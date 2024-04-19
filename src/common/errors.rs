@@ -47,6 +47,8 @@ pub enum MediatorError {
     ServiceLimitError(TxId, String),
     #[error("Unauthorized: {1}")]
     Unauthorized(TxId, String),
+    #[error("DID Error: {1}")]
+    DIDError(TxId, String),
 }
 
 impl IntoResponse for AppError {

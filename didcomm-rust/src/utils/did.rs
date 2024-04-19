@@ -68,6 +68,12 @@ impl AsKnownKeyPair for VerificationMethod {
                     public_key_multibase: _,
                 },
             ) => KnownKeyAlg::Ed25519,
+            (
+                VerificationMethodType::Multikey,
+                VerificationMaterial::Base58 {
+                    public_key_base58: _,
+                },
+            ) => KnownKeyAlg::X25519,
             _ => KnownKeyAlg::Unsupported,
         }
     }
@@ -237,6 +243,33 @@ impl AsKnownKeyPair for VerificationMethod {
                     )
                     .map(KnownKeyPair::Ed25519)
             }
+
+            (
+                VerificationMethodType::Multikey,
+                VerificationMaterial::Base58 {
+                    public_key_base58: ref value,
+                },
+            ) => {
+                let decoded_value = bs58::decode(value)
+                    .into_vec()
+                    .to_didcomm("Wrong base58 value in verification material")?;
+                let base64_url_value =
+                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+
+                let jwk = json!({
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": base64_url_value
+                });
+
+                Ed25519KeyPair::from_jwk_value(&jwk)
+                    .kind(
+                        ErrorKind::Malformed,
+                        "Unable parse base58 verification material",
+                    )
+                    .map(KnownKeyPair::Ed25519)
+            }
+
             _ => Err(err_msg(
                 ErrorKind::Unsupported,
                 "Unsupported verification method type and material combination",
