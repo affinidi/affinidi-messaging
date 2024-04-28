@@ -46,6 +46,7 @@ impl FromJwkValue for K256KeyPair {}
 impl ToJwkValue for Ed25519KeyPair {}
 impl ToJwkValue for P256KeyPair {}
 impl ToJwkValue for X25519KeyPair {}
+impl ToJwkValue for K256KeyPair {}
 
 #[cfg(test)]
 mod tests {

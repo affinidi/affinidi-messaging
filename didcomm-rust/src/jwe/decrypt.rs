@@ -102,6 +102,8 @@ mod tests {
             aes::{A128Kw, A256CbcHs512, A256Gcm, A256Kw, AesKey},
             chacha20::{Chacha20Key, XC20P},
             p256::P256KeyPair,
+            secp256k1,
+            secp256k1::Secp256k1KeyPair,
             x25519::X25519KeyPair,
         },
         encrypt::KeyAeadInPlace,

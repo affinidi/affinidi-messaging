@@ -17,9 +17,9 @@ use ssi::{
     did_resolve::{DIDResolver, ResolutionInputMetadata},
 };
 
-const MEDIATOR_DID: &str = "did:peer:2.Vz6Mkv5pcmEszkp4tLfAvHfMxME7GTwVspuETDon9C2LXyS49.EzDnaepcvcQifEuGktjFazZ1FMTzELf6hWWcWoFaQdTJrR89Lz.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX19";
-const ALICE_DID: &str = "did:peer:2.Vz6MknrybrXop8wjecgH5gNZ4bajiztB1EuJ1aPJW1PsLaFcP.EzDnaeYzK9dTHipxp7QxvUADomBdLsSSvPsHBMc93g4BvSviHZ.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX19";
-const BOB_DID: &str =   "did:peer:2.Vz6MkfRViUo3fADYPnpQeyJLCgtGsMfwqSUcEq7Jx6VrbA2Yg.EzDnaezTcKcJKooedjzf1tzFZs1eqVJwipRWDjDHJ7svXDpm6C.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiLCJkaWRjb21tL2FpcDI7ZW52PXJmYzU4NyJdLCJyb3V0aW5nX2tleXMiOlsiZGlkOnBlZXI6Mi5WejZNa3Y1cGNtRXN6a3A0dExmQXZIZk14TUU3R1R3VnNwdUVURG9uOUMyTFh5UzQ5LkV6RG5hZXBjdmNRaWZFdUdrdGpGYXpaMUZNVHpFTGY2aFdXY1dvRmFRZFRKclI4OUx6LlNleUowSWpvaVpHMGlMQ0p6SWpwN0luVnlhU0k2SW1oMGRIQnpPaTh2Ykc5allXeG9iM04wT2pjd016Y3ZJaXdpWVdOalpYQjBJanBiSW1ScFpHTnZiVzB2ZGpJaVhTd2ljbTkxZEdsdVoxOXJaWGx6SWpwYlhYMTkja2V5LTIiXX19";
+const MEDIATOR_DID: &str = "did:peer:2.Vz6Mkp9f4p6rSJkgbxTpPXL861PSN6EB996fQv5vCq5Q9C5Me.EzQ3shpFNDUgbePPhbLmwNcTiNSAhcb511urztSmT7aavVamJ3.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
+const ALICE_DID: &str = "did:peer:2.Vz6MkpwZQVX9QJz52XPEgC2Bcnfw85M7gALURiQtsXE4p3DTs.EzQ3shdKMPYJafjhf1Zf3fVcskZ7Zua2W5SNbXgv2LjVQTehCF.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
+const BOB_DID: &str =   "did:peer:2.Vz6MkojGQfxoRkNsFXjstcd2hwxvv1rnfTqu2K3broED94UZ8.EzQ3shTr4Cqcz3RcMztJ3M4NRAAeoDA5Q4eQ5wEPtuZk4sg2MZ.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbImRpZDpwZWVyOjIuVno2TWtwOWY0cDZyU0prZ2J4VHBQWEw4NjFQU042RUI5OTZmUXY1dkNxNVE5QzVNZS5FelEzc2hwRk5EVWdiZVBQaGJMbXdOY1RpTlNBaGNiNTExdXJ6dFNtVDdhYXZWYW1KMy5TZXlKMElqb2lSRWxFUTI5dGJVMWxjM05oWjJsdVp5SXNJbk1pT25zaWRYSnBJam9pYUhSMGNITTZMeTh4TWpjdU1DNHdMakU2TnpBek55SXNJbUVpT2xzaVpHbGtZMjl0YlM5Mk1pSmRMQ0p5SWpwYlhYMTkja2V5LTIiXX19";
 
 #[tokio::main]
 async fn main() {
@@ -32,9 +32,9 @@ async fn main() {
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
               "crv": "Ed25519",
-              "d": "QxPh4AUPAovUvgHoFruF1hobtttkx5OdIqKMlI4VqRE",
+              "d": "2_74tkY50_DFpLAHnKd9TUncl84S0NWZBqOQf2Yb2NU",
               "kty": "OKP",
-              "x": "6D0Kz3AC_CVQpIpfLr8gXV2odJHbBIk5U_KOH5Dj0Ho"
+              "x": "kBJx18jGP3bW_7vkmvSUiYzbFLwch0VBI-XRVowAONU"
             }),
         },
     };
@@ -44,11 +44,11 @@ async fn main() {
         type_: SecretType::JsonWebKey2020,
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
-              "crv": "P-256",
-              "d": "73qOI4G6BBuCUBEX0hxDf1pr5XM-woxhgRWNytDziS8",
+              "crv": "secp256k1",
+              "d": "CAxZcOofg3sSnQ6Pg4Ee22xEC1ykRfbNy1DEKRb68Lo",
               "kty": "EC",
-              "x": "Z2cfPLPCSzr9YcsghwBMh0gzXKutfDkMayU8mHkCyx8",
-              "y": "H0pLvsJUoxDfmonOXPA_7IoaAcvBadDFVCMlmenVyvc"
+              "x": "jsGSSTNv153VzdENREUACvlyLxh5UGPeE39UDXGyx9Q",
+              "y": "JGD1od91aLLz478tGgvR2LUs8cMK9FKzBa6bL5fX1bE"
             }),
         },
     };
@@ -58,11 +58,11 @@ async fn main() {
         type_: SecretType::JsonWebKey2020,
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
-              "crv": "P-256",
-              "d": "XWySi0rzVLJaAOWV50osao0GcO7pz1sdEBsBKA_RGQU",
+              "crv": "secp256k1",
+              "d": "4tMWf9hAOR_S_pSuQ6HqO5M4PojTFEhbKB1dafvilvM",
               "kty": "EC",
-              "x": "fybP8kGHSVHRgitU5yJ9PSi72ghoLrOupSYUsv7X-nw",
-              "y": "YaeVN4fJZhvhsMgjMVideamGtzVVCdVfCiNLkXM_Rfg"
+              "x": "7FZnaHwOSUuvFkPRXPnJiUdV9vP_grt2BJZwfkZBHfQ",
+              "y": "xL2gNgb4EfSJJ6uB6eYV-O6xyio0hPeYum04HADBqsY"
             }),
         },
     };
@@ -73,9 +73,9 @@ async fn main() {
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
               "crv": "Ed25519",
-              "d": "ZSpssmdTSLpvHo_iGsJAXQtmDihdNByTga9F6F9Kflo",
+              "d": "y413N3_Gp6XwMvh-VtLLx97h7Cm9ygk_2YQc3GfqNxw",
               "kty": "OKP",
-              "x": "fPDXgu2GDKop7IpZ9LJxVRT28W85jIcK8GZ4AbpNURQ"
+              "x": "m9TC56MDvFBzGaB5OUmK3pjFCohyu8sKP9e12MDebyY"
             }),
         },
     };
@@ -85,11 +85,11 @@ async fn main() {
         type_: SecretType::JsonWebKey2020,
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
-              "crv": "P-256",
-              "d": "30Ad-i5MyIP7KGmjmZlQXAgV3wnkJWJgEfAOfMt_idw",
+              "crv": "secp256k1",
+              "d": "Q3jovxzI8llisHswkuwpzMSEU84uI2i0wtokr-2dxZc",
               "kty": "EC",
-              "x": "-ZkVdPr8kXRHHqfdbk9grilzwqjBvLXNw2nLVVWILnU",
-              "y": "smQktql5yFapdtoH2j5AJ8A6brOJEt_5NFqSe2Vmwv0"
+              "x": "X58b8qkteYxvRBRlTEJd4F3GQoQHQj_eNswdm4xImqQ",
+              "y": "TkQOZJskdJyAe5g3-ELU_knaMtwgd8UGD9Ek95g__PI"
             }),
         },
     };
@@ -100,9 +100,9 @@ async fn main() {
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
               "crv": "Ed25519",
-              "d": "YynH_yKkmteZhFqFeasHH54vd84LFUn2mQNr7l1hxIQ",
+              "d": "3psa0xsEv0Otdz6vr8HjokWoiZyAU04xhjYwBdn2daI",
               "kty": "OKP",
-              "x": "Dmf7itWx59fyEaNFFn2OO5LpH6G_zwFl_gCZheFAm_k"
+              "x": "idLi4fT5nqf2J_eytLOuxObMaINXmDuf1StBoRJKhcs"
             }),
         },
     };

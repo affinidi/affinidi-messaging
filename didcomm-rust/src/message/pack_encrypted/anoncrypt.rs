@@ -2,6 +2,7 @@ use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
         chacha20::{Chacha20Key, XC20P},
+        k256::K256KeyPair,
         p256::P256KeyPair,
         x25519::X25519KeyPair,
     },
@@ -184,6 +185,59 @@ pub(crate) async fn anoncrypt<'dr, 'sr>(
                     AesKey<A256Gcm>,
                     EcdhEs<'_, P256KeyPair>,
                     P256KeyPair,
+                    AesKey<A256Kw>,
+                >(
+                    msg,
+                    jwe::Algorithm::EcdhEsA256kw,
+                    jwe::EncAlgorithm::A256Gcm,
+                    None,
+                    &to_keys,
+                )
+                .context("Unable produce anoncrypt envelope")?,
+            }
+        }
+        KnownKeyAlg::K256 => {
+            let _to_keys = to_keys
+                .iter()
+                .map(|vm| vm.as_k256().map(|k| (&vm.id, k)))
+                .collect::<Result<Vec<_>>>()?;
+
+            let to_keys: Vec<_> = _to_keys
+                .iter()
+                .map(|(id, key)| (id.as_str(), key))
+                .collect();
+
+            match enc_alg_anon {
+                AnonCryptAlg::A256cbcHs512EcdhEsA256kw => jwe::encrypt::<
+                    AesKey<A256CbcHs512>,
+                    EcdhEs<'_, K256KeyPair>,
+                    K256KeyPair,
+                    AesKey<A256Kw>,
+                >(
+                    msg,
+                    jwe::Algorithm::EcdhEsA256kw,
+                    jwe::EncAlgorithm::A256cbcHs512,
+                    None,
+                    &to_keys,
+                )
+                .context("Unable produce anoncrypt envelope")?,
+                AnonCryptAlg::Xc20pEcdhEsA256kw => jwe::encrypt::<
+                    Chacha20Key<XC20P>,
+                    EcdhEs<'_, K256KeyPair>,
+                    K256KeyPair,
+                    AesKey<A256Kw>,
+                >(
+                    msg,
+                    jwe::Algorithm::EcdhEsA256kw,
+                    jwe::EncAlgorithm::Xc20P,
+                    None,
+                    &to_keys,
+                )
+                .context("Unable produce anoncrypt envelope")?,
+                AnonCryptAlg::A256gcmEcdhEsA256kw => jwe::encrypt::<
+                    AesKey<A256Gcm>,
+                    EcdhEs<'_, K256KeyPair>,
+                    K256KeyPair,
                     AesKey<A256Kw>,
                 >(
                     msg,

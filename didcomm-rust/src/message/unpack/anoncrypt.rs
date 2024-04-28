@@ -2,6 +2,7 @@ use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
         chacha20::{Chacha20Key, XC20P},
+        k256::K256KeyPair,
         p256::P256KeyPair,
         x25519::X25519KeyPair,
     },
@@ -150,6 +151,36 @@ pub(crate) async fn _try_unpack_anoncrypt<'sr>(
                         AesKey<A256Gcm>,
                         EcdhEs<'_, P256KeyPair>,
                         P256KeyPair,
+                        AesKey<A256Kw>,
+                    >(None, (to_kid, to_key))?
+            }
+            (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::A256cbcHs512) => {
+                metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
+
+                parsed_jwe.decrypt::<
+                        AesKey<A256CbcHs512>,
+                        EcdhEs<'_, K256KeyPair>,
+                        K256KeyPair,
+                        AesKey<A256Kw>,
+                    >(None, (to_kid, to_key))?
+            }
+            (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::Xc20P) => {
+                metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
+
+                parsed_jwe.decrypt::<
+                        Chacha20Key<XC20P>,
+                        EcdhEs<'_, K256KeyPair>,
+                        K256KeyPair,
+                        AesKey<A256Kw>,
+                    >(None, (to_kid, to_key))?
+            }
+            (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::A256Gcm) => {
+                metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
+
+                parsed_jwe.decrypt::<
+                        AesKey<A256Gcm>,
+                        EcdhEs<'_, K256KeyPair>,
+                        K256KeyPair,
                         AesKey<A256Kw>,
                     >(None, (to_kid, to_key))?
             }

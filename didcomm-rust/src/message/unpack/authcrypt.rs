@@ -1,6 +1,7 @@
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Kw, AesKey},
+        k256::K256KeyPair,
         p256::P256KeyPair,
         x25519::X25519KeyPair,
     },
@@ -175,6 +176,28 @@ pub(crate) async fn _try_unpack_authcrypt<'dr, 'sr>(
                 "Incompatible sender and recipient key agreement curves",
             ))?,
             (KnownKeyPair::P256(_), KnownKeyPair::X25519(_), _) => Err(err_msg(
+                ErrorKind::Malformed,
+                "Incompatible sender and recipient key agreement curves",
+            ))?,
+            (
+                KnownKeyPair::K256(ref from_key),
+                KnownKeyPair::K256(ref to_key),
+                jwe::EncAlgorithm::A256cbcHs512,
+            ) => {
+                metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);
+
+                parsed_jwe.decrypt::<
+                    AesKey<A256CbcHs512>,
+                    Ecdh1PU<'_, K256KeyPair>,
+                    K256KeyPair,
+                    AesKey<A256Kw>,
+                >(Some((from_kid, from_key)), (to_kid, to_key))?
+            }
+            (KnownKeyPair::X25519(_), KnownKeyPair::K256(_), _) => Err(err_msg(
+                ErrorKind::Malformed,
+                "Incompatible sender and recipient key agreement curves",
+            ))?,
+            (KnownKeyPair::K256(_), KnownKeyPair::X25519(_), _) => Err(err_msg(
                 ErrorKind::Malformed,
                 "Incompatible sender and recipient key agreement curves",
             ))?,
