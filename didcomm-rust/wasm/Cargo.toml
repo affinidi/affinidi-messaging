@@ -10,10 +10,7 @@ homepage = 'https://github.com/sicpa-dlab/didcomm-rust/tree/main/wasm#readme'
 readme = 'README.md'
 
 [lib]
-crate-type = [
-    'cdylib',
-    'rlib',
-]
+crate-type = ['cdylib', 'rlib']
 
 [features]
 default = ['console_error_panic_hook']
@@ -48,7 +45,7 @@ version = '0.4'
 optional = true
 
 [dependencies.uuid]
-version = "0.8"
+version = "1.8"
 features = ["v4", "wasm-bindgen"]
 
 [dev-dependencies]
