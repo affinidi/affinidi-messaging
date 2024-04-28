@@ -1,19 +1,16 @@
-use axum::{routing::get, Router};
 use did_peer::DIDPeer;
 use didcomm::{
     protocols::routing::try_parse_forward,
-    secrets::{
-        resolvers::ExampleSecretsResolver, Secret, SecretMaterial, SecretType, SecretsResolver,
-    },
+    secrets::{Secret, SecretMaterial, SecretType},
     Message, PackEncryptedOptions, UnpackOptions,
 };
 use didcomm_mediator::{
     common::did_conversion::convert_did,
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
-use serde_json::{json, Value};
+use serde_json::json;
 use ssi::{
-    did::{DIDMethods, ServiceEndpoint},
+    did::DIDMethods,
     did_resolve::{DIDResolver, ResolutionInputMetadata},
 };
 
@@ -127,9 +124,9 @@ async fn main() {
     let mediator_did_doc = convert_did(&mediator_doc_opt.unwrap()).unwrap();
 
     let alice_did_doc = convert_did(&alice_doc_opt.unwrap()).unwrap();
-    //let bob_did_doc = convert_did(&bob_doc_opt.unwrap()).unwrap();
+    let bob_did_doc = convert_did(&bob_doc_opt.unwrap()).unwrap();
 
-    let a = bob_doc_opt.unwrap();
+    /*let a = bob_doc_opt.unwrap();
     let bob_did_doc = convert_did(&a).unwrap();
     let b = bob_did_doc
         .service
@@ -137,7 +134,7 @@ async fn main() {
         .first()
         .unwrap()
         .service_endpoint
-        .clone();
+        .clone();*/
 
     //println!("ServiceEndpoint::Map(map) = \n{:?}\n", b);
 

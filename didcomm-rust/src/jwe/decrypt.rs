@@ -1,16 +1,16 @@
-use askar_crypto::{
-    buffer::SecretBytes,
-    encrypt::KeyAeadInPlace,
-    kdf::{FromKeyDerivation, KeyExchange},
-    repr::{KeyGen, KeySecretBytes},
-};
-
 use crate::{
     error::{err_msg, Error, ErrorKind, Result, ResultContext, ResultExt},
     jwe::ParsedJWE,
     jwk::{FromJwkValue, ToJwkValue},
     utils::crypto::{JoseKDF, KeyWrap},
 };
+use askar_crypto::{
+    buffer::SecretBytes,
+    encrypt::KeyAeadInPlace,
+    kdf::{FromKeyDerivation, KeyExchange},
+    repr::{KeyGen, KeySecretBytes},
+};
+use base64::prelude::*;
 
 impl<'a, 'b> ParsedJWE<'a, 'b> {
     pub(crate) fn decrypt<CE, KDF, KE, KW>(
@@ -44,13 +44,15 @@ impl<'a, 'b> ParsedJWE<'a, 'b> {
                 .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Recipient not found"))?
                 .encrypted_key;
 
-            base64::decode_config(encrypted_key, base64::URL_SAFE_NO_PAD)
+            BASE64_URL_SAFE_NO_PAD
+                .decode(encrypted_key)
                 .kind(ErrorKind::Malformed, "Unable decode encrypted_key")?
         };
 
         let epk = KE::from_jwk_value(&self.protected.epk).context("Unable instantiate epk")?;
 
-        let tag = base64::decode_config(self.jwe.tag, base64::URL_SAFE_NO_PAD)
+        let tag = BASE64_URL_SAFE_NO_PAD
+            .decode(self.jwe.tag)
             .kind(ErrorKind::Malformed, "Unable decode tag")?;
 
         let kw = KDF::derive_key(
@@ -69,10 +71,12 @@ impl<'a, 'b> ParsedJWE<'a, 'b> {
             .unwrap_key(&encrypted_key)
             .kind(ErrorKind::Malformed, "Unable unwrap cek")?;
 
-        let ciphertext = base64::decode_config(self.jwe.ciphertext, base64::URL_SAFE_NO_PAD)
+        let ciphertext = BASE64_URL_SAFE_NO_PAD
+            .decode(self.jwe.ciphertext)
             .kind(ErrorKind::Malformed, "Unable decode ciphertext")?;
 
-        let iv = base64::decode_config(self.jwe.iv, base64::URL_SAFE_NO_PAD)
+        let iv = BASE64_URL_SAFE_NO_PAD
+            .decode(self.jwe.iv)
             .kind(ErrorKind::Malformed, "Unable decode iv")?;
 
         let plaintext = {

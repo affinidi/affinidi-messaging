@@ -14,6 +14,7 @@ use crate::{
     secrets::{Secret, SecretMaterial, SecretType},
     utils::crypto::{AsKnownKeyPair, KnownKeyAlg, KnownKeyPair},
 };
+use base64::prelude::*;
 
 pub(crate) fn is_did(did: &str) -> bool {
     let parts: Vec<_> = did.split(':').collect();
@@ -121,8 +122,7 @@ impl AsKnownKeyPair for VerificationMethod {
                 let decoded_value = bs58::decode(value)
                     .into_vec()
                     .to_didcomm("Wrong base58 value in verification material")?;
-                let base64_url_value =
-                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_value = BASE64_URL_SAFE_NO_PAD.encode(&decoded_value);
 
                 let jwk = json!({
                     "kty": "OKP",
@@ -147,8 +147,7 @@ impl AsKnownKeyPair for VerificationMethod {
                 let decoded_value = bs58::decode(value)
                     .into_vec()
                     .to_didcomm("Wrong base58 value in verification material")?;
-                let base64_url_value =
-                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_value = BASE64_URL_SAFE_NO_PAD.encode(&decoded_value);
 
                 let jwk = json!({
                     "kty": "OKP",
@@ -187,8 +186,7 @@ impl AsKnownKeyPair for VerificationMethod {
                         "Wrong codec in multibase secret material",
                     ))?
                 }
-                let base64_url_value =
-                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_value = BASE64_URL_SAFE_NO_PAD.encode(&decoded_value);
 
                 let jwk = json!({
                     "kty": "OKP",
@@ -227,8 +225,7 @@ impl AsKnownKeyPair for VerificationMethod {
                         "Wrong codec in multibase secret material",
                     ))?
                 }
-                let base64_url_value =
-                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_value = BASE64_URL_SAFE_NO_PAD.encode(&decoded_value);
 
                 let jwk = json!({
                     "kty": "OKP",
@@ -253,8 +250,7 @@ impl AsKnownKeyPair for VerificationMethod {
                 let decoded_value = bs58::decode(value)
                     .into_vec()
                     .to_didcomm("Wrong base58 value in verification material")?;
-                let base64_url_value =
-                    base64::encode_config(&decoded_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_value = BASE64_URL_SAFE_NO_PAD.encode(&decoded_value);
 
                 let jwk = json!({
                     "kty": "OKP",
@@ -382,12 +378,12 @@ impl AsKnownKeyPair for Secret {
                 });
 
                 key_pair.with_public_bytes(|buf| {
-                    jwk["x"] = Value::String(base64::encode_config(buf, base64::URL_SAFE_NO_PAD))
+                    jwk["x"] = Value::String(BASE64_URL_SAFE_NO_PAD.encode(buf))
                 });
 
                 key_pair.with_secret_bytes(|buf| {
                     if let Some(sk) = buf {
-                        jwk["d"] = Value::String(base64::encode_config(sk, base64::URL_SAFE_NO_PAD))
+                        jwk["d"] = Value::String(BASE64_URL_SAFE_NO_PAD.encode(sk))
                     }
                 });
 
@@ -408,8 +404,8 @@ impl AsKnownKeyPair for Secret {
 
                 let curve25519_point_size = 32;
                 let (d_value, x_value) = decoded_value.split_at(curve25519_point_size);
-                let base64_url_d_value = base64::encode_config(&d_value, base64::URL_SAFE_NO_PAD);
-                let base64_url_x_value = base64::encode_config(&x_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_d_value = BASE64_URL_SAFE_NO_PAD.encode(&d_value);
+                let base64_url_x_value = BASE64_URL_SAFE_NO_PAD.encode(&x_value);
 
                 let jwk = json!({"kty": "OKP",
                     "crv": "Ed25519",
@@ -463,12 +459,12 @@ impl AsKnownKeyPair for Secret {
                 });
 
                 key_pair.with_public_bytes(|buf| {
-                    jwk["x"] = Value::String(base64::encode_config(buf, base64::URL_SAFE_NO_PAD))
+                    jwk["x"] = Value::String(BASE64_URL_SAFE_NO_PAD.encode(buf))
                 });
 
                 key_pair.with_secret_bytes(|buf| {
                     if let Some(sk) = buf {
-                        jwk["d"] = Value::String(base64::encode_config(sk, base64::URL_SAFE_NO_PAD))
+                        jwk["d"] = Value::String(BASE64_URL_SAFE_NO_PAD.encode(sk))
                     }
                 });
 
@@ -506,8 +502,8 @@ impl AsKnownKeyPair for Secret {
 
                 let curve25519_point_size = 32;
                 let (d_value, x_value) = decoded_value.split_at(curve25519_point_size);
-                let base64_url_d_value = base64::encode_config(&d_value, base64::URL_SAFE_NO_PAD);
-                let base64_url_x_value = base64::encode_config(&x_value, base64::URL_SAFE_NO_PAD);
+                let base64_url_d_value = BASE64_URL_SAFE_NO_PAD.encode(&d_value);
+                let base64_url_x_value = BASE64_URL_SAFE_NO_PAD.encode(&x_value);
 
                 let jwk = json!({
                     "kty": "OKP",

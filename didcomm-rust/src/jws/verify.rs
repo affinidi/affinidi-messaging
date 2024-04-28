@@ -4,6 +4,7 @@ use crate::{
     error::{err_msg, Error, ErrorKind, Result, ResultExt},
     jws::{ParsedCompactJWS, ParsedJWS},
 };
+use base64::prelude::*;
 
 impl<'a, 'b> ParsedJWS<'a, 'b> {
     pub(crate) fn verify<Key: KeySigVerify>(&self, signer: (&str, &Key)) -> Result<bool> {
@@ -25,7 +26,8 @@ impl<'a, 'b> ParsedJWS<'a, 'b> {
         let sig_type = protected.alg.sig_type()?;
         let sign_input = format!("{}.{}", signature.protected, self.jws.payload);
 
-        let signature = base64::decode_config(&signature.signature, base64::URL_SAFE_NO_PAD)
+        let signature = BASE64_URL_SAFE_NO_PAD
+            .decode(&signature.signature)
             .kind(ErrorKind::Malformed, "Unable decode signature")?;
 
         let valid = key
@@ -46,7 +48,8 @@ impl<'a> ParsedCompactJWS<'a> {
         let sig_type = self.parsed_header.alg.sig_type()?;
         let sign_input = format!("{}.{}", self.header, self.payload);
 
-        let signature = base64::decode_config(self.signature, base64::URL_SAFE_NO_PAD)
+        let signature = BASE64_URL_SAFE_NO_PAD
+            .decode(self.signature)
             .kind(ErrorKind::Malformed, "Unable decode signature")?;
 
         let valid = key

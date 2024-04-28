@@ -9,6 +9,7 @@ use crate::{
     utils::{crypto::AsKnownKeyPair, did::did_or_url},
     UnpackMetadata, UnpackOptions,
 };
+use base64::prelude::*;
 
 pub(crate) async fn _try_unpack_sign<'dr>(
     msg: &str,
@@ -136,8 +137,9 @@ pub(crate) async fn _try_unpack_sign<'dr>(
     }
 
     // TODO: More precise error conversion
-    let payload = base64::decode_config(parsed_jws.jws.payload, base64::URL_SAFE_NO_PAD)
-        .kind(ErrorKind::Malformed, "Signed payloa is invalid base64")?;
+    let payload = BASE64_URL_SAFE_NO_PAD
+        .decode(parsed_jws.jws.payload)
+        .kind(ErrorKind::Malformed, "Signed payload is invalid base64")?;
 
     let payload =
         String::from_utf8(payload).kind(ErrorKind::Malformed, "Signed payload is invalid utf8")?;

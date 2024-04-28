@@ -3,6 +3,7 @@ use crate::{
     error::{err_msg, ErrorKind, Result, ResultExt},
     jws::envelope::{CompactHeader, ProtectedHeader, JWS},
 };
+use base64::prelude::*;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ParsedJWS<'a, 'b> {
@@ -31,7 +32,8 @@ impl<'a> JWS<'a> {
                     .get(i)
                     .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Invalid signature index"))?;
 
-                base64::decode_config_buf(signature.protected, base64::URL_SAFE_NO_PAD, b)
+                BASE64_URL_SAFE_NO_PAD
+                    .decode_vec(signature.protected, b)
                     .kind(ErrorKind::Malformed, "Unable decode protected header")?;
 
                 let p: ProtectedHeader =
@@ -74,7 +76,8 @@ pub(crate) fn parse_compact<'a>(
     let payload = segments[1];
     let signature = segments[2];
 
-    base64::decode_config_buf(header, base64::URL_SAFE_NO_PAD, buf)
+    BASE64_URL_SAFE_NO_PAD
+        .decode_vec(header, buf)
         .kind(ErrorKind::Malformed, "Unable decode header")?;
 
     let parsed_header: CompactHeader =

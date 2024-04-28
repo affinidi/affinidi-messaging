@@ -1,4 +1,5 @@
 use askar_crypto::sign::KeySign;
+use base64::prelude::*;
 use std::borrow::Cow;
 
 use crate::{
@@ -24,10 +25,10 @@ pub(crate) fn sign<Key: KeySign>(
         let protected = serde_json::to_string(&protected)
             .kind(ErrorKind::InvalidState, "Unable serialize protected header")?;
 
-        base64::encode_config(protected, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(protected)
     };
 
-    let payload = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+    let payload = BASE64_URL_SAFE_NO_PAD.encode(payload);
 
     let signature = {
         // JWS Signing Input
@@ -44,7 +45,7 @@ pub(crate) fn sign<Key: KeySign>(
                 )
             })?;
 
-        base64::encode_config(&signature, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(&signature)
     };
 
     let signature = Signature {
@@ -79,10 +80,10 @@ pub(crate) fn sign_compact<Key: KeySign>(
         let header = serde_json::to_string(&header)
             .kind(ErrorKind::InvalidState, "Unable serialize header")?;
 
-        base64::encode_config(header, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(header)
     };
 
-    let payload = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+    let payload = BASE64_URL_SAFE_NO_PAD.encode(payload);
 
     let signature = {
         // JWS Signing Input
@@ -99,7 +100,7 @@ pub(crate) fn sign_compact<Key: KeySign>(
                 )
             })?;
 
-        base64::encode_config(&signature, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(&signature)
     };
 
     let compact_jws = format!("{}.{}.{}", header, payload, signature);

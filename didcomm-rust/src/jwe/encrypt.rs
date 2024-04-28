@@ -5,9 +5,9 @@ use askar_crypto::{
     random,
     repr::{KeyGen, ToSecretBytes},
 };
-use std::borrow::Cow;
-
+use base64::prelude::*;
 use sha2::{Digest, Sha256};
+use std::borrow::Cow;
 
 use crate::{
     error::{Error, ErrorKind, Result, ResultExt},
@@ -57,8 +57,8 @@ where
 
     let protected = {
         let epk = epk.to_jwk_public_value()?;
-        let apu = skid.map(|skid| base64::encode_config(skid, base64::URL_SAFE_NO_PAD));
-        let apv = base64::encode_config(apv, base64::URL_SAFE_NO_PAD);
+        let apu = skid.map(|skid| BASE64_URL_SAFE_NO_PAD.encode(skid));
+        let apv = BASE64_URL_SAFE_NO_PAD.encode(apv);
 
         let p = ProtectedHeader {
             typ: Some(Cow::Borrowed("application/didcomm-encrypted+json")),
@@ -73,7 +73,7 @@ where
         let p = serde_json::to_string(&p)
             .kind(ErrorKind::InvalidState, "Unable serialize protected header")?;
 
-        base64::encode_config(&p, base64::URL_SAFE_NO_PAD)
+        BASE64_URL_SAFE_NO_PAD.encode(&p)
     };
 
     let mut buf = {
@@ -99,9 +99,9 @@ where
         let ciphertext = &buf.as_ref()[0..ciphertext_len];
         let tag_raw = &buf.as_ref()[ciphertext_len..];
 
-        let ciphertext = base64::encode_config(&ciphertext, base64::URL_SAFE_NO_PAD);
-        let tag = base64::encode_config(&tag_raw, base64::URL_SAFE_NO_PAD);
-        let iv = base64::encode_config(&iv, base64::URL_SAFE_NO_PAD);
+        let ciphertext = BASE64_URL_SAFE_NO_PAD.encode(&ciphertext);
+        let tag = BASE64_URL_SAFE_NO_PAD.encode(&tag_raw);
+        let iv = BASE64_URL_SAFE_NO_PAD.encode(&iv);
 
         (ciphertext, tag, tag_raw, iv)
     };
@@ -126,7 +126,7 @@ where
                 .wrap_key(&cek)
                 .kind(ErrorKind::InvalidState, "Unable wrap key")?;
 
-            let encrypted_key = base64::encode_config(&encrypted_key, base64::URL_SAFE_NO_PAD);
+            let encrypted_key = BASE64_URL_SAFE_NO_PAD.encode(&encrypted_key);
             encrypted_keys.push((kid, encrypted_key));
         }
 

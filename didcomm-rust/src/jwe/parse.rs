@@ -1,3 +1,4 @@
+use base64::prelude::*;
 use sha2::{Digest, Sha256};
 
 use crate::error::ToResult;
@@ -24,18 +25,20 @@ impl<'a> JWE<'a> {
     }
 
     pub(crate) fn parse<'b>(self, buf: &'b mut Vec<u8>) -> Result<ParsedJWE<'a, 'b>> {
-        base64::decode_config_buf(self.protected, base64::URL_SAFE_NO_PAD, buf)
+        BASE64_URL_SAFE_NO_PAD
+            .decode_vec(self.protected, buf)
             .kind(ErrorKind::Malformed, "Unable decode protected header")?;
 
         let protected: ProtectedHeader =
             serde_json::from_slice(buf).to_didcomm("Unable parse protected header")?;
 
-        let apv = base64::decode_config(protected.apv, base64::URL_SAFE_NO_PAD)
+        let apv = BASE64_URL_SAFE_NO_PAD
+            .decode(protected.apv)
             .kind(ErrorKind::Malformed, "Unable decode apv")?;
 
         let apu = protected
             .apu
-            .map(|apu| base64::decode_config(apu, base64::URL_SAFE_NO_PAD))
+            .map(|apu| BASE64_URL_SAFE_NO_PAD.decode(apu))
             .transpose()
             .kind(ErrorKind::Malformed, "Unable decode apu")?;
 

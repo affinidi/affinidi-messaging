@@ -6,6 +6,7 @@ use crate::{
     FromPrior,
 };
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
+use base64::prelude::*;
 
 impl FromPrior {
     /// Unpacks a plaintext value from a signed `from_prior` JWT.
@@ -122,7 +123,7 @@ impl FromPrior {
             Err(err_msg(ErrorKind::Malformed, "Wrong from_prior signature"))?
         }
 
-        let payload = base64::decode_config(parsed.payload, base64::URL_SAFE_NO_PAD).kind(
+        let payload = BASE64_URL_SAFE_NO_PAD.decode(parsed.payload).kind(
             ErrorKind::Malformed,
             "from_prior payload is not a valid base64",
         )?;
