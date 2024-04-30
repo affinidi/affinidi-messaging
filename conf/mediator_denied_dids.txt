@@ -1,0 +1,2 @@
+# Mediator Denied DID's, a DID listed here will be denied from using this mediator in any capacity (send or receive)
+# This Deny list always supersedes the allow list.

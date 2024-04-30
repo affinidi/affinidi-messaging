@@ -1,0 +1,2 @@
+# Mediator Allowed DID's, if this file contains any DID's then only listed DID's can use this mediator!
+# If blank, then any DID can send a message, unless explicitly listed in the mediator_denied_dids.txt list

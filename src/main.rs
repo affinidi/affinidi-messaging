@@ -1,3 +1,5 @@
+use std::env;
+
 use did_peer::DIDPeer;
 use didcomm::{
     protocols::routing::try_parse_forward,
@@ -6,6 +8,7 @@ use didcomm::{
 };
 use didcomm_mediator::{
     common::did_conversion::convert_did,
+    init,
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
 use serde_json::json;
@@ -13,6 +16,8 @@ use ssi::{
     did::DIDMethods,
     did_resolve::{DIDResolver, ResolutionInputMetadata},
 };
+use tracing::{event, Level};
+use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 const MEDIATOR_DID: &str = "did:peer:2.Vz6Mkp9f4p6rSJkgbxTpPXL861PSN6EB996fQv5vCq5Q9C5Me.EzQ3shpFNDUgbePPhbLmwNcTiNSAhcb511urztSmT7aavVamJ3.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
 const ALICE_DID: &str = "did:peer:2.Vz6MkpwZQVX9QJz52XPEgC2Bcnfw85M7gALURiQtsXE4p3DTs.EzQ3shdKMPYJafjhf1Zf3fVcskZ7Zua2W5SNbXgv2LjVQTehCF.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
@@ -20,6 +25,60 @@ const BOB_DID: &str =   "did:peer:2.Vz6MkojGQfxoRkNsFXjstcd2hwxvv1rnfTqu2K3broED
 
 #[tokio::main]
 async fn main() {
+    // setup logging/tracing framework
+    let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
+    let (filter, reload_handle) = reload::Layer::new(filter);
+    let ansi = env::var("LOCAL").is_ok();
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
+        .init();
+
+    if ansi {
+        event!(
+            Level::INFO,
+            r#"        db          ad88     ad88  88               88           88  88     88b           d88                       88  88"#
+        );
+        event!(
+            Level::INFO,
+            r#"       d88b        d8"      d8"    ""               ""           88  ""     888b         d888                       88  ""                ,d"#
+        );
+        event!(
+            Level::INFO,
+            r#"      d8'`8b       88       88                                   88         88`8b       d8'88                       88                    88"#
+        );
+        event!(
+            Level::INFO,
+            r#"     d8'  `8b    MM88MMM  MM88MMM  88  8b,dPPYba,   88   ,adPPYb,88  88     88 `8b     d8' 88   ,adPPYba,   ,adPPYb,88  88  ,adPPYYba,  MM88MMM  ,adPPYba,   8b,dPPYba,"#
+        );
+        event!(
+            Level::INFO,
+            r#"    d8YaaaaY8b     88       88     88  88P'   `"8a  88  a8"    `Y88  88     88  `8b   d8'  88  a8P_____88  a8"    `Y88  88  ""     `Y8    88    a8"     "8a  88P'   "Y8"#
+        );
+        event!(
+            Level::INFO,
+            r#"   d8""""""""8b    88       88     88  88       88  88  8b       88  88     88   `8b d8'   88  8PP"""""""  8b       88  88  ,adPPPPP88    88    8b       d8  88"#
+        );
+        event!(
+            Level::INFO,
+            r#"  d8'        `8b   88       88     88  88       88  88  "8a,   ,d88  88     88    `888'    88  "8b,   ,aa  "8a,   ,d88  88  88,    ,88    88,   "8a,   ,a8"  88"#
+        );
+        event!(
+            Level::INFO,
+            r#" d8'          `8b  88       88     88  88       88  88   `"8bbdP"Y8  88     88     `8'     88   `"Ybbd8"'   `"8bbdP"Y8  88  `"8bbdP"Y8    "Y888  `"YbbdP"'   88"#
+        );
+        event!(Level::INFO, "");
+    }
+
+    event!(
+        Level::INFO,
+        "[Loading Affinidi Secure Messaging Mediator configuration]"
+    );
+
+    let config = init(Some(reload_handle))
+        .await
+        .expect("Couldn't initialize mediator!");
+
     let mut did_resolver = DIDMethods::default();
     did_resolver.insert(Box::new(DIDPeer));
 
@@ -36,6 +95,11 @@ async fn main() {
         },
     };
 
+    println!(
+        "secret = {}",
+        serde_json::to_string_pretty(&mediator_v_secret).unwrap()
+    );
+
     let mediator_e_secret = Secret {
         id: [MEDIATOR_DID.to_string(), "#key-2".to_string()].concat(),
         type_: SecretType::JsonWebKey2020,
@@ -49,6 +113,12 @@ async fn main() {
             }),
         },
     };
+
+    println!();
+    println!(
+        "secret = {}",
+        serde_json::to_string_pretty(&mediator_e_secret).unwrap()
+    );
 
     let alice_e_secret: Secret = Secret {
         id: [ALICE_DID.to_string(), "#key-2".to_string()].concat(),
