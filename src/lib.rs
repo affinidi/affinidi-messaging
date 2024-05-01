@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use common::{
     config::{read_config_file, Config, ConfigRaw},
     errors::MediatorError,
@@ -6,7 +7,15 @@ use tracing::{event, level_filters::LevelFilter, Level};
 use tracing_subscriber::{reload::Handle, Registry};
 
 pub mod common;
+pub mod database;
+pub mod handlers;
 pub mod resolvers;
+
+#[derive(Clone)]
+pub struct SharedData {
+    pub config: Config,
+    pub service_start_timestamp: DateTime<Utc>,
+}
 
 pub async fn init(
     reload_handle: Option<Handle<LevelFilter, Registry>>,
@@ -42,7 +51,7 @@ pub async fn init(
         Ok(config) => {
             event!(
                 Level::INFO,
-                "Configuration settings parsed successfully. {:#?}",
+                "Configuration settings parsed successfully.\n{:#?}",
                 config
             );
             Ok(config)

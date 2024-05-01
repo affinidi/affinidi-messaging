@@ -19,30 +19,53 @@ use ssi::{
 use tracing::{event, Level};
 use tracing_subscriber::filter::LevelFilter;
 
+/// Database Struct contains database and storage of messages related configuration details
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DatabaseConfig {
+    pub database_file: String,
+    pub database_max_size_mb: String,
+    pub max_message_size: String,
+    pub max_queued_messages: String,
+}
+
+/// SecurityConfig Struct contains security related configuration details
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    pub use_ssl: String,
+    pub ssl_certificate_file: String,
+    pub ssl_key_file: String,
+}
+
 /// ConfigRaw Struct is used to deserialize the configuration file
 /// We then convert this to the Config Struct
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigRaw {
     pub log_level: String,
     pub listen_address: String,
-    pub database_file: String,
-    pub database_max_size_mb: String,
     pub mediator_did: String,
     pub mediator_secrets: String,
     pub mediator_allowed_dids: String,
     pub mediator_denied_dids: String,
+    pub database: DatabaseConfig,
+    pub security: SecurityConfig,
 }
 
+#[derive(Clone)]
 pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
-    pub database_file: String,
-    pub database_max_size_mb: u64,
     pub mediator_did: String,
     pub mediator_did_doc: DIDDoc,
     pub mediator_secrets: Vec<Secret>,
     pub mediator_allowed_dids: HashSet<String>,
     pub mediator_denied_dids: HashSet<String>,
+    pub database_file: String,
+    pub database_max_size_mb: u64,
+    pub max_message_size: u32,
+    pub max_queued_messages: u32,
+    pub use_ssl: bool,
+    pub ssl_certificate_file: String,
+    pub ssl_key_file: String,
 }
 
 impl fmt::Debug for Config {
@@ -50,8 +73,6 @@ impl fmt::Debug for Config {
         f.debug_struct("Config")
             .field("log_level", &self.log_level)
             .field("listen_address", &self.listen_address)
-            .field("database_file", &self.database_file)
-            .field("database_max_size_mb", &self.database_max_size_mb)
             .field("mediator_did", &self.mediator_did)
             .field("mediator_did_doc", &"Hidden")
             .field(
@@ -66,6 +87,13 @@ impl fmt::Debug for Config {
                 "mediator_denied_dids",
                 &&format!("({}) denied_dids loaded", self.mediator_denied_dids.len()),
             )
+            .field("use_ssl", &self.use_ssl)
+            .field("database_file", &self.database_file)
+            .field("database_max_size_mb", &self.database_max_size_mb)
+            .field("max_message_size", &self.max_message_size)
+            .field("max_queued_messages", &self.max_queued_messages)
+            .field("ssl_certificate_file", &self.ssl_certificate_file)
+            .field("ssl_key_file", &self.ssl_key_file)
             .finish()
     }
 }
@@ -75,8 +103,6 @@ impl Default for Config {
         Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
-            database_file: "".into(),
-            database_max_size_mb: 100,
             mediator_did: "".into(),
             mediator_did_doc: DIDDoc {
                 id: "".into(),
@@ -88,6 +114,13 @@ impl Default for Config {
             mediator_secrets: Vec::new(),
             mediator_allowed_dids: HashSet::new(),
             mediator_denied_dids: HashSet::new(),
+            database_file: "".into(),
+            database_max_size_mb: 100,
+            max_message_size: 1048576,
+            max_queued_messages: 100,
+            use_ssl: true,
+            ssl_certificate_file: "".into(),
+            ssl_key_file: "".into(),
         }
     }
 }
@@ -107,9 +140,18 @@ impl TryFrom<ConfigRaw> for Config {
                 _ => LevelFilter::INFO,
             },
             listen_address: raw.listen_address,
-            database_file: raw.database_file,
-            database_max_size_mb: raw.database_max_size_mb.parse::<u64>().unwrap_or(100),
             mediator_did: raw.mediator_did.clone(),
+            database_file: raw.database.database_file,
+            database_max_size_mb: raw
+                .database
+                .database_max_size_mb
+                .parse::<u64>()
+                .unwrap_or(100),
+            max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
+            max_queued_messages: raw.database.max_queued_messages.parse().unwrap_or(100),
+            use_ssl: raw.security.use_ssl.parse().unwrap(),
+            ssl_certificate_file: raw.security.ssl_certificate_file,
+            ssl_key_file: raw.security.ssl_key_file,
             ..Default::default()
         };
 

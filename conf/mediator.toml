@@ -6,14 +6,6 @@ log_level = "info"
 ### Default: 0.0.0.0:7037
 listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 
-### database_file: Where to store local data
-### Default: ./mediator_db.redb
-database_file = "${DATABASE_FILE:./mediator_db.redb}"
-
-### database_max_size_mb: Maximum size of the database in Megabytes
-### Default: 100
-database_max_size_mb = "${database_max_size_mb:100}"
-
 ### mediator_did: DID of the mediator
 ### REQUIRED!
 mediator_did = "${MEDIATOR_DID:did:peer:2.Vz6Mkp9f4p6rSJkgbxTpPXL861PSN6EB996fQv5vCq5Q9C5Me.EzQ3shpFNDUgbePPhbLmwNcTiNSAhcb511urztSmT7aavVamJ3.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
@@ -31,3 +23,35 @@ mediator_allowed_dids = "${MEDIATOR_ALLOWED_DIDS:./conf/mediator_allowed_dids.tx
 ### mediator_denied_dids: DID's that are denied to send messages through this mediator
 ### Default: Filename of a file containing a list of denied DIDs
 mediator_denied_dids = "${MEDIATOR_DENIED_DIDS:./conf/mediator_denied_dids.txt}"
+
+[database]
+### database_file: Where to store local data
+### Default: ./mediator_db.redb
+database_file = "${DATABASE_FILE:./mediator_db.redb}"
+
+### database_max_size_mb: Maximum size of the database in Megabytes
+### Default: 100
+database_max_size_mb = "${database_max_size_mb:100}"
+
+### max_message_size: Maximum size of a message in bytes
+### Default: 1048576 (1MB)
+max_message_size = "${MEDIATOR_DENIED_DIDS:1048576"
+
+### max_queued_messages: How many messages will we queue for a single recipient or a single sender
+### Default: 100
+### NOTE: This is a per-recipient or per-sender limit
+max_queued_messages = "${MEDIATOR_DENIED_DIDS:100"
+
+[security]
+### If true (default) SSL is enabled.
+### default: true
+### NOTE: do not use `false` in prod unless TLS is terminated outside of the service
+use_ssl = "${USE_SSL:true}"
+
+### Note: If you comment out the following SSL configs, Slate will default back to non-TLS mode.
+###       Useful if doing testing/debugging without requiring SSL certificate checks
+### ssl_certificate_file: <path> file that contains the SSL certificate for this service
+ssl_certificate_file = "${SSL_CERTIFICATE_FILE:conf/cert.pem}"
+
+### ssl_key_file: <path> file that contains the SSL certificate key
+ssl_key_file = "${SSL_KEY_FILE:conf/nopass.pem}"

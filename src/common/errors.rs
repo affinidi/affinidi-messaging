@@ -51,6 +51,8 @@ pub enum MediatorError {
     DIDError(TxId, String),
     #[error("Configuration Error: {1}")]
     ConfigError(TxId, String),
+    #[error("Database Error: {1}")]
+    DatabaseError(TxId, String),
 }
 
 impl IntoResponse for AppError {
