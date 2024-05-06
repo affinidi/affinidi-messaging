@@ -3,12 +3,15 @@ use std::env;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use did_peer::DIDPeer;
+use didcomm::Message;
 use didcomm_mediator::{
-    common::errors::MediatorError, database::open_database, handlers::health_checker_handler, init,
-    SharedData,
+    database::{self},
+    handlers::health_checker_handler,
+    init, SharedData,
 };
 use http::Method;
 use ssi::did::DIDMethods;
+use tokio::sync::mpsc;
 use tower_http::{
     cors::CorsLayer,
     trace::{self, TraceLayer},
@@ -17,7 +20,7 @@ use tracing::{event, Level};
 use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 #[tokio::main]
-async fn main() -> Result<(), MediatorError> {
+async fn main() {
     // setup logging/tracing framework
     let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
     let (filter, reload_handle) = reload::Layer::new(filter);
@@ -75,14 +78,21 @@ async fn main() -> Result<(), MediatorError> {
     let mut did_resolver = DIDMethods::default();
     did_resolver.insert(Box::new(DIDPeer));
 
+    // Start setting up the database durability and handling
+    // We run all database operations in a seperate thread and use Channels to communicate
+    let (db_tx, db_rx) = mpsc::channel::<Message>(1);
+
     // Create the shared application State
     let shared_state = SharedData {
         config: config.clone(),
         service_start_timestamp: chrono::Utc::now(),
+        send_channel: db_tx,
     };
 
-    // Establish the Database
-    let db = open_database(&config.database_file).expect("Couldn't open database!");
+    let db_shared_state = shared_state.clone();
+
+    // Start the database thread
+    let database_manager = tokio::spawn(async move { database::run(db_shared_state, db_rx).await });
 
     // build our application with a single route
     let app: Router = Router::new().route("/", get(|| async { "Hello, World!" }));
@@ -109,7 +119,7 @@ async fn main() -> Result<(), MediatorError> {
         )
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
         .route(
-            "/aaa/healthchecker",
+            "/asm/healthchecker",
             get(health_checker_handler).with_state(shared_state),
         );
 
@@ -132,5 +142,10 @@ async fn main() -> Result<(), MediatorError> {
             .unwrap();
     }
 
-    Ok(())
+    // Doesn't really do anything, will block and stop the app from exiting if the server functions fail
+    event!(
+        Level::ERROR,
+        "Services have failed, we are stuck on database_manager.await!"
+    );
+    database_manager.await.unwrap();
 }

@@ -1,6 +1,16 @@
-use axum::{extract::State, response::IntoResponse, Json};
-
 use crate::SharedData;
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
+
+pub mod message_inbound;
+pub mod message_outbound;
+
+pub fn application_routes(shared_data: &SharedData) -> Router {
+    let app = Router::new().route("/inbound", post(message_inbound::message_inbound_handler));
+
+    Router::new()
+        .nest("/asm/v1/", app)
+        .with_state(shared_data.to_owned())
+}
 
 pub async fn health_checker_handler(State(state): State<SharedData>) -> impl IntoResponse {
     let message: String = format!(

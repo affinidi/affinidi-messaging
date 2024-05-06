@@ -3,6 +3,8 @@ use common::{
     config::{read_config_file, Config, ConfigRaw},
     errors::MediatorError,
 };
+use didcomm::Message;
+use tokio::sync::mpsc::Sender;
 use tracing::{event, level_filters::LevelFilter, Level};
 use tracing_subscriber::{reload::Handle, Registry};
 
@@ -15,6 +17,7 @@ pub mod resolvers;
 pub struct SharedData {
     pub config: Config,
     pub service_start_timestamp: DateTime<Utc>,
+    pub send_channel: Sender<Message>,
 }
 
 pub async fn init(

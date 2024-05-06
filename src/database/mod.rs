@@ -1,7 +1,10 @@
-use redb::{Database, TableDefinition};
+use didcomm::Message;
+use redb::Database;
+use std::process;
+use tokio::sync::mpsc;
 use tracing::{event, Level};
 
-use crate::common::errors::MediatorError;
+use crate::{common::errors::MediatorError, SharedData};
 
 pub enum RecordType {
     Message(MessageRecord),
@@ -19,7 +22,29 @@ pub struct PointerRecord {
     pub pointers: Vec<String>,
 }
 
-pub fn open_database(file_name: &str) -> Result<Database, MediatorError> {
+pub async fn run(shared_state: SharedData, mut db_rx: mpsc::Receiver<Message>) {
+    event!(Level::INFO, "Database handler thread starting...");
+
+    let db = match open_database(&shared_state.config.database_file) {
+        Ok(db) => db,
+        Err(err) => {
+            event!(Level::ERROR, "Error opening database: {}", err);
+            event!(Level::ERROR, "Exiting...");
+            process::exit(1);
+        }
+    };
+
+    event!(Level::INFO, "Database handler thread running...");
+
+    loop {
+        let message = db_rx.recv().await;
+        if let Some(message) = message {
+            let message = message.clone();
+        }
+    }
+}
+
+fn open_database(file_name: &str) -> Result<Database, MediatorError> {
     let mut db = Database::create(file_name).map_err(|err| {
         event!(
             Level::ERROR,

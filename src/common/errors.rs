@@ -164,9 +164,7 @@ impl IntoResponse for AppError {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Session {
-    pub tx_id: String,      // Unique session transaction ID
-    pub project_id: String, // Affinidi Project ID - Legacy
-    pub owner_id: String,   // Affinidi Owner ID - Legacy
+    pub tx_id: String, // Unique session transaction ID
 }
 
 #[derive(Serialize, Debug)]
