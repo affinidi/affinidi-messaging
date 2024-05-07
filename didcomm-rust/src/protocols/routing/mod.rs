@@ -23,7 +23,7 @@ pub(crate) const DIDCOMM_V2_PROFILE: &str = "didcomm/v2";
 async fn find_did_comm_service<'dr>(
     did: &str,
     service_id: Option<&str>,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
 ) -> Result<Option<(String, DIDCommMessagingService)>> {
     let did_doc = did_resolver
         .resolve(did)
@@ -87,7 +87,7 @@ async fn find_did_comm_service<'dr>(
 async fn resolve_did_comm_services_chain<'dr>(
     to: &str,
     service_id: Option<&str>,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
 ) -> Result<Vec<(String, DIDCommMessagingService)>> {
     let (to_did, _) = did_or_url(to);
 
@@ -243,7 +243,7 @@ pub async fn wrap_in_forward<'dr>(
     to: &str,
     routing_keys: &Vec<String>,
     enc_alg_anon: &AnonCryptAlg,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
 ) -> Result<String> {
     let mut tos = routing_keys.clone();
 
@@ -269,7 +269,7 @@ pub async fn wrap_in_forward<'dr>(
 pub(crate) async fn wrap_in_forward_if_needed<'dr>(
     msg: &str,
     to: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
     options: &PackEncryptedOptions,
 ) -> Result<Option<(String, MessagingServiceMetadata)>> {
     if !options.forward {

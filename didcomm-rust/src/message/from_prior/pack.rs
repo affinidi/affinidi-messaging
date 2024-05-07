@@ -34,8 +34,8 @@ impl FromPrior {
     pub async fn pack<'dr, 'sr>(
         &self,
         issuer_kid: Option<&str>,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
     ) -> Result<(String, String)> {
         self.validate_pack(issuer_kid)?;
 

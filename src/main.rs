@@ -5,9 +5,11 @@ use axum_server::tls_rustls::RustlsConfig;
 use did_peer::DIDPeer;
 use didcomm::Message;
 use didcomm_mediator::{
-    database::{self},
-    handlers::health_checker_handler,
-    init, SharedData,
+    database,
+    handlers::{application_routes, health_checker_handler},
+    init,
+    resolvers::affinidi_dids::AffinidiDIDResolver,
+    SharedData,
 };
 use http::Method;
 use ssi::did::DIDMethods;
@@ -75,8 +77,9 @@ async fn main() {
         .await
         .expect("Couldn't initialize mediator!");
 
-    let mut did_resolver = DIDMethods::default();
-    did_resolver.insert(Box::new(DIDPeer));
+    let mut did_method_resolver = DIDMethods::default();
+    did_method_resolver.insert(Box::new(DIDPeer));
+    let did_resolver = AffinidiDIDResolver::new(vec![config.mediator_did_doc.clone()]);
 
     // Start setting up the database durability and handling
     // We run all database operations in a seperate thread and use Channels to communicate
@@ -87,6 +90,7 @@ async fn main() {
         config: config.clone(),
         service_start_timestamp: chrono::Utc::now(),
         send_channel: db_tx,
+        did_resolver,
     };
 
     let db_shared_state = shared_state.clone();
@@ -95,7 +99,7 @@ async fn main() {
     let database_manager = tokio::spawn(async move { database::run(db_shared_state, db_rx).await });
 
     // build our application with a single route
-    let app: Router = Router::new().route("/", get(|| async { "Hello, World!" }));
+    let app: Router = application_routes(&shared_state);
 
     // Add middleware to all routes
     let app = Router::new()
@@ -119,7 +123,7 @@ async fn main() {
         )
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
         .route(
-            "/asm/healthchecker",
+            "/atm/healthchecker",
             get(health_checker_handler).with_state(shared_state),
         );
 

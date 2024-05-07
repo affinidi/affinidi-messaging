@@ -7,7 +7,7 @@ use sign::_try_unpack_sign;
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     did::DIDResolver,
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{err_msg, Error, ErrorKind, Result, ResultExt},
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
     secrets::SecretsResolver,
@@ -50,12 +50,12 @@ impl Message {
     /// - `InvalidState` Indicates library error.
     /// - `IOError` IO error during DID or secrets resolving.
     /// TODO: verify and update errors list
-    pub async fn unpack<'dr, 'sr>(
+    pub async fn unpack(
         msg: &str,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+        did_resolver: &dyn DIDResolver,
+        secrets_resolver: &dyn SecretsResolver,
         options: &UnpackOptions,
-    ) -> Result<(Self, UnpackMetadata)> {
+    ) -> Result<(Message, UnpackMetadata)> {
         let mut metadata = UnpackMetadata {
             encrypted: false,
             authenticated: false,
@@ -72,7 +72,6 @@ impl Message {
             signed_message: None,
             from_prior: None,
         };
-
         let mut msg: &str = msg;
         let mut anoncrypted: Option<String>;
         let mut forwarded_msg: String;
@@ -124,10 +123,10 @@ impl Message {
         Ok((msg, metadata))
     }
 
-    async fn _try_unwrap_forwarded_message<'dr, 'sr>(
+    async fn _try_unwrap_forwarded_message(
         msg: &str,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+        did_resolver: &dyn DIDResolver,
+        secrets_resolver: &dyn SecretsResolver,
     ) -> Result<Option<String>> {
         let plaintext = match Message::from_str(msg) {
             Ok(m) => m,
@@ -148,7 +147,6 @@ impl Message {
                 return Ok(Some(forwarded_msg));
             }
         }
-
         Ok(None)
     }
 }
@@ -224,10 +222,10 @@ pub struct UnpackMetadata {
     pub from_prior: Option<FromPrior>,
 }
 
-async fn has_key_agreement_secret<'dr, 'sr>(
+async fn has_key_agreement_secret(
     did_or_kid: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+    did_resolver: &dyn DIDResolver,
+    secrets_resolver: &dyn SecretsResolver,
 ) -> Result<bool> {
     let kids = match did_or_url(did_or_kid) {
         (_, Some(kid)) => {

@@ -24,8 +24,8 @@ pub trait DIDResolver: Sync {
 
 /// Represents DID Doc resolver (https://www.w3.org/TR/did-core/#did-resolution).
 #[cfg(not(feature = "uniffi"))]
-#[async_trait(?Send)]
-pub trait DIDResolver {
+#[async_trait]
+pub trait DIDResolver: Sync + Send {
     /// Resolves a DID document by the given DID.
     ///
     /// # Params

@@ -24,9 +24,9 @@ impl FromPrior {
     /// - `DIDNotResolved` Issuer DID not found.
     /// - `DIDUrlNotFound` Issuer authentication verification method is not found.
     /// - `Unsupported` Used crypto or method is unsupported.
-    pub async fn unpack<'dr>(
+    pub async fn unpack(
         from_prior_jwt: &str,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
+        did_resolver: &dyn DIDResolver,
     ) -> Result<(FromPrior, String)> {
         let mut buf = vec![];
         let parsed = jws::parse_compact(from_prior_jwt, &mut buf)?;

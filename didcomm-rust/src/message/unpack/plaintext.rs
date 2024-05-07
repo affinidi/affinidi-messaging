@@ -2,9 +2,9 @@ use crate::did::DIDResolver;
 use crate::error::{ErrorKind, Result};
 use crate::{FromPrior, Message, UnpackMetadata};
 
-pub(crate) async fn _try_unpack_plaintext<'dr, 'sr>(
+pub(crate) async fn _try_unpack_plaintext(
     msg: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &dyn DIDResolver,
     metadata: &mut UnpackMetadata,
 ) -> Result<Option<Message>> {
     let msg = match Message::from_str(msg) {

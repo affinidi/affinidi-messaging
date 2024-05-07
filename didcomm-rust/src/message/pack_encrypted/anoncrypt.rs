@@ -22,7 +22,7 @@ use crate::{
 
 pub(crate) async fn anoncrypt<'dr, 'sr>(
     to: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
     msg: &[u8],
     enc_alg_anon: &AnonCryptAlg,
 ) -> Result<(String, Vec<String>)> /* (msg, to_kids) */ {

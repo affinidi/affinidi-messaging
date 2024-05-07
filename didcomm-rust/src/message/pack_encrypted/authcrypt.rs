@@ -24,8 +24,8 @@ use crate::{
 pub(crate) async fn authcrypt<'dr, 'sr>(
     to: &str,
     from: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
     msg: &[u8],
     enc_alg_auth: &AuthCryptAlg,
     enc_alg_anon: &AnonCryptAlg,

@@ -40,8 +40,8 @@ pub trait SecretsResolver: Sync {
 /// Interface for secrets resolver.
 /// Resolves secrets such as private keys to be used for signing and encryption.
 #[cfg(not(feature = "uniffi"))]
-#[async_trait(?Send)]
-pub trait SecretsResolver {
+#[async_trait]
+pub trait SecretsResolver: Sync + Send {
     /// Finds secret (usually private key) identified by the given key ID.
     ///
     /// # Parameters

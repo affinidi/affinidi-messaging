@@ -5,6 +5,7 @@ use didcomm::{
     secrets::{Secret, SecretsResolver},
 };
 
+#[derive(Clone)]
 pub struct AffinidiSecrets {
     known_secrets: Vec<Secret>,
 }
@@ -13,10 +14,14 @@ impl AffinidiSecrets {
     pub fn new(known_secrets: Vec<Secret>) -> Self {
         AffinidiSecrets { known_secrets }
     }
+
+    pub fn len(&self) -> usize {
+        self.known_secrets.len()
+    }
 }
 
 #[cfg_attr(feature = "uniffi", async_trait)]
-#[cfg_attr(not(feature = "uniffi"), async_trait(?Send))]
+#[cfg_attr(not(feature = "uniffi"), async_trait)]
 impl SecretsResolver for AffinidiSecrets {
     async fn get_secret(&self, secret_id: &str) -> Result<Option<Secret>> {
         Ok(self

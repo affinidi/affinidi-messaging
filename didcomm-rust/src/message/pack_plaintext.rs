@@ -26,7 +26,7 @@ impl Message {
     /// - `InvalidState` Indicates a library error.
     pub async fn pack_plaintext<'dr, 'sr>(
         &self,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
+        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
     ) -> Result<String> {
         let (from_prior, from_prior_issuer_kid) = match self.from_prior {
             Some(ref from_prior) => {

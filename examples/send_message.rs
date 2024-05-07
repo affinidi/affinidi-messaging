@@ -1,72 +1,185 @@
-use http::Uri;
-use http_body_util::{BodyExt, Empty};
-use hyper::body::Bytes;
-use hyper_util::{client::legacy::Client, rt::TokioExecutor};
-use rustls::{ClientConfig, RootCertStore};
+use did_peer::DIDPeer;
+use didcomm::{
+    secrets::{Secret, SecretMaterial, SecretType},
+    Message, PackEncryptedOptions,
+};
+use didcomm_mediator::{
+    common::did_conversion::convert_did,
+    resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
+};
+use reqwest::{Certificate, Client};
+use serde_json::json;
+use ssi::{did::DIDMethod, did_resolve::ResolutionInputMetadata};
 use std::{
     fs,
-    io::{self},
-    str::FromStr,
+    io::{self, Read},
+    time::SystemTime,
 };
+use uuid::Uuid;
+
+static MY_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
+static MEDIATOR_DID: &str = "did:peer:2.Vz6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ.EzQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
+
+/*
+Mediator Keys
+Key ID	#key-1
+Multibase Key	z6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ
+Curve	Ed25519
+Private Key (d)	Yo4iVVlvtShxB1o56RQ1bbvASMCgev4G_Lk95TuYs-c
+Public Key (x)	PHV1nLB1AgcCJyHe8uBqcgp7sM6yq3wgd2MK5ihAQOk
+
+Key ID	#key-2
+Multibase Key	zQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W
+Curve	secp256k1
+Private Key (d)	QoX2eruH8PqGj1fVJt3de4DEmji4IMJVVwIrXUM-Yw8
+Public Key (x)	l2fTSJLf6tsEimRL3tiULjjghDXjQmhr2EYHSZtbgTs
+Public Key (y)	J8XvxpibjZgRrL5oBQdGRqmCR5eiZOJGGwm_q6tKFhI
+*/
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    // Set a process wide default crypto provider.
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-    let tls = load_certs().unwrap();
+    // Load DID's
+    let did_resolver = load_dids().await;
 
-    // Prepare the HTTPS connector
-    let https = hyper_rustls::HttpsConnectorBuilder::new()
-        .with_tls_config(tls)
-        .https_or_http()
-        .enable_http1()
-        .build();
-
-    // Build the hyper client from the HTTPS connector.
-    let client: Client<_, Empty<Bytes>> = Client::builder(TokioExecutor::new()).build(https);
-    let url = Uri::from_str("https://localhost:7037/").map_err(|e| error(format!("{}", e)))?;
-
-    // Prepare a chain of futures which sends a GET request, inspects
-    // the returned headers, collects the whole body and prints it to
-    // stdout.
-    let fut = async move {
-        let res = client
-            .get(url)
-            .await
-            .map_err(|e| error(format!("Could not get: {:?}", e)))?;
-        println!("Status:\n{}", res.status());
-        println!("Headers:\n{:#?}", res.headers());
-
-        let body = res
-            .into_body()
-            .collect()
-            .await
-            .map_err(|e| error(format!("Could not get body: {:?}", e)))?
-            .to_bytes();
-        println!("Body:\n{}", String::from_utf8_lossy(&body));
-
-        Ok(())
+    let v1_secret = Secret {
+        id: [MY_DID.to_string(), "#key-1".to_string()].concat(),
+        type_: SecretType::JsonWebKey2020,
+        secret_material: SecretMaterial::JWK {
+            private_key_jwk: json!({
+              "crv": "Ed25519",
+              "d": "LLWCf83n8VsUYq31zlZRe0NNMCcn1N4Dh85dGpIqSFw",
+              "kty": "OKP",
+              "x": "Hn8T4ZjjT0oJ6rjhqox8AykwC3GDFsJF6KkaYZExwQo"
+            }),
+        },
     };
 
-    fut.await
+    let e1_secret = Secret {
+        id: [MY_DID.to_string(), "#key-2".to_string()].concat(),
+        type_: SecretType::JsonWebKey2020,
+        secret_material: SecretMaterial::JWK {
+            private_key_jwk: json!({
+              "crv": "secp256k1",
+              "d": "oi-dXG4EqfNODFPjv2vkieoLdbQZH9k6dwPDV8HDoms",
+              "kty": "EC",
+              "x": "DhfaXbhwo0KkOiyA5V1K1RZx6Ikr86h_lX5GOwxjmjE",
+              "y": "PpYqybOwMsm64vftt-7gBCQPIUbglMmyy_6rloSSAPk"
+            }),
+        },
+    };
+    // Load Secret's
+    let secrets_resolver = AffinidiSecrets::new(vec![v1_secret, e1_secret]);
+
+    // Set a process wide default crypto provider.
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    let client = init_client()?;
+
+    // Build the ping message
+    let msg = create_ping(MEDIATOR_DID, true);
+
+    let (msg, metadata) = msg
+        .pack_encrypted(
+            MEDIATOR_DID,
+            Some(MY_DID),
+            Some(MY_DID),
+            &did_resolver,
+            &secrets_resolver,
+            &PackEncryptedOptions::default(),
+        )
+        .await
+        .expect("Unable pack_encrypted");
+
+    println!("Encryption metadata is\n{:?}\n", metadata);
+
+    // --- Sending message by Alice ---
+    println!("Alice is sending message \n{}\n", msg);
+
+    let res = client
+        .post("https://localhost:7037/atm/v1/inbound")
+        .header("Content-Type", "application/json")
+        .body(msg)
+        .send()
+        .await
+        .map_err(|e| error(format!("Could not get: {:?}", e)))?;
+    println!("Status:\n{}", res.status());
+    println!("Headers:\n{:#?}", res.headers());
+
+    println!("Body:\n{}", res.text().await.unwrap());
+
+    Ok(())
 }
 
-fn load_certs() -> io::Result<ClientConfig> {
-    let f = fs::File::open("conf/keys/client.chain").map_err(|e| {
-        error(format!(
-            "failed to open {}: {}",
-            "conf/keys/client.chain", e
-        ))
-    })?;
-    let rd = &mut io::BufReader::new(f);
-    let certs = rustls_pemfile::certs(rd).collect::<Result<Vec<_>, _>>()?;
-    let mut roots = RootCertStore::empty();
-    let a = roots.add_parsable_certificates(certs);
-    println!("Added {:?} certs to the store", a);
-    // TLS client config using the custom CA store for lookups
-    Ok(rustls::ClientConfig::builder()
-        .with_root_certificates(roots)
-        .with_no_client_auth())
+async fn load_dids() -> AffinidiDIDResolver {
+    let peer_method = DIDPeer;
+    let (_, d1, _) = peer_method
+        .to_resolver()
+        .resolve(MY_DID, &ResolutionInputMetadata::default())
+        .await;
+    let d1 = DIDPeer::expand_keys(&d1.unwrap()).await;
+    let d1 = convert_did(&d1.unwrap()).unwrap();
+
+    let (_, d2, _) = peer_method
+        .to_resolver()
+        .resolve(MEDIATOR_DID, &ResolutionInputMetadata::default())
+        .await;
+    let d2 = DIDPeer::expand_keys(&d2.unwrap()).await;
+    let d2 = convert_did(&d2.unwrap()).unwrap();
+
+    AffinidiDIDResolver::new(vec![d1, d2])
+}
+
+/// Creates a DIDComm trust ping message
+/// # Arguments
+/// * `to_did` - The DID of the recipient
+/// * `response` - Whether a response is requested
+/// # Returns
+/// A DIDComm message to be sent
+///
+/// Notes:
+/// - This message will expire after 5 minutes
+fn create_ping(to_did: &str, response: bool) -> Message {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    Message::build(
+        Uuid::new_v4().into(),
+        "https://didcomm.org/trust-ping/2.0/ping".to_owned(),
+        json!(format!("response_requested: {}", response)),
+    )
+    .to(to_did.to_owned())
+    .from(MY_DID.to_owned())
+    .created_time(now)
+    .expires_time(now + 300)
+    .finalize()
+}
+
+fn init_client() -> Result<Client, std::io::Error> {
+    let certs = load_certs("conf/keys/client.chain")?;
+
+    let mut client = reqwest::ClientBuilder::new()
+        .use_rustls_tls()
+        .https_only(true)
+        .user_agent("Affinidi Trusted Messaging");
+
+    for cert in certs {
+        client = client.add_root_certificate(cert);
+    }
+
+    let client = client.build().unwrap();
+
+    // Build the hyper client from the HTTPS connector
+    Ok(client)
+}
+
+fn load_certs(path: &str) -> io::Result<Vec<Certificate>> {
+    let mut f =
+        fs::File::open(path).map_err(|e| error(format!("failed to open {}: {}", path, e)))?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf)?;
+
+    reqwest::Certificate::from_pem_bundle(&buf)
+        .map_err(|e| error(format!("failed to read {}: {}", path, e)))
 }
 
 fn error(err: String) -> io::Error {

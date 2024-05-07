@@ -79,8 +79,8 @@ impl Message {
         to: &str,
         from: Option<&str>,
         sign_by: Option<&str>,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
         options: &PackEncryptedOptions,
     ) -> Result<(String, PackEncryptedMetadata)> {
         self._validate_pack_encrypted(to, from, sign_by)?;

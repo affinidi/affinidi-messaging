@@ -11,9 +11,9 @@ use crate::{
 };
 use base64::prelude::*;
 
-pub(crate) async fn _try_unpack_sign<'dr>(
+pub(crate) async fn _try_unpack_sign(
     msg: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
+    did_resolver: &dyn DIDResolver,
     _opts: &UnpackOptions,
     metadata: &mut UnpackMetadata,
 ) -> Result<Option<String>> {

@@ -45,8 +45,8 @@ impl Message {
     pub async fn pack_signed<'dr, 'sr>(
         &self,
         sign_by: &str,
-        did_resolver: &'dr (dyn DIDResolver + 'dr),
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
     ) -> Result<(String, PackSignedMetadata)> {
         self._validate_pack_signed(sign_by)?;
 
@@ -219,8 +219,8 @@ mod tests {
         .await;
 
         async fn _pack_signed_works<'dr, 'sr, Key: KeySigVerify + FromJwkValue>(
-            did_resolver: &'dr (dyn DIDResolver + 'dr),
-            secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+            did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+            secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
             message: &Message,
             sign_by: &str,
             sign_by_kid: &str,

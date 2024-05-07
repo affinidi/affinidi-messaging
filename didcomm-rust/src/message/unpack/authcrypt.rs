@@ -22,10 +22,10 @@ use crate::{
     UnpackMetadata, UnpackOptions,
 };
 
-pub(crate) async fn _try_unpack_authcrypt<'dr, 'sr>(
+pub(crate) async fn _try_unpack_authcrypt(
     msg: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr),
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr),
+    did_resolver: &dyn DIDResolver,
+    secrets_resolver: &dyn SecretsResolver,
     opts: &UnpackOptions,
     metadata: &mut UnpackMetadata,
 ) -> Result<Option<String>> {

@@ -6,6 +6,8 @@ use std::{
     path::Path,
 };
 
+use crate::resolvers::affinidi_secrets::AffinidiSecrets;
+
 use super::{did_conversion::convert_did, errors::MediatorError};
 use async_convert::{async_trait, TryFrom};
 use did_peer::DIDPeer;
@@ -56,7 +58,7 @@ pub struct Config {
     pub listen_address: String,
     pub mediator_did: String,
     pub mediator_did_doc: DIDDoc,
-    pub mediator_secrets: Vec<Secret>,
+    pub mediator_secrets: AffinidiSecrets,
     pub mediator_allowed_dids: HashSet<String>,
     pub mediator_denied_dids: HashSet<String>,
     pub database_file: String,
@@ -111,7 +113,7 @@ impl Default for Config {
                 verification_method: Vec::new(),
                 service: Vec::new(),
             },
-            mediator_secrets: Vec::new(),
+            mediator_secrets: AffinidiSecrets::new(vec![]),
             mediator_allowed_dids: HashSet::new(),
             mediator_denied_dids: HashSet::new(),
             database_file: "".into(),
@@ -201,7 +203,7 @@ impl TryFrom<ConfigRaw> for Config {
 /// Loads the secret data into the Config file.
 /// Only supports a file containing a JSON array of secrets
 /// TODO: Add support for other methods of getting these secrets (AWS Secrets Manager, etc.)
-fn load_secrets(secrets: &str) -> Result<Vec<Secret>, MediatorError> {
+fn load_secrets(secrets: &str) -> Result<AffinidiSecrets, MediatorError> {
     let (type_, file_name) = secrets.split_at(7);
     if type_ != "file://" {
         return Err(MediatorError::ConfigError(
@@ -210,13 +212,17 @@ fn load_secrets(secrets: &str) -> Result<Vec<Secret>, MediatorError> {
         ));
     }
 
-    serde_json::from_str::<Vec<Secret>>(&read_file_lines(file_name)?.concat()).map_err(|err| {
-        event!(Level::ERROR, "Could not open file({}). {}", file_name, err);
-        MediatorError::ConfigError(
-            "NA".into(),
-            format!("Could not open file({}). {}", file_name, err),
-        )
-    })
+    Ok(AffinidiSecrets::new(
+        serde_json::from_str::<Vec<Secret>>(&read_file_lines(file_name)?.concat()).map_err(
+            |err| {
+                event!(Level::ERROR, "Could not open file({}). {}", file_name, err);
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    format!("Could not open file({}). {}", file_name, err),
+                )
+            },
+        )?,
+    ))
 }
 
 /// Loads from a file a list of DID's into a HashSet

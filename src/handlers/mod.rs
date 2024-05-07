@@ -8,7 +8,7 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new().route("/inbound", post(message_inbound::message_inbound_handler));
 
     Router::new()
-        .nest("/asm/v1/", app)
+        .nest("/atm/v1/", app)
         .with_state(shared_data.to_owned())
 }
 

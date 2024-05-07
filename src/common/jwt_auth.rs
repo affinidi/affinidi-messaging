@@ -72,6 +72,7 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let tx_id = create_tx_id();
 
+        /*
         event!(Level::DEBUG, "{}: INSIDE JWT Authentication", tx_id);
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
@@ -162,16 +163,9 @@ where
         let re = Regex::new(r"(user\/.[^\/]*)\/").unwrap();
         let Some(owner_id) = re.captures(sub[4]) else {
             return Err(AuthError::WrongCredentials);
-        };
+        };*/
 
         let session = Session { tx_id };
-
-        event!(
-            Level::INFO,
-            "{}: tx_id mapped to Affinidi ari({})",
-            session.tx_id,
-            payload.sub
-        );
 
         Ok(session)
     }
