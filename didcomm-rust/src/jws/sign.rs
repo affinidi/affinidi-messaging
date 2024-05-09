@@ -115,6 +115,7 @@ mod tests {
         jwk::FromJwk,
         sign::{KeySigVerify, KeySign},
     };
+    use base64::prelude::*;
 
     use crate::{
         error::{ErrorKind, Result},
@@ -161,10 +162,7 @@ mod tests {
             let mut buf = vec![];
             let msg = jws::parse(&msg, &mut buf).expect("Unable parse");
 
-            assert_eq!(
-                msg.jws.payload,
-                base64::encode_config(payload, base64::URL_SAFE_NO_PAD)
-            );
+            assert_eq!(msg.jws.payload, BASE64_URL_SAFE_NO_PAD.encode(payload));
 
             assert_eq!(msg.jws.signatures.len(), 1);
             assert_eq!(msg.jws.signatures[0].header.kid, kid);
@@ -341,10 +339,7 @@ mod tests {
             let mut buf = vec![];
             let msg = jws::parse_compact(&msg, &mut buf).expect("Unable parse_compact");
 
-            assert_eq!(
-                msg.payload,
-                base64::encode_config(payload, base64::URL_SAFE_NO_PAD)
-            );
+            assert_eq!(msg.payload, BASE64_URL_SAFE_NO_PAD.encode(payload));
 
             assert_eq!(msg.parsed_header.typ, typ);
             assert_eq!(msg.parsed_header.alg, alg);

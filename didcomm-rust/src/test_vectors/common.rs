@@ -1,3 +1,4 @@
+use base64::prelude::*;
 use serde_json::{Map, Value};
 
 pub const ALICE_DID: &str = "did:example:alice";
@@ -23,18 +24,18 @@ pub fn update_protected_field(msg: &str, field: &str, value: &str) -> String {
     let mut msg_dict: Map<String, Value> = parsed.as_object().unwrap().clone();
 
     let mut buffer = Vec::<u8>::new();
-    base64::decode_config_buf(
-        msg_dict.get("protected").unwrap().as_str().unwrap(),
-        base64::URL_SAFE_NO_PAD,
-        &mut buffer,
-    )
-    .unwrap();
+    BASE64_URL_SAFE_NO_PAD
+        .decode_slice(
+            msg_dict.get("protected").unwrap().as_str().unwrap(),
+            &mut buffer,
+        )
+        .unwrap();
     let parsed_protected: Value = serde_json::from_slice(&buffer).unwrap();
     let mut protected_dict: Map<String, Value> = parsed_protected.as_object().unwrap().clone();
     protected_dict.insert(String::from(field), value.into());
     let protected_str = serde_json::to_string(&protected_dict).unwrap();
     println!("{}", &protected_str);
-    let protected_str_base64 = base64::encode_config(protected_str, base64::URL_SAFE_NO_PAD);
+    let protected_str_base64 = BASE64_URL_SAFE_NO_PAD.encode(protected_str);
     msg_dict.insert(String::from("protected"), protected_str_base64.into());
     serde_json::to_string(&msg_dict).unwrap()
 }
@@ -44,17 +45,17 @@ pub fn remove_protected_field(msg: &str, field: &str) -> String {
     let mut msg_dict: Map<String, Value> = parsed.as_object().unwrap().clone();
 
     let mut buffer = Vec::<u8>::new();
-    base64::decode_config_buf(
-        msg_dict.get("protected").unwrap().as_str().unwrap(),
-        base64::URL_SAFE_NO_PAD,
-        &mut buffer,
-    )
-    .unwrap();
+    BASE64_URL_SAFE_NO_PAD
+        .decode_slice(
+            msg_dict.get("protected").unwrap().as_str().unwrap(),
+            &mut buffer,
+        )
+        .unwrap();
     let parsed_protected: Value = serde_json::from_slice(&buffer).unwrap();
     let mut protected_dict: Map<String, Value> = parsed_protected.as_object().unwrap().clone();
     protected_dict.remove(field);
     let protected_str = serde_json::to_string(&protected_dict).unwrap();
-    let protected_str_base64 = base64::encode_config(protected_str, base64::URL_SAFE_NO_PAD);
+    let protected_str_base64 = BASE64_URL_SAFE_NO_PAD.encode(protected_str);
 
     msg_dict.insert(String::from("protected"), protected_str_base64.into());
     serde_json::to_string(&msg_dict).unwrap()

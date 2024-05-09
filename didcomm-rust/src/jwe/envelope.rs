@@ -6,31 +6,31 @@ use std::borrow::Cow;
 /// Subset of JWE in generic json serialization form used for authcrypt
 /// and anoncrypt message types.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct JWE<'a> {
+pub(crate) struct JWE {
     /// BASE64URL(UTF8(JWE Protected Header))
     /// Note: this field value is used as AAD for JWE Ciphertext
-    pub protected: &'a str,
+    pub protected: String,
 
     /// Array of recipient-specific objects
-    pub recipients: Vec<Recipient<'a>>,
+    pub recipients: Vec<Recipient>,
 
     /// BASE64URL(JWE Initialization Vector)
-    pub iv: &'a str,
+    pub iv: String,
 
     /// BASE64URL(JWE Ciphertext)
-    pub ciphertext: &'a str,
+    pub ciphertext: String,
 
     /// BASE64URL(JWE Authentication Tag)
-    pub tag: &'a str,
+    pub tag: String,
 }
 
 /// Protected header for authcrypt/anoncrypt-specific JWE.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProtectedHeader<'a> {
+pub(crate) struct ProtectedHeader {
     /// Must be `application/didcomm-encrypted+json` or `didcomm-encrypted+json` for now.
     /// Something like `application/didcomm-encrypted+cbor` can be introduced in the
     /// future.
-    pub typ: Option<Cow<'a, str>>,
+    pub typ: Option<String>,
 
     /// Cryptographic algorithm used to encrypt or determine the value of the CEK.
     pub alg: Algorithm,
@@ -42,14 +42,14 @@ pub(crate) struct ProtectedHeader<'a> {
     /// Sender KID as DID Url.
     /// If absent implementations MUST be able to resolve the sender kid from the `apu` header.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub skid: Option<&'a str>,
+    pub skid: Option<String>,
 
     /// BASE64URL("skid" header value),
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub apu: Option<&'a str>,
+    pub apu: Option<String>,
 
     /// BASE64URL(SHA256(CONCAT('.', SORT([recipients[0].kid, ..., recipients[n].kid])))))
-    pub apv: &'a str,
+    pub apv: String,
 
     /// EPK generated once for all recipients.
     /// It MUST be of the same type and curve as all recipient keys since kdf
@@ -58,20 +58,20 @@ pub(crate) struct ProtectedHeader<'a> {
 }
 /// Recipient part of authcrypt/anoncrypt-specific JWE
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Recipient<'a> {
+pub(crate) struct Recipient {
     /// Per-recipient header
     /// Note it isn't serialized and not integrity protected
-    pub header: PerRecipientHeader<'a>,
+    pub header: PerRecipientHeader,
 
     /// BASE64URL(JWE Encrypted Key)
-    pub encrypted_key: &'a str,
+    pub encrypted_key: String,
 }
 
 /// Per-recipient header part of authcrypt/anoncrypt-specific JWE
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PerRecipientHeader<'a> {
+pub(crate) struct PerRecipientHeader {
     /// Recipient KID as DID URL
-    pub kid: &'a str,
+    pub kid: String,
 }
 
 /// Represents possible values for `alg` header.

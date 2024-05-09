@@ -7,7 +7,8 @@ use sign::_try_unpack_sign;
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     did::DIDResolver,
-    error::{err_msg, Error, ErrorKind, Result, ResultExt},
+    error::{err_msg, ErrorKind, Result, ResultExt},
+    jwe::envelope::JWE,
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
     secrets::SecretsResolver,
@@ -72,13 +73,17 @@ impl Message {
             signed_message: None,
             from_prior: None,
         };
-        let mut msg: &str = msg;
+        let mut msg = msg;
         let mut anoncrypted: Option<String>;
         let mut forwarded_msg: String;
 
+        println!("msg: {}", msg);
+        let parsed_jwe = JWE::from_str(msg)?;
+        let mut parsed_jwe = parsed_jwe.parse()?.verify_didcomm()?;
         loop {
             anoncrypted =
-                _try_unpack_anoncrypt(msg, secrets_resolver, options, &mut metadata).await?;
+                _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, &mut metadata)
+                    .await?;
 
             if options.unwrap_re_wrapping_forward && anoncrypted.is_some() {
                 let forwarded_msg_opt = Self::_try_unwrap_forwarded_message(
@@ -94,6 +99,7 @@ impl Message {
 
                     metadata.re_wrapped_in_forward = true;
 
+                    parsed_jwe = JWE::from_str(msg)?.parse()?.verify_didcomm()?;
                     continue;
                 }
             }
@@ -103,9 +109,14 @@ impl Message {
 
         let msg = anoncrypted.as_deref().unwrap_or(msg);
 
-        let authcrypted =
-            _try_unpack_authcrypt(msg, did_resolver, secrets_resolver, options, &mut metadata)
-                .await?;
+        let authcrypted = _try_unpack_authcrypt(
+            &parsed_jwe,
+            did_resolver,
+            secrets_resolver,
+            options,
+            &mut metadata,
+        )
+        .await?;
         let msg = authcrypted.as_deref().unwrap_or(msg);
 
         let signed = _try_unpack_sign(msg, did_resolver, options, &mut metadata).await?;
@@ -240,9 +251,9 @@ async fn has_key_agreement_secret(
         }
     };
 
-    let kids = kids.iter().map(|k| k as &str).collect::<Vec<_>>();
+    let kids = kids.iter().map(|k| k.to_owned()).collect::<Vec<_>>();
 
-    let secrets_ids = secrets_resolver.find_secrets(&kids[..]).await?;
+    let secrets_ids = secrets_resolver.find_secrets(&kids).await?;
 
     return Ok(!secrets_ids.is_empty());
 }

@@ -1,10 +1,9 @@
 mod anoncrypt;
 mod authcrypt;
 
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg},
@@ -274,6 +273,7 @@ pub struct MessagingServiceMetadata {
 
 #[cfg(test)]
 mod tests {
+    use base64::prelude::*;
     use std::borrow::Cow;
     use std::{collections::HashMap, iter::FromIterator};
 
@@ -2839,26 +2839,25 @@ mod tests {
         KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
         KW: KeyWrap + FromKeyDerivation,
     {
-        let mut buf = vec![];
-        let msg = jwe::parse(msg, &mut buf).expect("Unable parse jwe");
+        let msg = jwe::parse(msg).expect("Unable parse jwe");
 
         assert_eq!(
             msg.jwe
                 .recipients
                 .iter()
-                .map(|r| r.header.kid)
+                .map(|r| r.header.kid.to_string())
                 .collect::<Vec<_>>(),
             to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>()
         );
 
         assert_eq!(
             msg.protected.typ,
-            Some(Cow::Borrowed("application/didcomm-encrypted+json"))
+            Some("application/didcomm-encrypted+json".into())
         );
 
         assert_eq!(msg.protected.alg, jwe::Algorithm::Ecdh1puA256kw);
         assert_eq!(msg.protected.enc, jwe::EncAlgorithm::A256cbcHs512);
-        assert_eq!(msg.protected.skid, Some(from_key.id.as_ref()));
+        assert_eq!(msg.protected.skid, Some(from_key.id.to_string()));
 
         let mut common_msg: Option<Vec<u8>> = None;
 
@@ -2907,21 +2906,20 @@ mod tests {
         KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
         KW: KeyWrap + FromKeyDerivation,
     {
-        let mut buf = vec![];
-        let msg = jwe::parse(msg, &mut buf).expect("Unable parse jwe");
+        let msg = jwe::parse(msg).expect("Unable parse jwe");
 
         assert_eq!(
             msg.jwe
                 .recipients
                 .iter()
-                .map(|r| r.header.kid)
+                .map(|r| r.header.kid.to_string())
                 .collect::<Vec<_>>(),
             to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>()
         );
 
         assert_eq!(
             msg.protected.typ,
-            Some(Cow::Borrowed("application/didcomm-encrypted+json"))
+            Some("application/didcomm-encrypted+json".into())
         );
 
         assert_eq!(msg.protected.alg, jwe::Algorithm::EcdhEsA256kw);
@@ -2991,7 +2989,8 @@ mod tests {
         let valid = msg.verify((sign_key_id, &sign_key)).expect("Unable verify");
         assert!(valid);
 
-        let payload = base64::decode_config(msg.jws.payload, base64::URL_SAFE_NO_PAD)
+        let payload = BASE64_URL_SAFE_NO_PAD
+            .decode(msg.jws.payload)
             .expect("Unable decode_config");
 
         String::from_utf8(payload).expect("Unable from_utf8")

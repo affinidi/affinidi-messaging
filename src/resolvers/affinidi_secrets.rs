@@ -18,6 +18,10 @@ impl AffinidiSecrets {
     pub fn len(&self) -> usize {
         self.known_secrets.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.known_secrets.is_empty()
+    }
 }
 
 #[cfg_attr(feature = "uniffi", async_trait)]
@@ -31,10 +35,10 @@ impl SecretsResolver for AffinidiSecrets {
             .cloned())
     }
 
-    async fn find_secrets<'a>(&self, secret_ids: &'a [&'a str]) -> Result<Vec<&'a str>> {
+    async fn find_secrets(&self, secret_ids: &Vec<String>) -> Result<Vec<String>> {
         Ok(secret_ids
             .iter()
-            .filter(|&&sid| self.known_secrets.iter().any(|s| s.id == sid))
+            .filter(|sid| self.known_secrets.iter().any(|s| s.id == sid.to_string()))
             .cloned()
             .collect())
     }

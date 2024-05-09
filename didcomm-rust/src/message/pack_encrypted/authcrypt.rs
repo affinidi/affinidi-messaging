@@ -51,11 +51,11 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
 
     // Initial list of sender keys is all key_agreements of sender did doc
     // or filtered to keep only provided key
-    let from_kids: Vec<_> = from_ddoc
+    let from_kids: Vec<String> = from_ddoc
         .key_agreement
         .iter()
         .filter(|kid| from_kid.map(|from_kid| kid == &from_kid).unwrap_or(true))
-        .map(|s| s.as_str())
+        .map(|s| s.to_string())
         .collect();
 
     if from_kids.is_empty() {

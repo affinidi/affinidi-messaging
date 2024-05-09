@@ -53,7 +53,7 @@ impl FromPrior {
                 )
             })?;
 
-        let authentication_kids: Vec<&str> = if let Some(issuer_kid) = issuer_kid {
+        let authentication_kids: Vec<String> = if let Some(issuer_kid) = issuer_kid {
             let (did, kid) = did_or_url(issuer_kid);
 
             let kid = kid.ok_or_else(|| {
@@ -81,12 +81,16 @@ impl FromPrior {
                     )
                 })?;
 
-            vec![kid]
+            vec![kid.to_string()]
         } else {
-            did_doc.authentication.iter().map(|s| s.as_str()).collect()
+            did_doc
+                .authentication
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
         };
 
-        let kid = *secrets_resolver
+        let kid = secrets_resolver
             .find_secrets(&authentication_kids)
             .await
             .context("Unable to find secrets")?
@@ -96,10 +100,11 @@ impl FromPrior {
                     ErrorKind::SecretNotFound,
                     "No from_prior issuer secrets found",
                 )
-            })?;
+            })?
+            .to_string();
 
         let secret = secrets_resolver
-            .get_secret(kid)
+            .get_secret(&kid)
             .await
             .context("Unable to find secret")?
             .ok_or_else(|| {
@@ -116,19 +121,19 @@ impl FromPrior {
         let from_prior_jwt = match sign_key {
             KnownKeyPair::Ed25519(ref key) => jws::sign_compact(
                 from_prior_str.as_bytes(),
-                (kid, key),
+                (&kid, key),
                 JWT_TYP,
                 Algorithm::EdDSA,
             ),
             KnownKeyPair::P256(ref key) => jws::sign_compact(
                 from_prior_str.as_bytes(),
-                (kid, key),
+                (&kid, key),
                 JWT_TYP,
                 Algorithm::Es256,
             ),
             KnownKeyPair::K256(ref key) => jws::sign_compact(
                 from_prior_str.as_bytes(),
-                (kid, key),
+                (&kid, key),
                 JWT_TYP,
                 Algorithm::Es256K,
             ),

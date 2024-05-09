@@ -17,7 +17,7 @@ impl MockDidResolver {
 }
 
 #[cfg_attr(feature = "uniffi", async_trait)]
-#[cfg_attr(not(feature = "uniffi"), async_trait(?Send))]
+#[cfg_attr(not(feature = "uniffi"), async_trait)]
 impl DIDResolver for MockDidResolver {
     async fn resolve(&self, _did: &str) -> crate::error::Result<Option<DIDDoc>> {
         self.results.lock().unwrap().borrow_mut().pop().unwrap()

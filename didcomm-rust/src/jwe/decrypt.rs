@@ -12,7 +12,7 @@ use askar_crypto::{
 };
 use base64::prelude::*;
 
-impl<'a, 'b> ParsedJWE<'a, 'b> {
+impl ParsedJWE {
     pub(crate) fn decrypt<CE, KDF, KE, KW>(
         &self,
         sender: Option<(&str, &KE)>,
@@ -42,7 +42,8 @@ impl<'a, 'b> ParsedJWE<'a, 'b> {
                 .iter()
                 .find(|r| r.header.kid == kid)
                 .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Recipient not found"))?
-                .encrypted_key;
+                .encrypted_key
+                .to_string();
 
             BASE64_URL_SAFE_NO_PAD
                 .decode(encrypted_key)
@@ -52,7 +53,7 @@ impl<'a, 'b> ParsedJWE<'a, 'b> {
         let epk = KE::from_jwk_value(&self.protected.epk).context("Unable instantiate epk")?;
 
         let tag = BASE64_URL_SAFE_NO_PAD
-            .decode(self.jwe.tag)
+            .decode(self.jwe.tag.clone())
             .kind(ErrorKind::Malformed, "Unable decode tag")?;
 
         let kw = KDF::derive_key(
@@ -72,11 +73,11 @@ impl<'a, 'b> ParsedJWE<'a, 'b> {
             .kind(ErrorKind::Malformed, "Unable unwrap cek")?;
 
         let ciphertext = BASE64_URL_SAFE_NO_PAD
-            .decode(self.jwe.ciphertext)
+            .decode(&self.jwe.ciphertext)
             .kind(ErrorKind::Malformed, "Unable decode ciphertext")?;
 
         let iv = BASE64_URL_SAFE_NO_PAD
-            .decode(self.jwe.iv)
+            .decode(&self.jwe.iv)
             .kind(ErrorKind::Malformed, "Unable decode iv")?;
 
         let plaintext = {
@@ -106,8 +107,6 @@ mod tests {
             aes::{A128Kw, A256CbcHs512, A256Gcm, A256Kw, AesKey},
             chacha20::{Chacha20Key, XC20P},
             p256::P256KeyPair,
-            secp256k1,
-            secp256k1::Secp256k1KeyPair,
             x25519::X25519KeyPair,
         },
         encrypt::KeyAeadInPlace,
@@ -991,8 +990,7 @@ mod tests {
             &KE::from_jwk(recipient.1).expect("Unable from_jwk"),
         );
 
-        let mut buf = vec![];
-        let msg = jwe::parse(&msg, &mut buf).expect("Unable parse");
+        let msg = jwe::parse(&msg).expect("Unable parse");
 
         msg.decrypt::<CE, KDF, KE, KW>(sender, recipient)
     }

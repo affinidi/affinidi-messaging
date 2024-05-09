@@ -1,0 +1,250 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'didcomm'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "didcomm",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'attachments'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=attachments",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "attachments",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'attachments'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=attachments",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "attachments",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'advanced_params'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=advanced_params",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "advanced_params",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'advanced_params'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=advanced_params",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "advanced_params",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'basic'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=basic",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "basic",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'basic'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=basic",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "basic",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'rotate_did'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=rotate_did",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "rotate_did",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'rotate_did'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=rotate_did",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "rotate_did",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'routing'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=routing",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "routing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'routing'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=routing",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "routing",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'pack_signed'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=pack_signed",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "pack_signed",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'pack_encrypted'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=pack_encrypted",
+                    "--package=didcomm"
+                ],
+                "filter": {
+                    "name": "pack_encrypted",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

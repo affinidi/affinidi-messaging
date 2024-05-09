@@ -26,11 +26,16 @@ impl SecretsResolver for ExampleSecretsResolver {
             .map(|s| s.clone()))
     }
 
-    async fn find_secrets<'a>(&self, secret_ids: &'a [&'a str]) -> Result<Vec<&'a str>> {
+    async fn find_secrets(&self, secret_ids: &Vec<String>) -> Result<Vec<String>> {
         Ok(secret_ids
             .iter()
-            .filter(|&&sid| self.known_secrets.iter().find(|s| s.id == sid).is_some())
-            .map(|sid| *sid)
+            .filter(|sid| {
+                self.known_secrets
+                    .iter()
+                    .find(|s| s.id == sid.to_string())
+                    .is_some()
+            })
+            .map(|sid| sid.to_string())
             .collect())
     }
 }

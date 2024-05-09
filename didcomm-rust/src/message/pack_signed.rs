@@ -58,7 +58,7 @@ impl Message {
             .context("Unable resolve signer did")?
             .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Signer did not found"))?;
 
-        let authentications: Vec<_> = if let Some(key_id) = key_id {
+        let authentications: Vec<String> = if let Some(key_id) = key_id {
             did_doc
                 .authentication
                 .iter()
@@ -70,20 +70,25 @@ impl Message {
                     )
                 })?;
 
-            vec![key_id]
+            vec![key_id.to_string()]
         } else {
-            did_doc.authentication.iter().map(|s| s.as_str()).collect()
+            did_doc
+                .authentication
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
         };
 
-        let key_id = *secrets_resolver
+        let key_id = secrets_resolver
             .find_secrets(&authentications)
             .await
             .context("Unable find secrets")?
             .get(0)
-            .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "No signer secrets found"))?;
+            .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "No signer secrets found"))?
+            .to_string();
 
         let secret = secrets_resolver
-            .get_secret(key_id)
+            .get_secret(&key_id)
             .await
             .context("Unable get secret")?
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "Signer secret not found"))?;
@@ -96,13 +101,13 @@ impl Message {
 
         let msg = match sign_key {
             KnownKeyPair::Ed25519(ref key) => {
-                jws::sign(payload.as_bytes(), (key_id, key), Algorithm::EdDSA)
+                jws::sign(payload.as_bytes(), (&key_id, key), Algorithm::EdDSA)
             }
             KnownKeyPair::P256(ref key) => {
-                jws::sign(payload.as_bytes(), (key_id, key), Algorithm::Es256)
+                jws::sign(payload.as_bytes(), (&key_id, key), Algorithm::Es256)
             }
             KnownKeyPair::K256(ref key) => {
-                jws::sign(payload.as_bytes(), (key_id, key), Algorithm::Es256K)
+                jws::sign(payload.as_bytes(), (&key_id, key), Algorithm::Es256K)
             }
             _ => Err(err_msg(ErrorKind::Unsupported, "Unsupported signature alg"))?,
         }
@@ -140,9 +145,9 @@ mod tests {
         alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair},
         sign::KeySigVerify,
     };
-    use std::borrow::Cow;
-
+    use base64::prelude::*;
     use serde_json::Value;
+    use std::borrow::Cow;
 
     use crate::{
         did::{
@@ -252,7 +257,8 @@ mod tests {
             );
 
             let payload: Value = {
-                let payload = base64::decode_config(msg.jws.payload, base64::URL_SAFE_NO_PAD)
+                let payload = BASE64_URL_SAFE_NO_PAD
+                    .decode(msg.jws.payload)
                     .expect("Unable decode_config");
 
                 serde_json::from_slice(&payload).expect("Unable from_str")

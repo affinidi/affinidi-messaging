@@ -7,7 +7,6 @@ use askar_crypto::{
 };
 use base64::prelude::*;
 use sha2::{Digest, Sha256};
-use std::borrow::Cow;
 
 use crate::{
     error::{Error, ErrorKind, Result, ResultExt},
@@ -30,7 +29,7 @@ where
     KW: KeyWrap + FromKeyDerivation,
 {
     let (skid, skey) = match sender {
-        Some((skid, skey)) => (Some(skid), Some(skey)),
+        Some((skid, skey)) => (Some(skid.to_string()), Some(skey)),
         None => (None, None),
     };
 
@@ -57,16 +56,16 @@ where
 
     let protected = {
         let epk = epk.to_jwk_public_value()?;
-        let apu = skid.map(|skid| BASE64_URL_SAFE_NO_PAD.encode(skid));
+        let apu = skid.clone().map(|skid| BASE64_URL_SAFE_NO_PAD.encode(skid));
         let apv = BASE64_URL_SAFE_NO_PAD.encode(apv);
 
         let p = ProtectedHeader {
-            typ: Some(Cow::Borrowed("application/didcomm-encrypted+json")),
+            typ: Some("application/didcomm-encrypted+json".into()),
             alg: alg.clone(),
             enc,
-            skid,
-            apu: apu.as_deref(),
-            apv: &apv,
+            skid: skid.clone(),
+            apu,
+            apv,
             epk,
         };
 
@@ -136,17 +135,19 @@ where
     let recipients: Vec<_> = encrypted_keys
         .iter()
         .map(|(kid, encrypted_key)| Recipient {
-            header: PerRecipientHeader { kid },
-            encrypted_key: &encrypted_key,
+            header: PerRecipientHeader {
+                kid: kid.to_string(),
+            },
+            encrypted_key: encrypted_key.to_string(),
         })
         .collect();
 
     let jwe = JWE {
-        protected: &protected,
+        protected,
         recipients,
-        iv: &iv,
-        ciphertext: &ciphertext,
-        tag: &tag,
+        iv,
+        ciphertext,
+        tag,
     };
 
     let jwe = serde_json::to_string(&jwe).kind(ErrorKind::InvalidState, "Unable serialize jwe")?;
@@ -411,8 +412,7 @@ mod tests {
             )
             .expect("Unable encrypt");
 
-            let mut buf = vec![];
-            let msg = jwe::parse(&msg, &mut buf).expect("Unable parse");
+            let msg = jwe::parse(&msg).expect("Unable parse");
 
             assert_eq!(msg.protected.alg, alg);
             assert_eq!(msg.protected.enc, enc_alg);
