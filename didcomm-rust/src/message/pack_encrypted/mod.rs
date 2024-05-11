@@ -187,7 +187,7 @@ impl Message {
         }
 
         match (from, &self.from) {
-            (Some(ref from), Some(ref sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
+            (Some(from), Some(ref sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
                 ErrorKind::IllegalArgument,
                 "`message.from` value is not equal to `from` value's DID",
             ))?,
@@ -274,7 +274,6 @@ pub struct MessagingServiceMetadata {
 #[cfg(test)]
 mod tests {
     use base64::prelude::*;
-    use std::borrow::Cow;
     use std::{collections::HashMap, iter::FromIterator};
 
     use askar_crypto::{
@@ -891,6 +890,7 @@ mod tests {
         )
         .await;
 
+        #[allow(clippy::too_many_arguments)]
         async fn _pack_encrypted_works_authcrypt_protected_sender_signed<
             CE,
             KDF,
@@ -2147,7 +2147,7 @@ mod tests {
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
-                "not-a-did".into(),
+                "not-a-did",
                 None,
                 None,
                 &did_resolver,
@@ -2329,7 +2329,7 @@ mod tests {
         msg.to = Some(vec!["not-a-did".to_string()]);
         let res = msg
             .pack_encrypted(
-                "not-a-did".into(),
+                "not-a-did",
                 ALICE_DID.into(),
                 None,
                 &did_resolver,
@@ -2383,7 +2383,7 @@ mod tests {
         msg.to = Some(vec![ALICE_DID.to_string(), BOB_DID.to_string()]);
         let _ = msg
             .pack_encrypted(
-                "did:example:bob#key-x25519-1".into(),
+                "did:example:bob#key-x25519-1",
                 None,
                 None,
                 &did_resolver,
@@ -2803,7 +2803,7 @@ mod tests {
                 None,
                 &did_resolver,
                 &charlie_rotated_to_alice_secrets_resolver,
-                &&PackEncryptedOptions {
+                &PackEncryptedOptions {
                     forward: false,
                     ..PackEncryptedOptions::default()
                 },
@@ -2959,13 +2959,12 @@ mod tests {
         sign_key: &VerificationMethod,
         alg: jws::Algorithm,
     ) -> String {
-        let mut buf = vec![];
-        let msg = jws::parse(&msg, &mut buf).expect("Unable parse");
+        let msg = jws::parse(msg).expect("Unable parse");
 
         assert_eq!(
             msg.protected,
             vec![jws::ProtectedHeader {
-                typ: Cow::Borrowed("application/didcomm-signed+json"),
+                typ: "application/didcomm-signed+json".into(),
                 alg,
             }]
         );
@@ -2974,7 +2973,9 @@ mod tests {
 
         assert_eq!(
             msg.jws.signatures[0].header,
-            jws::Header { kid: &sign_key.id }
+            jws::Header {
+                kid: sign_key.id.clone()
+            }
         );
 
         let sign_key_id = &sign_key.id;

@@ -28,12 +28,11 @@ impl FromPrior {
         from_prior_jwt: &str,
         did_resolver: &dyn DIDResolver,
     ) -> Result<(FromPrior, String)> {
-        let mut buf = vec![];
-        let parsed = jws::parse_compact(from_prior_jwt, &mut buf)?;
+        let parsed = jws::parse_compact(from_prior_jwt)?;
 
-        let typ = parsed.parsed_header.typ;
+        let typ = &parsed.parsed_header.typ;
         let alg = parsed.parsed_header.alg.clone();
-        let kid = parsed.parsed_header.kid;
+        let kid = &parsed.parsed_header.kid;
 
         if typ != "JWT" {
             Err(err_msg(
@@ -77,7 +76,7 @@ impl FromPrior {
         let key = did_doc
             .verification_method
             .iter()
-            .find(|&vm| &vm.id == kid)
+            .find(|&vm| vm.id == kid)
             .ok_or_else(|| {
                 err_msg(
                     ErrorKind::DIDUrlNotFound,

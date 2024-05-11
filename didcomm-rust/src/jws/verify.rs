@@ -6,7 +6,7 @@ use crate::{
 };
 use base64::prelude::*;
 
-impl<'a, 'b> ParsedJWS<'a, 'b> {
+impl ParsedJWS {
     pub(crate) fn verify<Key: KeySigVerify>(&self, signer: (&str, &Key)) -> Result<bool> {
         let (kid, key) = signer;
 
@@ -43,13 +43,13 @@ impl<'a, 'b> ParsedJWS<'a, 'b> {
     }
 }
 
-impl<'a> ParsedCompactJWS<'a> {
+impl ParsedCompactJWS {
     pub(crate) fn verify<Key: KeySigVerify>(&self, key: &Key) -> Result<bool> {
         let sig_type = self.parsed_header.alg.sig_type()?;
         let sign_input = format!("{}.{}", self.header, self.payload);
 
         let signature = BASE64_URL_SAFE_NO_PAD
-            .decode(self.signature)
+            .decode(&self.signature)
             .kind(ErrorKind::Malformed, "Unable decode signature")?;
 
         let valid = key
@@ -87,7 +87,7 @@ mod tests {
         fn _verify_works<K: FromJwk + KeySigVerify>(kid: &str, key: &str, msg: &str) {
             let res = _verify::<K>(kid, key, msg);
             let res = res.expect("res is err");
-            assert_eq!(res, true);
+            assert!(res);
         }
     }
 
@@ -118,7 +118,7 @@ mod tests {
         ) {
             let res = _verify::<K>(kid, key, msg);
             let res = res.expect("res is err");
-            assert_eq!(res, true);
+            assert!(res);
         }
     }
 
@@ -137,7 +137,7 @@ mod tests {
         fn _verify_works_different_key<K: FromJwk + KeySigVerify>(kid: &str, key: &str, msg: &str) {
             let res = _verify::<K>(kid, key, msg);
             let res = res.expect("res is err");
-            assert_eq!(res, false);
+            assert!(!res);
         }
     }
 
@@ -168,7 +168,7 @@ mod tests {
         ) {
             let res = _verify::<K>(kid, key, msg);
             let res = res.expect("res is err");
-            assert_eq!(res, false);
+            assert!(!res);
         }
     }
 
@@ -284,7 +284,7 @@ mod tests {
     fn verify_compact_works() {
         let res = _verify_compact::<Ed25519KeyPair>(ALICE_PKEY_ED25519, ALICE_COMPACT_MSG_ED25519);
         let res = res.expect("res is err");
-        assert_eq!(res, true);
+        assert!(res);
     }
 
     #[test]
@@ -293,7 +293,7 @@ mod tests {
         let res =
             _verify_compact::<Ed25519KeyPair>(CHARLIE_PKEY_ED25519, ALICE_COMPACT_MSG_ED25519);
         let res = res.expect("res is err");
-        assert_eq!(res, false);
+        assert!(!res);
     }
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
         );
 
         let res = res.expect("res is err");
-        assert_eq!(res, false);
+        assert!(!res);
     }
 
     #[test]
@@ -342,8 +342,7 @@ mod tests {
     ) -> Result<bool, Error> {
         let key = Key::from_jwk(key).expect("unable from_jwk.");
 
-        let mut buf = vec![];
-        let msg = jws::parse(&msg, &mut buf).expect("unable parse.");
+        let msg = jws::parse(msg).expect("unable parse.");
 
         msg.verify((kid, &key))
     }
@@ -351,8 +350,7 @@ mod tests {
     fn _verify_compact<Key: FromJwk + KeySigVerify>(key: &str, msg: &str) -> Result<bool, Error> {
         let key = Key::from_jwk(key).expect("unable from_jwk.");
 
-        let mut buf = vec![];
-        let msg = jws::parse_compact(&msg, &mut buf).expect("unable parse.");
+        let msg = jws::parse_compact(msg).expect("unable parse.");
 
         msg.verify(&key)
     }

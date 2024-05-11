@@ -63,7 +63,7 @@ impl FromPrior {
                 )
             })?;
 
-            if did != &self.iss {
+            if did != self.iss {
                 Err(err_msg(
                     ErrorKind::IllegalArgument,
                     "from_prior issuer kid does not belong to from_prior `iss`",
@@ -94,7 +94,7 @@ impl FromPrior {
             .find_secrets(&authentication_kids)
             .await
             .context("Unable to find secrets")?
-            .get(0)
+            .first()
             .ok_or_else(|| {
                 err_msg(
                     ErrorKind::SecretNotFound,
@@ -141,7 +141,7 @@ impl FromPrior {
         }
         .context("Unable to produce signature")?;
 
-        Ok((from_prior_jwt, String::from(kid)))
+        Ok((from_prior_jwt, kid))
     }
 
     pub(crate) fn validate_pack(&self, issuer_kid: Option<&str>) -> Result<()> {
@@ -159,7 +159,7 @@ impl FromPrior {
             ))?;
         }
 
-        if &self.iss == &self.sub {
+        if self.iss == self.sub {
             Err(err_msg(
                 ErrorKind::Malformed,
                 "from_prior `iss` and `sub` values must not be equal",
@@ -176,7 +176,7 @@ impl FromPrior {
                 ))?;
             };
 
-            if did != &self.iss {
+            if did != self.iss {
                 Err(err_msg(
                     ErrorKind::IllegalArgument,
                     "from_prior issuer kid does not belong to from_prior `iss`",

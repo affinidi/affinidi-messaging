@@ -1,44 +1,42 @@
 use askar_crypto::sign::SignatureType;
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
-use std::borrow::Cow;
 
 use crate::error::{err_msg, ErrorKind, Result};
 
 /// Subset of JWS in generic json serialization used for signed message type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct JWS<'a> {
+pub(crate) struct Jws {
     /// Array of signatures
-    pub signatures: Vec<Signature<'a>>,
+    pub signatures: Vec<Signature>,
 
     /// BASE64URL(JWS Payload)
-    pub payload: &'a str,
+    pub payload: String,
 }
 
 /// Represents a signature or MAC over the JWS Payload and
 /// the JWS Protected Header.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct Signature<'a> {
+pub(crate) struct Signature {
     /// JWS unprotected header
     /// Note it isn't serialized and not integrity protected
-    #[serde(borrow)]
-    pub header: Header<'a>,
+    pub header: Header,
 
     /// BASE64URL(UTF8(JWS Protected Header))
-    pub protected: &'a str,
+    pub protected: String,
 
     /// BASE64URL(JWS signature)
     /// Note JWS signature input is ASCII(BASE64URL(UTF8(JWS Protected Header)) || '.' || BASE64URL(JWS Payload)).
-    pub signature: &'a str,
+    pub signature: String,
 }
 
 /// JWS protected header.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ProtectedHeader<'a> {
+pub(crate) struct ProtectedHeader {
     /// Must be `application/didcomm-signed+json` or `didcomm-signed+json` for now.
     /// Something like `application/didcomm-signed+cbor` can be introduced in the
     /// future.
-    pub typ: Cow<'a, str>,
+    pub typ: String,
 
     /// Cryptographic algorithm used to produce signature.
     pub alg: Algorithm,
@@ -46,22 +44,22 @@ pub(crate) struct ProtectedHeader<'a> {
 
 /// JWS unprotected header.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct Header<'a> {
+pub(crate) struct Header {
     /// KID used to produce signature as DID URL.
-    pub kid: &'a str,
+    pub kid: String,
 }
 
 /// Header of compactly serialized JWS.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct CompactHeader<'a> {
+pub(crate) struct CompactHeader {
     /// Media type of this complete JWS.
-    pub typ: &'a str,
+    pub typ: String,
 
     /// Cryptographic algorithm used to produce signature.
     pub alg: Algorithm,
 
     /// KID used to produce signature as DID URL.
-    pub kid: &'a str,
+    pub kid: String,
 }
 
 /// Represents possible values for `alg` header.

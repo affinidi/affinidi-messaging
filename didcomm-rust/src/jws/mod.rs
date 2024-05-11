@@ -16,7 +16,7 @@ mod verify;
 
 // TODO: Remove allow
 #[allow(unused_imports)]
-pub(crate) use envelope::{Algorithm, CompactHeader, Header, ProtectedHeader, Signature, JWS};
+pub(crate) use envelope::{Algorithm, CompactHeader, Header, Jws, ProtectedHeader, Signature};
 
 // TODO: Remove allow
 #[allow(unused_imports)]
@@ -76,8 +76,7 @@ mod tests {
 
         // Parse message
 
-        let mut buf = vec![];
-        let msg = jws::parse(&msg, &mut buf).expect("Unable parse");
+        let msg = jws::parse(&msg).expect("Unable parse");
 
         // Verify signature
 

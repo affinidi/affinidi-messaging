@@ -7,6 +7,7 @@ pub(crate) async fn _try_unpack_plaintext(
     did_resolver: &dyn DIDResolver,
     metadata: &mut UnpackMetadata,
 ) -> Result<Option<Message>> {
+    println!("Unpacking plaintext message: {}", msg);
     let msg = match Message::from_str(msg) {
         Ok(m) => m,
         Err(e) if e.kind() == ErrorKind::Malformed => return Ok(None),

@@ -19,6 +19,7 @@ pub mod test_vectors;
 
 pub mod algorithms;
 pub mod did;
+pub mod envelope;
 pub mod error;
 pub mod protocols;
 pub mod secrets;

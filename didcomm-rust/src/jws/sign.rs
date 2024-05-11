@@ -1,10 +1,9 @@
 use askar_crypto::sign::KeySign;
 use base64::prelude::*;
-use std::borrow::Cow;
 
 use crate::{
     error::{Error, ErrorKind, Result, ResultExt},
-    jws::envelope::{Algorithm, CompactHeader, Header, ProtectedHeader, Signature, JWS},
+    jws::envelope::{Algorithm, CompactHeader, Header, Jws, ProtectedHeader, Signature},
 };
 
 pub(crate) fn sign<Key: KeySign>(
@@ -18,7 +17,7 @@ pub(crate) fn sign<Key: KeySign>(
 
     let protected = {
         let protected = ProtectedHeader {
-            typ: Cow::Borrowed("application/didcomm-signed+json"),
+            typ: "application/didcomm-signed+json".into(),
             alg,
         };
 
@@ -49,14 +48,14 @@ pub(crate) fn sign<Key: KeySign>(
     };
 
     let signature = Signature {
-        header: Header { kid },
-        protected: &protected,
-        signature: &signature,
+        header: Header { kid: kid.into() },
+        protected,
+        signature,
     };
 
-    let jws = JWS {
+    let jws = Jws {
         signatures: vec![signature],
-        payload: &payload,
+        payload,
     };
 
     let jws = serde_json::to_string(&jws).kind(ErrorKind::InvalidState, "Unable serialize jws")?;
@@ -75,7 +74,11 @@ pub(crate) fn sign_compact<Key: KeySign>(
     let sig_type = alg.sig_type()?;
 
     let header = {
-        let header = CompactHeader { typ, alg, kid };
+        let header = CompactHeader {
+            typ: typ.into(),
+            alg,
+            kid: kid.into(),
+        };
 
         let header = serde_json::to_string(&header)
             .kind(ErrorKind::InvalidState, "Unable serialize header")?;
@@ -159,8 +162,7 @@ mod tests {
 
             let msg = res.expect("Unable _sign");
 
-            let mut buf = vec![];
-            let msg = jws::parse(&msg, &mut buf).expect("Unable parse");
+            let msg = jws::parse(&msg).expect("Unable parse");
 
             assert_eq!(msg.jws.payload, BASE64_URL_SAFE_NO_PAD.encode(payload));
 
@@ -336,8 +338,7 @@ mod tests {
 
             let msg = res.expect("Unable _sign_compact");
 
-            let mut buf = vec![];
-            let msg = jws::parse_compact(&msg, &mut buf).expect("Unable parse_compact");
+            let msg = jws::parse_compact(&msg).expect("Unable parse_compact");
 
             assert_eq!(msg.payload, BASE64_URL_SAFE_NO_PAD.encode(payload));
 

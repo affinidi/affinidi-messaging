@@ -77,7 +77,6 @@ impl Message {
         let mut anoncrypted: Option<String>;
         let mut forwarded_msg: String;
 
-        println!("msg: {}", msg);
         let parsed_jwe = JWE::from_str(msg)?;
         let mut parsed_jwe = parsed_jwe.parse()?.verify_didcomm()?;
         loop {

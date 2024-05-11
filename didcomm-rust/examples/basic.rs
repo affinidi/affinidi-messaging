@@ -20,17 +20,17 @@ use test_vectors::{
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     println!("=================== NON REPUDIABLE ENCRYPTION ===================");
-    //non_repudiable_encryption().await;
+    non_repudiable_encryption().await;
     println!("=================== MULTI RECIPIENT ===================");
     multi_recipient().await;
     println!("=================== REPUDIABLE AUTHENTICATED ENCRYPTION ===================");
-    //repudiable_authenticated_encryption().await;
+    repudiable_authenticated_encryption().await;
     println!("=================== REPUDIABLE NON AUTHENTICATED ENCRYPTION ===================");
-    //repudiable_non_authenticated_encryption().await;
+    repudiable_non_authenticated_encryption().await;
     println!("=================== SIGNED UNENCRYPTED ===================");
-    //signed_unencrypted().await;
+    signed_unencrypted().await;
     println!("=================== PLAINTEXT UNENCRYPTED ===================");
-    //plaintext_unencrypted().await;
+    plaintext_unencrypted().await;
 }
 
 async fn non_repudiable_encryption() {

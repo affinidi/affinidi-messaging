@@ -147,7 +147,6 @@ mod tests {
     };
     use base64::prelude::*;
     use serde_json::Value;
-    use std::borrow::Cow;
 
     use crate::{
         did::{
@@ -245,20 +244,19 @@ mod tests {
                 }
             );
 
-            let mut buf = vec![];
-            let msg = jws::parse(&msg, &mut buf).expect("Unable parse");
+            let msg = jws::parse(&msg).expect("Unable parse");
 
             assert_eq!(
                 msg.protected,
                 vec![ProtectedHeader {
-                    typ: Cow::Borrowed("application/didcomm-signed+json"),
+                    typ: "application/didcomm-signed+json".into(),
                     alg,
                 }]
             );
 
             let payload: Value = {
                 let payload = BASE64_URL_SAFE_NO_PAD
-                    .decode(msg.jws.payload)
+                    .decode(&msg.jws.payload)
                     .expect("Unable decode_config");
 
                 serde_json::from_slice(&payload).expect("Unable from_str")
