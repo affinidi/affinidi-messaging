@@ -4,8 +4,9 @@ use crate::{
     jws::envelope::{CompactHeader, Jws, ProtectedHeader},
 };
 use base64::prelude::*;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub(crate) struct ParsedJWS {
     pub(crate) jws: Jws,
     pub(crate) protected: Vec<ProtectedHeader>,
@@ -20,7 +21,7 @@ impl Jws {
         serde_json::from_str(s).to_didcomm("Unable parse jws")
     }
 
-    pub(crate) fn parse(self) -> Result<ParsedJWS> {
+    pub(crate) fn parse(&self) -> Result<ParsedJWS> {
         let protected = {
             let len = self.signatures.len();
             let mut protected = Vec::<ProtectedHeader>::with_capacity(len);
@@ -47,7 +48,7 @@ impl Jws {
         };
 
         Ok(ParsedJWS {
-            jws: self,
+            jws: self.clone(),
             protected,
         })
     }
@@ -354,7 +355,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode protected header: Invalid byte 33, offset 0."
+            "Malformed: Unable decode protected header: Invalid symbol 33, offset 0."
         );
     }
 
@@ -564,7 +565,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode header: Encoded text cannot have a 6-bit remainder."
+            "Malformed: Unable decode header: Invalid symbol 33, offset 0."
         );
     }
 

@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use serde_json::Value;
-use std::borrow::Cow;
 
 /// Subset of JWE in generic json serialization form used for authcrypt
 /// and anoncrypt message types.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct JWE {
+pub(crate) struct Jwe {
     /// BASE64URL(UTF8(JWE Protected Header))
     /// Note: this field value is used as AAD for JWE Ciphertext
     pub protected: String,
@@ -93,7 +92,7 @@ impl Algorithm {
         match self {
             Algorithm::Ecdh1puA256kw => "ECDH-1PU+A256KW",
             Algorithm::EcdhEsA256kw => "ECDH-ES+A256KW",
-            Algorithm::Other(ref s) => &s,
+            Algorithm::Other(ref s) => s,
         }
     }
 }

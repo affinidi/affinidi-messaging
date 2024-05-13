@@ -1,6 +1,6 @@
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
 
-use crate::jws::Jws;
+use crate::envelope::{Envelope, ParsedEnvelope};
 use crate::{
     algorithms::SignAlg,
     did::DIDResolver,
@@ -12,20 +12,15 @@ use crate::{
 use base64::prelude::*;
 
 pub(crate) async fn _try_unpack_sign(
-    msg: &str,
+    msg: &ParsedEnvelope,
     did_resolver: &dyn DIDResolver,
     _opts: &UnpackOptions,
     metadata: &mut UnpackMetadata,
-) -> Result<Option<String>> {
-    let jws_json = msg;
-
-    let jws = match Jws::from_str(msg) {
-        Ok(m) => m,
-        Err(e) if e.kind() == ErrorKind::Malformed => return Ok(None),
-        Err(e) => Err(e)?,
+) -> Result<Option<ParsedEnvelope>> {
+    let parsed_jws: &jws::ParsedJWS = match msg {
+        ParsedEnvelope::Jws(jws) => jws,
+        _ => return Ok(None),
     };
-
-    let parsed_jws = jws.parse()?;
 
     if parsed_jws.protected.len() != 1 {
         Err(err_msg(
@@ -83,7 +78,7 @@ pub(crate) async fn _try_unpack_sign(
     let signer_key = signer_ddoc
         .verification_method
         .iter()
-        .find(|&vm| &vm.id == signer_kid)
+        .find(|&vm| vm.id == signer_kid)
         .ok_or_else(|| {
             err_msg(
                 ErrorKind::DIDUrlNotFound,
@@ -137,7 +132,7 @@ pub(crate) async fn _try_unpack_sign(
 
     // TODO: More precise error conversion
     let payload = BASE64_URL_SAFE_NO_PAD
-        .decode(parsed_jws.jws.payload)
+        .decode(&parsed_jws.jws.payload)
         .kind(ErrorKind::Malformed, "Signed payload is invalid base64")?;
 
     let payload =
@@ -146,7 +141,8 @@ pub(crate) async fn _try_unpack_sign(
     metadata.authenticated = true;
     metadata.non_repudiation = true;
     metadata.sign_from = Some(signer_kid.into());
-    metadata.signed_message = Some(jws_json.into());
+    metadata.signed_message = Some(parsed_jws.jws.clone());
 
-    Ok(Some(payload))
+    let e = Envelope::from_str(&payload)?.parse()?.verify_didcomm()?;
+    Ok(Some(e))
 }

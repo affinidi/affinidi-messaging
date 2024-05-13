@@ -187,9 +187,7 @@ impl From<bs58::decode::Error> for Error {
 
 impl From<bs58::encode::Error> for Error {
     fn from(err: bs58::encode::Error) -> Self {
-        match err {
-            _ => Error::msg(ErrorKind::InvalidState, err.to_string()),
-        }
+        Error::msg(ErrorKind::InvalidState, err.to_string())
     }
 }
 

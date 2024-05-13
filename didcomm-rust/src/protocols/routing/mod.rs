@@ -179,15 +179,13 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
 
     let next = match msg.body {
         Value::Object(ref body) => match body.get("next") {
-            Some(&Value::String(ref next)) => Some(next),
+            Some(Value::String(ref next)) => Some(next),
             _ => None,
         },
         _ => None,
     };
 
-    if next.is_none() {
-        return None;
-    }
+    next?;
 
     let next = next.unwrap();
 
@@ -202,9 +200,7 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
         None => None,
     };
 
-    if json_attachment_data.is_none() {
-        return None;
-    }
+    json_attachment_data?;
 
     let forwarded_msg = &json_attachment_data.unwrap().json;
 
@@ -241,11 +237,11 @@ pub async fn wrap_in_forward<'dr>(
     msg: &str,
     headers: Option<&HashMap<String, Value>>,
     to: &str,
-    routing_keys: &Vec<String>,
+    routing_keys: &[String],
     enc_alg_anon: &AnonCryptAlg,
     did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
 ) -> Result<String> {
-    let mut tos = routing_keys.clone();
+    let mut tos = routing_keys.to_vec();
 
     let mut nexts = tos.clone();
     nexts.remove(0);

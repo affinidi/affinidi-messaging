@@ -2052,7 +2052,7 @@ mod tests {
                 &forwarded_msg_at_mediator1,
                 None,
                 &forward_at_mediator1.next,
-                &vec![MEDIATOR2_VERIFICATION_METHOD_KEY_AGREEM_X25519_1.id.clone()],
+                &[MEDIATOR2_VERIFICATION_METHOD_KEY_AGREEM_X25519_1.id.clone()],
                 &AnonCryptAlg::default(),
                 &did_resolver,
             )

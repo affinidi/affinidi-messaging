@@ -275,7 +275,7 @@ mod tests {
 
             assert_eq!(
                 format!("{}", err),
-                "Malformed: Unable decode signature: Invalid byte 33, offset 0."
+                "Malformed: Unable decode signature: Invalid symbol 33, offset 0."
             );
         }
     }
@@ -331,7 +331,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode signature: Invalid byte 33, offset 0."
+            "Malformed: Unable decode signature: Invalid symbol 33, offset 0."
         );
     }
 
@@ -501,6 +501,7 @@ mod tests {
     {
         "kty":"EC",
         "d":"N3Hm1LXA210YVGGsXw_GklMwcLu_bMgnzDese6YQIyA",
+        "crv":"secp256k1",
         "x":"aToW5EaTq5mlAf8C5ECYDSkqsJycrW-e1SQ6_GJcAOk",
         "y":"JAGX94caA21WKreXwYUaOCYTBMrqaX4KWIlsQZTHWCk"
     }

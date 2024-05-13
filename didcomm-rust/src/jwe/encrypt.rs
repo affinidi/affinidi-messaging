@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     error::{Error, ErrorKind, Result, ResultExt},
-    jwe::envelope::{Algorithm, EncAlgorithm, PerRecipientHeader, ProtectedHeader, Recipient, JWE},
+    jwe::envelope::{Algorithm, EncAlgorithm, Jwe, PerRecipientHeader, ProtectedHeader, Recipient},
     jwk::ToJwkValue,
     utils::crypto::{JoseKDF, KeyWrap},
 };
@@ -72,7 +72,7 @@ where
         let p = serde_json::to_string(&p)
             .kind(ErrorKind::InvalidState, "Unable serialize protected header")?;
 
-        BASE64_URL_SAFE_NO_PAD.encode(&p)
+        BASE64_URL_SAFE_NO_PAD.encode(p)
     };
 
     let mut buf = {
@@ -98,9 +98,9 @@ where
         let ciphertext = &buf.as_ref()[0..ciphertext_len];
         let tag_raw = &buf.as_ref()[ciphertext_len..];
 
-        let ciphertext = BASE64_URL_SAFE_NO_PAD.encode(&ciphertext);
-        let tag = BASE64_URL_SAFE_NO_PAD.encode(&tag_raw);
-        let iv = BASE64_URL_SAFE_NO_PAD.encode(&iv);
+        let ciphertext = BASE64_URL_SAFE_NO_PAD.encode(ciphertext);
+        let tag = BASE64_URL_SAFE_NO_PAD.encode(tag_raw);
+        let iv = BASE64_URL_SAFE_NO_PAD.encode(iv);
 
         (ciphertext, tag, tag_raw, iv)
     };
@@ -112,11 +112,11 @@ where
             let kw = KDF::derive_key(
                 &epk,
                 skey,
-                &key,
+                key,
                 alg.as_str().as_bytes(),
                 skid.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]),
                 apv.as_slice(),
-                &tag_raw,
+                tag_raw,
                 false,
             )
             .kind(ErrorKind::InvalidState, "Unable derive kw")?; //TODO Check this test and move to decrypt
@@ -142,7 +142,7 @@ where
         })
         .collect();
 
-    let jwe = JWE {
+    let jwe = Jwe {
         protected,
         recipients,
         iv,

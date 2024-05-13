@@ -11,8 +11,9 @@ use askar_crypto::{
 
 use crate::{
     algorithms::AnonCryptAlg,
+    envelope::{Envelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
-    jwe::{self, ParsedJWE},
+    jwe,
     secrets::SecretsResolver,
     utils::{
         crypto::{AsKnownKeyPair, KnownKeyPair},
@@ -22,11 +23,16 @@ use crate::{
 };
 
 pub(crate) async fn _try_unpack_anoncrypt(
-    jwe: &ParsedJWE,
+    jwe: &ParsedEnvelope,
     secrets_resolver: &dyn SecretsResolver,
     opts: &UnpackOptions,
     metadata: &mut UnpackMetadata,
-) -> Result<Option<String>> {
+) -> Result<Option<ParsedEnvelope>> {
+    let jwe = match jwe {
+        ParsedEnvelope::Jwe(jwe) => jwe,
+        _ => return Ok(None),
+    };
+
     if jwe.protected.alg != jwe::Algorithm::EcdhEsA256kw {
         return Ok(None);
     }
@@ -34,12 +40,11 @@ pub(crate) async fn _try_unpack_anoncrypt(
     let to_kid = jwe
         .to_kids
         .first()
-        .map(|k| k)
         .ok_or_else(|| err_msg(ErrorKind::Malformed, "No recipient keys found"))?;
 
-    let (to_did, _) = did_or_url(&to_kid);
+    let (to_did, _) = did_or_url(to_kid);
 
-    if let Some(_) = jwe.to_kids.iter().find(|k| {
+    if jwe.to_kids.iter().any(|k| {
         let (k_did, k_url) = did_or_url(k);
         (k_did != to_did) || (k_url.is_none())
     }) {
@@ -185,5 +190,6 @@ pub(crate) async fn _try_unpack_anoncrypt(
     let payload = String::from_utf8(payload)
         .kind(ErrorKind::Malformed, "Anoncrypt payload is invalid utf8")?;
 
-    Ok(Some(payload))
+    let e = Envelope::from_str(&payload)?.parse()?.verify_didcomm()?;
+    Ok(Some(e))
 }

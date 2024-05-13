@@ -23,18 +23,13 @@ impl SecretsResolver for ExampleSecretsResolver {
             .known_secrets
             .iter()
             .find(|s| s.id == secret_id)
-            .map(|s| s.clone()))
+            .cloned())
     }
 
-    async fn find_secrets(&self, secret_ids: &Vec<String>) -> Result<Vec<String>> {
+    async fn find_secrets(&self, secret_ids: &[String]) -> Result<Vec<String>> {
         Ok(secret_ids
             .iter()
-            .filter(|sid| {
-                self.known_secrets
-                    .iter()
-                    .find(|s| s.id == sid.to_string())
-                    .is_some()
-            })
+            .filter(|sid| self.known_secrets.iter().any(|s| s.id == sid.to_string()))
             .map(|sid| sid.to_string())
             .collect())
     }

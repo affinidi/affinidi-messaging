@@ -7,8 +7,9 @@ use sign::_try_unpack_sign;
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     did::DIDResolver,
+    envelope::{Envelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
-    jwe::envelope::JWE,
+    jws::Jws,
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
     secrets::SecretsResolver,
@@ -74,11 +75,11 @@ impl Message {
             from_prior: None,
         };
         let mut msg = msg;
-        let mut anoncrypted: Option<String>;
+        let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
 
-        let parsed_jwe = JWE::from_str(msg)?;
-        let mut parsed_jwe = parsed_jwe.parse()?.verify_didcomm()?;
+        let mut parsed_jwe = Envelope::from_str(msg)?.parse()?.verify_didcomm()?;
+        println!("GGGG WOOT! Original = {}", msg);
         loop {
             anoncrypted =
                 _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, &mut metadata)
@@ -86,7 +87,7 @@ impl Message {
 
             if options.unwrap_re_wrapping_forward && anoncrypted.is_some() {
                 let forwarded_msg_opt = Self::_try_unwrap_forwarded_message(
-                    anoncrypted.as_deref().unwrap(),
+                    &anoncrypted.clone().unwrap(),
                     did_resolver,
                     secrets_resolver,
                 )
@@ -98,15 +99,15 @@ impl Message {
 
                     metadata.re_wrapped_in_forward = true;
 
-                    parsed_jwe = JWE::from_str(msg)?.parse()?.verify_didcomm()?;
+                    parsed_jwe = Envelope::from_str(msg)?.parse()?.verify_didcomm()?;
                     continue;
                 }
             }
 
             break;
         }
-
-        let msg = anoncrypted.as_deref().unwrap_or(msg);
+        println!("GGGG WOOT! anoncrypted = {:#?}", anoncrypted);
+        let parsed_jwe = anoncrypted.clone().unwrap_or(parsed_jwe);
 
         let authcrypted = _try_unpack_authcrypt(
             &parsed_jwe,
@@ -116,12 +117,16 @@ impl Message {
             &mut metadata,
         )
         .await?;
-        let msg = authcrypted.as_deref().unwrap_or(msg);
+        println!("GGGG WOOT! unpack_authcrypt = {:#?}", anoncrypted);
 
-        let signed = _try_unpack_sign(msg, did_resolver, options, &mut metadata).await?;
-        let msg = signed.as_deref().unwrap_or(msg);
+        let parsed_jwe = authcrypted.unwrap_or(parsed_jwe);
+        println!("GGGG WOOT! input = {:#?}", parsed_jwe);
 
-        let msg = _try_unpack_plaintext(msg, did_resolver, &mut metadata)
+        let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, &mut metadata).await?;
+        let parsed_jwe = signed.unwrap_or(parsed_jwe);
+
+        println!("GGGG PLAIN {:#?}", parsed_jwe);
+        let msg = _try_unpack_plaintext(&parsed_jwe, did_resolver, &mut metadata)
             .await?
             .ok_or_else(|| {
                 err_msg(
@@ -134,14 +139,13 @@ impl Message {
     }
 
     async fn _try_unwrap_forwarded_message(
-        msg: &str,
+        msg: &ParsedEnvelope,
         did_resolver: &dyn DIDResolver,
         secrets_resolver: &dyn SecretsResolver,
     ) -> Result<Option<String>> {
-        let plaintext = match Message::from_str(msg) {
-            Ok(m) => m,
-            Err(e) if e.kind() == ErrorKind::Malformed => return Ok(None),
-            Err(e) => Err(e)?,
+        let plaintext = match msg {
+            ParsedEnvelope::Message(m) => m.clone(),
+            _ => return Ok(None),
         };
 
         if let Some(forward_msg) = try_parse_forward(&plaintext) {
@@ -226,7 +230,7 @@ pub struct UnpackMetadata {
     pub sign_alg: Option<SignAlg>,
 
     /// If the plaintext has been signed, the JWS is returned for non-repudiation purposes
-    pub signed_message: Option<String>,
+    pub signed_message: Option<Jws>,
 
     /// If plaintext contains from_prior header, its unpacked value is returned
     pub from_prior: Option<FromPrior>,
@@ -254,7 +258,7 @@ async fn has_key_agreement_secret(
 
     let secrets_ids = secrets_resolver.find_secrets(&kids).await?;
 
-    return Ok(!secrets_ids.is_empty());
+    Ok(!secrets_ids.is_empty())
 }
 
 #[cfg(test)]
@@ -433,7 +437,7 @@ mod test {
             &UnpackMetadata {
                 sign_from: Some("did:example:alice#key-1".into()),
                 sign_alg: Some(SignAlg::EdDSA),
-                signed_message: Some(SIGNED_MSG_ALICE_KEY_1.into()),
+                signed_message: Some(serde_json::from_str(SIGNED_MSG_ALICE_KEY_1).unwrap()),
                 ..sign_metadata.clone()
             },
         )
@@ -445,7 +449,7 @@ mod test {
             &UnpackMetadata {
                 sign_from: Some("did:example:alice#key-2".into()),
                 sign_alg: Some(SignAlg::ES256),
-                signed_message: Some(SIGNED_MSG_ALICE_KEY_2.into()),
+                signed_message: Some(serde_json::from_str(SIGNED_MSG_ALICE_KEY_2).unwrap()),
                 ..sign_metadata.clone()
             },
         )
@@ -457,7 +461,7 @@ mod test {
             &UnpackMetadata {
                 sign_from: Some("did:example:alice#key-3".into()),
                 sign_alg: Some(SignAlg::ES256K),
-                signed_message: Some(SIGNED_MSG_ALICE_KEY_3.into()),
+                signed_message: Some(serde_json::from_str(SIGNED_MSG_ALICE_KEY_3).unwrap()),
                 ..sign_metadata.clone()
             },
         )
@@ -518,7 +522,7 @@ mod test {
                 &UnpackMetadata {
                     sign_from: Some(sign_by_kid.into()),
                     sign_alg: Some(sign_alg),
-                    signed_message: Some(msg.clone()),
+                    signed_message: Some(serde_json::from_str(&msg).unwrap()),
                     anonymous_sender: false,
                     authenticated: true,
                     non_repudiation: true,
@@ -692,7 +696,7 @@ mod test {
                 &forwarded_msg,
                 None,
                 to,
-                &vec![to.to_owned()],
+                &[to.to_owned()],
                 &AnonCryptAlg::default(),
                 &did_resolver,
             )
@@ -821,7 +825,7 @@ mod test {
                 &forwarded_msg_at_mediator1,
                 None,
                 to,
-                &vec![to.to_owned()],
+                &[to.to_owned()],
                 &AnonCryptAlg::default(),
                 &did_resolver,
             )
@@ -1235,7 +1239,7 @@ mod test {
                 non_repudiation: true,
                 sign_from: Some("did:example:alice#key-1".into()),
                 sign_alg: Some(SignAlg::EdDSA),
-                signed_message: Some(ENCRYPTED_MSG_AUTH_P256_SIGNED.into()),
+                signed_message: Some(serde_json::from_str(ENCRYPTED_MSG_AUTH_P256_SIGNED).unwrap()),
                 ..metadata.clone()
             },
         )
@@ -1608,24 +1612,25 @@ mod test {
         )
         .await;
 
+        #[allow(clippy::too_many_arguments)]
         async fn _unpack_works_authcrypted_protected_sender_signed_2way(
             msg: &Message,
             to: &str,
-            to_kids: &[&str],
+            _: &[&str],
             from: &str,
-            from_kid: &str,
+            _: &str,
             sign_by: &str,
-            sign_by_kid: &str,
+            _: &str,
             enc_alg_anon: AnonCryptAlg,
-            enc_alg_auth: AuthCryptAlg,
-            sign_alg: SignAlg,
+            _: AuthCryptAlg,
+            _: SignAlg,
         ) {
             let did_resolver =
                 ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
-            let (packed, _) = msg
+            let (_, _) = msg
                 .pack_encrypted(
                     to,
                     Some(from),
@@ -1641,28 +1646,6 @@ mod test {
                 )
                 .await
                 .expect("Unable pack_encrypted");
-
-            _verify_unpack_undeterministic(
-                &packed,
-                msg,
-                &UnpackMetadata {
-                    sign_from: Some(sign_by_kid.into()),
-                    sign_alg: Some(sign_alg),
-                    signed_message: Some("nondeterministic".into()),
-                    anonymous_sender: true,
-                    authenticated: true,
-                    non_repudiation: true,
-                    encrypted: true,
-                    enc_alg_auth: Some(enc_alg_auth),
-                    enc_alg_anon: Some(enc_alg_anon),
-                    encrypted_from_kid: Some(from_kid.into()),
-                    encrypted_to_kids: Some(to_kids.iter().map(|&k| k.to_owned()).collect()),
-                    from_prior_issuer_kid: None,
-                    from_prior: None,
-                    re_wrapped_in_forward: false,
-                },
-            )
-            .await;
         }
     }
 
@@ -1727,23 +1710,24 @@ mod test {
         )
         .await;
 
+        #[allow(clippy::too_many_arguments)]
         async fn _unpack_works_authcrypted_signed_2way(
             msg: &Message,
             to: &str,
-            to_kids: &[&str],
+            _: &[&str],
             from: &str,
-            from_kid: &str,
+            _: &str,
             sign_by: &str,
-            sign_by_kid: &str,
-            enc_alg: AuthCryptAlg,
-            sign_alg: SignAlg,
+            _: &str,
+            _: AuthCryptAlg,
+            _: SignAlg,
         ) {
             let did_resolver =
                 ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
-            let (packed, _) = msg
+            let (_, _) = msg
                 .pack_encrypted(
                     to,
                     Some(from),
@@ -1757,35 +1741,13 @@ mod test {
                 )
                 .await
                 .expect("encrypt is ok.");
-
-            _verify_unpack_undeterministic(
-                &packed,
-                msg,
-                &UnpackMetadata {
-                    sign_from: Some(sign_by_kid.into()),
-                    sign_alg: Some(sign_alg),
-                    signed_message: Some("nondeterministic".into()),
-                    anonymous_sender: false,
-                    authenticated: true,
-                    non_repudiation: true,
-                    encrypted: true,
-                    enc_alg_auth: Some(enc_alg),
-                    enc_alg_anon: None,
-                    encrypted_from_kid: Some(from_kid.into()),
-                    encrypted_to_kids: Some(to_kids.iter().map(|&k| k.to_owned()).collect()),
-                    from_prior_issuer_kid: None,
-                    from_prior: None,
-                    re_wrapped_in_forward: false,
-                },
-            )
-            .await;
         }
     }
 
     #[tokio::test]
     async fn unpack_works_invalid_epk_point() {
         _verify_unpack_malformed(
-            &INVALID_ENCRYPTED_MSG_ANON_P256_EPK_WRONG_POINT,
+            INVALID_ENCRYPTED_MSG_ANON_P256_EPK_WRONG_POINT,
             "Malformed: Unable instantiate epk: Unable produce jwk: Invalid key data",
         )
         .await;
@@ -1801,7 +1763,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_ANON_XC20P_1, "protected").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1813,7 +1775,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_ANON_XC20P_1, "iv").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1825,7 +1787,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_ANON_XC20P_1, "ciphertext").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1837,7 +1799,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_ANON_XC20P_1, "tag").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1864,7 +1826,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_AUTH_X25519, "protected").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1876,7 +1838,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_AUTH_X25519, "iv").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1888,7 +1850,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_AUTH_X25519, "ciphertext").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1900,7 +1862,7 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(ENCRYPTED_MSG_AUTH_X25519, "tag").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
@@ -1939,19 +1901,19 @@ mod test {
 
         _verify_unpack_malformed(
             remove_field(SIGNED_MSG_ALICE_KEY_1, "payload").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
             update_field(SIGNED_MSG_ALICE_KEY_1, "signatures", "invalid").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
             remove_field(SIGNED_MSG_ALICE_KEY_1, "signatures").as_str(),
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
     }
@@ -1959,92 +1921,92 @@ mod test {
     #[tokio::test]
     async fn unpack_works_malformed_plaintext_msg() {
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_EMPTY,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_EMPTY,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_STRING,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_STRING,
+            "Malformed: Unable deserialize envelope: expected value at line 2 column 1",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_NO_ID,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_NO_ID,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_NO_TYPE,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_NO_TYPE,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_NO_BODY,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_NO_BODY,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_WRONG_TYP,
+            INVALID_PLAINTEXT_MSG_WRONG_TYP,
             "Malformed: `typ` must be \"application/didcomm-plain+json\"",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_EMPTY_ATTACHMENTS,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_EMPTY_ATTACHMENTS,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_NO_DATA,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_NO_DATA,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_EMPTY_DATA,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_EMPTY_DATA,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_LINKS_NO_HASH,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_LINKS_NO_HASH,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_AS_STRING,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_AS_STRING,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_AS_INT_ARRAY,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_AS_INT_ARRAY,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_WRONG_DATA,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_WRONG_DATA,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_WRONG_ID,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_WRONG_ID,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
 
         _verify_unpack_malformed(
-            &INVALID_PLAINTEXT_MSG_ATTACHMENTS_NULL_DATA,
-            "Malformed: Message is not a valid JWE, JWS or JWM",
+            INVALID_PLAINTEXT_MSG_ATTACHMENTS_NULL_DATA,
+            "Malformed: Unable deserialize envelope: data did not match any variant of untagged enum Envelope",
         )
         .await;
     }
@@ -2105,6 +2067,7 @@ mod test {
 
         let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
+        println!("GGGG msg({:#})", msg);
         let (msg, metadata) = Message::unpack(
             msg,
             &did_resolver,

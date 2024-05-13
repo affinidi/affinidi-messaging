@@ -63,7 +63,7 @@ pub trait SecretsResolver: Sync + Send {
     ///
     /// # Returns
     /// possible empty list of all secrets that have one of the given IDs.
-    async fn find_secrets(&self, secret_ids: &Vec<String>) -> Result<Vec<String>>;
+    async fn find_secrets(&self, secret_ids: &[String]) -> Result<Vec<String>>;
 }
 
 /// Represents secret.

@@ -99,7 +99,7 @@ mod tests {
         assert!(metadata.encrypted);
         assert!(metadata.authenticated);
         assert!(metadata.encrypted_from_kid.is_some());
-        assert!(metadata.encrypted_from_kid.unwrap().starts_with(&recipient));
+        assert!(metadata.encrypted_from_kid.unwrap().starts_with(recipient));
 
         assert_eq!(msg.from, Some(sender.into()));
         assert_eq!(msg.to, Some(vec![recipient.into()]));

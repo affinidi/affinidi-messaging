@@ -83,7 +83,7 @@ impl Message {
             .find_secrets(&authentications)
             .await
             .context("Unable find secrets")?
-            .get(0)
+            .first()
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "No signer secrets found"))?
             .to_string();
 
@@ -222,6 +222,7 @@ mod tests {
         )
         .await;
 
+        #[allow(clippy::too_many_arguments)]
         async fn _pack_signed_works<'dr, 'sr, Key: KeySigVerify + FromJwkValue>(
             did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
             secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
@@ -373,7 +374,7 @@ mod tests {
 
         let res = MESSAGE_SIMPLE
             .pack_signed(
-                &"did:example:alice#key-not-in-secrets-1",
+                "did:example:alice#key-not-in-secrets-1",
                 &did_resolver,
                 &secrets_resolver,
             )
@@ -413,7 +414,7 @@ mod tests {
 
         let res = MESSAGE_SIMPLE
             .pack_signed(
-                &"did:example:alice#key-d25519-1",
+                "did:example:alice#key-d25519-1",
                 &did_resolver,
                 &secrets_resolver,
             )

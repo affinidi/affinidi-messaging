@@ -4,12 +4,12 @@ use sha2::{Digest, Sha256};
 use crate::error::ToResult;
 use crate::{
     error::{err_msg, ErrorKind, Result, ResultExt},
-    jwe::envelope::{ProtectedHeader, JWE},
+    jwe::envelope::{Jwe, ProtectedHeader},
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ParsedJWE {
-    pub(crate) jwe: JWE,
+    pub(crate) jwe: Jwe,
     pub(crate) protected: ProtectedHeader,
     pub(crate) apu: Option<Vec<u8>>,
     pub(crate) apv: Vec<u8>,
@@ -17,17 +17,18 @@ pub(crate) struct ParsedJWE {
 }
 
 pub(crate) fn parse(jwe: &str) -> Result<ParsedJWE> {
-    JWE::from_str(jwe)?.parse()
+    Jwe::from_str(jwe)?.parse()
 }
 
-impl JWE {
-    pub(crate) fn from_str(s: &str) -> Result<JWE> {
+impl Jwe {
+    pub(crate) fn from_str(s: &str) -> Result<Jwe> {
         serde_json::from_str(s).to_didcomm("Unable parse jwe")
     }
 
     pub(crate) fn parse(self) -> Result<ParsedJWE> {
+        // Strip off base64 padding
         let decoded = BASE64_URL_SAFE_NO_PAD
-            .decode(self.protected.clone())
+            .decode(self.protected.replace('=', ""))
             .kind(ErrorKind::Malformed, "Unable decode protected header")?;
 
         let protected: ProtectedHeader =
@@ -77,7 +78,7 @@ impl ParsedJWE {
             Sha256::digest(kids.join(".").as_bytes())
         };
 
-        if &self.apv != did_comm_apv.as_slice() {
+        if self.apv != did_comm_apv.as_slice() {
             Err(err_msg(ErrorKind::Malformed, "APV mismatch"))?;
         }
 

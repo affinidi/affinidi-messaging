@@ -5,8 +5,8 @@ use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use crate::error::{err_msg, ErrorKind, Result};
 
 /// Subset of JWS in generic json serialization used for signed message type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct Jws {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Jws {
     /// Array of signatures
     pub signatures: Vec<Signature>,
 
@@ -16,8 +16,8 @@ pub(crate) struct Jws {
 
 /// Represents a signature or MAC over the JWS Payload and
 /// the JWS Protected Header.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct Signature {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Signature {
     /// JWS unprotected header
     /// Note it isn't serialized and not integrity protected
     pub header: Header,
@@ -31,7 +31,7 @@ pub(crate) struct Signature {
 }
 
 /// JWS protected header.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ProtectedHeader {
     /// Must be `application/didcomm-signed+json` or `didcomm-signed+json` for now.
     /// Something like `application/didcomm-signed+cbor` can be introduced in the
@@ -43,8 +43,8 @@ pub(crate) struct ProtectedHeader {
 }
 
 /// JWS unprotected header.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct Header {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Header {
     /// KID used to produce signature as DID URL.
     pub kid: String,
 }

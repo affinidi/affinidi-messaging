@@ -21,6 +21,7 @@ use crate::{
     },
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn authcrypt<'dr, 'sr>(
     to: &str,
     from: &str,
@@ -144,10 +145,9 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
         .find(|from_key| {
             to_keys
                 .iter()
-                .find(|to_key| to_key.key_alg() == from_key.key_alg())
-                .is_some()
+                .any(|to_key| to_key.key_alg() == from_key.key_alg())
         })
-        .map(|&key| key)
+        .copied()
         .ok_or_else(|| {
             err_msg(
                 ErrorKind::NoCompatibleCrypto,

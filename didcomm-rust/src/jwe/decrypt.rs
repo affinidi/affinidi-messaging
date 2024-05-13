@@ -59,7 +59,7 @@ impl ParsedJWE {
         let kw = KDF::derive_key(
             &epk,
             skey,
-            &key,
+            key,
             self.protected.alg.as_str().as_bytes(),
             self.apu.as_deref().unwrap_or(&[]),
             &self.apv,
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::Malformed);
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode encrypted_key: Invalid byte 33, offset 0."
+            "Malformed: Unable decode encrypted_key: Invalid symbol 33, offset 0."
         );
     }
 
@@ -429,7 +429,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode tag: Invalid byte 33, offset 0."
+            "Malformed: Unable decode tag: Invalid symbol 33, offset 0."
         );
     }
 
@@ -451,7 +451,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode iv: Encoded text cannot have a 6-bit remainder."
+            "Malformed: Unable decode iv: Invalid symbol 33, offset 0."
         );
     }
 
@@ -473,7 +473,7 @@ mod tests {
 
         assert_eq!(
             format!("{}", err),
-            "Malformed: Unable decode ciphertext: Encoded text cannot have a 6-bit remainder."
+            "Malformed: Unable decode ciphertext: Invalid symbol 33, offset 0."
         );
     }
 
@@ -990,7 +990,7 @@ mod tests {
             &KE::from_jwk(recipient.1).expect("Unable from_jwk"),
         );
 
-        let msg = jwe::parse(&msg).expect("Unable parse");
+        let msg = jwe::parse(msg).expect("Unable parse");
 
         msg.decrypt::<CE, KDF, KE, KW>(sender, recipient)
     }

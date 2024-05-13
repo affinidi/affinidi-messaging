@@ -1,5 +1,6 @@
 mod attachment;
 mod from_prior;
+#[allow(clippy::module_inception)]
 mod message;
 mod pack_encrypted;
 mod pack_plaintext;

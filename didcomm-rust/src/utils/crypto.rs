@@ -70,6 +70,7 @@ impl KeyWrap for AesKey<A256Kw> {}
 
 impl KeyWrap for AesKey<A128Kw> {}
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) trait JoseKDF<Key: KeyExchange, KW: KeyWrap + Sized> {
     fn derive_key(
         ephem_key: &Key,

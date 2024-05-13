@@ -1,19 +1,17 @@
 use crate::did::DIDResolver;
-use crate::error::{ErrorKind, Result};
+use crate::envelope::ParsedEnvelope;
+use crate::error::Result;
 use crate::{FromPrior, Message, UnpackMetadata};
 
 pub(crate) async fn _try_unpack_plaintext(
-    msg: &str,
+    msg: &ParsedEnvelope,
     did_resolver: &dyn DIDResolver,
     metadata: &mut UnpackMetadata,
 ) -> Result<Option<Message>> {
-    println!("Unpacking plaintext message: {}", msg);
-    let msg = match Message::from_str(msg) {
-        Ok(m) => m,
-        Err(e) if e.kind() == ErrorKind::Malformed => return Ok(None),
-        Err(e) => Err(e)?,
-    }
-    .validate()?;
+    let msg = match msg {
+        ParsedEnvelope::Message(msg) => msg.clone().validate()?,
+        _ => return Ok(None),
+    };
 
     if let Some(from_prior) = &msg.from_prior {
         let (unpacked_from_prior, from_prior_issuer_kid) =
