@@ -79,7 +79,6 @@ impl Message {
         let mut forwarded_msg: String;
 
         let mut parsed_jwe = Envelope::from_str(msg)?.parse()?.verify_didcomm()?;
-        println!("GGGG WOOT! Original = {}", msg);
         loop {
             anoncrypted =
                 _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, &mut metadata)
@@ -106,7 +105,6 @@ impl Message {
 
             break;
         }
-        println!("GGGG WOOT! anoncrypted = {:#?}", anoncrypted);
         let parsed_jwe = anoncrypted.clone().unwrap_or(parsed_jwe);
 
         let authcrypted = _try_unpack_authcrypt(
@@ -117,15 +115,12 @@ impl Message {
             &mut metadata,
         )
         .await?;
-        println!("GGGG WOOT! unpack_authcrypt = {:#?}", anoncrypted);
 
         let parsed_jwe = authcrypted.unwrap_or(parsed_jwe);
-        println!("GGGG WOOT! input = {:#?}", parsed_jwe);
 
         let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, &mut metadata).await?;
         let parsed_jwe = signed.unwrap_or(parsed_jwe);
 
-        println!("GGGG PLAIN {:#?}", parsed_jwe);
         let msg = _try_unpack_plaintext(&parsed_jwe, did_resolver, &mut metadata)
             .await?
             .ok_or_else(|| {
@@ -2067,7 +2062,6 @@ mod test {
 
         let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-        println!("GGGG msg({:#})", msg);
         let (msg, metadata) = Message::unpack(
             msg,
             &did_resolver,
