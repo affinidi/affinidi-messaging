@@ -35,7 +35,7 @@ impl SecretsResolver for AffinidiSecrets {
             .cloned())
     }
 
-    async fn find_secrets(&self, secret_ids: &Vec<String>) -> Result<Vec<String>> {
+    async fn find_secrets(&self, secret_ids: &[String]) -> Result<Vec<String>> {
         Ok(secret_ids
             .iter()
             .filter(|sid| self.known_secrets.iter().any(|s| s.id == sid.to_string()))
