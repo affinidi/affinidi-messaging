@@ -1,17 +1,13 @@
-use std::io;
-
-use axum::{
-    extract::{Path, State},
-    Json,
-};
-use didcomm::{did::DIDResolver, Message, UnpackOptions};
+use axum::{extract::State, Json};
+use did_peer::DIDPeer;
+use didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use ssi::did::DIDMethods;
+use std::borrow::BorrowMut;
 
 use crate::{
-    common::errors::{AppError, GenericDataStruct, Session, SuccessResponse},
-    resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
+    common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
     SharedData,
 };
 
@@ -47,16 +43,33 @@ pub async fn message_inbound_handler(
     Json(body): Json<InboundMessage>,
 ) -> Result<(StatusCode, Json<SuccessResponse<ResponseData>>), AppError> {
     let s = serde_json::to_string(&body).unwrap();
-    println!("{}", s);
+
+    let mut did_method_resolver = DIDMethods::default();
+    did_method_resolver.insert(Box::new(DIDPeer));
+    let mut did_resolver = state.did_resolver.clone();
+
+    let envelope =
+        match MetaEnvelope::new(&s, did_resolver.borrow_mut(), &did_method_resolver).await {
+            Ok(envelope) => envelope,
+            Err(e) => {
+                return Err(MediatorError::ParseError(
+                    session.tx_id,
+                    "Raw inbound DIDComm message".into(),
+                    e.to_string(),
+                )
+                .into());
+            }
+        };
+
     match Message::unpack(
-        &s,
-        &state.did_resolver,
+        &envelope,
+        &did_resolver,
         &state.config.mediator_secrets,
         &UnpackOptions::default(),
     )
     .await
     {
-        Ok((metadata, msg)) => {
+        Ok((msg, metadata)) => {
             println!("Unpacked metadata is\n{:#?}\n", metadata);
             println!("Unpacked message is\n{:#?}\n", msg);
         }

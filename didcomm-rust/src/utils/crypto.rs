@@ -150,14 +150,14 @@ pub(crate) enum KnownKeyAlg {
 }
 
 #[derive(Debug)]
-pub(crate) enum KnownKeyPair {
+pub enum KnownKeyPair {
     Ed25519(Ed25519KeyPair),
     X25519(X25519KeyPair),
     P256(P256KeyPair),
     K256(K256KeyPair),
 }
 
-pub(crate) trait AsKnownKeyPair {
+pub trait AsKnownKeyPair {
     fn key_alg(&self) -> KnownKeyAlg;
     fn as_key_pair(&self) -> Result<KnownKeyPair>;
 

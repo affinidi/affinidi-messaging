@@ -32,7 +32,7 @@ pub struct Signature {
 
 /// JWS protected header.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ProtectedHeader {
+pub struct ProtectedHeader {
     /// Must be `application/didcomm-signed+json` or `didcomm-signed+json` for now.
     /// Something like `application/didcomm-signed+cbor` can be introduced in the
     /// future.
@@ -65,7 +65,7 @@ pub(crate) struct CompactHeader {
 /// Represents possible values for `alg` header.
 /// Cryptographic algorithm used to produce signature over JWS payload.
 #[derive(Deserialize_enum_str, Serialize_enum_str, Debug, Clone, Eq, PartialEq)]
-pub(crate) enum Algorithm {
+pub enum Algorithm {
     #[serde(rename = "EdDSA")]
     EdDSA,
 

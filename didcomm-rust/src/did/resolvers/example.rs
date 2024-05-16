@@ -22,4 +22,8 @@ impl DIDResolver for ExampleDIDResolver {
     async fn resolve(&self, did: &str) -> Result<Option<DIDDoc>> {
         Ok(self.known_dids.iter().find(|ddoc| ddoc.id == did).cloned())
     }
+
+    fn insert(&mut self, did_doc: &DIDDoc) {
+        self.known_dids.push(did_doc.clone());
+    }
 }

@@ -1,22 +1,29 @@
-use base64::prelude::*;
-use sha2::{Digest, Sha256};
-
+use crate::envelope::MetaEnvelope;
 use crate::error::ToResult;
+use crate::utils::crypto::AsKnownKeyPair;
+use crate::utils::did::did_or_url;
+use crate::utils::did_conversion::convert_did;
 use crate::{
     error::{err_msg, ErrorKind, Result, ResultExt},
     jwe::envelope::{Jwe, ProtectedHeader},
 };
+use base64::prelude::*;
+use did_peer::DIDPeer;
+use sha2::{Digest, Sha256};
+use ssi::did::DIDMethods;
+use ssi::did_resolve::DIDResolver;
+use ssi::did_resolve::ResolutionInputMetadata;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ParsedJWE {
-    pub(crate) jwe: Jwe,
-    pub(crate) protected: ProtectedHeader,
-    pub(crate) apu: Option<Vec<u8>>,
-    pub(crate) apv: Vec<u8>,
-    pub(crate) to_kids: Vec<String>,
+pub struct ParsedJWE {
+    pub jwe: Jwe,
+    pub protected: ProtectedHeader,
+    pub apu: Option<Vec<u8>>,
+    pub apv: Vec<u8>,
+    pub to_kids: Vec<String>,
 }
 
-pub(crate) fn parse(jwe: &str) -> Result<ParsedJWE> {
+pub fn parse(jwe: &str) -> Result<ParsedJWE> {
     Jwe::from_str(jwe)?.parse()
 }
 
@@ -96,6 +103,105 @@ impl ParsedJWE {
             (None, Some(_)) => Err(err_msg(ErrorKind::Malformed, "SKID present, but no apu"))?,
             _ => (),
         };
+
+        Ok(self)
+    }
+
+    /// Populates various from_* fields for the Envelope
+    pub async fn fill_envelope_from(
+        &self,
+        envelope: &mut MetaEnvelope,
+        did_resolver: &mut dyn crate::did::DIDResolver,
+        did_methods: &DIDMethods<'_>,
+    ) -> Result<&Self> {
+        let from_kid = std::str::from_utf8(
+            self.apu
+                .as_deref()
+                .ok_or_else(|| err_msg(ErrorKind::Malformed, "No apu presented for JWE"))?,
+        )
+        .kind(ErrorKind::Malformed, "apu is invalid utf8")?;
+
+        let (from_did, from_url) = did_or_url(from_kid);
+
+        if from_url.is_none() {
+            Err(err_msg(
+                ErrorKind::Malformed,
+                "Sender key can't be resolved to key agreement",
+            ))?;
+        }
+
+        envelope.from_did = Some(from_did.into());
+
+        let (_, doc_opt, _) = did_methods
+            .resolve(
+                envelope.from_did.as_ref().unwrap(),
+                &ResolutionInputMetadata::default(),
+            )
+            .await;
+
+        let doc = doc_opt.ok_or_else(|| {
+            err_msg(
+                ErrorKind::Malformed,
+                format!(
+                    "Could not resolve senders DID ({})",
+                    envelope.from_did.as_ref().unwrap()
+                ),
+            )
+        })?;
+
+        let doc = if let Ok(doc) = DIDPeer::expand_keys(&doc).await {
+            doc
+        } else {
+            return Err(err_msg(
+                ErrorKind::Malformed,
+                format!(
+                    "Could not resolve senders DID ({})",
+                    envelope.from_did.as_ref().unwrap()
+                ),
+            ));
+        };
+
+        envelope.from_ddoc = match convert_did(&doc) {
+            Ok(ddoc) => Some(ddoc),
+            Err(e) => {
+                return Err(err_msg(
+                    ErrorKind::DIDNotResolved,
+                    format!("Couldn't convert DID. Reason: {}", e),
+                ));
+            }
+        };
+
+        // Add the Document to the list of DID Documents
+        did_resolver.insert(envelope.from_ddoc.as_ref().unwrap());
+
+        envelope.from_kid = Some(
+            envelope
+                .from_ddoc
+                .as_ref()
+                .unwrap()
+                .key_agreement
+                .iter()
+                .find(|&k| k.as_str() == from_kid)
+                .ok_or_else(|| err_msg(ErrorKind::DIDUrlNotFound, "Sender kid not found in did"))?
+                .to_string(),
+        );
+
+        envelope.from_key = Some(
+            envelope
+                .from_ddoc
+                .as_ref()
+                .unwrap()
+                .verification_method
+                .iter()
+                .find(|&vm| &vm.id == from_kid)
+                .ok_or_else(|| {
+                    err_msg(
+                        ErrorKind::DIDUrlNotFound,
+                        "Sender verification method not found in did",
+                    )
+                })?
+                .as_key_pair()?,
+        );
 
         Ok(self)
     }

@@ -5,7 +5,7 @@ use didcomm::{
     secrets::{Secret, SecretsResolver},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AffinidiSecrets {
     known_secrets: Vec<Secret>,
 }

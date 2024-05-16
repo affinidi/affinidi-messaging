@@ -77,8 +77,6 @@ async fn main() {
         .await
         .expect("Couldn't initialize mediator!");
 
-    let mut did_method_resolver = DIDMethods::default();
-    did_method_resolver.insert(Box::new(DIDPeer));
     let did_resolver = AffinidiDIDResolver::new(vec![config.mediator_did_doc.clone()]);
 
     // Start setting up the database durability and handling

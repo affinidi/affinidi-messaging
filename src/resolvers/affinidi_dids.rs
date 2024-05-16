@@ -7,7 +7,7 @@ use didcomm::{
 #[derive(Clone)]
 /// Allows resolve pre-defined did's for `example` and other methods.
 pub struct AffinidiDIDResolver {
-    known_dids: Vec<DIDDoc>,
+    pub known_dids: Vec<DIDDoc>,
 }
 
 impl AffinidiDIDResolver {
@@ -21,5 +21,9 @@ impl AffinidiDIDResolver {
 impl DIDResolver for AffinidiDIDResolver {
     async fn resolve(&self, did: &str) -> Result<Option<DIDDoc>> {
         Ok(self.known_dids.iter().find(|ddoc| ddoc.id == did).cloned())
+    }
+
+    fn insert(&mut self, did_doc: &DIDDoc) {
+        self.known_dids.push(did_doc.clone());
     }
 }

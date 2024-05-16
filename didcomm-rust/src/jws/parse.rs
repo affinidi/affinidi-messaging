@@ -7,12 +7,12 @@ use base64::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
-pub(crate) struct ParsedJWS {
-    pub(crate) jws: Jws,
-    pub(crate) protected: Vec<ProtectedHeader>,
+pub struct ParsedJWS {
+    pub jws: Jws,
+    pub protected: Vec<ProtectedHeader>,
 }
 
-pub(crate) fn parse(jws: &str) -> Result<ParsedJWS> {
+pub fn parse(jws: &str) -> Result<ParsedJWS> {
     Jws::from_str(jws)?.parse()
 }
 

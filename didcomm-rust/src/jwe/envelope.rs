@@ -5,7 +5,7 @@ use serde_json::Value;
 /// Subset of JWE in generic json serialization form used for authcrypt
 /// and anoncrypt message types.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Jwe {
+pub struct Jwe {
     /// BASE64URL(UTF8(JWE Protected Header))
     /// Note: this field value is used as AAD for JWE Ciphertext
     pub protected: String,
@@ -25,7 +25,7 @@ pub(crate) struct Jwe {
 
 /// Protected header for authcrypt/anoncrypt-specific JWE.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProtectedHeader {
+pub struct ProtectedHeader {
     /// Must be `application/didcomm-encrypted+json` or `didcomm-encrypted+json` for now.
     /// Something like `application/didcomm-encrypted+cbor` can be introduced in the
     /// future.
@@ -57,7 +57,7 @@ pub(crate) struct ProtectedHeader {
 }
 /// Recipient part of authcrypt/anoncrypt-specific JWE
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Recipient {
+pub struct Recipient {
     /// Per-recipient header
     /// Note it isn't serialized and not integrity protected
     pub header: PerRecipientHeader,
@@ -68,7 +68,7 @@ pub(crate) struct Recipient {
 
 /// Per-recipient header part of authcrypt/anoncrypt-specific JWE
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PerRecipientHeader {
+pub struct PerRecipientHeader {
     /// Recipient KID as DID URL
     pub kid: String,
 }
@@ -76,7 +76,7 @@ pub(crate) struct PerRecipientHeader {
 /// Represents possible values for `alg` header.
 /// Cryptographic algorithm used to encrypt or determine the value of the CEK.
 #[derive(Deserialize_enum_str, Serialize_enum_str, Debug, Clone, Eq, PartialEq)]
-pub(crate) enum Algorithm {
+pub enum Algorithm {
     #[serde(rename = "ECDH-1PU+A256KW")]
     Ecdh1puA256kw,
 
@@ -101,7 +101,7 @@ impl Algorithm {
 /// Identifies the content encryption algorithm used to perform authenticated encryption
 /// on the plaintext to produce the ciphertext and the Authentication Tag.
 #[derive(Deserialize_enum_str, Serialize_enum_str, Debug, Clone, Eq, PartialEq)]
-pub(crate) enum EncAlgorithm {
+pub enum EncAlgorithm {
     #[serde(rename = "A256CBC-HS512")]
     A256cbcHs512,
 

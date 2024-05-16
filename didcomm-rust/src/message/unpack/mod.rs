@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use anoncrypt::_try_unpack_anoncrypt;
 use authcrypt::_try_unpack_authcrypt;
 use sign::_try_unpack_sign;
+use ssi::did::DIDMethods;
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     did::DIDResolver,
-    envelope::{Envelope, ParsedEnvelope},
+    envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
     jws::Jws,
     message::unpack::plaintext::_try_unpack_plaintext,
@@ -23,6 +24,20 @@ mod plaintext;
 mod sign;
 
 impl Message {
+    pub async fn unpack_string<T>(
+        msg: &str,
+        did_resolver: &mut T,
+        did_method_resolver: &DIDMethods<'_>,
+        secrets_resolver: &dyn SecretsResolver,
+        options: &UnpackOptions,
+    ) -> Result<(Message, UnpackMetadata)>
+    where
+        T: DIDResolver,
+    {
+        let envelope = MetaEnvelope::new(msg, did_resolver, did_method_resolver).await?;
+
+        Self::unpack(&envelope, did_resolver, secrets_resolver, options).await
+    }
     /// Unpacks the packed message by doing decryption and verifying the signatures.
     /// This method supports all DID Comm message types (encrypted, signed, plaintext).
     ///
@@ -53,7 +68,7 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving.
     /// TODO: verify and update errors list
     pub async fn unpack(
-        msg: &str,
+        envelope: &MetaEnvelope,
         did_resolver: &dyn DIDResolver,
         secrets_resolver: &dyn SecretsResolver,
         options: &UnpackOptions,
@@ -74,11 +89,19 @@ impl Message {
             signed_message: None,
             from_prior: None,
         };
-        let mut msg = msg;
+        //let mut msg = msg;
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
 
-        let mut parsed_jwe = Envelope::from_str(msg)?.parse()?.verify_didcomm()?;
+        let mut parsed_jwe = if let Some(parsed) = &envelope.parsed_envelope {
+            parsed.clone()
+        } else {
+            return Err(err_msg(
+                ErrorKind::InvalidState,
+                "Parsed envelope not found",
+            ));
+        };
+
         loop {
             anoncrypted =
                 _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, &mut metadata)
@@ -94,11 +117,11 @@ impl Message {
 
                 if forwarded_msg_opt.is_some() {
                     forwarded_msg = forwarded_msg_opt.unwrap();
-                    msg = &forwarded_msg;
-
                     metadata.re_wrapped_in_forward = true;
 
-                    parsed_jwe = Envelope::from_str(msg)?.parse()?.verify_didcomm()?;
+                    parsed_jwe = Envelope::from_str(&forwarded_msg)?
+                        .parse()?
+                        .verify_didcomm()?;
                     continue;
                 }
             }
@@ -186,7 +209,7 @@ impl Default for UnpackOptions {
 
 /// Additional metadata about this `unpack` method execution like trust predicates
 /// and used keys identifiers.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize)]
 pub struct UnpackMetadata {
     /// Whether the plaintext has been encrypted
     pub encrypted: bool,
