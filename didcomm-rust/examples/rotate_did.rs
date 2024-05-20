@@ -4,6 +4,7 @@ mod test_vectors;
 
 // TODO: look for better solution
 // Allows test vectors usage inside and outside crate
+#[allow(clippy::single_component_path_imports)]
 pub(crate) use didcomm;
 
 use didcomm::{

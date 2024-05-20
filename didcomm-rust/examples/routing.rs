@@ -4,6 +4,7 @@ mod test_vectors;
 
 // TODO: look for better solution
 // Allows test vectors usage inside and outside crate
+#[allow(clippy::single_component_path_imports)]
 pub(crate) use didcomm;
 
 use didcomm::{
@@ -371,7 +372,7 @@ async fn re_wrapping_for_final_recipient() {
         &msg,
         None,
         &parsed_forward.next,
-        &vec![parsed_forward.next.clone()],
+        &[parsed_forward.next.clone()],
         &AnonCryptAlg::default(),
         &did_resolver,
     )
@@ -483,7 +484,7 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
         &msg,
         None,
         &parsed_forward.next,
-        &vec!["did:example:mediator2#key-x25519-1".to_owned()],
+        &["did:example:mediator2#key-x25519-1".to_owned()],
         &AnonCryptAlg::default(),
         &did_resolver,
     )

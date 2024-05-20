@@ -18,7 +18,7 @@ lazy_static! {
     };
     pub static ref ALICE_SECRET_AUTH_KEY_P256: Secret = Secret {
         id: "did:example:alice#key-2".into(),
-        type_: SecretType::JsonWebKey2020.into(),
+        type_: SecretType::JsonWebKey2020,
         secret_material: SecretMaterial::JWK {
             private_key_jwk: json!({
                 "kty": "EC",
