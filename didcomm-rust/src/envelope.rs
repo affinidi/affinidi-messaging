@@ -1,6 +1,9 @@
+use std::str::FromStr;
+
 use crate::{
     did::{DIDDoc, DIDResolver},
-    error::{err_msg, ErrorKind, Result, ToResult},
+    error::{err_msg, Error, ErrorKind, Result, ToResult},
+    secrets::SecretsResolver,
     utils::crypto::KnownKeyPair,
     UnpackMetadata,
 };
@@ -21,12 +24,15 @@ pub enum Envelope {
     Jws(Jws),
     Message(Message),
 }
+impl FromStr for Envelope {
+    type Err = Error;
 
-impl Envelope {
-    pub fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self> {
         serde_json::from_str(s).to_didcomm("Unable deserialize envelope")
     }
+}
 
+impl Envelope {
     pub fn parse(&self) -> Result<ParsedEnvelope> {
         match self {
             Envelope::Jwe(jwe) => Ok(ParsedEnvelope::Jwe(jwe.to_owned().parse()?)),
@@ -51,10 +57,18 @@ impl ParsedEnvelope {
             ParsedEnvelope::Message(_) => Ok(self),
         }
     }
+
+    pub fn get_type(&self) -> &str {
+        match self {
+            ParsedEnvelope::Jwe(_) => "JWE",
+            ParsedEnvelope::Jws(_) => "JWS",
+            ParsedEnvelope::Message(_) => "JMS",
+        }
+    }
 }
 
 /// Higher level Envelope that holds all required information pertaining to a DIDComm Message
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MetaEnvelope {
     pub envelope: Option<Envelope>,              // The raw envelope
     pub parsed_envelope: Option<ParsedEnvelope>, // The parsed envelope
@@ -63,30 +77,21 @@ pub struct MetaEnvelope {
     pub from_did: Option<String>,       // DID of Sender (did:method:identifier)
     pub from_ddoc: Option<DIDDoc>,      // DID Document of Sender
     pub from_key: Option<KnownKeyPair>, // Key of Sender
-}
-
-impl Default for MetaEnvelope {
-    fn default() -> Self {
-        Self {
-            envelope: None,
-            parsed_envelope: None,
-            metadata: UnpackMetadata::default(),
-            from_kid: None,
-            from_did: None,
-            from_ddoc: None,
-            from_key: None,
-        }
-    }
+    pub to_kid: Option<String>,
+    pub to_did: Option<String>,
+    pub to_kids_found: Vec<String>,
 }
 
 impl MetaEnvelope {
-    pub async fn new<T>(
+    pub async fn new<T, S>(
         msg: &str,
         did_resolver: &mut T,
+        secrets_resolver: &S,
         did_methods: &DIDMethods<'_>,
     ) -> Result<Self>
     where
         T: DIDResolver,
+        S: SecretsResolver,
     {
         let mut envelope = Self::default();
         envelope.envelope = Some(Envelope::from_str(msg)?);
@@ -99,7 +104,9 @@ impl MetaEnvelope {
                 .verify_didcomm()?,
         );
 
-        envelope._from(did_resolver, did_methods).await?;
+        envelope
+            ._from(did_resolver, secrets_resolver, did_methods)
+            .await?;
 
         Ok(envelope)
     }
@@ -107,10 +114,17 @@ impl MetaEnvelope {
     async fn _from(
         &mut self,
         did_resolver: &mut dyn DIDResolver,
+        secrets_resolver: &dyn SecretsResolver,
         did_methods: &DIDMethods<'_>,
     ) -> Result<&Self> {
-        let jwe = match self.parsed_envelope.as_ref() {
-            Some(ParsedEnvelope::Jwe(jwe)) => jwe,
+        match self.parsed_envelope.as_ref() {
+            Some(ParsedEnvelope::Jwe(jwe)) => {
+                jwe.to_owned()
+                    .fill_envelope_from(self, did_resolver, secrets_resolver, did_methods)
+                    .await?;
+            }
+            Some(ParsedEnvelope::Jws(_)) => {}
+            Some(ParsedEnvelope::Message(_)) => {}
             _ => {
                 return Err(err_msg(
                     ErrorKind::Malformed,
@@ -118,10 +132,6 @@ impl MetaEnvelope {
                 ))
             }
         };
-
-        jwe.to_owned()
-            .fill_envelope_from(self, did_resolver, did_methods)
-            .await?;
 
         Ok(self)
     }

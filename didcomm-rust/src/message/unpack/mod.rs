@@ -4,6 +4,8 @@ use anoncrypt::_try_unpack_anoncrypt;
 use authcrypt::_try_unpack_authcrypt;
 use sign::_try_unpack_sign;
 use ssi::did::DIDMethods;
+use std::str::FromStr;
+use tracing::debug;
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
@@ -24,19 +26,28 @@ mod plaintext;
 mod sign;
 
 impl Message {
-    pub async fn unpack_string<T>(
+    pub async fn unpack_string<S, T>(
         msg: &str,
         did_resolver: &mut T,
         did_method_resolver: &DIDMethods<'_>,
-        secrets_resolver: &dyn SecretsResolver,
+        secrets_resolver: &S,
         options: &UnpackOptions,
     ) -> Result<(Message, UnpackMetadata)>
     where
         T: DIDResolver,
+        S: SecretsResolver,
     {
-        let envelope = MetaEnvelope::new(msg, did_resolver, did_method_resolver).await?;
+        let mut envelope =
+            MetaEnvelope::new(msg, did_resolver, secrets_resolver, did_method_resolver).await?;
 
-        Self::unpack(&envelope, did_resolver, secrets_resolver, options).await
+        Self::unpack(
+            &mut envelope,
+            did_resolver,
+            did_method_resolver,
+            secrets_resolver,
+            options,
+        )
+        .await
     }
     /// Unpacks the packed message by doing decryption and verifying the signatures.
     /// This method supports all DID Comm message types (encrypted, signed, plaintext).
@@ -67,28 +78,17 @@ impl Message {
     /// - `InvalidState` Indicates library error.
     /// - `IOError` IO error during DID or secrets resolving.
     /// TODO: verify and update errors list
-    pub async fn unpack(
-        envelope: &MetaEnvelope,
-        did_resolver: &dyn DIDResolver,
-        secrets_resolver: &dyn SecretsResolver,
+    pub async fn unpack<S, T>(
+        envelope: &mut MetaEnvelope,
+        did_resolver: &mut T,
+        did_method_resolver: &DIDMethods<'_>,
+        secrets_resolver: &S,
         options: &UnpackOptions,
-    ) -> Result<(Message, UnpackMetadata)> {
-        let mut metadata = UnpackMetadata {
-            encrypted: false,
-            authenticated: false,
-            non_repudiation: false,
-            anonymous_sender: false,
-            re_wrapped_in_forward: false,
-            encrypted_from_kid: None,
-            encrypted_to_kids: None,
-            sign_from: None,
-            from_prior_issuer_kid: None,
-            enc_alg_auth: None,
-            enc_alg_anon: None,
-            sign_alg: None,
-            signed_message: None,
-            from_prior: None,
-        };
+    ) -> Result<(Message, UnpackMetadata)>
+    where
+        T: DIDResolver,
+        S: SecretsResolver,
+    {
         //let mut msg = msg;
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
@@ -104,8 +104,7 @@ impl Message {
 
         loop {
             anoncrypted =
-                _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, &mut metadata)
-                    .await?;
+                _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, envelope).await?;
 
             if options.unwrap_re_wrapping_forward && anoncrypted.is_some() {
                 let forwarded_msg_opt = Self::_try_unwrap_forwarded_message(
@@ -117,7 +116,7 @@ impl Message {
 
                 if forwarded_msg_opt.is_some() {
                     forwarded_msg = forwarded_msg_opt.unwrap();
-                    metadata.re_wrapped_in_forward = true;
+                    envelope.metadata.re_wrapped_in_forward = true;
 
                     parsed_jwe = Envelope::from_str(&forwarded_msg)?
                         .parse()?
@@ -129,22 +128,24 @@ impl Message {
             break;
         }
         let parsed_jwe = anoncrypted.clone().unwrap_or(parsed_jwe);
+        debug!("metadata = {:#?}", envelope.metadata);
 
         let authcrypted = _try_unpack_authcrypt(
             &parsed_jwe,
             did_resolver,
+            did_method_resolver,
             secrets_resolver,
             options,
-            &mut metadata,
+            envelope,
         )
         .await?;
 
         let parsed_jwe = authcrypted.unwrap_or(parsed_jwe);
 
-        let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, &mut metadata).await?;
+        let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, envelope).await?;
         let parsed_jwe = signed.unwrap_or(parsed_jwe);
 
-        let msg = _try_unpack_plaintext(&parsed_jwe, did_resolver, &mut metadata)
+        let msg = _try_unpack_plaintext(&parsed_jwe, did_resolver, envelope)
             .await?
             .ok_or_else(|| {
                 err_msg(
@@ -153,7 +154,7 @@ impl Message {
                 )
             })?;
 
-        Ok((msg, metadata))
+        Ok((msg, envelope.metadata.to_owned()))
     }
 
     async fn _try_unwrap_forwarded_message(
@@ -281,6 +282,9 @@ async fn has_key_agreement_secret(
 
 #[cfg(test)]
 mod test {
+    use tracing::debug;
+    use tracing_test::traced_test;
+
     use crate::{
         did::resolvers::ExampleDIDResolver,
         message::MessagingServiceMetadata,
@@ -654,7 +658,7 @@ mod test {
             from: Option<&str>,
             sign_by: Option<&str>,
         ) {
-            let did_resolver = ExampleDIDResolver::new(vec![
+            let mut did_resolver = ExampleDIDResolver::new(vec![
                 ALICE_DID_DOC.clone(),
                 BOB_DID_DOC.clone(),
                 MEDIATOR1_DID_DOC.clone(),
@@ -686,9 +690,11 @@ mod test {
                 })
             );
 
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack(
+            let did_method_resolver = DIDMethods::default();
+            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
                 &msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator1_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -721,9 +727,10 @@ mod test {
             .await
             .expect("Unable wrap in forward");
 
-            let (unpacked_msg, unpack_metadata) = Message::unpack(
+            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
                 &re_wrapping_forward_msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &bob_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -779,7 +786,7 @@ mod test {
             from: Option<&str>,
             sign_by: Option<&str>,
         ) {
-            let did_resolver = ExampleDIDResolver::new(vec![
+            let mut did_resolver = ExampleDIDResolver::new(vec![
                 ALICE_DID_DOC.clone(),
                 BOB_DID_DOC.clone(),
                 MEDIATOR1_DID_DOC.clone(),
@@ -811,9 +818,11 @@ mod test {
                 })
             );
 
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack(
+            let did_method_resolver = DIDMethods::default();
+            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
                 &msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator1_secrets_resolver,
                 &UnpackOptions {
                     unwrap_re_wrapping_forward: false,
@@ -850,9 +859,10 @@ mod test {
             .await
             .expect("Unable wrap in forward");
 
-            let (unpacked_once_msg, unpack_once_metadata) = Message::unpack(
+            let (unpacked_once_msg, unpack_once_metadata) = Message::unpack_string(
                 &re_wrapping_forward_msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &bob_secrets_resolver,
                 &UnpackOptions {
                     unwrap_re_wrapping_forward: false,
@@ -877,9 +887,10 @@ mod test {
             let forwarded_msg_at_bob = serde_json::to_string(&forward_at_bob.forwarded_msg)
                 .expect("Unable serialize forwarded message");
 
-            let (unpacked_twice_msg, unpack_twice_metadata) = Message::unpack(
+            let (unpacked_twice_msg, unpack_twice_metadata) = Message::unpack_string(
                 &forwarded_msg_at_bob,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &bob_secrets_resolver,
                 &UnpackOptions {
                     unwrap_re_wrapping_forward: false,
@@ -1209,6 +1220,7 @@ mod test {
         }
     }
 
+    #[traced_test]
     #[tokio::test]
     async fn unpack_works_authcrypt() {
         let metadata = UnpackMetadata {
@@ -1228,6 +1240,7 @@ mod test {
             re_wrapped_in_forward: false,
         };
 
+        debug!("testing ENCRYPTED_MSG_AUTH_X25519");
         _verify_unpack(
             ENCRYPTED_MSG_AUTH_X25519,
             &MESSAGE_SIMPLE,
@@ -1244,6 +1257,7 @@ mod test {
         )
         .await;
 
+        debug!("testing ENCRYPTED_MSG_AUTH_P256");
         _verify_unpack(
             ENCRYPTED_MSG_AUTH_P256,
             &MESSAGE_SIMPLE,
@@ -1401,6 +1415,7 @@ mod test {
 
     #[tokio::test]
     async fn unpack_works_authcrypted_protected_sender_2way() {
+        debug!("testing anonCryptAlg(A256cbcHs512EcdhEsA256kw) authCryptAlg(A256cbcHs512Ecdh1puA256kw)");
         _unpack_works_authcrypted_protected_sender_2way(
             &MESSAGE_SIMPLE,
             BOB_DID,
@@ -2077,7 +2092,7 @@ mod test {
     }
 
     async fn _verify_unpack(msg: &str, exp_msg: &Message, exp_metadata: &UnpackMetadata) {
-        let did_resolver = ExampleDIDResolver::new(vec![
+        let mut did_resolver = ExampleDIDResolver::new(vec![
             ALICE_DID_DOC.clone(),
             BOB_DID_DOC.clone(),
             CHARLIE_DID_DOC.clone(),
@@ -2085,9 +2100,11 @@ mod test {
 
         let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-        let (msg, metadata) = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let (msg, metadata) = Message::unpack_string(
             msg,
-            &did_resolver,
+            &mut did_resolver,
+            &did_method_resolver,
             &secrets_resolver,
             &UnpackOptions::default(),
         )
@@ -2104,17 +2121,18 @@ mod test {
         exp_msg: &Message,
         exp_metadata: &UnpackMetadata,
     ) {
-        let did_resolver = ExampleDIDResolver::new(vec![
+        let mut did_resolver = ExampleDIDResolver::new(vec![
             ALICE_DID_DOC.clone(),
             BOB_DID_DOC.clone(),
             CHARLIE_DID_DOC.clone(),
         ]);
 
         let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
-
-        let (msg, mut metadata) = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let (msg, mut metadata) = Message::unpack_string(
             msg,
-            &did_resolver,
+            &mut did_resolver,
+            &did_method_resolver,
             &secrets_resolver,
             &UnpackOptions::default(),
         )
@@ -2123,7 +2141,9 @@ mod test {
 
         assert_eq!(&msg, exp_msg);
 
-        metadata.signed_message = exp_metadata.signed_message.clone();
+        metadata
+            .signed_message
+            .clone_from(&exp_metadata.signed_message);
         assert_eq!(&metadata, exp_metadata);
     }
 
@@ -2132,7 +2152,7 @@ mod test {
     }
 
     async fn _verify_unpack_returns_error(msg: &str, exp_err_kind: ErrorKind, exp_err_msg: &str) {
-        let did_resolver = ExampleDIDResolver::new(vec![
+        let mut did_resolver = ExampleDIDResolver::new(vec![
             ALICE_DID_DOC.clone(),
             BOB_DID_DOC.clone(),
             CHARLIE_DID_DOC.clone(),
@@ -2140,9 +2160,11 @@ mod test {
 
         let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-        let err = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let err = Message::unpack_string(
             msg,
-            &did_resolver,
+            &mut did_resolver,
+            &did_method_resolver,
             &secrets_resolver,
             &UnpackOptions::default(),
         )

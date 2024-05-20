@@ -14,6 +14,7 @@ use didcomm::{
     Message, PackEncryptedOptions, UnpackOptions,
 };
 use serde_json::json;
+use ssi::did::DIDMethods;
 use test_vectors::{
     ALICE_DID, ALICE_DID_DOC, ALICE_SECRETS, BOB_DID, BOB_DID_DOC, BOB_SECRETS, CHARLIE_DID,
     CHARLIE_DID_DOC, CHARLIE_SECRETS, MEDIATOR1_DID_DOC, MEDIATOR1_SECRETS, MEDIATOR2_DID_DOC,
@@ -75,7 +76,7 @@ async fn single_mediator() {
     println!("Alice is sending message \n{}\n", msg);
 
     // --- Unpacking message by Mediator1 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -83,9 +84,11 @@ async fn single_mediator() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let did_method_resolver = DIDMethods::default();
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -105,7 +108,7 @@ async fn single_mediator() {
     println!("Mediator1 is forwarding message \n{}\n", msg);
 
     // --- Unpacking message by Bob ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -113,9 +116,10 @@ async fn single_mediator() {
 
     let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -166,7 +170,7 @@ async fn multiple_mediators_with_alternative_endpoints() {
     println!("Alice is sending message \n{}\n", msg);
 
     // --- Unpacking message by Mediator3 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         CHARLIE_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -176,9 +180,11 @@ async fn multiple_mediators_with_alternative_endpoints() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let did_method_resolver = DIDMethods::default();
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -198,7 +204,7 @@ async fn multiple_mediators_with_alternative_endpoints() {
     println!("Mediator3 is forwarding message \n{}\n", msg);
 
     // --- Unpacking message by Mediator2 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         CHARLIE_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -208,9 +214,10 @@ async fn multiple_mediators_with_alternative_endpoints() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -230,7 +237,7 @@ async fn multiple_mediators_with_alternative_endpoints() {
     println!("Mediator2 is forwarding message \n{}\n", msg);
 
     // --- Unpacking message by Mediator1 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         CHARLIE_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -240,9 +247,10 @@ async fn multiple_mediators_with_alternative_endpoints() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -262,7 +270,7 @@ async fn multiple_mediators_with_alternative_endpoints() {
     println!("Mediator1 is forwarding message \n{}\n", msg);
 
     // --- Unpacking message by Charlie ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         CHARLIE_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -272,9 +280,10 @@ async fn multiple_mediators_with_alternative_endpoints() {
 
     let secrets_resolver = ExampleSecretsResolver::new(CHARLIE_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -326,7 +335,7 @@ async fn re_wrapping_for_final_recipient() {
     println!("Alice is sending message \n{}\n", msg);
 
     // --- Unpacking message by Mediator1 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -334,9 +343,11 @@ async fn re_wrapping_for_final_recipient() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let did_method_resolver = DIDMethods::default();
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -374,7 +385,7 @@ async fn re_wrapping_for_final_recipient() {
     );
 
     // --- Unpacking message by Bob ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -382,9 +393,10 @@ async fn re_wrapping_for_final_recipient() {
 
     let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -434,7 +446,7 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
     println!("Alice is sending message \n{}\n", msg);
 
     // --- Unpacking message by Mediator1 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -443,9 +455,11 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let did_method_resolver = DIDMethods::default();
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -483,7 +497,7 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
     );
 
     // --- Unpacking message by Mediator2 ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -492,9 +506,10 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
 
     let secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )
@@ -513,7 +528,7 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
     println!("Mediator2 is forwarding message \n{}\n", msg);
 
     // --- Unpacking message by Bob ---
-    let did_resolver = ExampleDIDResolver::new(vec![
+    let mut did_resolver = ExampleDIDResolver::new(vec![
         ALICE_DID_DOC.clone(),
         BOB_DID_DOC.clone(),
         MEDIATOR1_DID_DOC.clone(),
@@ -522,9 +537,10 @@ async fn re_wrapping_for_mediator_unknown_to_sender() {
 
     let secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
 
-    let (msg, metadata) = Message::unpack(
+    let (msg, metadata) = Message::unpack_string(
         &msg,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &secrets_resolver,
         &UnpackOptions::default(),
     )

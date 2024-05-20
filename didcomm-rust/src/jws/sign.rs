@@ -490,7 +490,7 @@ mod tests {
         payload: &str,
     ) -> Result<String> {
         let key = K::from_jwk(key).expect("Unable from_jwk");
-        jws::sign(payload.as_bytes(), (&kid, &key), alg.clone())
+        jws::sign(payload.as_bytes(), (kid, &key), alg.clone())
     }
 
     fn _sign_compact<K: FromJwk + KeySign>(
@@ -501,7 +501,7 @@ mod tests {
         payload: &str,
     ) -> Result<String> {
         let key = K::from_jwk(key).expect("Unable from_jwk");
-        jws::sign_compact(payload.as_bytes(), (&kid, &key), typ, alg.clone())
+        jws::sign_compact(payload.as_bytes(), (kid, &key), typ, alg.clone())
     }
 
     const ALICE_KID_ED25519: &str = "did:example:alice#key-1";

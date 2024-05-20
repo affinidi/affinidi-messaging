@@ -48,21 +48,27 @@ pub async fn message_inbound_handler(
     did_method_resolver.insert(Box::new(DIDPeer));
     let mut did_resolver = state.did_resolver.clone();
 
-    let envelope =
-        match MetaEnvelope::new(&s, did_resolver.borrow_mut(), &did_method_resolver).await {
-            Ok(envelope) => envelope,
-            Err(e) => {
-                return Err(MediatorError::ParseError(
-                    session.tx_id,
-                    "Raw inbound DIDComm message".into(),
-                    e.to_string(),
-                )
-                .into());
-            }
-        };
+    let mut envelope = match MetaEnvelope::new(
+        &s,
+        did_resolver.borrow_mut(),
+        &state.config.mediator_secrets,
+        &did_method_resolver,
+    )
+    .await
+    {
+        Ok(envelope) => envelope,
+        Err(e) => {
+            return Err(MediatorError::ParseError(
+                session.tx_id,
+                "Raw inbound DIDComm message".into(),
+                e.to_string(),
+            )
+            .into());
+        }
+    };
 
     match Message::unpack(
-        &envelope,
+        &mut envelope,
         &did_resolver,
         &state.config.mediator_secrets,
         &UnpackOptions::default(),

@@ -8,10 +8,11 @@ use askar_crypto::{
     },
     kdf::ecdh_es::EcdhEs,
 };
+use std::str::FromStr;
 
 use crate::{
     algorithms::AnonCryptAlg,
-    envelope::{Envelope, ParsedEnvelope},
+    envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
     jwe,
     secrets::SecretsResolver,
@@ -19,14 +20,14 @@ use crate::{
         crypto::{AsKnownKeyPair, KnownKeyPair},
         did::did_or_url,
     },
-    UnpackMetadata, UnpackOptions,
+    UnpackOptions,
 };
 
 pub(crate) async fn _try_unpack_anoncrypt(
     jwe: &ParsedEnvelope,
     secrets_resolver: &dyn SecretsResolver,
     opts: &UnpackOptions,
-    metadata: &mut UnpackMetadata,
+    envelope: &mut MetaEnvelope,
 ) -> Result<Option<ParsedEnvelope>> {
     let jwe = match jwe {
         ParsedEnvelope::Jwe(jwe) => jwe,
@@ -54,9 +55,9 @@ pub(crate) async fn _try_unpack_anoncrypt(
         ))?;
     }
 
-    metadata.encrypted_to_kids = Some(jwe.to_kids.iter().map(|k| k.to_owned()).collect());
-    metadata.encrypted = true;
-    metadata.anonymous_sender = true;
+    envelope.metadata.encrypted_to_kids = Some(jwe.to_kids.iter().map(|k| k.to_owned()).collect());
+    envelope.metadata.encrypted = true;
+    envelope.metadata.anonymous_sender = true;
 
     let to_kids_found = secrets_resolver.find_secrets(&jwe.to_kids).await?;
 
@@ -83,7 +84,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
 
         let _payload = match (to_key, &jwe.protected.enc) {
             (KnownKeyPair::X25519(ref to_key), jwe::EncAlgorithm::A256cbcHs512) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256CbcHs512>,
@@ -93,7 +94,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::X25519(ref to_key), jwe::EncAlgorithm::Xc20P) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
 
                 jwe.decrypt::<
                         Chacha20Key<XC20P>,
@@ -103,7 +104,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::X25519(ref to_key), jwe::EncAlgorithm::A256Gcm) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256Gcm>,
@@ -113,7 +114,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::P256(ref to_key), jwe::EncAlgorithm::A256cbcHs512) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256CbcHs512>,
@@ -123,7 +124,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::P256(ref to_key), jwe::EncAlgorithm::Xc20P) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
 
                 jwe.decrypt::<
                         Chacha20Key<XC20P>,
@@ -133,7 +134,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::P256(ref to_key), jwe::EncAlgorithm::A256Gcm) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256Gcm>,
@@ -143,7 +144,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::A256cbcHs512) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256cbcHs512EcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256CbcHs512>,
@@ -153,7 +154,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::Xc20P) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::Xc20pEcdhEsA256kw);
 
                 jwe.decrypt::<
                         Chacha20Key<XC20P>,
@@ -163,7 +164,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
                     >(None, (&to_kid, to_key))?
             }
             (KnownKeyPair::K256(ref to_key), jwe::EncAlgorithm::A256Gcm) => {
-                metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
+                envelope.metadata.enc_alg_anon = Some(AnonCryptAlg::A256gcmEcdhEsA256kw);
 
                 jwe.decrypt::<
                         AesKey<A256Gcm>,

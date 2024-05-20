@@ -274,6 +274,7 @@ pub struct MessagingServiceMetadata {
 #[cfg(test)]
 mod tests {
     use base64::prelude::*;
+    use ssi::did::DIDMethods;
     use std::{collections::HashMap, iter::FromIterator};
 
     use askar_crypto::{
@@ -1557,7 +1558,7 @@ mod tests {
             from: Option<&str>,
             sign_by: Option<&str>,
         ) {
-            let did_resolver = ExampleDIDResolver::new(vec![
+            let mut did_resolver = ExampleDIDResolver::new(vec![
                 ALICE_DID_DOC.clone(),
                 BOB_DID_DOC.clone(),
                 MEDIATOR1_DID_DOC.clone(),
@@ -1618,9 +1619,11 @@ mod tests {
                 }
             }
 
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack(
+            let did_method_resolver = DIDMethods::default();
+            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
                 &msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator1_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1642,9 +1645,10 @@ mod tests {
             let forwarded_msg = serde_json::to_string(&forward.forwarded_msg)
                 .expect("Unable serialize forwarded message");
 
-            let (unpacked_msg, unpack_metadata) = Message::unpack(
+            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
                 &forwarded_msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &bob_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1734,7 +1738,7 @@ mod tests {
             .expires_time(1516385931)
             .finalize();
 
-            let did_resolver = ExampleDIDResolver::new(vec![
+            let mut did_resolver = ExampleDIDResolver::new(vec![
                 ALICE_DID_DOC.clone(),
                 CHARLIE_DID_DOC.clone(),
                 MEDIATOR1_DID_DOC.clone(),
@@ -1807,9 +1811,11 @@ mod tests {
                 }
             }
 
-            let (unpacked_msg_mediator3, unpack_metadata_mediator3) = Message::unpack(
+            let did_method_resolver = DIDMethods::default();
+            let (unpacked_msg_mediator3, unpack_metadata_mediator3) = Message::unpack_string(
                 &packed_msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator3_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1844,9 +1850,10 @@ mod tests {
                 serde_json::to_string(&forward_at_mediator3.forwarded_msg)
                     .expect("Unable serialize forwarded message");
 
-            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack(
+            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
                 &forwarded_msg_at_mediator3,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator2_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1881,9 +1888,10 @@ mod tests {
                 serde_json::to_string(&forward_at_mediator2.forwarded_msg)
                     .expect("Unable serialize forwarded message");
 
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack(
+            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
                 &forwarded_msg_at_mediator2,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator1_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1915,9 +1923,10 @@ mod tests {
                 serde_json::to_string(&forward_at_mediator1.forwarded_msg)
                     .expect("Unable serialize forwarded message");
 
-            let (unpacked_msg, unpack_metadata) = Message::unpack(
+            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
                 &forwarded_msg_at_mediator1,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &charlie_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -1985,7 +1994,7 @@ mod tests {
             from: Option<&str>,
             sign_by: Option<&str>,
         ) {
-            let did_resolver = ExampleDIDResolver::new(vec![
+            let mut did_resolver = ExampleDIDResolver::new(vec![
                 ALICE_DID_DOC.clone(),
                 BOB_DID_DOC.clone(),
                 MEDIATOR1_DID_DOC.clone(),
@@ -2023,9 +2032,11 @@ mod tests {
                 })
             );
 
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack(
+            let did_method_resolver = DIDMethods::default();
+            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
                 &msg,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator1_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -2059,9 +2070,10 @@ mod tests {
             .await
             .expect("Unable wrap in forward");
 
-            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack(
+            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
                 &forward_msg_for_mediator2,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &mediator2_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -2084,9 +2096,10 @@ mod tests {
                 serde_json::to_string(&forward_at_mediator2.forwarded_msg)
                     .expect("Unable serialize forwarded message");
 
-            let (unpacked_msg, unpack_metadata) = Message::unpack(
+            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
                 &forwarded_msg_at_mediator2,
-                &did_resolver,
+                &mut did_resolver,
+                &did_method_resolver,
                 &bob_secrets_resolver,
                 &UnpackOptions::default(),
             )
@@ -2787,7 +2800,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_prior() {
-        let did_resolver = ExampleDIDResolver::new(vec![
+        let mut did_resolver = ExampleDIDResolver::new(vec![
             ALICE_DID_DOC.clone(),
             BOB_DID_DOC.clone(),
             CHARLIE_DID_DOC.clone(),
@@ -2811,9 +2824,11 @@ mod tests {
             .await
             .expect("Unable pack_encrypted");
 
-        let (unpacked_msg, unpack_metadata) = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let (unpacked_msg, unpack_metadata) = Message::unpack_string(
             &packed_msg,
-            &did_resolver,
+            &mut did_resolver,
+            &did_method_resolver,
             &bob_secrets_resolver,
             &UnpackOptions::default(),
         )

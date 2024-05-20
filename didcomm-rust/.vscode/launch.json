@@ -7,6 +7,24 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "TEST",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--lib",
+                    "--no-run",
+                ],
+                "filter": {
+                    "name": "didcommmessage",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in library 'didcomm'",
             "cargo": {
                 "args": [

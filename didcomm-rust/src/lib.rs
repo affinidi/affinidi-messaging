@@ -33,6 +33,7 @@ pub use message::{
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use ssi::did::DIDMethods;
 
     use crate::{
         did::resolvers::ExampleDIDResolver, secrets::resolvers::ExampleSecretsResolver, Message,
@@ -87,12 +88,14 @@ mod tests {
 
         // --- Unpacking message ---
 
-        let recipient_did_resolver = ExampleDIDResolver::new(vec![]);
+        let mut recipient_did_resolver = ExampleDIDResolver::new(vec![]);
         let recipient_secrets_resolver = ExampleSecretsResolver::new(vec![]);
 
-        let (msg, metadata) = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let (msg, metadata) = Message::unpack_string(
             &packed_msg,
-            &recipient_did_resolver,
+            &mut recipient_did_resolver,
+            &did_method_resolver,
             &recipient_secrets_resolver,
             &UnpackOptions::default(),
         )

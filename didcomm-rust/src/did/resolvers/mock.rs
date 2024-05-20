@@ -22,4 +22,12 @@ impl DIDResolver for MockDidResolver {
     async fn resolve(&self, _did: &str) -> crate::error::Result<Option<DIDDoc>> {
         self.results.lock().unwrap().borrow_mut().pop().unwrap()
     }
+
+    fn insert(&mut self, did_doc: &DIDDoc) {
+        self.results
+            .lock()
+            .unwrap()
+            .borrow_mut()
+            .push(Ok(Some(did_doc.clone())));
+    }
 }

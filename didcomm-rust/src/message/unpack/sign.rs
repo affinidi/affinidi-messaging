@@ -1,26 +1,33 @@
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
+use tracing::debug;
 
-use crate::envelope::{Envelope, ParsedEnvelope};
+use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
     algorithms::SignAlg,
     did::DIDResolver,
     error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
     jws,
     utils::{crypto::AsKnownKeyPair, did::did_or_url},
-    UnpackMetadata, UnpackOptions,
+    UnpackOptions,
 };
 use base64::prelude::*;
+use std::str::FromStr;
 
 pub(crate) async fn _try_unpack_sign(
     msg: &ParsedEnvelope,
     did_resolver: &dyn DIDResolver,
     _opts: &UnpackOptions,
-    metadata: &mut UnpackMetadata,
+    envelope: &mut MetaEnvelope,
 ) -> Result<Option<ParsedEnvelope>> {
+    debug!(
+        "Is this a signed envelope? expect(JWS) actual({})",
+        msg.get_type()
+    );
     let parsed_jws: &jws::ParsedJWS = match msg {
         ParsedEnvelope::Jws(jws) => jws,
         _ => return Ok(None),
     };
+    debug!("Trying to unpack signed envelope");
 
     if parsed_jws.protected.len() != 1 {
         Err(err_msg(
@@ -88,7 +95,7 @@ pub(crate) async fn _try_unpack_sign(
 
     let valid = match alg {
         jws::Algorithm::EdDSA => {
-            metadata.sign_alg = Some(SignAlg::EdDSA);
+            envelope.metadata.sign_alg = Some(SignAlg::EdDSA);
 
             let signer_key = signer_key
                 .as_ed25519()
@@ -99,7 +106,7 @@ pub(crate) async fn _try_unpack_sign(
                 .context("Unable verify sign envelope")?
         }
         jws::Algorithm::Es256 => {
-            metadata.sign_alg = Some(SignAlg::ES256);
+            envelope.metadata.sign_alg = Some(SignAlg::ES256);
 
             let signer_key = signer_key
                 .as_p256()
@@ -110,7 +117,7 @@ pub(crate) async fn _try_unpack_sign(
                 .context("Unable verify sign envelope")?
         }
         jws::Algorithm::Es256K => {
-            metadata.sign_alg = Some(SignAlg::ES256K);
+            envelope.metadata.sign_alg = Some(SignAlg::ES256K);
 
             let signer_key = signer_key
                 .as_k256()
@@ -138,10 +145,10 @@ pub(crate) async fn _try_unpack_sign(
     let payload =
         String::from_utf8(payload).kind(ErrorKind::Malformed, "Signed payload is invalid utf8")?;
 
-    metadata.authenticated = true;
-    metadata.non_repudiation = true;
-    metadata.sign_from = Some(signer_kid.into());
-    metadata.signed_message = Some(parsed_jws.jws.clone());
+    envelope.metadata.authenticated = true;
+    envelope.metadata.non_repudiation = true;
+    envelope.metadata.sign_from = Some(signer_kid.into());
+    envelope.metadata.signed_message = Some(parsed_jws.jws.clone());
 
     let e = Envelope::from_str(&payload)?.parse()?.verify_didcomm()?;
     Ok(Some(e))

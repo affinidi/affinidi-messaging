@@ -70,6 +70,7 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
+    use ssi::did::DIDMethods;
 
     use crate::{
         did::resolvers::ExampleDIDResolver,
@@ -126,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_plaintext_works_from_prior() {
-        let did_resolver = ExampleDIDResolver::new(vec![
+        let mut did_resolver = ExampleDIDResolver::new(vec![
             ALICE_DID_DOC.clone(),
             BOB_DID_DOC.clone(),
             CHARLIE_DID_DOC.clone(),
@@ -138,9 +139,11 @@ mod tests {
             .await
             .expect("Unable pack_plaintext");
 
-        let (unpacked_msg, unpack_metadata) = Message::unpack(
+        let did_method_resolver = DIDMethods::default();
+        let (unpacked_msg, unpack_metadata) = Message::unpack_string(
             &packed_msg,
-            &did_resolver,
+            &mut did_resolver,
+            &did_method_resolver,
             &bob_secrets_resolver,
             &UnpackOptions::default(),
         )
