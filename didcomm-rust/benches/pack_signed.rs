@@ -1,4 +1,5 @@
 // Allows share test vectors between unit and integration tests
+#[allow(clippy::single_component_path_imports)]
 pub(crate) use didcomm;
 
 #[allow(unused_imports, dead_code)]
