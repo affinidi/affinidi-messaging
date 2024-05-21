@@ -35,6 +35,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
                 _ => {
                     return Err(MediatorError::DIDError(
                         "-1".into(),
+                        did_doc.id.clone(),
                         "Unknown verification method type".into(),
                     ))
                 }
@@ -43,6 +44,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
     } else {
         return Err(MediatorError::DIDError(
             "-1".into(),
+            did_doc.id.clone(),
             "missing verificationMethod in DID Document".into(),
         ));
     }
@@ -57,6 +59,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
                 _ => {
                     return Err(MediatorError::DIDError(
                         "-1".into(),
+                        did_doc.id.clone(),
                         "Unknown keyAgreement".into(),
                     ))
                 }
@@ -65,6 +68,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
     } else {
         return Err(MediatorError::DIDError(
             "-1".into(),
+            did_doc.id.clone(),
             "missing keyAgreement in DID Document".into(),
         ));
     }
@@ -79,6 +83,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
                 _ => {
                     return Err(MediatorError::DIDError(
                         "-1".into(),
+                        did_doc.id.clone(),
                         "Unknown authentication".into(),
                     ))
                 }
@@ -87,6 +92,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
     } else {
         return Err(MediatorError::DIDError(
             "-1".into(),
+            did_doc.id.clone(),
             "missing authentication in DID Document".into(),
         ));
     }
@@ -106,6 +112,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
                 _ => {
                     return Err(MediatorError::DIDError(
                         "-1".into(),
+                        did_doc.id.clone(),
                         "Unknown service endpoint".into(),
                     ))
                 }
@@ -141,6 +148,7 @@ pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
     } else {
         return Err(MediatorError::DIDError(
             "-1".into(),
+            did_doc.id.clone(),
             "missing authentication in DID Document".into(),
         ));
     }

@@ -25,18 +25,10 @@ where
 /// MediatorError the first String is always the tx_id
 #[derive(Error, Debug)]
 pub enum MediatorError {
-    #[error("Element ({1}) already exists")]
-    AlreadyExists(TxId, String),
     #[error("Error in handling errors! {1}")]
     ErrorHandlingError(TxId, String),
-    #[error("Element ({1}) has ({2}) direct children still")]
-    HasChildren(TxId, String, i32),
     #[error("{1}")]
     InternalError(TxId, String),
-    #[error("Structure is locked to change")]
-    LockError(TxId),
-    #[error("Element ({1}) not found")]
-    NotFound(TxId, String),
     #[error("Couldn't parse ({1}). Reason: {2}")]
     ParseError(TxId, String, String),
     #[error("Permission Error: {1}")]
@@ -47,33 +39,24 @@ pub enum MediatorError {
     ServiceLimitError(TxId, String),
     #[error("Unauthorized: {1}")]
     Unauthorized(TxId, String),
-    #[error("DID Error: {1}")]
-    DIDError(TxId, String),
+    #[error("DID Error: did({1}) Error: {2}")]
+    DIDError(TxId, String, String),
     #[error("Configuration Error: {1}")]
     ConfigError(TxId, String),
     #[error("Database Error: {1}")]
     DatabaseError(TxId, String),
+    #[error("Message unpack error: {1}")]
+    MessageUnpackError(TxId, String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let response = match self.0 {
-            MediatorError::AlreadyExists(tx_id, element) => {
-                let response = ErrorResponse {
-                    httpCode: StatusCode::FORBIDDEN.as_u16(),
-                    transactionID: tx_id.to_string(),
-                    errorCode: 1,
-                    errorCodeStr: "AlreadyExists".to_string(),
-                    message: format!("Element ({}) already exists", element),
-                };
-                event!(Level::WARN, "{}", response.to_string());
-                response
-            }
             MediatorError::ErrorHandlingError(tx_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                     transactionID: tx_id.to_string(),
-                    errorCode: 2,
+                    errorCode: 1,
                     errorCodeStr: "ErrorHandlingError".to_string(),
                     message: msg.to_string(),
                 };
@@ -84,44 +67,53 @@ impl IntoResponse for AppError {
                 let response = ErrorResponse {
                     httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                     transactionID: tx_id.to_string(),
-                    errorCode: 3,
+                    errorCode: 2,
                     errorCodeStr: "InternalError".to_string(),
                     message: msg.to_string(),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::LockError(tx_id) => {
+            MediatorError::ParseError(tx_id, _, msg) => {
                 let response = ErrorResponse {
-                    httpCode: StatusCode::SERVICE_UNAVAILABLE.as_u16(),
+                    httpCode: StatusCode::BAD_REQUEST.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 3,
+                    errorCodeStr: "BadRequest: ParseError".to_string(),
+                    message: msg.to_string(),
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::PermissionError(tx_id, msg) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::FORBIDDEN.as_u16(),
                     transactionID: tx_id.to_string(),
                     errorCode: 4,
-                    errorCodeStr: "StructureLockError".to_string(),
-                    message:
-                        "Structure is currently locked due to changes occurring. Please try again"
-                            .into(),
+                    errorCodeStr: "Forbidden: PermissionError".to_string(),
+                    message: msg.to_string(),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::NotFound(tx_id, element) => {
+            MediatorError::RequestDataError(tx_id, msg) => {
                 let response = ErrorResponse {
-                    httpCode: StatusCode::NOT_FOUND.as_u16(),
+                    httpCode: StatusCode::BAD_REQUEST.as_u16(),
                     transactionID: tx_id.to_string(),
                     errorCode: 5,
-                    errorCodeStr: "NotFound".to_string(),
-                    message: format!("Element ({}) not found", element),
+                    errorCodeStr: "BadRequest: RequestDataError".to_string(),
+                    message: format!("Bad Request: ({})", msg),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::RequestDataError(tx_id, element) => {
+            MediatorError::ServiceLimitError(tx_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
                     transactionID: tx_id.to_string(),
                     errorCode: 6,
-                    errorCodeStr: "BadRequest".to_string(),
-                    message: format!("Bad Request: ({})", element),
+                    errorCodeStr: "BadRequest: ServiceLimitError".to_string(),
+                    message: msg.to_string(),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response
@@ -137,18 +129,46 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            _ => {
-                event!(
-                    Level::WARN,
-                    "unknown MediatorError ({:?}) matched on MediatorError::response()",
-                    self.0
-                );
+            MediatorError::DIDError(tx_id, did, msg) => {
                 let response = ErrorResponse {
-                    httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    transactionID: "UNKNOWN".into(),
+                    httpCode: StatusCode::BAD_REQUEST.as_u16(),
+                    transactionID: tx_id.to_string(),
                     errorCode: 8,
-                    errorCodeStr: "ErrorHandlingError".to_string(),
-                    message: format!("Unknown error code ({:?})", self.0),
+                    errorCodeStr: "DIDError".to_string(),
+                    message: format!("did({}) Error: {}", did, msg),
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::ConfigError(tx_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::SERVICE_UNAVAILABLE.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 9,
+                    errorCodeStr: "ConfigError".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::DatabaseError(tx_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::SERVICE_UNAVAILABLE.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 10,
+                    errorCodeStr: "DatabaseError".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::MessageUnpackError(tx_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::BAD_REQUEST.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 11,
+                    errorCodeStr: "MessageUnpackError".to_string(),
+                    message,
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response
