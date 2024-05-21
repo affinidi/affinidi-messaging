@@ -69,7 +69,8 @@ pub async fn message_inbound_handler(
 
     match Message::unpack(
         &mut envelope,
-        &did_resolver,
+        &mut did_resolver,
+        &did_method_resolver,
         &state.config.mediator_secrets,
         &UnpackOptions::default(),
     )
