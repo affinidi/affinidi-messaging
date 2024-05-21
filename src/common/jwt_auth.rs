@@ -16,8 +16,11 @@ use itertools::Itertools;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{event, Level};
+use std::{
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tracing::{event, info, Level};
 
 const SKEW: u64 = 30; // We allow for a 30 second skew on time checks
 
@@ -70,6 +73,16 @@ where
 {
     type Rejection = AuthError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let remote_addr = if let Some(address) = parts
+            .extensions
+            .get::<axum::extract::ConnectInfo<SocketAddr>>()
+            .map(|ci| ci.0)
+        {
+            address.to_string()
+        } else {
+            "UNKNOWN".into()
+        };
+
         let tx_id = create_tx_id();
 
         /*
@@ -165,7 +178,9 @@ where
             return Err(AuthError::WrongCredentials);
         };*/
 
-        let session = Session { tx_id };
+        info!("{}: Connection accepted from ({})", &tx_id, &remote_addr);
+
+        let session = Session { tx_id, remote_addr };
 
         Ok(session)
     }

@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, net::SocketAddr};
 
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
@@ -94,7 +94,7 @@ async fn main() {
     // Start the database thread
     let database_manager = tokio::spawn(async move { database::run(db_shared_state, db_rx).await });
 
-    // build our application with a single route
+    // build our application routes
     let app: Router = application_routes(&shared_state);
 
     // Add middleware to all routes
@@ -131,13 +131,13 @@ async fn main() {
                 .await
                 .expect("bad certificate/key");
         axum_server::bind_rustls(config.listen_address.parse().unwrap(), ssl_config)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await
             .unwrap();
     } else {
         event!(Level::WARN, "**** WARNING: Running without SSL/TLS ****");
         axum_server::bind(config.listen_address.parse().unwrap())
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await
             .unwrap();
     }
