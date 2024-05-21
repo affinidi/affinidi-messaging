@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use didcomm::Message;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::json;
 use tracing::info;
 use uuid::Uuid;
 
@@ -77,7 +77,7 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
             Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/trust-ping/2.0/ping".to_owned(),
-                Value::Null,
+                json!({}),
             )
             .thid(msg.id.clone())
             .to(from)

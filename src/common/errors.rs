@@ -49,6 +49,8 @@ pub enum MediatorError {
     MessageUnpackError(TxId, String),
     #[error("MessageExpired: expiry({1}) now({2})")]
     MessageExpired(TxId, String, String),
+    #[error("Message pack error: {1}")]
+    MessagePackError(TxId, String),
 }
 
 impl IntoResponse for AppError {
@@ -182,6 +184,17 @@ impl IntoResponse for AppError {
                     errorCode: 12,
                     errorCodeStr: "MessageExpired".to_string(),
                     message: format!("Message expired: expiry({}) now({})", expired, now),
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::MessagePackError(tx_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::BAD_REQUEST.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 13,
+                    errorCodeStr: "MessagePackError".to_string(),
+                    message,
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response

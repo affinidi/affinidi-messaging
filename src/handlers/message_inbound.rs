@@ -95,8 +95,51 @@ pub async fn message_inbound_handler(
         Err(e) => return Err(e.into()),
     };
 
+    // Store the message if necessary
+    let response = if let Some(response) = &response {
+        // Pack the message for the next recipient(s)
+        let to_dids = if let Some(to_did) = &response.to {
+            to_did
+        } else {
+            return Err(MediatorError::MessagePackError(
+                session.tx_id,
+                "No recipients found".into(),
+            )
+            .into());
+        };
+
+        let recipient = to_dids.first().unwrap();
+        Some(
+            response
+                .pack(
+                    recipient,
+                    &state.config.mediator_did,
+                    &metadata,
+                    &state.config.mediator_secrets,
+                    &did_resolver,
+                )
+                .await?,
+        )
+        /*
+        for recipient in to_dids {
+            let a = response
+                .pack(
+                    recipient,
+                    &state.config.mediator_did,
+                    &metadata,
+                    &state.config.mediator_secrets,
+                    &did_resolver,
+                )
+                .await?;
+
+            }
+        */
+    } else {
+        None
+    };
+
     let response = response.map(|response| ResponseData {
-        body: serde_json::to_string_pretty(&response).unwrap(),
+        body: response,
         metadata,
     });
 

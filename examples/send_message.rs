@@ -1,15 +1,19 @@
 use did_peer::DIDPeer;
 use didcomm::{
     secrets::{Secret, SecretMaterial, SecretType},
-    Message, PackEncryptedOptions,
+    Message, PackEncryptedOptions, UnpackOptions,
 };
 use didcomm_mediator::{
-    common::did_conversion::convert_did,
+    common::{did_conversion::convert_did, errors::SuccessResponse},
+    handlers::message_inbound::ResponseData,
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
 use reqwest::{Certificate, Client};
 use serde_json::json;
-use ssi::{did::DIDMethod, did_resolve::ResolutionInputMetadata};
+use ssi::{
+    did::{DIDMethod, DIDMethods},
+    did_resolve::ResolutionInputMetadata,
+};
 use std::{
     fs,
     io::{self, Read},
@@ -39,7 +43,7 @@ Public Key (y)	J8XvxpibjZgRrL5oBQdGRqmCR5eiZOJGGwm_q6tKFhI
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     // Load DID's
-    let did_resolver = load_dids().await;
+    let mut did_resolver = load_dids().await;
 
     let v1_secret = Secret {
         id: [MY_DID.to_string(), "#key-1".to_string()].concat(),
@@ -77,6 +81,8 @@ async fn main() -> std::io::Result<()> {
     // Build the ping message
     let msg = create_ping(MEDIATOR_DID, true);
 
+    println!("Ping message is\n{:#?}\n", msg);
+
     let (msg, metadata) = msg
         .pack_encrypted(
             MEDIATOR_DID,
@@ -102,9 +108,27 @@ async fn main() -> std::io::Result<()> {
         .await
         .map_err(|e| error(format!("Could not get: {:?}", e)))?;
     println!("Status:\n{}", res.status());
-    println!("Headers:\n{:#?}", res.headers());
+    //println!("Headers:\n{:#?}", res.headers());
 
-    println!("Body:\n{}", res.text().await.unwrap());
+    let body = res.text().await.unwrap();
+
+    println!();
+    let results = serde_json::from_str::<SuccessResponse<ResponseData>>(&body);
+    let msg = results.unwrap().data.unwrap().body;
+
+    let mut did_method_resolver = DIDMethods::default();
+    did_method_resolver.insert(Box::new(DIDPeer));
+
+    let a = Message::unpack_string(
+        &msg,
+        &mut did_resolver,
+        &did_method_resolver,
+        &secrets_resolver,
+        &UnpackOptions::default(),
+    )
+    .await;
+
+    println!("Unpacked message is\n{:#?}\n", a.unwrap().0);
 
     Ok(())
 }

@@ -1,6 +1,8 @@
 use std::{str::FromStr, time::SystemTime};
 
-use didcomm::Message;
+use didcomm::{
+    did::DIDResolver, secrets::SecretsResolver, Message, PackEncryptedOptions, UnpackMetadata,
+};
 
 use crate::common::errors::{MediatorError, Session};
 
@@ -39,8 +41,23 @@ impl MessageType {
     }
 }
 
-pub trait MessageHandler {
+pub(crate) trait MessageHandler {
+    /// Processes an incoming message, determines any additional actions to take
+    /// Returns a message to store and deliver if necessary
     fn process(&self, session: &Session) -> Result<Option<Message>, MediatorError>;
+
+    /// Uses the incoming unpack metadata to determine best way to pack the message
+    async fn pack<S, T>(
+        &self,
+        to_did: &str,
+        mediator_did: &str,
+        metadata: &UnpackMetadata,
+        secrets_resolver: &S,
+        did_resolver: &T,
+    ) -> Result<String, MediatorError>
+    where
+        S: SecretsResolver,
+        T: DIDResolver;
 }
 
 impl MessageHandler for Message {
@@ -63,5 +80,45 @@ impl MessageHandler for Message {
         }
 
         msg_type.process(self, session)
+    }
+
+    async fn pack<S, T>(
+        &self,
+        to_did: &str,
+        mediator_did: &str,
+        metadata: &UnpackMetadata,
+        secrets_resolver: &S,
+        did_resolver: &T,
+    ) -> Result<String, MediatorError>
+    where
+        S: SecretsResolver,
+        T: DIDResolver,
+    {
+        if metadata.encrypted {
+            // Respond with an encrypted message
+            let a = match self
+                .pack_encrypted(
+                    to_did,
+                    self.from.as_deref(),
+                    Some(mediator_did),
+                    did_resolver,
+                    secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+            {
+                Ok(msg) => msg,
+                Err(e) => {
+                    return Err(MediatorError::MessagePackError("-1".into(), e.to_string()));
+                }
+            };
+
+            Ok(a.0)
+        } else {
+            Err(MediatorError::MessagePackError(
+                "-1".into(),
+                "PACK METHOD NOT IMPLEMENTED".into(),
+            ))
+        }
     }
 }
