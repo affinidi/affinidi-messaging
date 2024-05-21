@@ -1,6 +1,6 @@
 use axum::{extract::State, Json};
 use did_peer::DIDPeer;
-use didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use ssi::did::DIDMethods;
@@ -8,6 +8,7 @@ use std::borrow::BorrowMut;
 
 use crate::{
     common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
+    messages::MessageHandler,
     SharedData,
 };
 
@@ -33,7 +34,8 @@ pub struct InboundMessage {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ResponseData {
-    pub name: String,
+    pub body: String,
+    pub metadata: UnpackMetadata,
 }
 impl GenericDataStruct for ResponseData {}
 
@@ -67,7 +69,8 @@ pub async fn message_inbound_handler(
         }
     };
 
-    match Message::unpack(
+    // Unpack the message
+    let (msg, metadata) = match Message::unpack(
         &mut envelope,
         &mut did_resolver,
         &did_method_resolver,
@@ -76,16 +79,26 @@ pub async fn message_inbound_handler(
     )
     .await
     {
-        Ok((msg, metadata)) => {
-            println!("Unpacked metadata is\n{:#?}\n", metadata);
-            println!("Unpacked message is\n{:#?}\n", msg);
+        Ok(ok) => ok,
+        Err(e) => {
+            return Err(MediatorError::MessageUnpackError(
+                session.tx_id,
+                format!("Couldn't unpack incoming message. Reason: {}", e),
+            )
+            .into());
         }
-        Err(e) => println!("ERROR: {:?}", e),
-    }
-
-    let response_data = ResponseData {
-        name: "Woot".into(),
     };
+
+    // Process the message
+    let response = match msg.process(&session) {
+        Ok(response) => response,
+        Err(e) => return Err(e.into()),
+    };
+
+    let response = response.map(|response| ResponseData {
+        body: serde_json::to_string_pretty(&response).unwrap(),
+        metadata,
+    });
 
     Ok((
         StatusCode::OK,
@@ -95,7 +108,7 @@ pub async fn message_inbound_handler(
             errorCode: 0,
             errorCodeStr: "NA".to_string(),
             message: "Success".to_string(),
-            data: response_data,
+            data: response,
         }),
     ))
 }

@@ -47,6 +47,8 @@ pub enum MediatorError {
     DatabaseError(TxId, String),
     #[error("Message unpack error: {1}")]
     MessageUnpackError(TxId, String),
+    #[error("MessageExpired: expiry({1}) now({2})")]
+    MessageExpired(TxId, String, String),
 }
 
 impl IntoResponse for AppError {
@@ -173,6 +175,17 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
+            MediatorError::MessageExpired(tx_id, expired, now) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::UNPROCESSABLE_ENTITY.as_u16(),
+                    transactionID: tx_id.to_string(),
+                    errorCode: 12,
+                    errorCodeStr: "MessageExpired".to_string(),
+                    message: format!("Message expired: expiry({}) now({})", expired, now),
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
         };
         (
             StatusCode::from_u16(response.httpCode).ok().unwrap(),
@@ -218,7 +231,7 @@ pub struct SuccessResponse<T: GenericDataStruct> {
     pub errorCodeStr: String,
     pub message: String,
     #[serde(bound(deserialize = ""))]
-    pub data: T,
+    pub data: Option<T>,
 }
 
 impl<T: GenericDataStruct> fmt::Display for SuccessResponse<T> {
@@ -236,7 +249,7 @@ impl<T: GenericDataStruct> SuccessResponse<T> {
         tx_id: &str,
         http_code: StatusCode,
         msg: &str,
-        data: T,
+        data: Option<T>,
     ) -> Json<SuccessResponse<T>> {
         let response = SuccessResponse {
             transactionID: tx_id.to_string(),

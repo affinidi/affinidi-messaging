@@ -12,7 +12,7 @@ use tracing_subscriber::{reload::Handle, Registry};
 pub mod common;
 pub mod database;
 pub mod handlers;
-pub mod protocols;
+pub mod messages;
 pub mod resolvers;
 
 #[derive(Clone)]

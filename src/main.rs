@@ -2,7 +2,6 @@ use std::env;
 
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use did_peer::DIDPeer;
 use didcomm::Message;
 use didcomm_mediator::{
     database,
@@ -12,7 +11,6 @@ use didcomm_mediator::{
     SharedData,
 };
 use http::Method;
-use ssi::did::DIDMethods;
 use tokio::sync::mpsc;
 use tower_http::{
     cors::CorsLayer,
