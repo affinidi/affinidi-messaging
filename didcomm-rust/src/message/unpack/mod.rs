@@ -210,7 +210,7 @@ impl Default for UnpackOptions {
 
 /// Additional metadata about this `unpack` method execution like trust predicates
 /// and used keys identifiers.
-#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct UnpackMetadata {
     /// Whether the plaintext has been encrypted
     pub encrypted: bool,
