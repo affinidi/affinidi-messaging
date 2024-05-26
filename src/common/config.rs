@@ -24,10 +24,12 @@ use tracing_subscriber::filter::LevelFilter;
 /// Database Struct contains database and storage of messages related configuration details
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    pub database_file: String,
-    pub database_max_size_mb: String,
+    pub database_url: String,
+    pub database_pool_size: String,
+    pub database_timeout: String,
     pub max_message_size: String,
     pub max_queued_messages: String,
+    pub message_expiry_minutes: String,
 }
 
 /// SecurityConfig Struct contains security related configuration details
@@ -61,10 +63,12 @@ pub struct Config {
     pub mediator_secrets: AffinidiSecrets,
     pub mediator_allowed_dids: HashSet<String>,
     pub mediator_denied_dids: HashSet<String>,
-    pub database_file: String,
-    pub database_max_size_mb: u64,
+    pub database_url: String,
+    pub database_pool_size: usize,
+    pub database_timeout: u32,
     pub max_message_size: u32,
     pub max_queued_messages: u32,
+    pub message_expiry_minutes: u32,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
@@ -90,10 +94,12 @@ impl fmt::Debug for Config {
                 &&format!("({}) denied_dids loaded", self.mediator_denied_dids.len()),
             )
             .field("use_ssl", &self.use_ssl)
-            .field("database_file", &self.database_file)
-            .field("database_max_size_mb", &self.database_max_size_mb)
+            .field("database_url", &self.database_url)
+            .field("database_pool_size", &self.database_pool_size)
+            .field("database_timeout", &self.database_timeout)
             .field("max_message_size", &self.max_message_size)
             .field("max_queued_messages", &self.max_queued_messages)
+            .field("message_expiry_minutes", &self.message_expiry_minutes)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
             .finish()
@@ -116,10 +122,12 @@ impl Default for Config {
             mediator_secrets: AffinidiSecrets::new(vec![]),
             mediator_allowed_dids: HashSet::new(),
             mediator_denied_dids: HashSet::new(),
-            database_file: "".into(),
-            database_max_size_mb: 100,
+            database_url: "redis://127.0.0.1/".into(),
+            database_pool_size: 10,
+            database_timeout: 2,
             max_message_size: 1048576,
             max_queued_messages: 100,
+            message_expiry_minutes: 10080,
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -143,14 +151,12 @@ impl TryFrom<ConfigRaw> for Config {
             },
             listen_address: raw.listen_address,
             mediator_did: raw.mediator_did.clone(),
-            database_file: raw.database.database_file,
-            database_max_size_mb: raw
-                .database
-                .database_max_size_mb
-                .parse::<u64>()
-                .unwrap_or(100),
+            database_url: raw.database.database_url,
+            database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
+            database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
             max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
             max_queued_messages: raw.database.max_queued_messages.parse().unwrap_or(100),
+            message_expiry_minutes: raw.database.message_expiry_minutes.parse().unwrap_or(10080),
             use_ssl: raw.security.use_ssl.parse().unwrap(),
             ssl_certificate_file: raw.security.ssl_certificate_file,
             ssl_key_file: raw.security.ssl_key_file,

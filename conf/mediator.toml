@@ -25,22 +25,31 @@ mediator_allowed_dids = "${MEDIATOR_ALLOWED_DIDS:./conf/mediator_allowed_dids.tx
 mediator_denied_dids = "${MEDIATOR_DENIED_DIDS:./conf/mediator_denied_dids.txt}"
 
 [database]
-### database_file: Where to store local data
-### Default: ./mediator_db.redb
-database_file = "${DATABASE_FILE:./mediator_db.redb}"
+### database_url: URL of the Redis compatable database
+### Default: redis://127.0.0.1/
+database_url = "${REDIS_URL:redis://127.0.0.1/}"
 
-### database_max_size_mb: Maximum size of the database in Megabytes
-### Default: 100
-database_max_size_mb = "${database_max_size_mb:100}"
+### database_pool_size: Number of connections to the database
+### Default: 10
+database_pool_size = "${DATABASE_POOL_SIZE:10}"
+
+### database_timeout: Timeout for database operations in seconds
+### Default: 2
+database_timeout = "${DATABASE_TIMEOUT:2}"
 
 ### max_message_size: Maximum size of a message in bytes
 ### Default: 1048576 (1MB)
-max_message_size = "${MEDIATOR_DENIED_DIDS:1048576"
+max_message_size = "${MAX_MESSAGE_SIZE:1048576"
 
 ### max_queued_messages: How many messages will we queue for a single recipient or a single sender
 ### Default: 100
 ### NOTE: This is a per-recipient or per-sender limit
-max_queued_messages = "${MEDIATOR_DENIED_DIDS:100"
+max_queued_messages = "${MAX_QUEUED_MESSAGES:100"
+
+### message_expiry_minutes: Time to live in minutes for messages stored
+### Messages will expire after this limit
+### Default: 10080 (7 days)
+message_expiry_minutes = "$MESSAGE_EXPIRY_MINUTES:10080"
 
 [security]
 ### If true (default) SSL is enabled.
