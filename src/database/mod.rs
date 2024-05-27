@@ -1,79 +1,36 @@
-use didcomm::Message;
-use redb::Database;
-use std::process;
-use tokio::sync::mpsc;
-use tracing::{event, Level};
+use std::fmt::{self, Display, Formatter};
 
-use crate::{common::errors::MediatorError, SharedData};
+pub mod handlers;
 
-pub enum RecordType {
-    Message(MessageRecord),
-    Pointer(PointerRecord),
+#[derive(Clone)]
+pub struct DatabaseHandler {
+    pub pool: deadpool_redis::Pool,
 }
 
-pub struct MessageRecord {
-    pub id: String,
-    pub source: String,
-    pub destination: String,
-    pub message: String,
+/// Statistics for the mediator
+#[derive(Default, Debug)]
+pub struct MetadataStats {
+    pub message_count: u64,
+    pub bytes_stored: u64,
+    pub did_count: u64,
 }
 
-pub struct PointerRecord {
-    pub pointers: Vec<String>,
-}
-
-pub async fn run(shared_state: SharedData, mut db_rx: mpsc::Receiver<Message>) {
-    event!(Level::INFO, "Database handler thread starting...");
-
-    let db = match open_database(&shared_state.config.database_file) {
-        Ok(db) => db,
-        Err(err) => {
-            event!(Level::ERROR, "Error opening database: {}", err);
-            event!(Level::ERROR, "Exiting...");
-            process::exit(1);
-        }
-    };
-
-    event!(Level::INFO, "Database handler thread running...");
-
-    loop {
-        let message = db_rx.recv().await;
-        if let Some(message) = message {
-            let message = message.clone();
+impl MetadataStats {
+    pub fn new() -> Self {
+        Self {
+            message_count: 0,
+            bytes_stored: 0,
+            did_count: 0,
         }
     }
 }
 
-fn open_database(file_name: &str) -> Result<Database, MediatorError> {
-    let mut db = Database::create(file_name).map_err(|err| {
-        event!(
-            Level::ERROR,
-            "Error creating database({}): {}",
-            file_name,
-            err
-        );
-        MediatorError::DatabaseError(
-            "NA".into(),
-            format!("Error creating database({}): {}", file_name, err),
+impl Display for MetadataStats {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\n\tMessage count: {}\n\tBytes stored: {}\n\tDID count: {}",
+            self.message_count, self.bytes_stored, self.did_count
         )
-    })?;
-    event!(Level::INFO, "Database({}) opened", file_name);
-
-    // When opening, try compacting database first time
-    db.compact().map_err(|err| {
-        event!(
-            Level::ERROR,
-            "Error compacting database({}): {}",
-            file_name,
-            err
-        );
-        MediatorError::DatabaseError(
-            "NA".into(),
-            format!("Error compacting database({}): {}", file_name, err),
-        )
-    })?;
-
-    event!(Level::INFO, "Database compacted successfully...");
-
-    Ok(db)
+    }
 }

@@ -113,9 +113,19 @@ async fn main() -> std::io::Result<()> {
     let body = res.text().await.unwrap();
 
     println!();
-    let results = serde_json::from_str::<SuccessResponse<ResponseData>>(&body);
-    let msg = results.unwrap().data.unwrap().body;
+    let results = serde_json::from_str::<SuccessResponse<ResponseData>>(&body)
+        .ok()
+        .unwrap();
+    let msg = results.data.clone().unwrap().body;
 
+    println!(
+        "Received metadata is\n{:#?}\n",
+        &results.data.unwrap().metadata
+    );
+    println!();
+    println!("Received message is\n{:#?}\n", msg);
+
+    /*
     let mut did_method_resolver = DIDMethods::default();
     did_method_resolver.insert(Box::new(DIDPeer));
 
@@ -128,7 +138,7 @@ async fn main() -> std::io::Result<()> {
     )
     .await;
 
-    println!("Unpacked message is\n{:#?}\n", a.unwrap().0);
+    println!("Unpacked message is\n{:#?}\n", a.unwrap().0);*/
 
     Ok(())
 }

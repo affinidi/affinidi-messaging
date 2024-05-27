@@ -5,6 +5,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use ssi::did::DIDMethods;
 use std::borrow::BorrowMut;
+use tracing::{event, Level};
 
 use crate::{
     common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
@@ -96,7 +97,7 @@ pub async fn message_inbound_handler(
     };
 
     // Store the message if necessary
-    let response = if let Some(response) = &response {
+    let msg_count = if let Some(response) = &response {
         // Pack the message for the next recipient(s)
         let to_dids = if let Some(to_did) = &response.to {
             to_did
@@ -108,21 +109,10 @@ pub async fn message_inbound_handler(
             .into());
         };
 
-        let recipient = to_dids.first().unwrap();
-        Some(
-            response
-                .pack(
-                    recipient,
-                    &state.config.mediator_did,
-                    &metadata,
-                    &state.config.mediator_secrets,
-                    &did_resolver,
-                )
-                .await?,
-        )
-        /*
+        let mut msg_count = 0;
         for recipient in to_dids {
-            let a = response
+            event!(Level::INFO, "Packing message for recipient: {}", recipient);
+            let msg_str = response
                 .pack(
                     recipient,
                     &state.config.mediator_did,
@@ -132,14 +122,20 @@ pub async fn message_inbound_handler(
                 )
                 .await?;
 
-            }
-        */
+            state
+                .database
+                .store_message(&session.tx_id, &msg_str, &envelope)
+                .await?;
+
+            msg_count += 1;
+        }
+        msg_count
     } else {
-        None
+        0
     };
 
-    let response = response.map(|response| ResponseData {
-        body: response,
+    let response = Some(ResponseData {
+        body: format!("messages saved successfully count({})", msg_count),
         metadata,
     });
 

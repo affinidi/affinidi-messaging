@@ -1,17 +1,14 @@
-use std::{env, net::SocketAddr};
-
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use didcomm::Message;
 use didcomm_mediator::{
-    database,
+    database::DatabaseHandler,
     handlers::{application_routes, health_checker_handler},
     init,
     resolvers::affinidi_dids::AffinidiDIDResolver,
     SharedData,
 };
 use http::Method;
-use tokio::sync::mpsc;
+use std::{env, net::SocketAddr};
 use tower_http::{
     cors::CorsLayer,
     trace::{self, TraceLayer},
@@ -78,21 +75,22 @@ async fn main() {
     let did_resolver = AffinidiDIDResolver::new(vec![config.mediator_did_doc.clone()]);
 
     // Start setting up the database durability and handling
-    // We run all database operations in a seperate thread and use Channels to communicate
-    let (db_tx, db_rx) = mpsc::channel::<Message>(1);
+    let database = match DatabaseHandler::new(&config).await {
+        Ok(db) => db,
+        Err(err) => {
+            event!(Level::ERROR, "Error opening database: {}", err);
+            event!(Level::ERROR, "Exiting...");
+            std::process::exit(1);
+        }
+    };
 
     // Create the shared application State
     let shared_state = SharedData {
         config: config.clone(),
         service_start_timestamp: chrono::Utc::now(),
-        send_channel: db_tx,
         did_resolver,
+        database: database,
     };
-
-    let db_shared_state = shared_state.clone();
-
-    // Start the database thread
-    let database_manager = tokio::spawn(async move { database::run(db_shared_state, db_rx).await });
 
     // build our application routes
     let app: Router = application_routes(&shared_state);
@@ -124,7 +122,10 @@ async fn main() {
         );
 
     if config.use_ssl {
-        event!(Level::INFO, "Using SSL/TLS for secure communication.");
+        event!(
+            Level::INFO,
+            "This mediator is using SSL/TLS for secure communication."
+        );
         // configure certificate and private key used by https
         let ssl_config =
             RustlsConfig::from_pem_file(config.ssl_certificate_file, config.ssl_key_file)
@@ -141,11 +142,4 @@ async fn main() {
             .await
             .unwrap();
     }
-
-    // Doesn't really do anything, will block and stop the app from exiting if the server functions fail
-    event!(
-        Level::ERROR,
-        "Services have failed, we are stuck on database_manager.await!"
-    );
-    database_manager.await.unwrap();
 }
