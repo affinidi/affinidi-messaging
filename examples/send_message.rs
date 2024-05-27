@@ -1,7 +1,7 @@
 use did_peer::DIDPeer;
 use didcomm::{
     secrets::{Secret, SecretMaterial, SecretType},
-    Message, PackEncryptedOptions, UnpackOptions,
+    Message, PackEncryptedOptions,
 };
 use didcomm_mediator::{
     common::{did_conversion::convert_did, errors::SuccessResponse},
@@ -10,10 +10,7 @@ use didcomm_mediator::{
 };
 use reqwest::{Certificate, Client};
 use serde_json::json;
-use ssi::{
-    did::{DIDMethod, DIDMethods},
-    did_resolve::ResolutionInputMetadata,
-};
+use ssi::{did::DIDMethod, did_resolve::ResolutionInputMetadata};
 use std::{
     fs,
     io::{self, Read},
@@ -24,26 +21,10 @@ use uuid::Uuid;
 static MY_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
 static MEDIATOR_DID: &str = "did:peer:2.Vz6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ.EzQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
 
-/*
-Mediator Keys
-Key ID	#key-1
-Multibase Key	z6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ
-Curve	Ed25519
-Private Key (d)	Yo4iVVlvtShxB1o56RQ1bbvASMCgev4G_Lk95TuYs-c
-Public Key (x)	PHV1nLB1AgcCJyHe8uBqcgp7sM6yq3wgd2MK5ihAQOk
-
-Key ID	#key-2
-Multibase Key	zQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W
-Curve	secp256k1
-Private Key (d)	QoX2eruH8PqGj1fVJt3de4DEmji4IMJVVwIrXUM-Yw8
-Public Key (x)	l2fTSJLf6tsEimRL3tiULjjghDXjQmhr2EYHSZtbgTs
-Public Key (y)	J8XvxpibjZgRrL5oBQdGRqmCR5eiZOJGGwm_q6tKFhI
-*/
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     // Load DID's
-    let mut did_resolver = load_dids().await;
+    let did_resolver = load_dids().await;
 
     let v1_secret = Secret {
         id: [MY_DID.to_string(), "#key-1".to_string()].concat(),
