@@ -180,7 +180,12 @@ where
 
         info!("{}: Connection accepted from ({})", &tx_id, &remote_addr);
 
-        let session = Session { tx_id, remote_addr };
+        let session = Session {
+            tx_id,
+            remote_addr,
+            authenticated: false,
+            challenge_sent: None,
+        };
 
         Ok(session)
     }

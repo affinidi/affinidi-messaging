@@ -210,8 +210,10 @@ impl IntoResponse for AppError {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Session {
-    pub tx_id: String,       // Unique session transaction ID
-    pub remote_addr: String, // Remote Socket address
+    pub tx_id: String,                  // Unique session transaction ID
+    pub remote_addr: String,            // Remote Socket address
+    pub authenticated: bool,            // Has this session been authenticated?
+    pub challenge_sent: Option<String>, // Challenge sent to the client
 }
 
 #[derive(Serialize, Debug)]
