@@ -1,6 +1,7 @@
 use crate::SharedData;
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 
+pub mod authenticate;
 pub mod message_inbound;
 pub mod message_outbound;
 
@@ -10,7 +11,12 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
         .route(
             "/outbound",
             post(message_outbound::message_outbound_handler),
-        );
+        )
+        .route(
+            "/authenticate/challenge",
+            post(authenticate::authentication_challenge),
+        )
+        .route("/authenticate", post(authenticate::authentication_response));
 
     Router::new()
         .nest("/atm/v1/", app)

@@ -5,7 +5,7 @@ use didcomm::{
 };
 use didcomm_mediator::{
     common::{did_conversion::convert_did, errors::SuccessResponse},
-    handlers::message_inbound::ResponseData,
+    handlers::{authenticate::Challenge, message_inbound::ResponseData},
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
 use reqwest::{Certificate, Client};
@@ -81,6 +81,49 @@ async fn main() -> std::io::Result<()> {
     // --- Sending message by Alice ---
     println!("Alice is sending message \n{}\n", msg);
 
+    // Authenticate
+    // Step 1. Get the challenge
+    println!("Authenticating (step 1/2) :: Get challenge...");
+    let res = client
+        .post("https://localhost:7037/atm/v1/authenticate/challenge")
+        .header("Content-Type", "application/json")
+        .body(format!("{{\"did\": \"{}\"}}", MY_DID).to_string())
+        .send()
+        .await
+        .map_err(|e| error(format!("Could not get: {:?}", e)))?;
+    let body = res.text().await.unwrap();
+    let body = serde_json::from_str::<SuccessResponse<Challenge>>(&body)
+        .ok()
+        .unwrap();
+
+    println!("Authenticating (step 2/2) :: Create challenge response...");
+    let auth_response = create_auth_challenge_response(MEDIATOR_DID, body.data.as_ref().unwrap());
+    println!("Auth response = {:#?}", auth_response);
+    let (auth_msg, _) = auth_response
+        .pack_encrypted(
+            MEDIATOR_DID,
+            Some(MY_DID),
+            Some(MY_DID),
+            &did_resolver,
+            &secrets_resolver,
+            &PackEncryptedOptions::default(),
+        )
+        .await
+        .expect("Unable pack_encrypted");
+
+    // Step 2. Send the challenge response
+    let res = client
+        .post("https://localhost:7037/atm/v1/authenticate")
+        .header("Content-Type", "application/json")
+        .body(auth_msg)
+        .send()
+        .await
+        .map_err(|e| error(format!("Could not get: {:?}", e)))?;
+    println!("Status:\n{}", res.status());
+    let body = res.text().await.unwrap();
+    println!("Body:\n{}", body);
+
+    // Send the Ping message
     let res = client
         .post("https://localhost:7037/atm/v1/inbound")
         .header("Content-Type", "application/json")
@@ -141,6 +184,32 @@ async fn load_dids() -> AffinidiDIDResolver {
     let d2 = convert_did(&d2.unwrap()).unwrap();
 
     AffinidiDIDResolver::new(vec![d1, d2])
+}
+
+/// Creates an Affinidi Trusted Messaging Authenticaton Challenge Response Message
+/// # Arguments
+/// * `to_did` - The DID of the recipient
+/// * `challenge` - The challenge that was sent
+/// # Returns
+/// A DIDComm message to be sent
+///
+/// Notes:
+/// - This message will expire after 5 minutes
+fn create_auth_challenge_response(to_did: &str, body: &Challenge) -> Message {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    Message::build(
+        Uuid::new_v4().into(),
+        "https://affinidi.com/atm/1.0/authenticate".to_owned(),
+        json!(body),
+    )
+    .to(to_did.to_owned())
+    .from(MY_DID.to_owned())
+    .created_time(now)
+    .expires_time(now + 60)
+    .finalize()
 }
 
 /// Creates a DIDComm trust ping message

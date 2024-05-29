@@ -89,7 +89,7 @@ async fn main() {
         config: config.clone(),
         service_start_timestamp: chrono::Utc::now(),
         did_resolver,
-        database: database,
+        database,
     };
 
     // build our application routes

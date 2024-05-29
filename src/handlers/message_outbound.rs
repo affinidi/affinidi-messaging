@@ -46,7 +46,7 @@ pub async fn message_outbound_handler(
         Ok(envelope) => envelope,
         Err(e) => {
             return Err(MediatorError::ParseError(
-                session.tx_id,
+                session.session_id,
                 "Raw inbound DIDComm message".into(),
                 e.to_string(),
             )
@@ -67,7 +67,7 @@ pub async fn message_outbound_handler(
         Ok(ok) => ok,
         Err(e) => {
             return Err(MediatorError::MessageUnpackError(
-                session.tx_id,
+                session.session_id,
                 format!("Couldn't unpack incoming message. Reason: {}", e),
             )
             .into());
@@ -87,7 +87,7 @@ pub async fn message_outbound_handler(
             to_did
         } else {
             return Err(MediatorError::MessagePackError(
-                session.tx_id,
+                session.session_id,
                 "No recipients found".into(),
             )
             .into());
@@ -117,7 +117,7 @@ pub async fn message_outbound_handler(
     Ok((
         StatusCode::OK,
         Json(SuccessResponse {
-            transactionID: session.tx_id,
+            sessionId: session.session_id,
             httpCode: StatusCode::OK.as_u16(),
             errorCode: 0,
             errorCodeStr: "NA".to_string(),

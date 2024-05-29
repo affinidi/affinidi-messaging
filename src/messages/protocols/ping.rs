@@ -68,7 +68,7 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
 
     info!(
         "{}: Ping message received from: ({}) Respond?({})",
-        session.tx_id, &from, respond
+        session.session_id, &from, respond
     );
 
     if respond {

@@ -1,5 +1,5 @@
 use super::errors::{ErrorResponse, Session};
-use crate::common::errors::create_tx_id;
+use crate::common::errors::create_session_id;
 use axum::{
     async_trait,
     extract::FromRequestParts,
@@ -56,7 +56,7 @@ impl IntoResponse for AuthError {
             AuthError::ExpiredToken => (StatusCode::UNAUTHORIZED, "Expired credentials"),
         };
         let body = Json(json!(ErrorResponse {
-            transactionID: "UNAUTHORIZED".into(),
+            sessionId: "UNAUTHORIZED".into(),
             httpCode: status.as_u16(),
             errorCode: status.as_u16(),
             errorCodeStr: status.to_string(),
@@ -83,7 +83,7 @@ where
             "UNKNOWN".into()
         };
 
-        let tx_id = create_tx_id();
+        let session_id = create_session_id();
 
         /*
         event!(Level::DEBUG, "{}: INSIDE JWT Authentication", tx_id);
@@ -178,10 +178,13 @@ where
             return Err(AuthError::WrongCredentials);
         };*/
 
-        info!("{}: Connection accepted from ({})", &tx_id, &remote_addr);
+        info!(
+            "{}: Connection accepted from ({})",
+            &session_id, &remote_addr
+        );
 
         let session = Session {
-            tx_id,
+            session_id,
             remote_addr,
             authenticated: false,
             challenge_sent: None,

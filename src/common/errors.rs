@@ -9,7 +9,7 @@ use std::fmt;
 use thiserror::Error;
 use tracing::{event, Level};
 
-type TxId = String;
+type SessId = String;
 
 pub struct AppError(MediatorError);
 
@@ -22,44 +22,48 @@ where
     }
 }
 
-/// MediatorError the first String is always the tx_id
+/// MediatorError the first String is always the session_id
 #[derive(Error, Debug)]
 pub enum MediatorError {
     #[error("Error in handling errors! {1}")]
-    ErrorHandlingError(TxId, String),
+    ErrorHandlingError(SessId, String),
     #[error("{1}")]
-    InternalError(TxId, String),
+    InternalError(SessId, String),
     #[error("Couldn't parse ({1}). Reason: {2}")]
-    ParseError(TxId, String, String),
+    ParseError(SessId, String, String),
     #[error("Permission Error: {1}")]
-    PermissionError(TxId, String),
+    PermissionError(SessId, String),
     #[error("Request is invalid: {1}")]
-    RequestDataError(TxId, String),
+    RequestDataError(SessId, String),
     #[error("Service Limit exceeded: {1}")]
-    ServiceLimitError(TxId, String),
+    ServiceLimitError(SessId, String),
     #[error("Unauthorized: {1}")]
-    Unauthorized(TxId, String),
+    Unauthorized(SessId, String),
     #[error("DID Error: did({1}) Error: {2}")]
-    DIDError(TxId, String, String),
+    DIDError(SessId, String, String),
     #[error("Configuration Error: {1}")]
-    ConfigError(TxId, String),
+    ConfigError(SessId, String),
     #[error("Database Error: {1}")]
-    DatabaseError(TxId, String),
+    DatabaseError(SessId, String),
     #[error("Message unpack error: {1}")]
-    MessageUnpackError(TxId, String),
+    MessageUnpackError(SessId, String),
     #[error("MessageExpired: expiry({1}) now({2})")]
-    MessageExpired(TxId, String, String),
+    MessageExpired(SessId, String, String),
     #[error("Message pack error: {1}")]
-    MessagePackError(TxId, String),
+    MessagePackError(SessId, String),
+    #[error("Feature not implemented: {1}")]
+    NotImplemented(SessId, String),
+    #[error("Authorization Session ({0}) error: {1}")]
+    SessionError(SessId, String),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let response = match self.0 {
-            MediatorError::ErrorHandlingError(tx_id, msg) => {
+            MediatorError::ErrorHandlingError(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 1,
                     errorCodeStr: "ErrorHandlingError".to_string(),
                     message: msg.to_string(),
@@ -67,10 +71,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::InternalError(tx_id, msg) => {
+            MediatorError::InternalError(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 2,
                     errorCodeStr: "InternalError".to_string(),
                     message: msg.to_string(),
@@ -78,10 +82,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::ParseError(tx_id, _, msg) => {
+            MediatorError::ParseError(session_id, _, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 3,
                     errorCodeStr: "BadRequest: ParseError".to_string(),
                     message: msg.to_string(),
@@ -89,10 +93,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::PermissionError(tx_id, msg) => {
+            MediatorError::PermissionError(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::FORBIDDEN.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 4,
                     errorCodeStr: "Forbidden: PermissionError".to_string(),
                     message: msg.to_string(),
@@ -100,10 +104,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::RequestDataError(tx_id, msg) => {
+            MediatorError::RequestDataError(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 5,
                     errorCodeStr: "BadRequest: RequestDataError".to_string(),
                     message: format!("Bad Request: ({})", msg),
@@ -111,10 +115,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::ServiceLimitError(tx_id, msg) => {
+            MediatorError::ServiceLimitError(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 6,
                     errorCodeStr: "BadRequest: ServiceLimitError".to_string(),
                     message: msg.to_string(),
@@ -122,10 +126,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::Unauthorized(tx_id, msg) => {
+            MediatorError::Unauthorized(session_id, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::UNAUTHORIZED.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 7,
                     errorCodeStr: "Unauthorized".to_string(),
                     message: format!("Unauthorized access: {}", msg),
@@ -133,10 +137,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::DIDError(tx_id, did, msg) => {
+            MediatorError::DIDError(session_id, did, msg) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 8,
                     errorCodeStr: "DIDError".to_string(),
                     message: format!("did({}) Error: {}", did, msg),
@@ -144,10 +148,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::ConfigError(tx_id, message) => {
+            MediatorError::ConfigError(session_id, message) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::SERVICE_UNAVAILABLE.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 9,
                     errorCodeStr: "ConfigError".to_string(),
                     message,
@@ -155,10 +159,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::DatabaseError(tx_id, message) => {
+            MediatorError::DatabaseError(session_id, message) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::SERVICE_UNAVAILABLE.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 10,
                     errorCodeStr: "DatabaseError".to_string(),
                     message,
@@ -166,10 +170,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::MessageUnpackError(tx_id, message) => {
+            MediatorError::MessageUnpackError(session_id, message) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 11,
                     errorCodeStr: "MessageUnpackError".to_string(),
                     message,
@@ -177,10 +181,10 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::MessageExpired(tx_id, expired, now) => {
+            MediatorError::MessageExpired(session_id, expired, now) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::UNPROCESSABLE_ENTITY.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 12,
                     errorCodeStr: "MessageExpired".to_string(),
                     message: format!("Message expired: expiry({}) now({})", expired, now),
@@ -188,12 +192,34 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
-            MediatorError::MessagePackError(tx_id, message) => {
+            MediatorError::MessagePackError(session_id, message) => {
                 let response = ErrorResponse {
                     httpCode: StatusCode::BAD_REQUEST.as_u16(),
-                    transactionID: tx_id.to_string(),
+                    sessionId: session_id.to_string(),
                     errorCode: 13,
                     errorCodeStr: "MessagePackError".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::NotImplemented(session_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::NOT_IMPLEMENTED.as_u16(),
+                    sessionId: session_id.to_string(),
+                    errorCode: 14,
+                    errorCodeStr: "NotImplemented".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::SessionError(session_id, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::NOT_ACCEPTABLE.as_u16(),
+                    sessionId: session_id.to_string(),
+                    errorCode: 14,
+                    errorCodeStr: "SessionError".to_string(),
                     message,
                 };
                 event!(Level::WARN, "{}", response.to_string());
@@ -210,7 +236,7 @@ impl IntoResponse for AppError {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Session {
-    pub tx_id: String,                  // Unique session transaction ID
+    pub session_id: String,             // Unique session transaction ID
     pub remote_addr: String,            // Remote Socket address
     pub authenticated: bool,            // Has this session been authenticated?
     pub challenge_sent: Option<String>, // Challenge sent to the client
@@ -219,7 +245,7 @@ pub struct Session {
 #[derive(Serialize, Debug)]
 #[allow(non_snake_case)]
 pub struct ErrorResponse {
-    pub transactionID: String,
+    pub sessionId: String,
     pub httpCode: u16,
     pub errorCode: u16,
     pub errorCodeStr: String,
@@ -231,7 +257,7 @@ impl fmt::Display for ErrorResponse {
         write!(
             f,
             "{}: httpcode({}) errorCode({}), errorCodeStr({}) message({})",
-            self.transactionID, self.httpCode, self.errorCode, self.errorCodeStr, self.message,
+            self.sessionId, self.httpCode, self.errorCode, self.errorCodeStr, self.message,
         )
     }
 }
@@ -241,7 +267,7 @@ pub trait GenericDataStruct: DeserializeOwned + Serialize {}
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct SuccessResponse<T: GenericDataStruct> {
-    pub transactionID: String,
+    pub sessionId: String,
     pub httpCode: u16,
     pub errorCode: i32,
     pub errorCodeStr: String,
@@ -255,20 +281,20 @@ impl<T: GenericDataStruct> fmt::Display for SuccessResponse<T> {
         write!(
             f,
             "{}: httpcode({}) errorCode({}), errorCodeStr({}) message({})",
-            self.transactionID, self.httpCode, self.errorCode, self.errorCodeStr, self.message,
+            self.sessionId, self.httpCode, self.errorCode, self.errorCodeStr, self.message,
         )
     }
 }
 
 impl<T: GenericDataStruct> SuccessResponse<T> {
     pub fn response(
-        tx_id: &str,
+        session_id: &str,
         http_code: StatusCode,
         msg: &str,
         data: Option<T>,
     ) -> Json<SuccessResponse<T>> {
         let response = SuccessResponse {
-            transactionID: tx_id.to_string(),
+            sessionId: session_id.to_string(),
             httpCode: http_code.as_u16(),
             errorCode: 0,
             errorCodeStr: "Ok".to_string(),
@@ -281,7 +307,7 @@ impl<T: GenericDataStruct> SuccessResponse<T> {
 }
 
 // Creates a random transaction identifier for each transaction
-pub fn create_tx_id() -> String {
+pub fn create_session_id() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(8)

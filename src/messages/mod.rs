@@ -11,7 +11,8 @@ use self::protocols::ping;
 pub mod protocols;
 
 pub enum MessageType {
-    Ping,
+    TrustPing,            // Trust Ping Protocol
+    AffinidiAuthenticate, // Affinidi Authentication Response
 }
 
 impl FromStr for MessageType {
@@ -19,7 +20,8 @@ impl FromStr for MessageType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "https://didcomm.org/trust-ping/2.0/ping" => Ok(Self::Ping),
+            "https://didcomm.org/trust-ping/2.0/ping" => Ok(Self::TrustPing),
+            "https://affinidi.com/atm/1.0/authenticate" => Ok(Self::AffinidiAuthenticate),
             _ => Err(MediatorError::ParseError(
                 "-1".into(),
                 s.into(),
@@ -36,7 +38,11 @@ impl MessageType {
         session: &Session,
     ) -> Result<Option<Message>, MediatorError> {
         match self {
-            Self::Ping => ping::process(message, session),
+            Self::TrustPing => ping::process(message, session),
+            Self::AffinidiAuthenticate => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Affinidi Authentication is only handled by the Authorization handler".into(),
+            )),
         }
     }
 }

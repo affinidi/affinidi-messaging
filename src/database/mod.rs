@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 pub mod handlers;
+pub mod session;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {

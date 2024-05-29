@@ -1,22 +1,23 @@
+use super::{did_conversion::convert_did, errors::MediatorError};
+use crate::resolvers::affinidi_secrets::AffinidiSecrets;
+use async_convert::{async_trait, TryFrom};
+use base64::prelude::*;
+use did_peer::DIDPeer;
+use didcomm::{did::DIDDoc, secrets::Secret};
+use jsonwebtoken::{DecodingKey, EncodingKey};
+use regex::{Captures, Regex};
+use ring::signature::{Ed25519KeyPair, KeyPair};
+use serde::{Deserialize, Serialize};
+use ssi::{
+    did::DIDMethods,
+    did_resolve::{DIDResolver, ResolutionInputMetadata},
+};
 use std::{
     collections::HashSet,
     env, fmt,
     fs::File,
     io::{self, BufRead},
     path::Path,
-};
-
-use crate::resolvers::affinidi_secrets::AffinidiSecrets;
-
-use super::{did_conversion::convert_did, errors::MediatorError};
-use async_convert::{async_trait, TryFrom};
-use did_peer::DIDPeer;
-use didcomm::{did::DIDDoc, secrets::Secret};
-use regex::{Captures, Regex};
-use serde::{Deserialize, Serialize};
-use ssi::{
-    did::DIDMethods,
-    did_resolve::{DIDResolver, ResolutionInputMetadata},
 };
 use tracing::{event, Level};
 use tracing_subscriber::filter::LevelFilter;
@@ -38,6 +39,7 @@ pub struct SecurityConfig {
     pub use_ssl: String,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
+    pub jwt_authorization_secret: String,
 }
 
 /// ConfigRaw Struct is used to deserialize the configuration file
@@ -72,6 +74,8 @@ pub struct Config {
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
+    pub jwt_encoding_key: Option<EncodingKey>,
+    pub jwt_decoding_key: Option<DecodingKey>,
 }
 
 impl fmt::Debug for Config {
@@ -102,6 +106,8 @@ impl fmt::Debug for Config {
             .field("message_expiry_minutes", &self.message_expiry_minutes)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
+            .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
+            .field("jwt_decoding_key?", &self.jwt_decoding_key.is_some())
             .finish()
     }
 }
@@ -131,6 +137,8 @@ impl Default for Config {
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
+            jwt_encoding_key: None,
+            jwt_decoding_key: None,
         }
     }
 }
@@ -201,6 +209,27 @@ impl TryFrom<ConfigRaw> for Config {
 
         // Load mediator denied DID's
         config.mediator_denied_dids = load_did_list(&raw.mediator_denied_dids)?;
+
+        // Create the JWT encoding and decoding keys
+        let jwt_secret = BASE64_URL_SAFE_NO_PAD
+            .decode(&raw.security.jwt_authorization_secret)
+            .map_err(|err| {
+                event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    format!("Could not create JWT key pair. {}", err),
+                )
+            })?;
+        config.jwt_encoding_key = Some(EncodingKey::from_ed_der(&jwt_secret));
+
+        let pair = Ed25519KeyPair::from_pkcs8(&jwt_secret).map_err(|err| {
+            event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not create JWT key pair. {}", err),
+            )
+        })?;
+        config.jwt_decoding_key = Some(DecodingKey::from_ed_der(pair.public_key().as_ref()));
 
         Ok(config)
     }

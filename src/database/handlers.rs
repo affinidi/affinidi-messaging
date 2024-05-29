@@ -119,7 +119,7 @@ impl DatabaseHandler {
     /// Step 10: Commit the transaction
     pub async fn store_message(
         &self,
-        tx_id: &str,
+        session_id: &str,
         message: &str,
         metadata: &MetaEnvelope,
     ) -> Result<(), MediatorError> {
@@ -208,10 +208,10 @@ impl DatabaseHandler {
             event!(
                 Level::ERROR,
                 "{}: store_message(): No recipient found",
-                tx_id
+                session_id
             );
             return Err(MediatorError::InternalError(
-                tx_id.into(),
+                session_id.into(),
                 "No recipient found".into(),
             ));
         }
@@ -222,7 +222,7 @@ impl DatabaseHandler {
         tx.query_async(&mut con).await.map_err(|err| {
             event!(Level::ERROR, "Couldn't store message in database: {}", err);
             MediatorError::DatabaseError(
-                tx_id.into(),
+                session_id.into(),
                 format!("Couldn't store message in database: {}", err),
             )
         })?;

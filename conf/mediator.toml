@@ -57,10 +57,14 @@ message_expiry_minutes = "$MESSAGE_EXPIRY_MINUTES:10080"
 ### NOTE: do not use `false` in prod unless TLS is terminated outside of the service
 use_ssl = "${USE_SSL:true}"
 
-### Note: If you comment out the following SSL configs, Slate will default back to non-TLS mode.
+### Note: If you comment out the following SSL configs,  will default back to non-TLS mode.
 ###       Useful if doing testing/debugging without requiring SSL certificate checks
 ### ssl_certificate_file: <path> file that contains the SSL certificate for this service
 ssl_certificate_file = "${SSL_CERTIFICATE_FILE:conf/keys/end.cert}"
 
 ### ssl_key_file: <path> file that contains the SSL certificate key
 ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
+
+### jwt_authorization_secret
+### REQUIRED: Key string that is used to sign JWT tokens
+jwt_authorization_secret = "${AUTHORIZATION_SECRET:MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
