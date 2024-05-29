@@ -111,7 +111,6 @@ pub async fn message_inbound_handler(
 
         let mut msg_count = 0;
         for recipient in to_dids {
-            event!(Level::INFO, "Packing message for recipient: {}", recipient);
             let msg_str = response
                 .pack(
                     recipient,

@@ -1,9 +1,17 @@
+use std::fmt::Debug;
+
+use axum::{
+    async_trait,
+    extract::{FromRef, FromRequestParts},
+};
 use chrono::{DateTime, Utc};
 use common::{
     config::{read_config_file, Config, ConfigRaw},
     errors::MediatorError,
+    jwt_auth::AuthError,
 };
 use database::DatabaseHandler;
+use http::request::Parts;
 use resolvers::affinidi_dids::AffinidiDIDResolver;
 use tracing::{event, level_filters::LevelFilter, Level};
 use tracing_subscriber::{reload::Handle, Registry};
@@ -20,6 +28,28 @@ pub struct SharedData {
     pub service_start_timestamp: DateTime<Utc>,
     pub did_resolver: AffinidiDIDResolver,
     pub database: DatabaseHandler,
+}
+
+impl Debug for SharedData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedData")
+            .field("config", &self.config)
+            .field("service_start_timestamp", &self.service_start_timestamp)
+            .finish()
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for SharedData
+where
+    Self: FromRef<S>,
+    S: Send + Sync + Debug,
+{
+    type Rejection = AuthError;
+
+    async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        Ok(Self::from_ref(state)) // <---- added this line
+    }
 }
 
 pub async fn init(

@@ -5,7 +5,10 @@ use didcomm::{
 };
 use didcomm_mediator::{
     common::{did_conversion::convert_did, errors::SuccessResponse},
-    handlers::{authenticate::Challenge, message_inbound::ResponseData},
+    handlers::{
+        authenticate::{AuthorizationResponse, Challenge},
+        message_inbound::ResponseData,
+    },
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
 use reqwest::{Certificate, Client};
@@ -122,11 +125,17 @@ async fn main() -> std::io::Result<()> {
     println!("Status:\n{}", res.status());
     let body = res.text().await.unwrap();
     println!("Body:\n{}", body);
+    let tokens = serde_json::from_str::<SuccessResponse<AuthorizationResponse>>(&body)
+        .ok()
+        .unwrap()
+        .data
+        .unwrap();
 
     // Send the Ping message
     let res = client
         .post("https://localhost:7037/atm/v1/inbound")
         .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", tokens.access_token))
         .body(msg)
         .send()
         .await
@@ -135,6 +144,7 @@ async fn main() -> std::io::Result<()> {
     //println!("Headers:\n{:#?}", res.headers());
 
     let body = res.text().await.unwrap();
+    println!("Body:\n{}", body);
 
     println!();
     let results = serde_json::from_str::<SuccessResponse<ResponseData>>(&body)

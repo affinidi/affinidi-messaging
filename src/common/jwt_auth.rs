@@ -1,8 +1,8 @@
 use super::errors::{ErrorResponse, Session};
-use crate::common::errors::create_session_id;
+use crate::{database::session::SessionClaims, SharedData};
 use axum::{
     async_trait,
-    extract::FromRequestParts,
+    extract::{FromRef, FromRequestParts},
     response::{IntoResponse, Response},
     Json, RequestPartsExt,
 };
@@ -10,19 +10,15 @@ use axum_extra::{
     headers::{authorization::Bearer, Authorization},
     TypedHeader,
 };
-use base64::prelude::*;
 use http::{request::Parts, StatusCode};
-use itertools::Itertools;
-use regex::Regex;
+use jsonwebtoken::{TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
+    fmt::{Debug, Display},
     net::SocketAddr,
-    time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::{event, info, Level};
-
-const SKEW: u64 = 30; // We allow for a 30 second skew on time checks
+use tracing::{error, event, info, warn, Level};
 
 // Payload contents of the JWT
 // All times are in seconds since UNIX EPOCH
@@ -45,22 +41,38 @@ pub enum AuthError {
     MissingCredentials,
     InvalidToken,
     ExpiredToken,
+    InternalServerError(String),
+}
+
+impl Display for AuthError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AuthError::WrongCredentials => write!(f, "Wrong credentials"),
+            AuthError::MissingCredentials => write!(f, "Missing credentials"),
+            AuthError::InvalidToken => write!(f, "Invalid token"),
+            AuthError::ExpiredToken => write!(f, "Expired token"),
+            AuthError::InternalServerError(message) => {
+                write!(f, "Internal Server Error: {}", message)
+            }
+        }
+    }
 }
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
-            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
-            AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
-            AuthError::ExpiredToken => (StatusCode::UNAUTHORIZED, "Expired credentials"),
+        let status = match self {
+            AuthError::WrongCredentials => StatusCode::UNAUTHORIZED,
+            AuthError::MissingCredentials => StatusCode::BAD_REQUEST,
+            AuthError::InvalidToken => StatusCode::BAD_REQUEST,
+            AuthError::ExpiredToken => StatusCode::UNAUTHORIZED,
+            AuthError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let body = Json(json!(ErrorResponse {
             sessionId: "UNAUTHORIZED".into(),
             httpCode: status.as_u16(),
             errorCode: status.as_u16(),
             errorCodeStr: status.to_string(),
-            message: error_message.into()
+            message: self.to_string(),
         }));
         (status, body).into_response()
     }
@@ -69,10 +81,22 @@ impl IntoResponse for AuthError {
 #[async_trait]
 impl<S> FromRequestParts<S> for Session
 where
-    S: Send + Sync,
+    SharedData: FromRef<S>,
+    S: Send + Sync + Debug,
 {
     type Rejection = AuthError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let state = parts
+            .extract_with_state::<SharedData, _>(_state)
+            .await
+            .map_err(|e| {
+                error!("Couldn't get SharedData state! Reason: {}", e);
+                AuthError::InternalServerError(format!(
+                    "Couldn't get SharedData state! Reason: {}",
+                    e
+                ))
+            })?;
+
         let remote_addr = if let Some(address) = parts
             .extensions
             .get::<axum::extract::ConnectInfo<SocketAddr>>()
@@ -80,113 +104,55 @@ where
         {
             address.to_string()
         } else {
-            "UNKNOWN".into()
+            warn!("No remote address in request!");
+            return Err(AuthError::MissingCredentials);
         };
 
-        let session_id = create_session_id();
+        let mut validation = Validation::new(jsonwebtoken::Algorithm::EdDSA);
+        validation.set_audience(&["ATM"]);
+        validation.set_required_spec_claims(&["exp", "sub", "aud", "session_id"]);
 
-        /*
-        event!(Level::DEBUG, "{}: INSIDE JWT Authentication", tx_id);
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
-            .map_err(|_| AuthError::MissingCredentials)?;
+            .map_err(|_| {
+                warn!(
+                    "{}: No Authorization Bearer header in request!",
+                    remote_addr
+                );
+                AuthError::MissingCredentials
+            })?;
 
-        event!(Level::DEBUG, "{}: JWT = {}", tx_id, bearer.token());
-
-        /*
-            let decode_key = DecodingKey::from_ec_components(
-                "b3kdYEBrlWjQwY55F8MhXC97pwkjTpcQZZ09oDDBK4c",
-                "wlopQwIPWuT55M3ZfCDZdoBs1nh2kwEvzPjnkakf96U",
-            )
-            .unwrap();
-        // TODO: This needs to be decode() not decode_header()
-        let claims = match decode_header(&token.unwrap()) {
-            Ok(c) => c,
-            Err(err) => {
-                event!(Level::WARN, "decode failed {:?}", err);
-                let json_error = ErrorResponse {
-                    status: "fail".to_string(),
-                    message: "Invalid token".to_string(),
-                };
-                return ready(Err(ErrorUnauthorized(json_error)));
-            }
-        };
-        event!(Level::DEBUG, "claims = {:?}", claims);
-        */
-
-        let token = bearer.token();
-
-        let jwt_parts: Vec<&str> = token.split('.').collect_vec();
-        if jwt_parts.len() != 3 {
-            return Err(AuthError::InvalidToken);
-        }
-
-        let payload_raw = if let Ok(payload) = BASE64_STANDARD_NO_PAD.decode(jwt_parts[1]) {
-            if let Ok(payload) = String::from_utf8(payload) {
-                payload
-            } else {
-                return Err(AuthError::InvalidToken);
-            }
-        } else {
-            return Err(AuthError::InvalidToken);
-        };
-        event!(Level::DEBUG, "payload_raw = {}", payload_raw);
-
-        // Deserialize JSON payload
-        let payload = if let Ok(payload) = serde_json::from_str::<TokenPayload>(&payload_raw) {
-            payload
-        } else {
-            return Err(AuthError::InvalidToken);
-        };
-
-        event!(Level::DEBUG, "payload = {:?}", payload);
-
-        // Check the validity of the JWT
-        let since_epoch = if let Ok(epoch) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            epoch.as_secs()
-        } else {
-            return Err(AuthError::InvalidToken);
-        };
-        if (payload.exp + SKEW) < since_epoch
-            || (payload.iat - SKEW) > since_epoch
-            || (payload.nbf - SKEW) > since_epoch
+        let token_data: TokenData<SessionClaims> = if let Some(decoding_key) =
+            state.config.jwt_decoding_key.as_ref()
         {
-            event!(
-                Level::DEBUG,
-                "{}: expired token epoch({}) exp({}) iat({}) nbf({})",
-                tx_id,
-                since_epoch,
-                payload.exp,
-                payload.iat,
-                payload.nbf
-            );
-            return Err(AuthError::ExpiredToken);
-        }
+            match jsonwebtoken::decode::<SessionClaims>(bearer.token(), decoding_key, &validation) {
+                Ok(token_data) => token_data,
+                Err(err) => {
+                    event!(
+                        Level::WARN,
+                        "{}: decoding JWT failed {:?}",
+                        remote_addr,
+                        err
+                    );
+                    return Err(AuthError::InvalidToken);
+                }
+            }
+        } else {
+            return Err(AuthError::MissingCredentials);
+        };
 
-        // Extract the Subject which gives us the projectId
-        // ari:iam::<project_id>:user/<principal_id> ...
-        // ari:iam::e1f31c18-a69f-4423-b276-cbd1bf0863aa:user/ff660134-f87d-4959-8425-192609e483cb/client/e7a5c192-fc6f-4164-b010-68c4bd8bfb66"
-
-        let sub = payload.sub.split(':').collect_vec();
-        if sub.len() < 5 {
-            return Err(AuthError::WrongCredentials);
-        }
-
-        let re = Regex::new(r"(user\/.[^\/]*)\/").unwrap();
-        let Some(owner_id) = re.captures(sub[4]) else {
-            return Err(AuthError::WrongCredentials);
-        };*/
+        let session_id = token_data.claims.session_id.clone();
 
         info!(
-            "{}: Connection accepted from ({})",
+            "{}: Protected connection accepted from ({})",
             &session_id, &remote_addr
         );
 
         let session = Session {
             session_id,
             remote_addr,
-            authenticated: false,
+            authenticated: true,
             challenge_sent: None,
         };
 
