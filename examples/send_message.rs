@@ -1,3 +1,4 @@
+use atm_sdk::ATM;
 use did_peer::DIDPeer;
 use didcomm::{
     secrets::{Secret, SecretMaterial, SecretType},
@@ -196,7 +197,7 @@ async fn load_dids() -> AffinidiDIDResolver {
     AffinidiDIDResolver::new(vec![d1, d2])
 }
 
-/// Creates an Affinidi Trusted Messaging Authenticaton Challenge Response Message
+/// Creates an Affinidi Trusted Messaging Authentication Challenge Response Message
 /// # Arguments
 /// * `to_did` - The DID of the recipient
 /// * `challenge` - The challenge that was sent
