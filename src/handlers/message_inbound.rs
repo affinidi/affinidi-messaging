@@ -5,7 +5,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use ssi::did::DIDMethods;
 use std::borrow::BorrowMut;
-use tracing::{event, Level};
+use tracing::{debug, span, Level};
 
 use crate::{
     common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
@@ -34,17 +34,18 @@ pub struct InboundMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ResponseData {
+pub struct InboundMessageResponse {
     pub body: String,
     pub metadata: UnpackMetadata,
 }
-impl GenericDataStruct for ResponseData {}
+impl GenericDataStruct for InboundMessageResponse {}
 
 pub async fn message_inbound_handler(
     session: Session,
     State(state): State<SharedData>,
     Json(body): Json<InboundMessage>,
-) -> Result<(StatusCode, Json<SuccessResponse<ResponseData>>), AppError> {
+) -> Result<(StatusCode, Json<SuccessResponse<InboundMessageResponse>>), AppError> {
+    let _span = span!(Level::DEBUG, "message_inbound_handler", session = %session.session_id);
     let s = serde_json::to_string(&body).unwrap();
 
     let mut did_method_resolver = DIDMethods::default();
@@ -69,6 +70,7 @@ pub async fn message_inbound_handler(
             .into());
         }
     };
+    debug!("message converted to MetaEnvelope");
 
     // Unpack the message
     let (msg, metadata) = match Message::unpack(
@@ -90,11 +92,14 @@ pub async fn message_inbound_handler(
         }
     };
 
+    debug!("message unpacked:\n{:#?}", msg);
+
     // Process the message
     let response = match msg.process(&session) {
         Ok(response) => response,
         Err(e) => return Err(e.into()),
     };
+    debug!("message processed:\n{:#?}", response);
 
     // Store the message if necessary
     let msg_count = if let Some(response) = &response {
@@ -133,7 +138,7 @@ pub async fn message_inbound_handler(
         0
     };
 
-    let response = Some(ResponseData {
+    let response = Some(InboundMessageResponse {
         body: format!("messages saved successfully count({})", msg_count),
         metadata,
     });

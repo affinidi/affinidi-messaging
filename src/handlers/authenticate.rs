@@ -23,11 +23,11 @@ use crate::{
 use super::message_inbound::InboundMessage;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Challenge {
+pub struct AuthenticationChallenge {
     pub challenge: String,
     pub session_id: String,
 }
-impl GenericDataStruct for Challenge {}
+impl GenericDataStruct for AuthenticationChallenge {}
 
 /// Request body for POST /authenticate/challenge
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -51,7 +51,7 @@ pub async fn authentication_challenge(
     ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
     State(state): State<SharedData>,
     Json(body): Json<ChallengeBody>,
-) -> Result<(StatusCode, Json<SuccessResponse<Challenge>>), AppError> {
+) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
     let session = Session {
         session_id: create_random_string(8),
         challenge: create_random_string(32),
@@ -75,7 +75,7 @@ pub async fn authentication_challenge(
             errorCode: 0,
             errorCodeStr: "NA".to_string(),
             message: "Success".to_string(),
-            data: Some(Challenge {
+            data: Some(AuthenticationChallenge {
                 challenge: session.challenge,
                 session_id: session.session_id.clone(),
             }),
@@ -173,7 +173,7 @@ pub async fn authentication_response(
     }
 
     // Turn message body into Challenge
-    let challenge: Challenge = serde_json::from_value(msg.body).map_err(|err| {
+    let challenge: AuthenticationChallenge = serde_json::from_value(msg.body).map_err(|err| {
         warn!("Couldn't parse body into ChallengeBody. Reason: {}", err);
         MediatorError::SessionError(
             "UNKNOWN".into(),

@@ -5,7 +5,7 @@ use serde_json::json;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, ATM};
+use crate::{errors::ATMError, messages::InboundMessageResponse, ATM};
 
 impl<'c> ATM<'c> {
     pub async fn send_ping(
@@ -14,8 +14,7 @@ impl<'c> ATM<'c> {
         anonymous: bool,
         expect_response: bool,
     ) -> Result<(), ATMError> {
-        let span = span!(Level::DEBUG, "send_ping",);
-        let _enter = span.enter();
+        let _span = span!(Level::DEBUG, "send_ping",).entered();
         debug!(
             "Pinging {}, anonymous?({}) response_expected?({})",
             to_did, anonymous, expect_response
@@ -43,7 +42,7 @@ impl<'c> ATM<'c> {
         let mut msg = Message::build(
             Uuid::new_v4().into(),
             "https://didcomm.org/trust-ping/2.0/ping".to_owned(),
-            json!(format!("response_requested: {}", expect_response)),
+            json!({"response_requested": expect_response}),
         )
         .to(to_did.to_owned());
 
@@ -59,7 +58,7 @@ impl<'c> ATM<'c> {
         debug!("Ping message: {:?}", msg);
 
         // Pack the message
-        let (msg, metadata) = msg
+        let (msg, _) = msg
             .pack_encrypted(
                 to_did,
                 from_did.as_deref(),
@@ -70,6 +69,11 @@ impl<'c> ATM<'c> {
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+        // send the message
+        let response = self.send_message::<InboundMessageResponse>(&msg).await?;
+
+        debug!("Response: {:?}", response);
 
         Ok(())
     }

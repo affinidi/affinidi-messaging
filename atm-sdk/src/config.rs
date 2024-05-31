@@ -16,6 +16,8 @@ use crate::errors::ATMError;
 pub struct Config {
     pub(crate) my_did: String,
     ssl_certificates: Vec<Certificate>,
+    pub(crate) atm_api: String,
+    pub(crate) atm_did: String,
 }
 
 impl Config {
@@ -47,6 +49,8 @@ impl Config {
 pub struct ConfigBuilder {
     ssl_certificates: Vec<String>,
     my_did: Option<String>,
+    atm_api: Option<String>,
+    atm_did: Option<String>,
 }
 
 impl ConfigBuilder {
@@ -65,6 +69,18 @@ impl ConfigBuilder {
     /// Add the DID for the client itself to ATM
     pub fn with_my_did(mut self, my_did: &str) -> Self {
         self.my_did = Some(my_did.to_owned());
+        self
+    }
+
+    /// Add the URL for the ATM API
+    pub fn with_atm_api(mut self, api_url: &str) -> Self {
+        self.atm_api = Some(api_url.to_owned());
+        self
+    }
+
+    /// Add the DID for the ATM service itself
+    pub fn with_atm_did(mut self, atm_did: &str) -> Self {
+        self.atm_did = Some(atm_did.to_owned());
         self
     }
 
@@ -106,9 +122,26 @@ impl ConfigBuilder {
             ));
         };
 
+        let atm_api = if let Some(atm_url) = self.atm_api {
+            atm_url
+        } else {
+            // TODO: Change this to the production URL
+            "https://localhost:7037/atm/v1".to_string()
+        };
+
+        let atm_did = if let Some(atm_did) = self.atm_did {
+            atm_did
+        } else {
+            return Err(ATMError::ConfigError(
+                "You must provide the DID for the ATM service!".to_owned(),
+            ));
+        };
+
         Ok(Config {
             ssl_certificates: certs,
             my_did,
+            atm_api,
+            atm_did,
         })
     }
 }

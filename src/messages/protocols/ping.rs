@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use didcomm::Message;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::common::errors::{MediatorError, Session};
@@ -29,15 +29,6 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
         .unwrap()
         .as_secs();
 
-    let from: String = if let Some(from) = &msg.from {
-        from.into()
-    } else {
-        return Err(MediatorError::RequestDataError(
-            "-1".into(),
-            "Message missing 'from' field".into(),
-        ));
-    };
-
     let to = if let Some(to) = &msg.to {
         if let Some(first) = to.first() {
             first.to_owned()
@@ -54,24 +45,30 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
         ));
     };
 
-    let respond: bool = if let Some(body) = msg.body.as_str() {
-        if let Ok(respond) = serde_json::from_str::<Ping>(body) {
-            respond.response_requested
-        } else {
-            // Defaults to true
-            true
-        }
+    let respond: bool = if let Ok(body) = serde_json::from_value::<Ping>(msg.body.to_owned()) {
+        body.response_requested
     } else {
-        // Defaults to true
         true
     };
+    debug!("Respond requested: {}", respond);
 
     info!(
         "{}: Ping message received from: ({}) Respond?({})",
-        session.session_id, &from, respond
+        session.session_id,
+        msg.from.clone().unwrap_or_else(|| "ANONYMOUS".to_string()),
+        respond
     );
 
     if respond {
+        let from = if let Some(from) = &msg.from {
+            from.to_owned()
+        } else {
+            return Err(MediatorError::RequestDataError(
+                "-1".into(),
+                "Anonymous Trust-Ping is asking for a response, this is an invalid request!".into(),
+            ));
+        };
+
         // Build the message (we swap from and to)
         Ok(Some(
             Message::build(

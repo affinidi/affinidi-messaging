@@ -1,7 +1,7 @@
 use atm_sdk::{config::Config, conversions::secret_from_str, errors::ATMError, ATM};
 use did_peer::DIDPeer;
 use serde_json::json;
-use tracing::{debug, Level};
+use tracing_subscriber::filter;
 
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
@@ -9,7 +9,7 @@ async fn main() -> Result<(), ATMError> {
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
         .compact()
-        .with_max_level(Level::DEBUG)
+        .with_env_filter(filter::EnvFilter::from_default_env())
         .finish();
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
@@ -32,11 +32,12 @@ async fn main() -> Result<(), ATMError> {
       "y": "PpYqybOwMsm64vftt-7gBCQPIUbglMmyy_6rloSSAPk"
     });
 
-    let mediator_did = "did:peer:2.Vz6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ.EzQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
+    let atm_did = "did:peer:2.Vz6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94eFwUjRbbZJ.EzQ3shXbp9EFX7JzH2rPVfEfAEAYA4ifv4qY5sLcRgZxLHY42W.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
 
     let config = Config::builder()
         .with_ssl_certificates(&mut vec!["../conf/keys/client.chain".into()])
         .with_my_did(my_did)
+        .with_atm_did(atm_did)
         .build()?;
 
     let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
@@ -47,7 +48,7 @@ async fn main() -> Result<(), ATMError> {
 
     // Send the ping message
     // Sending to the mediator, anonymous message, expecting a response (which will get dropped as we're anonymous)
-    atm.send_ping(mediator_did, true, true).await?;
+    atm.send_ping(atm_did, false, true).await?;
 
     println!("Good!");
     Ok(())

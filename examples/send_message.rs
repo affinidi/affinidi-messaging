@@ -7,8 +7,8 @@ use didcomm::{
 use didcomm_mediator::{
     common::{did_conversion::convert_did, errors::SuccessResponse},
     handlers::{
-        authenticate::{AuthorizationResponse, Challenge},
-        message_inbound::ResponseData,
+        authenticate::{AuthenticationChallenge, AuthorizationResponse},
+        message_inbound::InboundMessageResponse,
     },
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
@@ -96,7 +96,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .map_err(|e| error(format!("Could not get: {:?}", e)))?;
     let body = res.text().await.unwrap();
-    let body = serde_json::from_str::<SuccessResponse<Challenge>>(&body)
+    let body = serde_json::from_str::<SuccessResponse<AuthenticationChallenge>>(&body)
         .ok()
         .unwrap();
 
@@ -148,7 +148,7 @@ async fn main() -> std::io::Result<()> {
     println!("Body:\n{}", body);
 
     println!();
-    let results = serde_json::from_str::<SuccessResponse<ResponseData>>(&body)
+    let results = serde_json::from_str::<SuccessResponse<InboundMessageResponse>>(&body)
         .ok()
         .unwrap();
     let msg = results.data.clone().unwrap().body;
@@ -206,7 +206,7 @@ async fn load_dids() -> AffinidiDIDResolver {
 ///
 /// Notes:
 /// - This message will expire after 5 minutes
-fn create_auth_challenge_response(to_did: &str, body: &Challenge) -> Message {
+fn create_auth_challenge_response(to_did: &str, body: &AuthenticationChallenge) -> Message {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()

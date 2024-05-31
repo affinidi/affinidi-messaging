@@ -3,6 +3,7 @@ use didcomm::did::DIDDoc;
 use didcomm::did::DIDResolver as DidcommDIDResolver;
 use didcomm::secrets::Secret;
 use errors::ATMError;
+use messages::AuthorizationResponse;
 use reqwest::Client;
 use resolvers::did_resolver::AffinidiDIDResolver;
 use resolvers::secrets_resolver::AffinidiSecrets;
@@ -11,6 +12,7 @@ use ssi::did_resolve::DIDResolver as SSIDIDResolver;
 use tracing::debug;
 use tracing::span;
 
+mod authentication;
 pub mod config;
 pub mod conversions;
 pub mod errors;
@@ -22,7 +24,9 @@ pub struct ATM<'c> {
     did_methods_resolver: DIDMethods<'c>,
     did_resolver: AffinidiDIDResolver,
     secrets_resolver: AffinidiSecrets,
-    client: Client,
+    pub(crate) client: Client,
+    authenticated: bool,
+    jwt_tokens: Option<AuthorizationResponse>,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -75,6 +79,8 @@ impl<'c> ATM<'c> {
             did_resolver: AffinidiDIDResolver::new(vec![]),
             secrets_resolver: AffinidiSecrets::new(vec![]),
             client,
+            authenticated: false,
+            jwt_tokens: None,
         };
 
         for method in did_methods {
@@ -82,6 +88,8 @@ impl<'c> ATM<'c> {
         }
         // Add our own DID to the DID_RESOLVER
         atm.add_did(&config.my_did).await?;
+        // Add our ATM DID to the DID_RESOLVER
+        atm.add_did(&config.atm_did).await?;
 
         Ok(atm)
     }
