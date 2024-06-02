@@ -1,0 +1,33 @@
+[package]
+name = "atn-atm-sdk"
+version = "0.1.1"
+description = "Affinidi Trusted Messaging SDK"
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+did-peer = { version = "0.3", path = "../../did-peer" }
+atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
+http = "1"
+jsonwebtoken = "9.3"
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+ssi = "0.7"
+thiserror = "1.0"
+tokio = { version = "1.37.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws_lc_rs",
+    "tls12",
+] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+
+[dev-dependencies]

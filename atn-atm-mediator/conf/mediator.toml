@@ -1,0 +1,70 @@
+### log_level: trace debug info warn error
+### default: info
+log_level = "debug"
+
+### listen_address: <ip_address>:<tcp_port> that this service will listen on.
+### Default: 0.0.0.0:7037
+listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
+
+### mediator_did: DID of the mediator
+### REQUIRED!
+mediator_did = "${MEDIATOR_DID:did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
+
+### mediator_secrets: Secrets of the mediator
+### REQUIRED: Location of secrets (supports file:// only)
+### Example file:[{"id": "#key-1", "crv": "secp256k1", "kty": "EC", "d": "...", "x": "...", "y": "..."}, {}]
+### NOTE: The key identifiers (id) must match the key identifiers in the mediator_did
+mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
+
+### mediator_allowed_dids: DID's that are allowed to send messages through this mediator
+### Default: Filename of a file containing a list of allowed DIDs
+mediator_allowed_dids = "${MEDIATOR_ALLOWED_DIDS:./conf/mediator_allowed_dids.txt}"
+
+### mediator_denied_dids: DID's that are denied to send messages through this mediator
+### Default: Filename of a file containing a list of denied DIDs
+mediator_denied_dids = "${MEDIATOR_DENIED_DIDS:./conf/mediator_denied_dids.txt}"
+
+[database]
+### database_url: URL of the Redis compatable database
+### Default: redis://127.0.0.1/
+database_url = "${REDIS_URL:redis://127.0.0.1/}"
+
+### database_pool_size: Number of connections to the database
+### Default: 10
+database_pool_size = "${DATABASE_POOL_SIZE:10}"
+
+### database_timeout: Timeout for database operations in seconds
+### Default: 2
+database_timeout = "${DATABASE_TIMEOUT:2}"
+
+### max_message_size: Maximum size of a message in bytes
+### Default: 1048576 (1MB)
+max_message_size = "${MAX_MESSAGE_SIZE:1048576"
+
+### max_queued_messages: How many messages will we queue for a single recipient or a single sender
+### Default: 100
+### NOTE: This is a per-recipient or per-sender limit
+max_queued_messages = "${MAX_QUEUED_MESSAGES:100"
+
+### message_expiry_minutes: Time to live in minutes for messages stored
+### Messages will expire after this limit
+### Default: 10080 (7 days)
+message_expiry_minutes = "$MESSAGE_EXPIRY_MINUTES:10080"
+
+[security]
+### If true (default) SSL is enabled.
+### default: true
+### NOTE: do not use `false` in prod unless TLS is terminated outside of the service
+use_ssl = "${USE_SSL:true}"
+
+### Note: If you comment out the following SSL configs,  will default back to non-TLS mode.
+###       Useful if doing testing/debugging without requiring SSL certificate checks
+### ssl_certificate_file: <path> file that contains the SSL certificate for this service
+ssl_certificate_file = "${SSL_CERTIFICATE_FILE:conf/keys/end.cert}"
+
+### ssl_key_file: <path> file that contains the SSL certificate key
+ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
+
+### jwt_authorization_secret
+### REQUIRED: Key string that is used to sign JWT tokens
+jwt_authorization_secret = "${AUTHORIZATION_SECRET:MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
