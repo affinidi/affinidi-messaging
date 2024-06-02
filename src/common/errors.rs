@@ -240,6 +240,7 @@ pub struct Session {
     pub remote_addr: String,            // Remote Socket address
     pub authenticated: bool,            // Has this session been authenticated?
     pub challenge_sent: Option<String>, // Challenge sent to the client
+    pub did: String,                    // DID of the client
 }
 
 #[derive(Serialize, Debug)]

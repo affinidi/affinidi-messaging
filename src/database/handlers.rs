@@ -4,12 +4,14 @@ use std::{
 };
 
 use deadpool_redis::Connection;
-use didcomm::envelope::MetaEnvelope;
 use serde::Serialize;
 use sha256::digest;
-use tracing::{event, Level};
+use tracing::{debug, event, span, Instrument, Level};
 
-use crate::common::{config::Config, errors::MediatorError};
+use crate::{
+    common::{config::Config, errors::MediatorError},
+    handlers::message_list::Folder,
+};
 
 use super::{DatabaseHandler, MetadataStats};
 
@@ -18,7 +20,7 @@ use super::{DatabaseHandler, MetadataStats};
 /// timestamp: Unix timestamp of when the message was created (in seconds)
 #[derive(Serialize)]
 struct ExpiryRecord {
-    pub message_sha: String,
+    pub message_hash: String,
     pub timestamp: u64,
 }
 
@@ -121,68 +123,76 @@ impl DatabaseHandler {
         &self,
         session_id: &str,
         message: &str,
-        metadata: &MetaEnvelope,
+        to_did: &str,
+        from_did: Option<&str>,
     ) -> Result<(), MediatorError> {
-        // step 1
-        let mut tx = deadpool_redis::redis::pipe();
-        tx.atomic();
+        let _span = span!(Level::DEBUG, "store_message", session_id = session_id);
+        async move {
+            // step 1
+            let mut tx = deadpool_redis::redis::pipe();
+            tx.atomic();
 
-        // step 2: store the message
-        let message_sha = digest(message.as_bytes());
-        tx.cmd("HSET")
-            .arg("MESSAGE_STORE")
-            .arg(&message_sha)
-            .arg(message);
+            // step 2: store the message
+            let message_hash = digest(message.as_bytes());
+            tx.cmd("HSET")
+                .arg("MESSAGE_STORE")
+                .arg(&message_hash)
+                .arg(message);
 
-        // step 3: increment the bytes stored
-        tx.cmd("HINCRBY")
-            .arg("MESSAGE_STORE")
-            .arg("bytes_stored")
-            .arg(message.len());
+            // step 3: increment the bytes stored
+            tx.cmd("HINCRBY")
+                .arg("MESSAGE_STORE")
+                .arg("bytes_stored")
+                .arg(message.len());
 
-        // step 4: store the sender
-        // step 5: update the sender stats
-        // step 8: update the DID_LIST for sender
-        if let Some(from_did) = &metadata.from_did {
-            let from_did_hash = digest(from_did.as_bytes());
-            tx.cmd("RPUSH")
-                .arg(format!("SEND_Q_{}", from_did_hash))
-                .arg(&message_sha)
-                .cmd("HINCRBY")
-                .arg(format!("DID_{}", from_did_hash))
-                .arg(
-                    "send_bytes_queued
+            // step 4: store the sender
+            // step 5: update the sender stats
+            // step 8: update the DID_LIST for sender
+            if let Some(from_did) = from_did {
+                let from_did_hash = digest(from_did.as_bytes());
+                tx.cmd("RPUSH")
+                    .arg(format!("SEND_Q_{}", from_did_hash))
+                    .arg(&message_hash)
+                    .cmd("HINCRBY")
+                    .arg(format!("DID_{}", from_did_hash))
+                    .arg(
+                        "send_bytes_queued
                 ",
-                )
-                .arg(message.len())
-                .cmd("HINCRBY")
-                .arg(format!("DID_{}", from_did_hash))
-                .arg("send_queued")
-                .arg("1")
-                .cmd("HSET")
-                .arg("DID_LIST")
-                .arg(&from_did_hash)
-                .arg(from_did)
-                .arg(from_did)
-                .arg(&from_did_hash);
-        }
+                    )
+                    .arg(message.len())
+                    .cmd("HINCRBY")
+                    .arg(format!("DID_{}", from_did_hash))
+                    .arg("send_queued")
+                    .arg("1")
+                    .cmd("HSET")
+                    .arg("DID_LIST")
+                    .arg(&from_did_hash)
+                    .arg(from_did)
+                    .arg(from_did)
+                    .arg(&from_did_hash);
+                debug!(
+                    "sender: did({}) did_hash({}) bytes({})",
+                    from_did,
+                    from_did_hash,
+                    message.len()
+                );
+            }
 
-        // step 6: create a pointer in the EXPIRY_LIST
-        let er = ExpiryRecord {
-            message_sha,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-        };
-        tx.cmd("RPUSH")
-            .arg("EXPIRY_LIST")
-            .arg(serde_json::to_string(&er).unwrap());
+            // step 6: create a pointer in the EXPIRY_LIST
+            let er = ExpiryRecord {
+                message_hash,
+                timestamp: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            };
+            tx.cmd("RPUSH")
+                .arg("EXPIRY_LIST")
+                .arg(serde_json::to_string(&er).unwrap());
 
-        // step 7: update the recipient stats
-        // step 8: update the DID_LIST
-        // step 9: create a pointer in the RECEIVE_Q
-        if let Some(to_did) = &metadata.to_did {
+            // step 7: update the recipient stats
+            // step 8: update the DID_LIST
+            // step 9: create a pointer in the RECEIVE_Q
             let to_did_hash = digest(to_did);
             tx.cmd("HINCRBY")
                 .arg(format!("DID_{}", to_did_hash))
@@ -203,31 +213,26 @@ impl DatabaseHandler {
                 .arg("*")
                 .arg("message")
                 .arg(message);
-        } else {
-            // If there is no recipient, then something is very wrong!
-            event!(
-                Level::ERROR,
-                "{}: store_message(): No recipient found",
-                session_id
-            );
-            return Err(MediatorError::InternalError(
-                session_id.into(),
-                "No recipient found".into(),
-            ));
+
+            debug!("receiver: did({}) did_hash({})", to_did, to_did_hash,);
+
+            let mut con = self.get_connection().await?;
+
+            // Write the transaction
+            tx.query_async(&mut con).await.map_err(|err| {
+                event!(Level::ERROR, "Couldn't store message in database: {}", err);
+                MediatorError::DatabaseError(
+                    session_id.into(),
+                    format!("Couldn't store message in database: {}", err),
+                )
+            })?;
+
+            debug!("Message hash({}) stored in database", er.message_hash);
+
+            Ok(())
         }
-
-        let mut con = self.get_connection().await?;
-
-        // Write the transaction
-        tx.query_async(&mut con).await.map_err(|err| {
-            event!(Level::ERROR, "Couldn't store message in database: {}", err);
-            MediatorError::DatabaseError(
-                session_id.into(),
-                format!("Couldn't store message in database: {}", err),
-            )
-        })?;
-
-        Ok(())
+        .instrument(_span)
+        .await
     }
 
     /// Retrieves metadata statistics that are global to the mediator database
@@ -272,5 +277,62 @@ impl DatabaseHandler {
         event!(Level::INFO, "Shared METADATA: {}", stats);
 
         Ok(stats)
+    }
+
+    pub async fn list_messages(
+        &self,
+        did: &str,
+        folder: Folder,
+    ) -> Result<Vec<String>, MediatorError> {
+        let mut conn = self.get_connection().await?;
+
+        let did_hash = digest(did.as_bytes());
+        debug!("DID:({})\nDID_HASH: {}", did, did_hash);
+        let messages: Vec<String> = match folder {
+            Folder::Inbox => deadpool_redis::redis::cmd("XRANGE")
+                .arg(format!("RECEIVE_Q_{}", did_hash))
+                .arg("-")
+                .arg("+")
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| {
+                    event!(
+                        Level::ERROR,
+                        "Couldn't get message_list(RECEIVE_Q) from database for DID {}: {}",
+                        did,
+                        err
+                    );
+                    MediatorError::DatabaseError(
+                        did.into(),
+                        format!(
+                            "Couldn't get message_list(RECEIVE_Q) from database for DID {}: {}",
+                            did, err
+                        ),
+                    )
+                })?,
+            Folder::Outbox => deadpool_redis::redis::cmd("LRANGE")
+                .arg(format!("SEND_Q_{}", did_hash))
+                .arg("0")
+                .arg("-1")
+                .query_async(&mut conn)
+                .await
+                .map_err(|err| {
+                    event!(
+                        Level::ERROR,
+                        "Couldn't get message_list(SEND_Q) from database for DID {}: {}",
+                        did,
+                        err
+                    );
+                    MediatorError::DatabaseError(
+                        did.into(),
+                        format!(
+                            "Couldn't get message_list(SEND_Q) from database for DID {}: {}",
+                            did, err
+                        ),
+                    )
+                })?,
+        };
+
+        Ok(messages)
     }
 }

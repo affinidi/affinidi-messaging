@@ -1,4 +1,3 @@
-use atm_sdk::ATM;
 use did_peer::DIDPeer;
 use didcomm::{
     secrets::{Secret, SecretMaterial, SecretType},

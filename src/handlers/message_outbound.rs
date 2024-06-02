@@ -109,11 +109,6 @@ pub async fn message_outbound_handler(
         None
     };
 
-    let response = response.map(|response| ResponseData {
-        body: response,
-        metadata,
-    });
-
     Ok((
         StatusCode::OK,
         Json(SuccessResponse {
@@ -122,7 +117,7 @@ pub async fn message_outbound_handler(
             errorCode: 0,
             errorCodeStr: "NA".to_string(),
             message: "Success".to_string(),
-            data: response,
+            data: None,
         }),
     ))
 }

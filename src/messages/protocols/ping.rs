@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use didcomm::Message;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::{debug, info};
+use tracing::{debug, info, span};
 use uuid::Uuid;
 
 use crate::common::errors::{MediatorError, Session};
@@ -24,6 +24,12 @@ impl Default for Ping {
 
 /// Process a trust-ping message and generates a response if needed
 pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message>, MediatorError> {
+    let _span = span!(
+        tracing::Level::DEBUG,
+        "trust_ping",
+        session_id = session.session_id.as_str()
+    )
+    .entered();
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -44,17 +50,17 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
             "Message missing 'to' field".into(),
         ));
     };
+    debug!("To: {}", to);
 
     let respond: bool = if let Ok(body) = serde_json::from_value::<Ping>(msg.body.to_owned()) {
         body.response_requested
     } else {
         true
     };
-    debug!("Respond requested: {}", respond);
+    debug!("Response requested: {}", respond);
 
     info!(
-        "{}: Ping message received from: ({}) Respond?({})",
-        session.session_id,
+        "ping received from: ({}) Respond?({})",
         msg.from.clone().unwrap_or_else(|| "ANONYMOUS".to_string()),
         respond
     );
@@ -70,21 +76,23 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
         };
 
         // Build the message (we swap from and to)
-        Ok(Some(
-            Message::build(
-                Uuid::new_v4().into(),
-                "https://didcomm.org/trust-ping/2.0/ping".to_owned(),
-                json!({}),
-            )
-            .thid(msg.id.clone())
-            .to(from)
-            .from(to)
-            .created_time(now)
-            .expires_time(now + 300)
-            .finalize(),
-        ))
+        let response_msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/trust-ping/2.0/ping".to_owned(),
+            json!({}),
+        )
+        .thid(msg.id.clone())
+        .to(from)
+        .from(to)
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+
+        debug!("response_msg: {:?}", response_msg);
+
+        Ok(Some(response_msg))
     } else {
-        // No response requested
+        debug!("No response requested");
         Ok(None)
     }
 }

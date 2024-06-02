@@ -8,6 +8,12 @@ use uuid::Uuid;
 use crate::{errors::ATMError, messages::InboundMessageResponse, ATM};
 
 impl<'c> ATM<'c> {
+    /// Sends a trust ping message to the specified DID
+    /// - `to_did` - The DID to send the ping to
+    /// - `anonymous` - Whether the ping should be sent anonymously
+    /// - `expect_response` - Whether a response is expected[^note]
+    ///
+    /// [^note]: Anonymous pings cannot expect a response, the SDK will automatically set this to false if anonymous is true
     pub async fn send_ping(
         &mut self,
         to_did: &str,

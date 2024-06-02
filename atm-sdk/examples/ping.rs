@@ -1,4 +1,6 @@
-use atm_sdk::{config::Config, conversions::secret_from_str, errors::ATMError, ATM};
+use atm_sdk::{
+    config::Config, conversions::secret_from_str, errors::ATMError, messages::list::Folder, ATM,
+};
 use did_peer::DIDPeer;
 use serde_json::json;
 use tracing_subscriber::filter;
@@ -49,6 +51,8 @@ async fn main() -> Result<(), ATMError> {
     // Send the ping message
     // Sending to the mediator, anonymous message, expecting a response (which will get dropped as we're anonymous)
     atm.send_ping(atm_did, false, true).await?;
+
+    atm.list_messages(my_did, Folder::Inbox).await?;
 
     println!("Good!");
     Ok(())

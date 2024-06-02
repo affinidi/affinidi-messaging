@@ -1,7 +1,8 @@
 use std::{str::FromStr, time::SystemTime};
 
 use didcomm::{
-    did::DIDResolver, secrets::SecretsResolver, Message, PackEncryptedOptions, UnpackMetadata,
+    did::DIDResolver, secrets::SecretsResolver, Message, PackEncryptedMetadata,
+    PackEncryptedOptions, UnpackMetadata,
 };
 
 use crate::common::errors::{MediatorError, Session};
@@ -60,7 +61,7 @@ pub(crate) trait MessageHandler {
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
         did_resolver: &T,
-    ) -> Result<String, MediatorError>
+    ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
         S: SecretsResolver,
         T: DIDResolver;
@@ -95,7 +96,7 @@ impl MessageHandler for Message {
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
         did_resolver: &T,
-    ) -> Result<String, MediatorError>
+    ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
         S: SecretsResolver,
         T: DIDResolver,
@@ -119,7 +120,7 @@ impl MessageHandler for Message {
                 }
             };
 
-            Ok(a.0)
+            Ok(a)
         } else {
             Err(MediatorError::MessagePackError(
                 "-1".into(),

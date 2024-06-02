@@ -154,6 +154,7 @@ where
             remote_addr,
             authenticated: true,
             challenge_sent: None,
+            did: token_data.claims.sub.clone(),
         };
 
         Ok(session)

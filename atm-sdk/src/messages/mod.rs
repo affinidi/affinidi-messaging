@@ -4,6 +4,7 @@ use tracing::{debug, span, Level};
 
 use crate::{errors::ATMError, ATM};
 
+pub mod list;
 pub mod sending;
 
 /// Generic response structure for all responses from the ATM API
