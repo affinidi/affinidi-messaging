@@ -1,4 +1,5 @@
-use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
+use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use atn_atm_sdk::messages::sending::InboundMessageResponse;
 use axum::{extract::State, Json};
 use did_peer::DIDPeer;
 use http::StatusCode;
@@ -8,7 +9,7 @@ use std::borrow::BorrowMut;
 use tracing::{debug, span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, Session, SuccessResponse},
     messages::MessageHandler,
     SharedData,
 };
@@ -33,19 +34,16 @@ pub struct InboundMessage {
     pub tag: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct InboundMessageResponse {
-    pub body: String,
-    pub metadata: UnpackMetadata,
-}
-impl GenericDataStruct for InboundMessageResponse {}
-
 pub async fn message_inbound_handler(
     session: Session,
     State(state): State<SharedData>,
     Json(body): Json<InboundMessage>,
 ) -> Result<(StatusCode, Json<SuccessResponse<InboundMessageResponse>>), AppError> {
-    let _span = span!(Level::DEBUG, "message_inbound_handler", session = %session.session_id);
+    let _span = span!(
+        Level::DEBUG,
+        "message_inbound_handler",
+        session = session.session_id
+    );
     async move {
         let s = serde_json::to_string(&body).unwrap();
 
@@ -151,7 +149,6 @@ pub async fn message_inbound_handler(
 
         let response = Some(InboundMessageResponse {
             body: format!("messages saved successfully count({})", msg_count),
-            metadata,
         });
 
         Ok((

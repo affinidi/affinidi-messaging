@@ -1,6 +1,7 @@
 use std::{borrow::BorrowMut, net::SocketAddr, time::SystemTime};
 
 use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use atn_atm_sdk::messages::GenericDataStruct;
 use axum::{
     extract::{ConnectInfo, State},
     Json,
@@ -14,7 +15,7 @@ use ssi::did::DIDMethods;
 use tracing::{info, warn};
 
 use crate::{
-    common::errors::{AppError, GenericDataStruct, MediatorError, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::{Session, SessionClaims, SessionState},
     messages::MessageType,
     SharedData,

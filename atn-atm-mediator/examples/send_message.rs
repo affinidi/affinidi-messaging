@@ -4,12 +4,10 @@ use atn_atm_didcomm::{
 };
 use atn_atm_mediator::{
     common::{did_conversion::convert_did, errors::SuccessResponse},
-    handlers::{
-        authenticate::{AuthenticationChallenge, AuthorizationResponse},
-        message_inbound::InboundMessageResponse,
-    },
+    handlers::authenticate::{AuthenticationChallenge, AuthorizationResponse},
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
+use atn_atm_sdk::messages::sending::InboundMessageResponse;
 use did_peer::DIDPeer;
 use reqwest::{Certificate, Client};
 use serde_json::json;
@@ -152,10 +150,6 @@ async fn main() -> std::io::Result<()> {
         .unwrap();
     let msg = results.data.clone().unwrap().body;
 
-    println!(
-        "Received metadata is\n{:#?}\n",
-        &results.data.unwrap().metadata
-    );
     println!();
     println!("Received message is\n{:#?}\n", msg);
 

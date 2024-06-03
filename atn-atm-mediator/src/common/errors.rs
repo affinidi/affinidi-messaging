@@ -1,10 +1,11 @@
+use atn_atm_sdk::messages::GenericDataStruct;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use rand::{distributions::Alphanumeric, Rng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 use tracing::{event, Level};
@@ -262,9 +263,6 @@ impl fmt::Display for ErrorResponse {
         )
     }
 }
-
-pub trait GenericDataStruct: DeserializeOwned + Serialize {}
-
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct SuccessResponse<T: GenericDataStruct> {

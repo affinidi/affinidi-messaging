@@ -3,15 +3,15 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use atn_atm_sdk::messages::list::{Folder, MessageList, MessageListElement};
 use deadpool_redis::Connection;
+use itertools::Itertools;
+use redis::{from_redis_value, Value};
 use serde::Serialize;
 use sha256::digest;
 use tracing::{debug, event, span, Instrument, Level};
 
-use crate::{
-    common::{config::Config, errors::MediatorError},
-    handlers::message_list::Folder,
-};
+use crate::common::{config::Config, errors::MediatorError};
 
 use super::{DatabaseHandler, MetadataStats};
 
@@ -128,6 +128,8 @@ impl DatabaseHandler {
     ) -> Result<(), MediatorError> {
         let _span = span!(Level::DEBUG, "store_message", session_id = session_id);
         async move {
+            let to_did_hash = digest(to_did);
+
             // step 1
             let mut tx = deadpool_redis::redis::pipe();
             tx.atomic();
@@ -150,9 +152,16 @@ impl DatabaseHandler {
             // step 8: update the DID_LIST for sender
             if let Some(from_did) = from_did {
                 let from_did_hash = digest(from_did.as_bytes());
-                tx.cmd("RPUSH")
+
+                tx.cmd("XADD")
                     .arg(format!("SEND_Q_{}", from_did_hash))
+                    .arg("*")
+                    .arg("msg_id")
                     .arg(&message_hash)
+                    .arg("bytes")
+                    .arg(message.len())
+                    .arg("address")
+                    .arg(to_did)
                     .cmd("HINCRBY")
                     .arg(format!("DID_{}", from_did_hash))
                     .arg(
@@ -180,7 +189,7 @@ impl DatabaseHandler {
 
             // step 6: create a pointer in the EXPIRY_LIST
             let er = ExpiryRecord {
-                message_hash,
+                message_hash: message_hash.clone(),
                 timestamp: SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
@@ -193,7 +202,6 @@ impl DatabaseHandler {
             // step 7: update the recipient stats
             // step 8: update the DID_LIST
             // step 9: create a pointer in the RECEIVE_Q
-            let to_did_hash = digest(to_did);
             tx.cmd("HINCRBY")
                 .arg(format!("DID_{}", to_did_hash))
                 .arg("receive_bytes_queued")
@@ -208,11 +216,16 @@ impl DatabaseHandler {
                 .arg(to_did)
                 .arg(to_did)
                 .arg(&to_did_hash)
+                // Add to stream
                 .cmd("XADD")
                 .arg(format!("RECEIVE_Q_{}", to_did_hash))
                 .arg("*")
-                .arg("message")
-                .arg(message);
+                .arg("msg_id")
+                .arg(&message_hash)
+                .arg("bytes")
+                .arg(message.len())
+                .arg("address")
+                .arg(from_did.unwrap_or("anonymous"));
 
             debug!("receiver: did({}) did_hash({})", to_did, to_did_hash,);
 
@@ -283,55 +296,98 @@ impl DatabaseHandler {
         &self,
         did: &str,
         folder: Folder,
-    ) -> Result<Vec<String>, MediatorError> {
+    ) -> Result<MessageList, MediatorError> {
         let mut conn = self.get_connection().await?;
 
         let did_hash = digest(did.as_bytes());
-        debug!("DID:({})\nDID_HASH: {}", did, did_hash);
-        let messages: Vec<String> = match folder {
-            Folder::Inbox => deadpool_redis::redis::cmd("XRANGE")
-                .arg(format!("RECEIVE_Q_{}", did_hash))
-                .arg("-")
-                .arg("+")
-                .query_async(&mut conn)
-                .await
-                .map_err(|err| {
-                    event!(
-                        Level::ERROR,
-                        "Couldn't get message_list(RECEIVE_Q) from database for DID {}: {}",
-                        did,
-                        err
-                    );
-                    MediatorError::DatabaseError(
-                        did.into(),
-                        format!(
-                            "Couldn't get message_list(RECEIVE_Q) from database for DID {}: {}",
-                            did, err
-                        ),
-                    )
-                })?,
-            Folder::Outbox => deadpool_redis::redis::cmd("LRANGE")
-                .arg(format!("SEND_Q_{}", did_hash))
-                .arg("0")
-                .arg("-1")
-                .query_async(&mut conn)
-                .await
-                .map_err(|err| {
-                    event!(
-                        Level::ERROR,
-                        "Couldn't get message_list(SEND_Q) from database for DID {}: {}",
-                        did,
-                        err
-                    );
-                    MediatorError::DatabaseError(
-                        did.into(),
-                        format!(
-                            "Couldn't get message_list(SEND_Q) from database for DID {}: {}",
-                            did, err
-                        ),
-                    )
-                })?,
+        debug!("DID_HASH: {}", did_hash);
+        let key = match folder {
+            Folder::Inbox => format!("RECEIVE_Q_{}", did_hash),
+            Folder::Outbox => format!("SEND_Q_{}", did_hash),
         };
+
+        let db_response: Value = deadpool_redis::redis::cmd("XRANGE")
+            .arg(&key)
+            .arg("-")
+            .arg("+")
+            .query_async(&mut conn)
+            .await
+            .map_err(|err| {
+                event!(
+                    Level::ERROR,
+                    "Couldn't get message_list({}) from database for DID {}: {}",
+                    key,
+                    did,
+                    err
+                );
+                MediatorError::DatabaseError(
+                    did.into(),
+                    format!(
+                        "Couldn't get message_list({}) from database for DID {}: {}",
+                        key, did, err
+                    ),
+                )
+            })?;
+
+        // The following should really be a Impl FromRedisValue for MessageList
+        // But I don't want to poison the atn-atm-sdk crate with Redis and internal details
+        // So I'm going to manually parse the response here
+        // We could have an internal/external SDK - but that's a lot of work
+        let mut messages: MessageList = Vec::new();
+
+        // Redis response is
+        // Bulk([bulk(string(id), bulk(string(field), string(field))])
+
+        fn _error<T>(e: T, did: &str, key: &str) -> MediatorError
+        where
+            T: std::fmt::Display,
+        {
+            event!(
+                Level::ERROR,
+                "Couldn't parse message_list did({}) folder({}): {}",
+                did,
+                key,
+                e
+            );
+            MediatorError::DatabaseError(
+                "NA".into(),
+                format!(
+                    "Couldn't parse message_list did({}) folder({}): {}",
+                    did, key, e
+                ),
+            )
+        }
+
+        let items: Vec<Value> = from_redis_value(&db_response).map_err(|e| _error(e, did, &key))?;
+
+        for item in items {
+            // item = Bulk(string(id), Bulk(fields...))
+            let item: Vec<Value> = from_redis_value(&item).unwrap();
+            let mut msg_element = MessageListElement {
+                list_id: from_redis_value(&item[0]).map_err(|e| _error(e, did, &key))?,
+                ..Default::default()
+            };
+            msg_element.msg_date = msg_element
+                .list_id
+                .split('-')
+                .next()
+                .unwrap_or("")
+                .parse()
+                .unwrap_or(0);
+
+            let fields: Vec<String> =
+                from_redis_value(&item[1]).map_err(|e| _error(e, did, &key))?;
+
+            for (k, v) in fields.iter().tuples() {
+                match k.as_str() {
+                    "msg_id" => msg_element.msg_id.clone_from(v),
+                    "bytes" => msg_element.msg_size = v.parse().unwrap_or(0),
+                    "address" => msg_element.msg_address.clone_from(v),
+                    _ => {}
+                }
+            }
+            messages.push(msg_element);
+        }
 
         Ok(messages)
     }

@@ -54,8 +54,12 @@ async fn main() -> Result<(), ATMError> {
     // Sending to the mediator, anonymous message, expecting a response (which will get dropped as we're anonymous)
     atm.send_ping(atm_did, false, true).await?;
 
-    atm.list_messages(my_did, Folder::Inbox).await?;
-
-    println!("Good!");
+    let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
+    let outbox_list = atm.list_messages(my_did, Folder::Outbox).await?;
+    println!(
+        "messages: inbox({}) outbox({})",
+        inbox_list.len(),
+        outbox_list.len()
+    );
     Ok(())
 }

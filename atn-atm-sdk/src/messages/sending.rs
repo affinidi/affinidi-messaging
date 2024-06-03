@@ -1,11 +1,20 @@
 use std::time::SystemTime;
 
 use atn_atm_didcomm::{Message, PackEncryptedOptions};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, messages::InboundMessageResponse, ATM};
+use crate::{errors::ATMError, ATM};
+
+use super::GenericDataStruct;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct InboundMessageResponse {
+    pub body: String,
+}
+impl GenericDataStruct for InboundMessageResponse {}
 
 impl<'c> ATM<'c> {
     /// Sends a trust ping message to the specified DID

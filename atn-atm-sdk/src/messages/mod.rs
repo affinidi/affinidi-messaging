@@ -1,4 +1,3 @@
-use atn_atm_didcomm::UnpackMetadata;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::{debug, span, Level};
 
@@ -34,13 +33,6 @@ pub struct AuthorizationResponse {
     pub refresh_token: String,
 }
 impl GenericDataStruct for AuthorizationResponse {}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct InboundMessageResponse {
-    pub body: String,
-    pub metadata: UnpackMetadata,
-}
-impl GenericDataStruct for InboundMessageResponse {}
 
 /// Helps with deserializing the generic data field in the SuccessResponse struct
 pub trait GenericDataStruct: DeserializeOwned + Serialize {}

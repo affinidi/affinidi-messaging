@@ -1,4 +1,5 @@
 use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
+use atn_atm_sdk::messages::GenericDataStruct;
 use axum::{extract::State, Json};
 use did_peer::DIDPeer;
 use http::StatusCode;
@@ -7,7 +8,7 @@ use ssi::did::DIDMethods;
 use std::borrow::BorrowMut;
 
 use crate::{
-    common::errors::{AppError, GenericDataStruct, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, Session, SuccessResponse},
     messages::MessageHandler,
     SharedData,
 };
