@@ -1,7 +1,13 @@
 use crate::SharedData;
-use axum::{extract::State, response::IntoResponse, routing::get, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    response::IntoResponse,
+    routing::{delete, get, post},
+    Json, Router,
+};
 
 pub mod authenticate;
+pub mod message_delete;
 pub mod message_inbound;
 pub mod message_list;
 pub mod message_outbound;
@@ -10,6 +16,7 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
         .route("/inbound", post(message_inbound::message_inbound_handler))
         .route("/list/:folder", get(message_list::message_list_handler))
+        .route("/delete", delete(message_delete::message_delete_handler))
         .route(
             "/authenticate/challenge",
             post(authenticate::authentication_challenge),

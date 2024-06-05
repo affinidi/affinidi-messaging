@@ -1,7 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 
+pub mod delete;
 pub mod handlers;
 pub mod session;
+pub mod store;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {
@@ -11,27 +13,23 @@ pub struct DatabaseHandler {
 /// Statistics for the mediator
 #[derive(Default, Debug)]
 pub struct MetadataStats {
-    pub message_count: u64,
-    pub bytes_stored: u64,
-    pub did_count: u64,
-}
-
-impl MetadataStats {
-    pub fn new() -> Self {
-        Self {
-            message_count: 0,
-            bytes_stored: 0,
-            did_count: 0,
-        }
-    }
+    pub received_bytes: u64,
+    pub sent_bytes: u64,
+    pub received_count: u64,
+    pub sent_count: u64,
+    pub deleted_count: u64,
 }
 
 impl Display for MetadataStats {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "\n\tMessage count: {}\n\tBytes stored: {}\n\tDID count: {}",
-            self.message_count, self.bytes_stored, self.did_count
+            "\n\tMessage counts: recv({}) sent({}) deleted({}) queued({})\n\tBytes stored: {}",
+            self.received_count,
+            self.sent_count,
+            self.deleted_count,
+            self.received_count - self.deleted_count,
+            self.received_bytes - self.sent_bytes
         )
     }
 }

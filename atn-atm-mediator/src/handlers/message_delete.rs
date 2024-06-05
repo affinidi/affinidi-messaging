@@ -1,7 +1,7 @@
 use atn_atm_didcomm::UnpackMetadata;
 use atn_atm_sdk::messages::{
     list::{Folder, MessageList},
-    GenericDataStruct,
+    DeleteMessageRequest, GenericDataStruct,
 };
 use axum::{
     extract::{Path, State},
@@ -23,26 +23,33 @@ pub struct ResponseData {
 }
 impl GenericDataStruct for ResponseData {}
 
-/// Retrieves lists of messages either from the send or receive queue
-pub async fn message_list_handler(
+/// Deletes a specific message from ATM
+/// Returns a list of messages that were deleted
+pub async fn message_delete_handler(
     session: Session,
-    Path(folder): Path<Folder>,
     State(state): State<SharedData>,
+    Json(body): Json<DeleteMessageRequest>,
 ) -> Result<(StatusCode, Json<SuccessResponse<MessageList>>), AppError> {
     let _span = span!(
         Level::DEBUG,
-        "message_list_handler",
+        "message_delete_handler",
         session = session.session_id,
         did = session.did,
-        folder = folder.to_string()
     );
     async move {
-        let messages = state
-            .database
-            .list_messages(&session.did, folder, None)
-            .await?;
+        debug!("Deleting ({}) messages", body.message_ids.len());
+        let mut deleted: MessageList = Vec::new();
 
-        debug!("List contains ({}) messages", messages.len());
+        for message in &body.message_ids {
+            debug!("Deleting message: message_id({})", message);
+            deleted.push(
+                state
+                    .database
+                    .delete_messages(&session.session_id, &session.did, message)
+                    .await?,
+            );
+        }
+
         Ok((
             StatusCode::OK,
             Json(SuccessResponse {
@@ -51,7 +58,7 @@ pub async fn message_list_handler(
                 errorCode: 0,
                 errorCodeStr: "NA".to_string(),
                 message: "Success".to_string(),
-                data: Some(messages),
+                data: None,
             }),
         ))
     }

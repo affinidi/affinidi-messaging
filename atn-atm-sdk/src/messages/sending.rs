@@ -1,14 +1,11 @@
-use std::time::SystemTime;
-
+use super::{GenericDataStruct, SuccessResponse};
+use crate::{errors::ATMError, ATM};
 use atn_atm_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::SystemTime;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
-
-use crate::{errors::ATMError, ATM};
-
-use super::GenericDataStruct;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct InboundMessageResponse {
@@ -17,6 +14,43 @@ pub struct InboundMessageResponse {
 impl GenericDataStruct for InboundMessageResponse {}
 
 impl<'c> ATM<'c> {
+    pub async fn send_message<T>(&mut self, msg: &str) -> Result<SuccessResponse<T>, ATMError>
+    where
+        T: GenericDataStruct,
+    {
+        let _span = span!(Level::DEBUG, "send_message",).entered();
+        let tokens = self.authenticate().await?;
+
+        let msg = msg.to_owned();
+
+        let res = self
+            .client
+            .post(format!("{}/inbound", self.config.atm_api))
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", tokens.access_token))
+            .body(msg)
+            .send()
+            .await
+            .map_err(|e| ATMError::HTTPSError(format!("Could not send message: {:?}", e)))?;
+
+        let status = res.status();
+        debug!("API response: status({})", status);
+
+        let body = res
+            .text()
+            .await
+            .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
+
+        if !status.is_success() {
+            debug!("Failed to get response body. Body: {:?}", body);
+        }
+        let body = serde_json::from_str::<SuccessResponse<T>>(&body)
+            .ok()
+            .unwrap();
+
+        Ok(body)
+    }
+
     /// Sends a trust ping message to the specified DID
     /// - `to_did` - The DID to send the ping to
     /// - `anonymous` - Whether the ping should be sent anonymously

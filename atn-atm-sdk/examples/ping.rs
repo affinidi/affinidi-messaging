@@ -1,5 +1,9 @@
 use atn_atm_sdk::{
-    config::Config, conversions::secret_from_str, errors::ATMError, messages::list::Folder, ATM,
+    config::Config,
+    conversions::secret_from_str,
+    errors::ATMError,
+    messages::{list::Folder, DeleteMessageRequest},
+    ATM,
 };
 use did_peer::DIDPeer;
 use serde_json::json;
@@ -52,14 +56,19 @@ async fn main() -> Result<(), ATMError> {
 
     // Send the ping message
     // Sending to the mediator, anonymous message, expecting a response (which will get dropped as we're anonymous)
+    // NOTE: SDK will automatically set response to false if the message is anonymous
     atm.send_ping(atm_did, false, true).await?;
 
     let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
     let outbox_list = atm.list_messages(my_did, Folder::Outbox).await?;
-    println!(
-        "messages: inbox({}) outbox({})",
-        inbox_list.len(),
-        outbox_list.len()
-    );
+
+    // Create list of messages to delete
+    let delete_msgs: DeleteMessageRequest = DeleteMessageRequest {
+        message_ids: inbox_list.iter().map(|m| m.msg_id.clone()).collect(),
+    };
+
+    // delete messages
+    let deleted = atm.delete_messages(&delete_msgs).await?;
+
     Ok(())
 }
