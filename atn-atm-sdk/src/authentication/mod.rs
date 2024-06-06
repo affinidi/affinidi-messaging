@@ -142,16 +142,16 @@ impl<'c> ATM<'c> {
 
     /// Creates an Affinidi Trusted Messaging Authentication Challenge Response Message
     /// # Arguments
-    /// * `to_did` - The DID of the recipient
+    /// * `atm_did` - The DID for ATM
     /// * `challenge` - The challenge that was sent
     /// # Returns
     /// A DIDComm message to be sent
     ///
     /// Notes:
-    /// - This message will expire after 5 minutes
+    /// - This message will expire after 60 seconds
     fn _create_auth_challenge_response(
         &self,
-        to_did: &str,
+        atm_did: &str,
         body: &AuthenticationChallenge,
     ) -> Message {
         let now = SystemTime::now()
@@ -163,7 +163,7 @@ impl<'c> ATM<'c> {
             "https://affinidi.com/atm/1.0/authenticate".to_owned(),
             json!(body),
         )
-        .to(to_did.to_owned())
+        .to(atm_did.to_owned())
         .from(self.config.my_did.to_owned())
         .created_time(now)
         .expires_time(now + 60)

@@ -50,25 +50,38 @@ async fn main() -> Result<(), ATMError> {
 
     let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
 
-    // Now to add our secrets to ATM
+    // Add our secrets to ATM Client - stays local.
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
-    // Send the ping message
-    // Sending to the mediator, anonymous message, expecting a response (which will get dropped as we're anonymous)
-    // NOTE: SDK will automatically set response to false if the message is anonymous
+    // Send a trust-ping message to ATM, will generate a PONG response
     atm.send_ping(atm_did, false, true).await?;
 
+    // Do we have messages in our inbox? Or how about queued still for delivery to others?
     let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
-    let outbox_list = atm.list_messages(my_did, Folder::Outbox).await?;
+    atm.list_messages(my_did, Folder::Outbox).await?;
 
-    // Create list of messages to delete
+    // Create list of messages to delete (who reads their inbox??)
     let delete_msgs: DeleteMessageRequest = DeleteMessageRequest {
         message_ids: inbox_list.iter().map(|m| m.msg_id.clone()).collect(),
     };
 
     // delete messages
-    let deleted = atm.delete_messages(&delete_msgs).await?;
+    atm.delete_messages(&delete_msgs).await?;
 
+    /*
+        // Send a message to another DID via ATM
+        atm.create_message(
+            "Hello, World!",
+            "did:example:to_address",
+            MessageCreateOptions::default(),
+        )
+        .send()
+        .await?;
+
+        // I already have a DIDComm message, let's send it as well
+        atm.send_didcomm(&didcomm_msg, &to_did, MessageSendOptions::default())
+            .await?;
+    */
     Ok(())
 }

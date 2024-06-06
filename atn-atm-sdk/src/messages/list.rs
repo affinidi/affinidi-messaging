@@ -1,9 +1,9 @@
+use super::GenericDataStruct;
 use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 use std::fmt::{Debug, Display};
 use tracing::{debug, span, Level};
-
-use super::GenericDataStruct;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -42,18 +42,21 @@ impl GenericDataStruct for MessageList {}
 
 impl<'c> ATM<'c> {
     /// Returns a list of messages that are stored in the ATM
+    /// # Parameters
+    /// - `did`: The DID to list messages for
+    /// - `folder`: The folder to list messages from
     pub async fn list_messages(
         &mut self,
-        to_did: &str,
+        did: &str,
         folder: Folder,
     ) -> Result<MessageList, ATMError> {
         let _span = span!(Level::DEBUG, "list_messages", folder = folder.to_string()).entered();
-        debug!("listing folder({}) for DID({})", to_did, folder);
+        debug!("listing folder({}) for DID({})", did, folder);
 
         // Check that DID exists in DIDResolver, add it if not
-        if !self.did_resolver.contains(to_did) {
+        if !self.did_resolver.contains(did) {
             debug!("DID not found in resolver, adding...");
-            self.add_did(to_did).await?;
+            self.add_did(did).await?;
         }
 
         // Check if authenticated
@@ -61,7 +64,12 @@ impl<'c> ATM<'c> {
 
         let res = self
             .client
-            .get(format!("{}/list/{}", self.config.atm_api, folder))
+            .get(format!(
+                "{}/list/{}/{}",
+                self.config.atm_api,
+                digest(did),
+                folder,
+            ))
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .send()
@@ -79,7 +87,10 @@ impl<'c> ATM<'c> {
             .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
-            debug!("Failed to get response body. Body: {:?}", body);
+            return Err(ATMError::HTTPSError(format!(
+                "Status not successful. status({}), response({})",
+                status, body
+            )));
         }
 
         let body = serde_json::from_str::<SuccessResponse<MessageList>>(&body)

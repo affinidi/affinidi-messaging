@@ -14,17 +14,6 @@ pub struct MessageMetaData {
 
 impl DatabaseHandler {
     /// Stores a message in the database
-    /// Step 1: Create a transaction
-    /// Step 2: Store the message in the MESSAGE_STORE
-    /// Step 3: Increment the MESSAGE_STORE bytes_stored field
-    /// Step 4: Store the sender in the SEND_Q_<DID_HASH> LIST (this may not be required if anonymous sender)
-    /// Step 5: Update DID_<hash> for sender stats
-    /// Step 6: Create a pointer in the EXPIRY_LIST List
-    /// Step 7: Update DID_<hash> for recipient stats
-    /// Step 8: Update DID_LIST (Hash) for mapping of DID/hash values
-    /// Step 9: Create a pointer in the RECEIVE_Q_<DID_HASH> Stream
-    /// step 10: Create Metadata record for the message (bytes, to_did_hash, from_did_hash, timestamp)
-    /// Step 11: Commit the transaction
     pub async fn store_message(
         &self,
         session_id: &str,
@@ -46,7 +35,7 @@ impl DatabaseHandler {
                 .arg(message)
                 .arg(message.len())
                 .arg(to_did)
-                .arg(to_hash);
+                .arg(&to_hash);
 
             if let Some(from_did) = from_did {
                 let from_hash = digest(from_did.as_bytes());
@@ -54,6 +43,17 @@ impl DatabaseHandler {
             } else {
                 tx.arg("ANONYMOUS");
             }
+
+            debug!(
+                "trying to store msg_id({}), from({:?}) from_hash({:?}) to({}) to_hash({}), bytes({})",
+                message_hash,
+                from_did,
+                from_did.map(|h| digest(h.as_bytes())),
+                to_did,
+                &to_hash,
+                message.len()
+            );
+
             let result: String = tx.query_async(&mut conn).await.map_err(|err| {
                 event!(Level::ERROR, "Couldn't store message in database: {}", err);
                 MediatorError::DatabaseError(

@@ -15,7 +15,10 @@ pub mod message_outbound;
 pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
         .route("/inbound", post(message_inbound::message_inbound_handler))
-        .route("/list/:folder", get(message_list::message_list_handler))
+        .route(
+            "/list/:did_hash/:folder",
+            get(message_list::message_list_handler),
+        )
         .route("/delete", delete(message_delete::message_delete_handler))
         .route(
             "/authenticate/challenge",

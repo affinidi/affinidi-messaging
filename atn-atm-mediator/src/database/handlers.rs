@@ -4,8 +4,7 @@ use atn_atm_sdk::messages::list::{Folder, MessageList, MessageListElement};
 use deadpool_redis::Connection;
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
-use sha256::digest;
-use tracing::{debug, event, Level};
+use tracing::{debug, event, span, Level};
 
 use crate::common::{config::Config, errors::MediatorError};
 
@@ -142,28 +141,34 @@ impl DatabaseHandler {
             }
         }
 
-        event!(Level::INFO, "Shared METADATA: {}", stats);
+        event!(Level::INFO, "Global Metadata: {}", stats);
 
         Ok(stats)
     }
 
     /// Retrieves list of messages for the specified DID and folder
     /// The folder can be either Inbox or Outbox
-    /// - did: The DID to retrieve messages for
+    /// - did_hash: The DID sha256 hash to retrieve messages for
     /// - range: stream ID range to retrieve (defaults to '-' and '+' which gets all messages)
     pub async fn list_messages(
         &self,
-        did: &str,
+        did_hash: &str,
         folder: Folder,
         range: Option<(&str, &str)>,
     ) -> Result<MessageList, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "list_messages",
+            did_hash = did_hash,
+            folder = format!("{:?}", folder),
+            range = format!("{:?}", range)
+        );
         let mut conn = self.get_connection().await?;
 
-        let did_hash = digest(did.as_bytes());
         debug!("DID_HASH: {}", did_hash);
         let key = match folder {
-            Folder::Inbox => format!("RECEIVE_Q_{}", did_hash),
-            Folder::Outbox => format!("SEND_Q_{}", did_hash),
+            Folder::Inbox => format!("RECEIVE_Q:{}", did_hash),
+            Folder::Outbox => format!("SEND_Q:{}", did_hash),
         };
 
         let (start, end) = if let Some((start, end)) = range {
@@ -181,16 +186,16 @@ impl DatabaseHandler {
             .map_err(|err| {
                 event!(
                     Level::ERROR,
-                    "Couldn't get message_list({}) from database for DID {}: {}",
+                    "Couldn't get message_list({}) from database for DID_hash {}: {}",
                     key,
-                    did,
+                    did_hash,
                     err
                 );
                 MediatorError::DatabaseError(
-                    did.into(),
+                    did_hash.into(),
                     format!(
-                        "Couldn't get message_list({}) from database for DID {}: {}",
-                        key, did, err
+                        "Couldn't get message_list({}) from database for DID_hash {}: {}",
+                        key, did_hash, err
                     ),
                 )
             })?;
@@ -224,13 +229,14 @@ impl DatabaseHandler {
             )
         }
 
-        let items: Vec<Value> = from_redis_value(&db_response).map_err(|e| _error(e, did, &key))?;
+        let items: Vec<Value> =
+            from_redis_value(&db_response).map_err(|e| _error(e, did_hash, &key))?;
 
         for item in items {
             // item = Bulk(string(id), Bulk(fields...))
             let item: Vec<Value> = from_redis_value(&item).unwrap();
             let mut msg_element = MessageListElement {
-                list_id: from_redis_value(&item[0]).map_err(|e| _error(e, did, &key))?,
+                list_id: from_redis_value(&item[0]).map_err(|e| _error(e, did_hash, &key))?,
                 ..Default::default()
             };
             msg_element.msg_date = msg_element
@@ -242,13 +248,14 @@ impl DatabaseHandler {
                 .unwrap_or(0);
 
             let fields: Vec<String> =
-                from_redis_value(&item[1]).map_err(|e| _error(e, did, &key))?;
+                from_redis_value(&item[1]).map_err(|e| _error(e, did_hash, &key))?;
 
             for (k, v) in fields.iter().tuples() {
                 match k.as_str() {
-                    "msg_id" => msg_element.msg_id.clone_from(v),
-                    "bytes" => msg_element.msg_size = v.parse().unwrap_or(0),
-                    "address" => msg_element.msg_address.clone_from(v),
+                    "MSG_ID" => msg_element.msg_id.clone_from(v),
+                    "BYTES" => msg_element.msg_size = v.parse().unwrap_or(0),
+                    "FROM" => msg_element.msg_address.clone_from(v),
+                    "TO" => msg_element.msg_address.clone_from(v),
                     _ => {}
                 }
             }
