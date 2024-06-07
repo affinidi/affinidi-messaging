@@ -1,5 +1,7 @@
 #!lua name=atm
 
+
+
 -- store_message
 -- keys = message_hash
 -- args = [1] message
@@ -60,4 +62,66 @@ local function store_message(keys, args)
     return redis.status_reply('OK')
 end
 
+-- delete_message
+-- keys = message_hash
+local function delete_message(keys, args)
+    -- Correct number of keys?
+    if #keys ~= 1  then
+        return redis.error_reply('delete_message: only accepts one key')
+    end
+
+    -- Correct number of args?
+    if #args ~= 1 then
+        return redis.error_reply('delete_message: Requires DID hash argument')
+    end
+
+    -- set response type to Version 3
+    redis.setresp(3)
+
+    -- Retrieve message metadata
+    local meta = redis.call('HGETALL', 'MSG:META:'..keys[1])
+    if meta.map == nil then
+        return redis.error_reply('Couldn\'t retrieve metadata')
+    end
+
+    -- Check that the requesting DID has some form of ownership of this message
+    if meta.map.TO ~= args[1] and meta.map.FROM ~= args[1] then
+        return redis.error_reply('Requesting DID does not have ownership of this message')
+    end
+
+    local bytes = meta.map.BYTES
+    if bytes == nil then
+        redis.log(redis.LOG_WARNING, 'message ('..keys[1]..') metadata did not contain BYTES field.')
+        return redis.error_reply('message ('..keys[1]..') metadata did not contain BYTES field.')
+    end
+    
+    -- Delete message
+    redis.call('DEL', 'MSG:'..keys[1])
+
+    -- Set Global Metrics
+    redis.call('HINCRBY', 'GLOBAL', 'RECEIVED_BYTES', -bytes)
+    redis.call('HINCRBY', 'GLOBAL', 'DELETED_COUNT', 1)
+
+    -- Remove the receiver records
+    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'QUEUE_BYTES', -bytes)
+    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'QUEUE_COUNT', -1)
+    redis.call('XDEL', 'RECEIVE_Q:'..meta.map.TO, meta.map.RECEIVE_ID)
+    
+    -- Remove the sender records
+    local SQ = nil
+    if meta.map.SEND_ID == nil then
+        -- Remove the sender records
+        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_BYTES', -bytes)
+        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_COUNT', -1)
+        SQ = redis.call('XDEL', 'SEND_Q:'..meta.map.FROM, meta.map.SEND_ID)
+    end
+
+    -- Remove the message metadata
+    redis.call('DEL', 'MSG:META:'..keys[1])
+
+    return redis.status_reply('OK')    
+end
+
+redis.register_function('hgetall', store_message)
 redis.register_function('store_message', store_message)
+redis.register_function('delete_message', delete_message)
