@@ -1,6 +1,5 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
-use atn_atm_sdk::messages::list::MessageListElement;
 use tracing::{debug, event, span, Instrument, Level};
 
 impl DatabaseHandler {
@@ -13,7 +12,7 @@ impl DatabaseHandler {
         session_id: &str,
         did_hash: &str,
         message_hash: &str,
-    ) -> Result<MessageListElement, MediatorError> {
+    ) -> Result<(), MediatorError> {
         let _span = span!(
             Level::DEBUG,
             "delete_messages",
@@ -51,10 +50,7 @@ impl DatabaseHandler {
             if response != "OK" {
                 Err(MediatorError::DatabaseError(session_id.into(), response))
             } else {
-                Ok(MessageListElement {
-                    msg_id: message_hash.into(),
-                    ..Default::default()
-                })
+                Ok(())
             }
         }
         .instrument(_span)

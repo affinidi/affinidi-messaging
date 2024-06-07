@@ -1,9 +1,11 @@
 use atn_atm_didcomm::UnpackMetadata;
-use atn_atm_sdk::messages::{list::MessageList, DeleteMessageRequest, GenericDataStruct};
+use atn_atm_sdk::messages::{
+    delete::DeleteMessageResponse, DeleteMessageRequest, GenericDataStruct,
+};
 use axum::{extract::State, Json};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, span, Instrument, Level};
+use tracing::{debug, span, warn, Instrument, Level};
 
 use crate::{
     common::errors::{AppError, Session, SuccessResponse},
@@ -23,7 +25,7 @@ pub async fn message_delete_handler(
     session: Session,
     State(state): State<SharedData>,
     Json(body): Json<DeleteMessageRequest>,
-) -> Result<(StatusCode, Json<SuccessResponse<MessageList>>), AppError> {
+) -> Result<(StatusCode, Json<SuccessResponse<DeleteMessageResponse>>), AppError> {
     let _span = span!(
         Level::DEBUG,
         "message_delete_handler",
@@ -32,16 +34,22 @@ pub async fn message_delete_handler(
     );
     async move {
         debug!("Deleting ({}) messages", body.message_ids.len());
-        let mut deleted: MessageList = Vec::new();
+        let mut deleted: DeleteMessageResponse = DeleteMessageResponse::default();
 
         for message in &body.message_ids {
             debug!("Deleting message: message_id({})", message);
-            deleted.push(
-                state
-                    .database
-                    .delete_messages(&session.session_id, &session.did_hash, message)
-                    .await?,
-            );
+            let result = state
+                .database
+                .delete_messages(&session.session_id, &session.did_hash, message)
+                .await;
+
+            match result {
+                Ok(_) => deleted.successful.push(message.into()),
+                Err(err) => {
+                    warn!("failed to delete msg({}). Reason: {}", message, err);
+                    deleted.errors.push((message.into(), err.to_string()));
+                }
+            }
         }
 
         Ok((
@@ -52,7 +60,7 @@ pub async fn message_delete_handler(
                 errorCode: 0,
                 errorCodeStr: "NA".to_string(),
                 message: "Success".to_string(),
-                data: None,
+                data: Some(deleted),
             }),
         ))
     }

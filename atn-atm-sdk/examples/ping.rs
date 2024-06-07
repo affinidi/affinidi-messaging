@@ -7,6 +7,7 @@ use atn_atm_sdk::{
 };
 use did_peer::DIDPeer;
 use serde_json::json;
+use tracing::{info, warn};
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -56,10 +57,16 @@ async fn main() -> Result<(), ATMError> {
 
     // Send a trust-ping message to ATM, will generate a PONG response
     atm.send_ping(atm_did, false, true).await?;
+    info!("Successfully sent ping");
 
     // Do we have messages in our inbox? Or how about queued still for delivery to others?
     let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
-    atm.list_messages(my_did, Folder::Outbox).await?;
+    let outbox_list = atm.list_messages(my_did, Folder::Outbox).await?;
+    info!(
+        "Inbox contains {} messages. Outbox contains {} messages",
+        inbox_list.len(),
+        outbox_list.len()
+    );
 
     // Create list of messages to delete (who reads their inbox??)
     let delete_msgs: DeleteMessageRequest = DeleteMessageRequest {
@@ -67,7 +74,11 @@ async fn main() -> Result<(), ATMError> {
     };
 
     // delete messages
-    atm.delete_messages(&delete_msgs).await?;
+    let r = atm.delete_messages(&delete_msgs).await?;
+    info!("Successfully deleted {} messages.", r.successful.len());
+    for (msg, err) in r.errors {
+        warn!("failed to delete msg({}). Reason: {}", msg, err);
+    }
 
     /*
         // Send a message to another DID via ATM

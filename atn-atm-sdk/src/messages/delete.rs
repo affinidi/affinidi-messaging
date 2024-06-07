@@ -1,8 +1,19 @@
+use serde::{Deserialize, Serialize};
 use tracing::{debug, span, Level};
 
-use crate::{errors::ATMError, ATM};
+use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 
-use super::DeleteMessageRequest;
+use super::{DeleteMessageRequest, GenericDataStruct};
+
+/// Response from message_delete
+/// - successful: Contains list of message_id's that were deleted successfully
+/// - errors: Contains a list of message_id's and error messages for failed deletions
+#[derive(Default, Serialize, Deserialize)]
+pub struct DeleteMessageResponse {
+    pub successful: Vec<String>,
+    pub errors: Vec<(String, String)>,
+}
+impl GenericDataStruct for DeleteMessageResponse {}
 
 impl<'c> ATM<'c> {
     /// Delete messages from ATM
@@ -10,7 +21,7 @@ impl<'c> ATM<'c> {
     pub async fn delete_messages(
         &mut self,
         messages: &DeleteMessageRequest,
-    ) -> Result<(), ATMError> {
+    ) -> Result<DeleteMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "delete_messages").entered();
 
         // Check if authenticated
@@ -46,9 +57,33 @@ impl<'c> ATM<'c> {
             .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
-            debug!("Failed to get response body. Body: {:?}", body);
+            return Err(ATMError::HTTPSError(format!(
+                "Status not successful. status({}), response({})",
+                status, body
+            )));
         }
 
-        Ok(())
+        let body = serde_json::from_str::<SuccessResponse<DeleteMessageResponse>>(&body)
+            .ok()
+            .unwrap();
+
+        let list = if let Some(list) = body.data {
+            list
+        } else {
+            return Err(ATMError::HTTPSError("No messages found".to_string()));
+        };
+
+        debug!(
+            "response: success({}) messages, failed({}) messages",
+            list.successful.len(),
+            list.errors.len()
+        );
+        if !list.errors.is_empty() {
+            for (msg, err) in &list.errors {
+                debug!("failed: msg({}) error({})", msg, err);
+            }
+        }
+
+        Ok(list)
     }
 }
