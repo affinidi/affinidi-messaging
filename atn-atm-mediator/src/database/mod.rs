@@ -13,11 +13,11 @@ pub struct DatabaseHandler {
 /// Statistics for the mediator
 #[derive(Default, Debug)]
 pub struct MetadataStats {
-    pub received_bytes: u64,
-    pub sent_bytes: u64,
-    pub received_count: u64,
-    pub sent_count: u64,
-    pub deleted_count: u64,
+    pub received_bytes: i64,
+    pub sent_bytes: i64,
+    pub received_count: i64,
+    pub sent_count: i64,
+    pub deleted_count: i64,
 }
 
 impl Display for MetadataStats {

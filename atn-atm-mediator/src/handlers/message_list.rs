@@ -13,7 +13,6 @@ use axum::{
 };
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use sha256::digest;
 use tracing::{debug, span, Instrument, Level};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -44,8 +43,7 @@ pub async fn message_list_handler(
     async move {
         // Check that the DID hash matches the session DID
         // TODO: In the future, add support for lists of DID's owned by the session owner
-        let s_did_hash = digest(session.did);
-        if s_did_hash != did_hash {
+        if session.did_hash != did_hash {
             return Err(MediatorError::PermissionError(
                 session.session_id,
                 "You don't have permission to access this resource.".into(),

@@ -255,6 +255,7 @@ pub struct Session {
     pub authenticated: bool,            // Has this session been authenticated?
     pub challenge_sent: Option<String>, // Challenge sent to the client
     pub did: String,                    // DID of the client
+    pub did_hash: String,               // Sha256 hash of the DID
 }
 
 #[derive(Serialize, Debug)]

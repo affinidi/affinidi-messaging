@@ -5,6 +5,9 @@
 ### 7th June 2024
 
 * Added authentication check on database session.state, protects against replay attack.
+* Added Sha256 hash of DID to Session Struct. Optimisation
+* Changed Mediator GLOBAL Stats from u64 to i64 in case of negative values
+* Removed unused common/Stats module
 
 ### 6th June 2024
 

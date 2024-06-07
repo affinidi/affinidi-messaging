@@ -1,12 +1,6 @@
 use atn_atm_didcomm::UnpackMetadata;
-use atn_atm_sdk::messages::{
-    list::{Folder, MessageList},
-    DeleteMessageRequest, GenericDataStruct,
-};
-use axum::{
-    extract::{Path, State},
-    Json,
-};
+use atn_atm_sdk::messages::{list::MessageList, DeleteMessageRequest, GenericDataStruct};
+use axum::{extract::State, Json};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, span, Instrument, Level};
@@ -45,7 +39,7 @@ pub async fn message_delete_handler(
             deleted.push(
                 state
                     .database
-                    .delete_messages(&session.session_id, &session.did, message)
+                    .delete_messages(&session.session_id, &session.did_hash, message)
                     .await?,
             );
         }

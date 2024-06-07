@@ -14,6 +14,7 @@ use http::{request::Parts, StatusCode};
 use jsonwebtoken::{TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha256::digest;
 use std::{
     fmt::{Debug, Display},
     net::SocketAddr,
@@ -143,10 +144,12 @@ where
         };
 
         let session_id = token_data.claims.session_id.clone();
+        let did = token_data.claims.sub.clone();
+        let did_hash = digest(&did);
 
         info!(
-            "{}: Protected connection accepted from ({})",
-            &session_id, &remote_addr
+            "{}: Protected connection accepted from address({}) did_hash({})",
+            &session_id, &remote_addr, &did_hash
         );
 
         let session = Session {
@@ -154,7 +157,8 @@ where
             remote_addr,
             authenticated: true,
             challenge_sent: None,
-            did: token_data.claims.sub.clone(),
+            did,
+            did_hash,
         };
 
         Ok(session)
