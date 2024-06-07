@@ -12,7 +12,7 @@ use jsonwebtoken::{encode, Header};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use ssi::did::DIDMethods;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     common::errors::{AppError, MediatorError, SuccessResponse},
@@ -201,6 +201,21 @@ pub async fn authentication_response(
             )
             .into());
         }
+    }
+
+    // Check that this isn't a replay attack
+    if let SessionState::ChallengeSent = session.state {
+        debug!("Database session state is ChallengeSent - Good to go!");
+    } else {
+        warn!(
+            "{}:{}: Session is in an invalid state for authentication",
+            session.session_id, session.remote_address
+        );
+        return Err(MediatorError::SessionError(
+            session.session_id.clone(),
+            "Session is in an invalid state for authentication".into(),
+        )
+        .into());
     }
 
     // Passed all the checks, now create the JWT tokens
