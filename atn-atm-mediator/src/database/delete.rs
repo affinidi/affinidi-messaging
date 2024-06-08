@@ -7,7 +7,7 @@ impl DatabaseHandler {
     /// - session_id: authentication session ID
     /// - did: DID of the delete requestor
     /// - message_hash: sha257 hash of the message to delete
-    pub async fn delete_messages(
+    pub async fn delete_message(
         &self,
         session_id: &str,
         did_hash: &str,
@@ -15,7 +15,7 @@ impl DatabaseHandler {
     ) -> Result<(), MediatorError> {
         let _span = span!(
             Level::DEBUG,
-            "delete_messages",
+            "delete_message",
             message_hash = message_hash,
             did_hash = did_hash
         );

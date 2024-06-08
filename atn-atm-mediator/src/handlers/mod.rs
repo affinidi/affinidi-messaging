@@ -16,6 +16,10 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
         .route("/inbound", post(message_inbound::message_inbound_handler))
         .route(
+            "/outbound",
+            post(message_outbound::message_outbound_handler),
+        )
+        .route(
             "/list/:did_hash/:folder",
             get(message_list::message_list_handler),
         )

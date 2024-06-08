@@ -2,6 +2,12 @@
 
 ## Changelog history
 
+### 8th June 2024
+
+* Refactored namespace for several SDK structs
+* implemented get_messages()
+* implemented unpack()
+
 ### 7th June 2024
 
 * improved delete_message return type to DeleteMessageResponse Struct, with returns for success and errors

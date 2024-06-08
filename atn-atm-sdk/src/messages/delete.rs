@@ -1,19 +1,8 @@
-use serde::{Deserialize, Serialize};
 use tracing::{debug, span, Level};
 
 use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 
-use super::{DeleteMessageRequest, GenericDataStruct};
-
-/// Response from message_delete
-/// - successful: Contains list of message_id's that were deleted successfully
-/// - errors: Contains a list of message_id's and error messages for failed deletions
-#[derive(Default, Serialize, Deserialize)]
-pub struct DeleteMessageResponse {
-    pub success: Vec<String>,
-    pub errors: Vec<(String, String)>,
-}
-impl GenericDataStruct for DeleteMessageResponse {}
+use super::{DeleteMessageRequest, DeleteMessageResponse};
 
 impl<'c> ATM<'c> {
     /// Delete messages from ATM

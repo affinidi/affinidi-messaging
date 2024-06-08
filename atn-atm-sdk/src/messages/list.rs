@@ -1,44 +1,7 @@
-use super::GenericDataStruct;
+use super::{Folder, MessageList};
 use crate::{errors::ATMError, messages::SuccessResponse, ATM};
-use serde::{Deserialize, Serialize};
 use sha256::digest;
-use std::fmt::{Debug, Display};
 use tracing::{debug, span, Level};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum Folder {
-    Inbox,
-    Outbox,
-}
-
-impl Display for Folder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Folder::Inbox => write!(f, "inbox"),
-            Folder::Outbox => write!(f, "outbox"),
-        }
-    }
-}
-
-/// A list of messages that are stored in the ATM for a given DID
-/// - msg-id: The unique identifier of the message
-/// - list-id: The unique identifier of the element in the list the message is stored in
-/// - msg-size: The size of the message in bytes
-/// - msg-date: The date the message was stored in the ATM (milliseconds since epoch)
-/// - msg-address: The address of the message in the ATM. This can be either sender or recipient depending on folder
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct MessageListElement {
-    pub msg_id: String,
-    pub list_id: String,
-    pub msg_size: u64,
-    pub msg_date: u64,
-    pub msg_address: String,
-}
-impl GenericDataStruct for MessageListElement {}
-
-pub type MessageList = Vec<MessageListElement>;
-impl GenericDataStruct for MessageList {}
 
 impl<'c> ATM<'c> {
     /// Returns a list of messages that are stored in the ATM

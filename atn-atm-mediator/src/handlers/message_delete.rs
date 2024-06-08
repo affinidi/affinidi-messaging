@@ -1,7 +1,5 @@
 use atn_atm_didcomm::UnpackMetadata;
-use atn_atm_sdk::messages::{
-    delete::DeleteMessageResponse, DeleteMessageRequest, GenericDataStruct,
-};
+use atn_atm_sdk::messages::{DeleteMessageRequest, DeleteMessageResponse, GenericDataStruct};
 use axum::{extract::State, Json};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -40,7 +38,7 @@ pub async fn message_delete_handler(
             debug!("Deleting message: message_id({})", message);
             let result = state
                 .database
-                .delete_messages(&session.session_id, &session.did_hash, message)
+                .delete_message(&session.session_id, &session.did_hash, message)
                 .await;
 
             match result {

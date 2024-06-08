@@ -3,10 +3,7 @@ use crate::{
     SharedData,
 };
 use atn_atm_didcomm::UnpackMetadata;
-use atn_atm_sdk::messages::{
-    list::{Folder, MessageList},
-    GenericDataStruct,
-};
+use atn_atm_sdk::messages::{Folder, GenericDataStruct, MessageList};
 use axum::{
     extract::{Path, State},
     Json,

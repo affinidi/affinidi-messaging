@@ -17,4 +17,6 @@ pub enum ATMError {
     ConfigError(String),
     #[error("Authentication error: {0}")]
     AuthenticationError(String),
+    #[error("DIDComm message error: {0}. Reason: {1}")]
+    DidcommError(String, String),
 }

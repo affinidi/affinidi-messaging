@@ -1,13 +1,16 @@
+use std::time::Duration;
+
 use atn_atm_sdk::{
     config::Config,
     conversions::secret_from_str,
     errors::ATMError,
-    messages::{list::Folder, DeleteMessageRequest},
+    messages::{Folder, GetMessagesRequest},
     ATM,
 };
 use did_peer::DIDPeer;
 use serde_json::json;
-use tracing::{info, warn};
+use tokio::time::sleep;
+use tracing::{debug, info};
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -56,7 +59,7 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
     // Send a trust-ping message to ATM, will generate a PONG response
-    atm.send_ping(atm_did, false, true).await?;
+    atm.send_ping(atm_did, true, true).await?;
     info!("Successfully sent ping");
 
     // Do we have messages in our inbox? Or how about queued still for delivery to others?
@@ -68,17 +71,37 @@ async fn main() -> Result<(), ATMError> {
         outbox_list.len()
     );
 
-    // Create list of messages to delete (who reads their inbox??)
+    // Retrieve the first message in the inbox
+    if let Some(msg) = inbox_list.first() {
+        let msgs = atm
+            .get_messages(&GetMessagesRequest {
+                delete: true,
+                message_ids: vec![msg.msg_id.clone()],
+            })
+            .await?;
+
+        for msg in msgs.success {
+            let (message, meta_data) = atm.unpack(&msg.msg.unwrap()).await?;
+            println!(
+                "Message received: {}, body = {:?}",
+                msg.msg_id, message.body
+            );
+        }
+    }
+    sleep(Duration::from_millis(100)).await;
+    println!("Done");
+    // delete messages
+    /*
+        // Create list of messages to delete (who reads their inbox??)
     let delete_msgs: DeleteMessageRequest = DeleteMessageRequest {
         message_ids: inbox_list.iter().map(|m| m.msg_id.clone()).collect(),
     };
 
-    // delete messages
     let r = atm.delete_messages(&delete_msgs).await?;
     info!("Successfully deleted {} messages.", r.success.len());
     for (msg, err) in r.errors {
         warn!("failed to delete msg({}). Reason: {}", msg, err);
-    }
+    }*/
 
     /*
         // Send a message to another DID via ATM

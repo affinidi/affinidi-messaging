@@ -105,3 +105,28 @@ Response from `send_didcomm_message()` is:
 
 * Success : Result->Ok `SuccessResponse<T>` struct (where the data field of `SuccessResponse` is of type `<T>`)
 * Error   : Result->Err with ATMError object describing the error
+
+### Get DIDComm Message
+
+* Retrieves one or more messages from ATM
+* You must know the message_id(s) in advance. See `list_messages()`
+* You can specify if you want to delete along with the get_message() request
+
+```rust
+async fn get_messages(messages: &GetMessagesRequest) -> Result<GetMessagesResponse, ATMError>
+// Gets one or more messages from ATM
+
+// Example: Get one message, and don't delete it
+get_messages(&vec!["message_id".into()], false).await?;
+```
+
+Response from `get_messages()` is:
+
+* Success : Result->Ok `GetMessagesResponse` struct
+* Error   : Result->Err with ATMError object describing the error
+
+Working with `GetMessageResponse`:
+
+* success       `Vec<String>`           : List of message_id's that were successfully deleted
+* get_errors    `Vec<(String, String)>` : List of failed gets on message_ids + error message
+* delete_errors `vec<(String, String)>` : List of failed deletes on message_ids + error message
