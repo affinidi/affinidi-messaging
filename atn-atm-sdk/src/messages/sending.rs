@@ -14,7 +14,12 @@ pub struct InboundMessageResponse {
 impl GenericDataStruct for InboundMessageResponse {}
 
 impl<'c> ATM<'c> {
-    pub async fn send_message<T>(&mut self, msg: &str) -> Result<SuccessResponse<T>, ATMError>
+    /// send_didcomm_message
+    /// - msg: Packed DIDComm message that we want to send
+    pub async fn send_didcomm_message<T>(
+        &mut self,
+        msg: &str,
+    ) -> Result<SuccessResponse<T>, ATMError>
     where
         T: GenericDataStruct,
     {
@@ -53,20 +58,20 @@ impl<'c> ATM<'c> {
 
     /// Sends a trust ping message to the specified DID
     /// - `to_did` - The DID to send the ping to
-    /// - `anonymous` - Whether the ping should be sent anonymously
+    /// - `signed` - Whether the ping should signed or anonymous?
     /// - `expect_response` - Whether a response is expected[^note]
     ///
     /// [^note]: Anonymous pings cannot expect a response, the SDK will automatically set this to false if anonymous is true
     pub async fn send_ping(
         &mut self,
         to_did: &str,
-        anonymous: bool,
+        signed: bool,
         expect_response: bool,
     ) -> Result<(), ATMError> {
         let _span = span!(Level::DEBUG, "send_ping",).entered();
         debug!(
-            "Pinging {}, anonymous?({}) response_expected?({})",
-            to_did, anonymous, expect_response
+            "Pinging {}, signed?({}) response_expected?({})",
+            to_did, signed, expect_response
         );
 
         // Check that DID exists in DIDResolver, add it if not
@@ -76,7 +81,7 @@ impl<'c> ATM<'c> {
         }
 
         // If an anonymous ping is being sent, we should ensure that expect_response is false
-        let expect_response = if anonymous && expect_response {
+        let expect_response = if !signed && expect_response {
             debug!("Anonymous pings cannot expect a response, changing to false...");
             false
         } else {
@@ -95,7 +100,7 @@ impl<'c> ATM<'c> {
         )
         .to(to_did.to_owned());
 
-        let from_did = if anonymous {
+        let from_did = if !signed {
             // Can support anonymous pings
             None
         } else {
@@ -120,7 +125,9 @@ impl<'c> ATM<'c> {
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
         // send the message
-        let response = self.send_message::<InboundMessageResponse>(&msg).await?;
+        let response = self
+            .send_didcomm_message::<InboundMessageResponse>(&msg)
+            .await?;
 
         debug!("Response: {:?}", response);
 

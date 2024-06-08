@@ -75,7 +75,7 @@ async fn main() -> Result<(), ATMError> {
 
     // delete messages
     let r = atm.delete_messages(&delete_msgs).await?;
-    info!("Successfully deleted {} messages.", r.successful.len());
+    info!("Successfully deleted {} messages.", r.success.len());
     for (msg, err) in r.errors {
         warn!("failed to delete msg({}). Reason: {}", msg, err);
     }

@@ -44,7 +44,7 @@ pub async fn message_delete_handler(
                 .await;
 
             match result {
-                Ok(_) => deleted.successful.push(message.into()),
+                Ok(_) => deleted.success.push(message.into()),
                 Err(err) => {
                     warn!("failed to delete msg({}). Reason: {}", message, err);
                     deleted.errors.push((message.into(), err.to_string()));

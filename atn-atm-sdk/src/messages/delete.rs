@@ -10,7 +10,7 @@ use super::{DeleteMessageRequest, GenericDataStruct};
 /// - errors: Contains a list of message_id's and error messages for failed deletions
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeleteMessageResponse {
-    pub successful: Vec<String>,
+    pub success: Vec<String>,
     pub errors: Vec<(String, String)>,
 }
 impl GenericDataStruct for DeleteMessageResponse {}
@@ -75,7 +75,7 @@ impl<'c> ATM<'c> {
 
         debug!(
             "response: success({}) messages, failed({}) messages",
-            list.successful.len(),
+            list.success.len(),
             list.errors.len()
         );
         if !list.errors.is_empty() {
