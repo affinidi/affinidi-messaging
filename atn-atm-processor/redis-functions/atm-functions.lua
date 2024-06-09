@@ -1,7 +1,5 @@
 #!lua name=atm
 
-
-
 -- store_message
 -- keys = message_hash
 -- args = [1] message
@@ -23,7 +21,8 @@ local function store_message(keys, args)
     redis.setresp(3)
 
     -- Get current time on server
-    local time = redis.call('TIME')[1]
+    local time = redis.call('TIME')
+    local time = string.format("%d%.0f", time[1], time[2]/1000)
     local bytes = tonumber(args[2])
     if bytes == nil then
         return redis.error_reply('store_message: invalid bytes')
