@@ -22,7 +22,10 @@ sha256 = "1.5"
 ssi = "0.7"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
-tracing = "0.1"
+tracing = { version = "0.1", features = [
+    "max_level_debug",
+    "release_max_level_info",
+] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 rustls = { version = "0.23", default-features = false, features = [

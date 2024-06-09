@@ -6,7 +6,7 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use ssi::did::DIDMethods;
 use std::borrow::BorrowMut;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{debug, span, warn, Instrument, Level};
 
 use crate::{
     common::errors::{AppError, MediatorError, Session, SuccessResponse},
@@ -100,8 +100,10 @@ pub async fn message_inbound_handler(
         };
         debug!("message processed:\n{:#?}", response);
 
+        let mut stored_messages = InboundMessageResponse::default();
+
         // Store the message if necessary
-        let msg_count = if let Some(response) = &response {
+        if let Some(response) = &response {
             // Pack the message for the next recipient(s)
             let to_dids = if let Some(to_did) = &response.to {
                 to_did
@@ -118,7 +120,6 @@ pub async fn message_inbound_handler(
                 to_dids
             );
 
-            let mut msg_count = 0;
             for recipient in to_dids {
                 let (msg_str, _msg_metadata) = response
                     .pack(
@@ -130,7 +131,7 @@ pub async fn message_inbound_handler(
                     )
                     .await?;
 
-                state
+                match state
                     .database
                     .store_message(
                         &session.session_id,
@@ -138,18 +139,24 @@ pub async fn message_inbound_handler(
                         recipient,
                         Some(&state.config.mediator_did),
                     )
-                    .await?;
-
-                msg_count += 1;
+                    .await
+                {
+                    Ok(msg_id) => {
+                        debug!(
+                            "message id({}) stored successfully recipient({})",
+                            msg_id, recipient
+                        );
+                        stored_messages.messages.push((recipient.clone(), msg_id));
+                    }
+                    Err(e) => {
+                        warn!("error storing message recipient({}): {:?}", recipient, e);
+                        stored_messages
+                            .errors
+                            .push((recipient.clone(), e.to_string()));
+                    }
+                }
             }
-            msg_count
-        } else {
-            0
-        };
-
-        let response = Some(InboundMessageResponse {
-            body: format!("messages saved successfully count({})", msg_count),
-        });
+        }
 
         Ok((
             StatusCode::OK,
@@ -159,7 +166,7 @@ pub async fn message_inbound_handler(
                 errorCode: 0,
                 errorCodeStr: "NA".to_string(),
                 message: "Success".to_string(),
-                data: response,
+                data: Some(stored_messages),
             }),
         ))
     }

@@ -1,16 +1,12 @@
-use std::time::Duration;
+use std::time::SystemTime;
 
 use atn_atm_sdk::{
-    config::Config,
-    conversions::secret_from_str,
-    errors::ATMError,
-    messages::{Folder, GetMessagesRequest},
+    config::Config, conversions::secret_from_str, errors::ATMError, messages::GetMessagesRequest,
     ATM,
 };
 use did_peer::DIDPeer;
 use serde_json::json;
-use tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::{error, info};
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -18,7 +14,6 @@ async fn main() -> Result<(), ATMError> {
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
-        .compact()
         .with_env_filter(filter::EnvFilter::from_default_env())
         .finish();
     // use that subscriber to process traces emitted after this point
@@ -52,70 +47,75 @@ async fn main() -> Result<(), ATMError> {
         .with_atm_did(atm_did)
         .build()?;
 
+    // Create a new ATM Client
     let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
 
     // Add our secrets to ATM Client - stays local.
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
+    // Ready to send a trust-ping to ATM
+    let start = SystemTime::now();
+
+    // You normally don't need to call authenticate() as it is called automatically
+    // We do this here so we can time the auth cycle
+    atm.authenticate().await?;
+    let after_auth = SystemTime::now();
+
     // Send a trust-ping message to ATM, will generate a PONG response
-    atm.send_ping(atm_did, true, true).await?;
-    info!("Successfully sent ping");
+    let response = atm.send_ping(atm_did, true, true).await?;
+    let after_ping = SystemTime::now();
 
-    // Do we have messages in our inbox? Or how about queued still for delivery to others?
-    let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
-    let outbox_list = atm.list_messages(my_did, Folder::Outbox).await?;
-    info!(
-        "Inbox contains {} messages. Outbox contains {} messages",
-        inbox_list.len(),
-        outbox_list.len()
-    );
-
-    // Retrieve the first message in the inbox
-    if let Some(msg) = inbox_list.first() {
-        let msgs = atm
-            .get_messages(&GetMessagesRequest {
-                delete: true,
-                message_ids: vec![msg.msg_id.clone()],
-            })
-            .await?;
-
-        for msg in msgs.success {
-            let (message, meta_data) = atm.unpack(&msg.msg.unwrap()).await?;
-            println!(
-                "Message received: {}, body = {:?}",
-                msg.msg_id, message.body
-            );
-        }
-    }
-    sleep(Duration::from_millis(100)).await;
-    println!("Done");
-    // delete messages
-    /*
-        // Create list of messages to delete (who reads their inbox??)
-    let delete_msgs: DeleteMessageRequest = DeleteMessageRequest {
-        message_ids: inbox_list.iter().map(|m| m.msg_id.clone()).collect(),
+    // Get the message ID from the response
+    let msg_id = if let Some((_, msg_id)) = response.messages.first() {
+        msg_id.clone()
+    } else {
+        error!("No message ID found in response");
+        return Err(ATMError::MsgSendError(
+            "No message ID found in response".into(),
+        ));
     };
 
-    let r = atm.delete_messages(&delete_msgs).await?;
-    info!("Successfully deleted {} messages.", r.success.len());
-    for (msg, err) in r.errors {
-        warn!("failed to delete msg({}). Reason: {}", msg, err);
-    }*/
-
-    /*
-        // Send a message to another DID via ATM
-        atm.create_message(
-            "Hello, World!",
-            "did:example:to_address",
-            MessageCreateOptions::default(),
-        )
-        .send()
+    // Get the PONG message from ATM
+    let msgs = atm
+        .get_messages(&GetMessagesRequest {
+            delete: true,
+            message_ids: vec![msg_id],
+        })
         .await?;
+    let after_get = SystemTime::now();
 
-        // I already have a DIDComm message, let's send it as well
-        atm.send_didcomm(&didcomm_msg, &to_did, MessageSendOptions::default())
-            .await?;
-    */
+    // Unpack the messages retrieved
+    for msg in msgs.success {
+        atm.unpack(&msg.msg.unwrap()).await?;
+        info!("PONG received: {}", msg.msg_id);
+    }
+    let after_unpack = SystemTime::now();
+
+    // Print out timing information
+    info!(
+        "Authenticating took {}ms :: total {}ms to complete",
+        after_auth.duration_since(start).unwrap().as_millis(),
+        after_auth.duration_since(start).unwrap().as_millis()
+    );
+    info!(
+        "Sending Ping took {}ms :: total {}ms to complete",
+        after_ping.duration_since(after_auth).unwrap().as_millis(),
+        after_ping.duration_since(start).unwrap().as_millis()
+    );
+    info!(
+        "Get response took {}ms :: total {}ms to complete",
+        after_get.duration_since(after_ping).unwrap().as_millis(),
+        after_get.duration_since(start).unwrap().as_millis()
+    );
+    info!(
+        "Unpack took {}ms :: total {}ms to complete",
+        after_unpack.duration_since(after_get).unwrap().as_millis(),
+        after_unpack.duration_since(start).unwrap().as_millis()
+    );
+    info!(
+        "Total trust-ping took {}ms to complete",
+        after_unpack.duration_since(start).unwrap().as_millis()
+    );
     Ok(())
 }

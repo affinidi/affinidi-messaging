@@ -4,11 +4,11 @@ use tracing::{debug, span, Level};
 use crate::{errors::ATMError, ATM};
 
 impl<'c> ATM<'c> {
-    pub async fn unpack(&mut self, msg: &str) -> Result<(Message, UnpackMetadata), ATMError> {
+    pub async fn unpack(&mut self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {
         let _span = span!(Level::DEBUG, "unpack",).entered();
 
         let mut envelope = match MetaEnvelope::new(
-            msg,
+            message,
             &mut self.did_resolver,
             &self.secrets_resolver,
             &self.did_methods_resolver,

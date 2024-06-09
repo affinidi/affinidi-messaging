@@ -7,7 +7,6 @@ use atn_atm_mediator::{
     handlers::authenticate::{AuthenticationChallenge, AuthorizationResponse},
     resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
 };
-use atn_atm_sdk::messages::sending::InboundMessageResponse;
 use did_peer::DIDPeer;
 use reqwest::{Certificate, Client};
 use serde_json::json;
@@ -145,13 +144,6 @@ async fn main() -> std::io::Result<()> {
     println!("Body:\n{}", body);
 
     println!();
-    let results = serde_json::from_str::<SuccessResponse<InboundMessageResponse>>(&body)
-        .ok()
-        .unwrap();
-    let msg = results.data.clone().unwrap().body;
-
-    println!();
-    println!("Received message is\n{:#?}\n", msg);
 
     /*
     let mut did_method_resolver = DIDMethods::default();

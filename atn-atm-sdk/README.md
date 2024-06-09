@@ -9,9 +9,15 @@ To enable logging at DEBUG level just for atm_sdk crate
 
 ## Examples
 
-Send a trust ping
+To enable logging for examples, `export RUST_LOG=none,atn_atm_sdk=debug,ping=debug,demo=debug`
 
-`cargo run --example ping`
+* Send a trust ping
+
+    `cargo run --example ping`
+
+* Run the demo
+
+    `cargo run --example demo`
 
 ## API Calls
 
@@ -111,6 +117,7 @@ Response from `send_didcomm_message()` is:
 * Retrieves one or more messages from ATM
 * You must know the message_id(s) in advance. See `list_messages()`
 * You can specify if you want to delete along with the get_message() request
+* Call `unpack(&message)` next to unpack the message you have received
 
 ```rust
 async fn get_messages(messages: &GetMessagesRequest) -> Result<GetMessagesResponse, ATMError>
@@ -130,3 +137,24 @@ Working with `GetMessageResponse`:
 * success       `Vec<String>`           : List of message_id's that were successfully deleted
 * get_errors    `Vec<(String, String)>` : List of failed gets on message_ids + error message
 * delete_errors `vec<(String, String)>` : List of failed deletes on message_ids + error message
+
+### Unpack a DIDComm message
+
+* A wrapper for DIDComm Message::unpack() that simplifies the setup of resolvers etc already done for ATM
+* Takes a plain `String` and returns a DIDComm `Message` and `UnpackMetadata` objects
+
+```rust
+async fn unpack(message: &str) -> Result<(Message, UnpackMetadata), ATMError>
+// Unpacks any DIDComm message into a Message and UnpackMetadata response
+
+// Example:
+let didcomm_message = atm.get_messages(&vec!["msg_id".to_string()], true).await?;
+let (message, meta_data) = atm.unpack(&didcomm_message).await?;
+
+println!("Message body = {}", message.body);
+```
+
+Response from `unpack()` is:
+
+* Success : Result->Ok (`Message`, `UnpackMetadata`)
+* Error   : Result->Err with ATMError object describing the error

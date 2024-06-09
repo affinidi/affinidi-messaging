@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+### 9th June 2024
+
+* Refactored inbound message handling so it returns more relevant information to clients
+
 ### 8th June 2024
 
 * Refactored namespace for several SDK structs

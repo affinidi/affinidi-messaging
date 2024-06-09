@@ -2,6 +2,14 @@
 
 ## Changelog history
 
+### 9th June 2024
+
+* Minor refactoring of unpack()
+* Refactored send_didcomm_message() so it now returns more relevant information such as recipients, message_ids and errors
+* refactored send_ping() so it returns new structure
+* Changed example ping to now just do a full trust-ping to ATM, includes timing data
+* Added new example `demo` to show all API calls
+
 ### 8th June 2024
 
 * Refactored namespace for several SDK structs

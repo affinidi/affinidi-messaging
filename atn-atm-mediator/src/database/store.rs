@@ -14,13 +14,14 @@ pub struct MessageMetaData {
 
 impl DatabaseHandler {
     /// Stores a message in the database
+    /// Returns the message_id (hash of the message)
     pub async fn store_message(
         &self,
         session_id: &str,
         message: &str,
         to_did: &str,
         from_did: Option<&str>,
-    ) -> Result<(), MediatorError> {
+    ) -> Result<String, MediatorError> {
         let _span = span!(Level::DEBUG, "store_message", session_id = session_id);
         async move {
             let message_hash = digest(message.as_bytes());
@@ -66,7 +67,7 @@ impl DatabaseHandler {
 
             debug!("Message hash({}) stored in database", message_hash);
 
-            Ok(())
+            Ok(message_hash)
         }
         .instrument(_span)
         .await

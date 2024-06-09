@@ -13,7 +13,7 @@ use crate::{
 
 impl<'c> ATM<'c> {
     /// Authenticate the SDK against Affinidi Trusted Messaging
-    pub(crate) async fn authenticate(&mut self) -> Result<AuthorizationResponse, ATMError> {
+    pub async fn authenticate(&mut self) -> Result<AuthorizationResponse, ATMError> {
         if self.authenticated {
             // Already authenticated
             if let Some(tokens) = &self.jwt_tokens {

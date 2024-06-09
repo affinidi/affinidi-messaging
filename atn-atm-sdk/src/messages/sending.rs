@@ -7,9 +7,16 @@ use std::time::SystemTime;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
+/// Response from the ATM API when sending a message
+/// Contains a list of messages that were sent
+/// - messages : List of successful stored messages (recipient, message_ids)
+/// - errors   : List of errors that occurred while storing messages (recipient, error)
+///
+/// NOTE: Sending a single message can result in multiple forward messages being sent!
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct InboundMessageResponse {
-    pub body: String,
+    pub messages: Vec<(String, String)>,
+    pub errors: Vec<(String, String)>,
 }
 impl GenericDataStruct for InboundMessageResponse {}
 
@@ -67,7 +74,7 @@ impl<'c> ATM<'c> {
         to_did: &str,
         signed: bool,
         expect_response: bool,
-    ) -> Result<(), ATMError> {
+    ) -> Result<InboundMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "send_ping",).entered();
         debug!(
             "Pinging {}, signed?({}) response_expected?({})",
@@ -131,6 +138,12 @@ impl<'c> ATM<'c> {
 
         debug!("Response: {:?}", response);
 
-        Ok(())
+        let response = if let Some(response) = response.data {
+            response
+        } else {
+            return Err(ATMError::MsgSendError("No response data".into()));
+        };
+
+        Ok(response)
     }
 }
