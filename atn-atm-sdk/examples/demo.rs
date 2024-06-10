@@ -2,7 +2,7 @@ use atn_atm_sdk::{
     config::Config,
     conversions::secret_from_str,
     errors::ATMError,
-    messages::{Folder, GetMessagesRequest},
+    messages::{fetch::FetchOptions, FetchDeletePolicy, Folder},
     ATM,
 };
 use did_peer::DIDPeer;
@@ -56,7 +56,7 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
     // Send a trust-ping message to ATM, will generate a PONG response
-    let response = atm.send_ping(atm_did, true, true).await?;
+    /*let response = atm.send_ping(atm_did, true, true).await?;
     info!(
         "Successfully sent ping message responses({})",
         response.messages.len()
@@ -66,7 +66,7 @@ async fn main() -> Result<(), ATMError> {
     }
     for (recipient, err) in response.errors {
         warn!("recipient({}) error({})", recipient, err);
-    }
+    }*/
 
     // Do we have messages in our inbox? Or how about queued still for delivery to others?
     let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
@@ -77,8 +77,28 @@ async fn main() -> Result<(), ATMError> {
         outbox_list.len()
     );
 
+    // Fetch all messages from the inbox
+    let messages = atm
+        .fetch_messages(&FetchOptions {
+            delete_policy: FetchDeletePolicy::OnReceive,
+            ..Default::default()
+        })
+        .await?;
+    info!("fetched {} messages", messages.success.len());
+    let mut i = 1;
+    for msg in &messages.success {
+        let (_, _) = atm.unpack(&msg.msg.clone().unwrap()).await?;
+        info!(
+            "({}/{}): Message_id({}) fetched",
+            i,
+            messages.success.len(),
+            msg.msg_id
+        );
+        i += 1;
+    }
+
     // Retrieve the first message in the inbox
-    if let Some(msg) = inbox_list.first() {
+    /*if let Some(msg) = inbox_list.first() {
         let msgs = atm
             .get_messages(&GetMessagesRequest {
                 delete: true,
@@ -93,7 +113,7 @@ async fn main() -> Result<(), ATMError> {
                 msg.msg_id, message.body
             );
         }
-    }
+    }*/
     // delete messages
     /*
         // Create list of messages to delete (who reads their inbox??)

@@ -41,6 +41,7 @@ local function store_message(keys, args)
     -- Update the receiver records
     redis.call('HINCRBY', 'DID:'..args[4], 'QUEUE_BYTES', bytes)
     redis.call('HINCRBY', 'DID:'..args[4], 'QUEUE_COUNT', 1)
+    -- If changing the fields in the future, update the fetch_messages function
     local RQ = redis.call('XADD', 'RECEIVE_Q:'..args[4], time..'-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM', args[5])
     
     -- Update the sender records
@@ -63,6 +64,7 @@ end
 
 -- delete_message
 -- keys = message_hash
+-- args = [1] did_hash
 local function delete_message(keys, args)
     -- Correct number of keys?
     if #keys ~= 1  then
@@ -108,7 +110,7 @@ local function delete_message(keys, args)
     
     -- Remove the sender records
     local SQ = nil
-    if meta.map.SEND_ID == nil then
+    if meta.map.SEND_ID ~= nil then
         -- Remove the sender records
         redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_BYTES', -bytes)
         redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_COUNT', -1)
@@ -121,6 +123,67 @@ local function delete_message(keys, args)
     return redis.status_reply('OK')    
 end
 
-redis.register_function('hgetall', store_message)
+-- fetch_messages
+-- keys = did_hash
+-- args = [1] start_id
+--        [2] limit
+local function fetch_messages(keys, args)
+    -- Do we have the correct number of arguments?
+    if #args ~= 2  then
+        return redis.error_reply('fetch_messages: wrong arguments')
+    end
+
+    -- set response type to Version 3
+    redis.setresp(3)
+
+    -- Prepend an exclusive start_id if it exists
+    local start_id = '-'
+    if args[1] ~= "-" then
+        start_id = '('..args[1]
+    end
+
+    -- Get list of messages from stream
+    local list = redis.call('XRANGE', 'RECEIVE_Q:'..keys[1], start_id, '+', 'COUNT', args[2])
+
+    local fetched_messages = {}
+    -- unpack the XRANGE list
+    for x, element in ipairs(list) do
+        -- element[1] = stream_id
+        -- element[2] = array of Stream Fields
+        for i, sub_element in ipairs(element) do
+            if i == 1 then 
+                -- This is the stream ID
+                fetched_messages[x] = {'STREAM_ID', sub_element}
+            else
+                -- [1] = MSG_ID
+                -- [2] = message_id
+                -- [3] = BYTES
+                -- [4] = bytes
+                -- [5] = FROM
+                -- [6] = from_did
+                table.insert(fetched_messages[x], sub_element[1])
+                table.insert(fetched_messages[x], sub_element[2])
+                table.insert(fetched_messages[x], 'FROM_DID')
+                table.insert(fetched_messages[x], sub_element[6])
+
+                -- fetch the message
+                table.insert(fetched_messages[x], 'MSG')
+                local msg = redis.call('GET', 'MSG:'..sub_element[2])
+                table.insert(fetched_messages[x], msg)
+
+                -- fetch the message metadata
+                local meta = redis.call('HGETALL', 'MSG:META:'..sub_element[2])
+                for k, v in pairs(meta.map) do
+                    table.insert(fetched_messages[x], 'META_'..k)
+                    table.insert(fetched_messages[x], v)
+                end
+            end
+        end
+    end -- end of XRANGE list
+
+    return fetched_messages
+end
+
 redis.register_function('store_message', store_message)
 redis.register_function('delete_message', delete_message)
+redis.register_function('fetch_messages', fetch_messages)

@@ -3,6 +3,7 @@ use std::fmt::Display;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub mod delete;
+pub mod fetch;
 pub mod get;
 pub mod list;
 pub mod sending;
@@ -117,6 +118,29 @@ pub struct GetMessagesResponse {
     pub delete_errors: Vec<(String, String)>,
 }
 impl GenericDataStruct for GetMessagesResponse {}
+
+/// Enum for the delete policy when retrieving messages
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub enum FetchDeletePolicy {
+    /// Deletes messages as they are fetched, occurs automatically within ATM
+    Optimistic,
+    /// The SDK will delete messages after they are received by the SDK
+    OnReceive,
+    /// Messages are not deleted (Default behavior)
+    /// It is up to the caller as to when and how they want to delete messages
+    #[default]
+    DoNotDelete,
+}
+
+impl Display for FetchDeletePolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchDeletePolicy::Optimistic => write!(f, "optimistic"),
+            FetchDeletePolicy::OnReceive => write!(f, "on_receive"),
+            FetchDeletePolicy::DoNotDelete => write!(f, "do_not_delete"),
+        }
+    }
+}
 
 /// Helps with deserializing the generic data field in the SuccessResponse struct
 pub trait GenericDataStruct: DeserializeOwned + Serialize {}

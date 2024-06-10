@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 pub mod delete;
+pub mod fetch;
 pub mod get;
 pub mod handlers;
 pub mod list;

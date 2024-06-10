@@ -7,6 +7,7 @@ use axum::{
 };
 
 pub mod authenticate;
+pub mod inbox_fetch;
 pub mod message_delete;
 pub mod message_inbound;
 pub mod message_list;
@@ -14,20 +15,27 @@ pub mod message_outbound;
 
 pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
+        // Inbound message handling from ATM clients
         .route("/inbound", post(message_inbound::message_inbound_handler))
+        // Outbound message handling to ATM clients
         .route(
             "/outbound",
             post(message_outbound::message_outbound_handler),
         )
+        .route("/fetch", post(inbox_fetch::inbox_fetch_handler))
+        // Listing of messages for a DID
         .route(
             "/list/:did_hash/:folder",
             get(message_list::message_list_handler),
         )
+        // Delete/remove messages stored in ATM
         .route("/delete", delete(message_delete::message_delete_handler))
+        // Authentication step 1/2 - Client requests challenge from server
         .route(
             "/authenticate/challenge",
             post(authenticate::authentication_challenge),
         )
+        // Authentication step 2/2 - Client sends encrypted challenge to server
         .route("/authenticate", post(authenticate::authentication_response));
 
     Router::new()

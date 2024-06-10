@@ -79,7 +79,7 @@ async fn main() -> Result<(), ATMError> {
     // Get the PONG message from ATM
     let msgs = atm
         .get_messages(&GetMessagesRequest {
-            delete: true,
+            delete: false,
             message_ids: vec![msg_id],
         })
         .await?;
