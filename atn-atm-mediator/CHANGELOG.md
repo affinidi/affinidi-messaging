@@ -2,6 +2,11 @@
 
 ## Changelog history
 
+### 12th June 2024
+
+* Removed unused configuration options (allow/deny lists)
+* Added method to load Mediator secrets from AWS Secrets Manager
+
 ### 9th June 2024
 
 * Refactored inbound message handling so it returns more relevant information to clients

@@ -17,6 +17,7 @@ atn-atm-sdk = { version = "0.1", path = "../atn-atm-sdk" }
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.29"
 aws-sdk-memorydb = "1.26.0"
+aws-sdk-secretsmanager = "1.26.0"
 axum = { version = "0.7" }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 axum-server = { version = "0.6", features = ["tls-rustls"] }

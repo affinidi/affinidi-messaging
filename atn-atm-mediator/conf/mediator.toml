@@ -11,18 +11,14 @@ listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 mediator_did = "${MEDIATOR_DID:did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
 
 ### mediator_secrets: Secrets of the mediator
-### REQUIRED: Location of secrets (supports file:// only)
-### Example file:[{"id": "#key-1", "crv": "secp256k1", "kty": "EC", "d": "...", "x": "...", "y": "..."}, {}]
+### REQUIRED: Location of secrets
+### Supported formats:
+### - file://<path> - Load secrets from a file
+### - aws_secrets://<secret_name> - Load secrets from AWS Secrets Manager
+### See secrets.json-example for the format of the secrets
 ### NOTE: The key identifiers (id) must match the key identifiers in the mediator_did
-mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
-
-### mediator_allowed_dids: DID's that are allowed to send messages through this mediator
-### Default: Filename of a file containing a list of allowed DIDs
-mediator_allowed_dids = "${MEDIATOR_ALLOWED_DIDS:./conf/mediator_allowed_dids.txt}"
-
-### mediator_denied_dids: DID's that are denied to send messages through this mediator
-### Default: Filename of a file containing a list of denied DIDs
-mediator_denied_dids = "${MEDIATOR_DENIED_DIDS:./conf/mediator_denied_dids.txt}"
+mediator_secrets = "${MEDIATOR_SECRETS:aws_secrets://dev/atn/atm/mediator/global/secrets}"
+#mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
 
 [database]
 ### database_url: URL of the Redis compatable database

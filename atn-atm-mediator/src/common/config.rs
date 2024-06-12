@@ -1,7 +1,9 @@
 use super::{did_conversion::convert_did, errors::MediatorError};
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use async_convert::{async_trait, TryFrom};
-use atn_atm_didcomm::{did::DIDDoc, secrets::Secret};
+use atn_atm_didcomm::did::DIDDoc;
+use aws_config::{self, BehaviorVersion, Region, SdkConfig};
+use aws_sdk_secretsmanager;
 use base64::prelude::*;
 use did_peer::DIDPeer;
 use jsonwebtoken::{DecodingKey, EncodingKey};
@@ -13,13 +15,12 @@ use ssi::{
     did_resolve::{DIDResolver, ResolutionInputMetadata},
 };
 use std::{
-    collections::HashSet,
     env, fmt,
     fs::File,
     io::{self, BufRead},
     path::Path,
 };
-use tracing::{event, Level};
+use tracing::{event, info, Level};
 use tracing_subscriber::filter::LevelFilter;
 
 /// Database Struct contains database and storage of messages related configuration details
@@ -50,8 +51,6 @@ pub struct ConfigRaw {
     pub listen_address: String,
     pub mediator_did: String,
     pub mediator_secrets: String,
-    pub mediator_allowed_dids: String,
-    pub mediator_denied_dids: String,
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
 }
@@ -63,8 +62,6 @@ pub struct Config {
     pub mediator_did: String,
     pub mediator_did_doc: DIDDoc,
     pub mediator_secrets: AffinidiSecrets,
-    pub mediator_allowed_dids: HashSet<String>,
-    pub mediator_denied_dids: HashSet<String>,
     pub database_url: String,
     pub database_pool_size: usize,
     pub database_timeout: u32,
@@ -88,14 +85,6 @@ impl fmt::Debug for Config {
             .field(
                 "mediator_secrets",
                 &format!("({}) secrets loaded", self.mediator_secrets.len()),
-            )
-            .field(
-                "mediator_allowed_dids",
-                &&format!("({}) allowed_dids loaded", self.mediator_allowed_dids.len()),
-            )
-            .field(
-                "mediator_denied_dids",
-                &&format!("({}) denied_dids loaded", self.mediator_denied_dids.len()),
             )
             .field("use_ssl", &self.use_ssl)
             .field("database_url", &self.database_url)
@@ -126,8 +115,6 @@ impl Default for Config {
                 service: Vec::new(),
             },
             mediator_secrets: AffinidiSecrets::new(vec![]),
-            mediator_allowed_dids: HashSet::new(),
-            mediator_denied_dids: HashSet::new(),
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
             database_timeout: 2,
@@ -171,6 +158,16 @@ impl TryFrom<ConfigRaw> for Config {
             ..Default::default()
         };
 
+        // Set up AWS Configuration
+        let region = match env::var("AWS_REGION") {
+            Ok(region) => Region::new(region),
+            Err(_) => Region::new("ap-southeast-1"),
+        };
+        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+            .region(region)
+            .load()
+            .await;
+
         // Resolve mediator DID Doc and expand keys
         let mut did_resolver = DIDMethods::default();
         did_resolver.insert(Box::new(DIDPeer));
@@ -202,13 +199,7 @@ impl TryFrom<ConfigRaw> for Config {
         config.mediator_did_doc = convert_did(&doc_opt)?;
 
         // Load mediator secrets
-        config.mediator_secrets = load_secrets(&raw.mediator_secrets)?;
-
-        // Load mediator allowed DID's
-        config.mediator_allowed_dids = load_did_list(&raw.mediator_allowed_dids)?;
-
-        // Load mediator denied DID's
-        config.mediator_denied_dids = load_did_list(&raw.mediator_denied_dids)?;
+        config.mediator_secrets = load_secrets(&raw.mediator_secrets, &aws_config).await?;
 
         // Create the JWT encoding and decoding keys
         let jwt_secret = BASE64_URL_SAFE_NO_PAD
@@ -236,35 +227,60 @@ impl TryFrom<ConfigRaw> for Config {
 }
 
 /// Loads the secret data into the Config file.
-/// Only supports a file containing a JSON array of secrets
-/// TODO: Add support for other methods of getting these secrets (AWS Secrets Manager, etc.)
-fn load_secrets(secrets: &str) -> Result<AffinidiSecrets, MediatorError> {
-    let (type_, file_name) = secrets.split_at(7);
-    if type_ != "file://" {
+async fn load_secrets(
+    secrets: &str,
+    aws_config: &SdkConfig,
+) -> Result<AffinidiSecrets, MediatorError> {
+    let parts: Vec<&str> = secrets.split("://").collect();
+    if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
             "NA".into(),
-            "Only file:// is supported for mediator secrets".into(),
+            "Invalid mediator secrets format".into(),
         ));
     }
+    info!("Loading secrets method({}) path({})", parts[0], parts[1]);
+    let content: String = match parts[0] {
+        "file" => read_file_lines(parts[1])?.concat(),
+        "aws_secrets" => {
+            let asm = aws_sdk_secretsmanager::Client::new(aws_config);
+
+            let response = asm
+                .get_secret_value()
+                .secret_id(parts[1])
+                .send()
+                .await
+                .map_err(|e| {
+                    event!(Level::ERROR, "Could not get secret value. {}", e);
+                    MediatorError::ConfigError(
+                        "NA".into(),
+                        format!("Could not get secret value. {}", e),
+                    )
+                })?;
+            response.secret_string.ok_or_else(|| {
+                event!(Level::ERROR, "No secret string found in response");
+                MediatorError::ConfigError("NA".into(), "No secret string found in response".into())
+            })?
+        }
+        _ => {
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "Invalid MEDIATOR_SECRETS format! Expecting file:// or aws_secrets:// ...".into(),
+            ))
+        }
+    };
 
     Ok(AffinidiSecrets::new(
-        serde_json::from_str::<Vec<Secret>>(&read_file_lines(file_name)?.concat()).map_err(
-            |err| {
-                event!(Level::ERROR, "Could not open file({}). {}", file_name, err);
-                MediatorError::ConfigError(
-                    "NA".into(),
-                    format!("Could not open file({}). {}", file_name, err),
-                )
-            },
-        )?,
-    ))
-}
-
-/// Loads from a file a list of DID's into a HashSet
-/// Useful for the allow/deny lists for the mediator
-fn load_did_list(file_name: &str) -> Result<HashSet<String>, MediatorError> {
-    Ok(HashSet::from_iter(
-        read_file_lines(file_name)?.iter().cloned(),
+        serde_json::from_str(&content).map_err(|err| {
+            event!(
+                Level::ERROR,
+                "Could not parse MEDIATOR_SECRETS JSON content. {}",
+                err
+            );
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not parse MEDIATOR_SECRETS JSON content. {}", err),
+            )
+        })?,
     ))
 }
 
