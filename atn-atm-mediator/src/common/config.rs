@@ -203,15 +203,9 @@ impl TryFrom<ConfigRaw> for Config {
         config.mediator_secrets = load_secrets(&raw.mediator_secrets, &aws_config).await?;
 
         // Create the JWT encoding and decoding keys
-        let jwt_secret = BASE64_URL_SAFE_NO_PAD
-            .decode(&raw.security.jwt_authorization_secret)
-            .map_err(|err| {
-                event!(Level::ERROR, "Could not create JWT key pair. {}", err);
-                MediatorError::ConfigError(
-                    "NA".into(),
-                    format!("Could not create JWT key pair. {}", err),
-                )
-            })?;
+        let jwt_secret =
+            config_jwt_secret(&raw.security.jwt_authorization_secret, &aws_config).await?;
+
         config.jwt_encoding_key = Some(EncodingKey::from_ed_der(&jwt_secret));
 
         let pair = Ed25519KeyPair::from_pkcs8(&jwt_secret).map_err(|err| {
@@ -368,6 +362,7 @@ fn expand_env_vars(raw_config: &Vec<String>) -> Vec<String> {
     result
 }
 
+/// Converts the mediator_did config to a valid DID depending on source
 async fn read_did_config(
     did_config: &str,
     aws_config: &SdkConfig,
@@ -435,4 +430,56 @@ async fn read_did_config(
     };
 
     Ok(content)
+}
+
+/// Converts the jwt_authorization_secret config to a valid JWT secret
+/// Can take a basic string, or fetch from AWS Secrets Manager
+async fn config_jwt_secret(
+    jwt_secret: &str,
+    aws_config: &SdkConfig,
+) -> Result<Vec<u8>, MediatorError> {
+    let parts: Vec<&str> = jwt_secret.split("://").collect();
+    if parts.len() != 2 {
+        return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid `jwt_authorization_secret` format".into(),
+        ));
+    }
+    let content: String = match parts[0] {
+        "string" => parts[1].to_string(),
+        "aws_secrets" => {
+            info!("Loading JWT secret from AWS Secrets Manager");
+            let asm = aws_sdk_secretsmanager::Client::new(aws_config);
+
+            let response = asm
+                .get_secret_value()
+                .secret_id(parts[1])
+                .send()
+                .await
+                .map_err(|e| {
+                    event!(Level::ERROR, "Could not get secret value. {}", e);
+                    MediatorError::ConfigError(
+                        "NA".into(),
+                        format!("Could not get secret value. {}", e),
+                    )
+                })?;
+            response.secret_string.ok_or_else(|| {
+                event!(Level::ERROR, "No secret string found in response");
+                MediatorError::ConfigError("NA".into(), "No secret string found in response".into())
+            })?
+        }
+        _ => return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid `jwt_authorization_secret` format! Expecting string:// or aws_secrets:// ..."
+                .into(),
+        )),
+    };
+
+    BASE64_URL_SAFE_NO_PAD.decode(content).map_err(|err| {
+        event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+        MediatorError::ConfigError(
+            "NA".into(),
+            format!("Could not create JWT key pair. {}", err),
+        )
+    })
 }

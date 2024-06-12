@@ -67,4 +67,8 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 
 ### jwt_authorization_secret
 ### REQUIRED: Key string that is used to sign JWT tokens
-jwt_authorization_secret = "${AUTHORIZATION_SECRET:MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
+### Supported Formats:
+### - string://<key> - Use the key as is
+### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
+#jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
+jwt_authorization_secret = "${AUTHORIZATION_SECRET:aws_secrets://dev/atn/atm/mediator/global/jwt_secret}"
