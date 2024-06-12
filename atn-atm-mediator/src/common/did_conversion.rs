@@ -9,6 +9,7 @@ use ssi::did::Document;
 
 use super::errors::MediatorError;
 
+/// Converts a DID Document from SSI format to DIDComm format
 pub fn convert_did(did_doc: &Document) -> Result<DIDDoc, MediatorError> {
     let mut new_doc = DIDDoc {
         id: did_doc.id.clone(),

@@ -4,6 +4,7 @@ use async_convert::{async_trait, TryFrom};
 use atn_atm_didcomm::did::DIDDoc;
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
+use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
 use did_peer::DIDPeer;
 use jsonwebtoken::{DecodingKey, EncodingKey};
@@ -135,6 +136,16 @@ impl TryFrom<ConfigRaw> for Config {
     type Error = MediatorError;
 
     async fn try_from(raw: ConfigRaw) -> Result<Self, Self::Error> {
+        // Set up AWS Configuration
+        let region = match env::var("AWS_REGION") {
+            Ok(region) => Region::new(region),
+            Err(_) => Region::new("ap-southeast-1"),
+        };
+        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+            .region(region)
+            .load()
+            .await;
+
         let mut config = Config {
             log_level: match raw.log_level.as_str() {
                 "trace" => LevelFilter::TRACE,
@@ -145,7 +156,7 @@ impl TryFrom<ConfigRaw> for Config {
                 _ => LevelFilter::INFO,
             },
             listen_address: raw.listen_address,
-            mediator_did: raw.mediator_did.clone(),
+            mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
             database_url: raw.database.database_url,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
@@ -158,22 +169,12 @@ impl TryFrom<ConfigRaw> for Config {
             ..Default::default()
         };
 
-        // Set up AWS Configuration
-        let region = match env::var("AWS_REGION") {
-            Ok(region) => Region::new(region),
-            Err(_) => Region::new("ap-southeast-1"),
-        };
-        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
-            .region(region)
-            .load()
-            .await;
-
         // Resolve mediator DID Doc and expand keys
         let mut did_resolver = DIDMethods::default();
         did_resolver.insert(Box::new(DIDPeer));
 
         let (_, doc_opt, _) = did_resolver
-            .resolve(&raw.mediator_did, &ResolutionInputMetadata::default())
+            .resolve(&config.mediator_did, &ResolutionInputMetadata::default())
             .await;
 
         let doc_opt = match doc_opt {
@@ -181,7 +182,7 @@ impl TryFrom<ConfigRaw> for Config {
             None => {
                 return Err(MediatorError::ConfigError(
                     "NA".into(),
-                    format!("Could not resolve mediator DID ({})", raw.mediator_did),
+                    format!("Could not resolve mediator DID ({})", config.mediator_did),
                 ));
             }
         };
@@ -235,7 +236,7 @@ async fn load_secrets(
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
             "NA".into(),
-            "Invalid mediator secrets format".into(),
+            "Invalid `mediator_secrets` format".into(),
         ));
     }
     info!("Loading secrets method({}) path({})", parts[0], parts[1]);
@@ -264,7 +265,7 @@ async fn load_secrets(
         _ => {
             return Err(MediatorError::ConfigError(
                 "NA".into(),
-                "Invalid MEDIATOR_SECRETS format! Expecting file:// or aws_secrets:// ...".into(),
+                "Invalid `mediator_secrets` format! Expecting file:// or aws_secrets:// ...".into(),
             ))
         }
     };
@@ -273,12 +274,12 @@ async fn load_secrets(
         serde_json::from_str(&content).map_err(|err| {
             event!(
                 Level::ERROR,
-                "Could not parse MEDIATOR_SECRETS JSON content. {}",
+                "Could not parse `mediator_secrets` JSON content. {}",
                 err
             );
             MediatorError::ConfigError(
                 "NA".into(),
-                format!("Could not parse MEDIATOR_SECRETS JSON content. {}", err),
+                format!("Could not parse `mediator_secrets` JSON content. {}", err),
             )
         })?,
     ))
@@ -365,4 +366,73 @@ fn expand_env_vars(raw_config: &Vec<String>) -> Vec<String> {
         );
     }
     result
+}
+
+async fn read_did_config(
+    did_config: &str,
+    aws_config: &SdkConfig,
+) -> Result<String, MediatorError> {
+    let parts: Vec<&str> = did_config.split("://").collect();
+    if parts.len() != 2 {
+        return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid `mediator_did` format".into(),
+        ));
+    }
+    let content: String = match parts[0] {
+        "did" => parts[1].to_string(),
+        "aws_parameter_store" => {
+            let ssm = aws_sdk_ssm::Client::new(aws_config);
+
+            let response = ssm
+                .get_parameter()
+                .set_name(Some(parts[1].to_string()))
+                .send()
+                .await
+                .map_err(|e| {
+                    event!(Level::ERROR, "Could not get mediator_did parameter. {}", e);
+                    MediatorError::ConfigError(
+                        "NA".into(),
+                        format!("Could not get mediator_did parameter. {}", e),
+                    )
+                })?;
+            let parameter = response.parameter.ok_or_else(|| {
+                event!(Level::ERROR, "No parameter string found in response");
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    "No parameter string found in response".into(),
+                )
+            })?;
+
+            if let Some(_type) = parameter.r#type {
+                if _type != ParameterType::String {
+                    return Err(MediatorError::ConfigError(
+                        "NA".into(),
+                        "Expected String parameter type".into(),
+                    ));
+                }
+            } else {
+                return Err(MediatorError::ConfigError(
+                    "NA".into(),
+                    "Unknown parameter type".into(),
+                ));
+            }
+
+            parameter.value.ok_or_else(|| {
+                event!(Level::ERROR, "No parameter string found in response");
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    "No parameter string found in response".into(),
+                )
+            })?
+        }
+        _ => {
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "Invalid MEDIATOR_SECRETS format! Expecting file:// or aws_secrets:// ...".into(),
+            ))
+        }
+    };
+
+    Ok(content)
 }

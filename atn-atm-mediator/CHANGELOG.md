@@ -6,6 +6,7 @@
 
 * Removed unused configuration options (allow/deny lists)
 * Added method to load Mediator secrets from AWS Secrets Manager
+* Added method to load the mediator DID from AWS Systems Manager Parameter Store
 
 ### 9th June 2024
 

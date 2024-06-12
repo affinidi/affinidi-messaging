@@ -7,8 +7,12 @@ log_level = "debug"
 listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 
 ### mediator_did: DID of the mediator
-### REQUIRED!
-mediator_did = "${MEDIATOR_DID:did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
+### REQUIRED: DID of the mediator
+### Supported formats:
+### - did://did:peer:<version>:<base58-encoded-verification-key>
+### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
+#mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
+mediator_did = "${MEDIATOR_DID:aws_parameter_store:///dev/atn/atm/global/did}"
 
 ### mediator_secrets: Secrets of the mediator
 ### REQUIRED: Location of secrets
