@@ -56,7 +56,7 @@ impl<'c> ATM<'c> {
 
         let mut client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
-            .https_only(true)
+            .https_only(config.ssl_only)
             .user_agent("Affinidi Trusted Messaging");
 
         for cert in config.get_ssl_certificates() {
@@ -66,7 +66,7 @@ impl<'c> ATM<'c> {
         let client = match client.build() {
             Ok(client) => client,
             Err(e) => {
-                return Err(ATMError::HTTPSError(format!(
+                return Err(ATMError::TransportError(format!(
                     "Couldn't create HTTPS Client. Reason: {}",
                     e
                 )))

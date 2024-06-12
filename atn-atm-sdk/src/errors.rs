@@ -9,8 +9,8 @@ pub enum ATMError {
     SecretsError(String),
     #[error("SSL error: {0}")]
     SSLError(String),
-    #[error("HTTPS error: {0}")]
-    HTTPSError(String),
+    #[error("Transport (HTTP(S)) error: {0}")]
+    TransportError(String),
     #[error("Message sending error: {0}")]
     MsgSendError(String),
     #[error("Config error: {0}")]

@@ -37,7 +37,7 @@ impl<'c> ATM<'c> {
             .send()
             .await
             .map_err(|e| {
-                ATMError::HTTPSError(format!(
+                ATMError::TransportError(format!(
                     "retrieving authentication challenge failed. Reason: {:?}",
                     e
                 ))
@@ -48,7 +48,7 @@ impl<'c> ATM<'c> {
         let body = res
             .text()
             .await
-            .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
+            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
             debug!("Failed to get authentication challenge. Body: {:?}", body);
@@ -101,7 +101,7 @@ impl<'c> ATM<'c> {
             .send()
             .await
             .map_err(|e| {
-                ATMError::HTTPSError(format!("Could not post authentication response: {:?}", e))
+                ATMError::TransportError(format!("Could not post authentication response: {:?}", e))
             })?;
 
         let status = res.status();
@@ -110,7 +110,7 @@ impl<'c> ATM<'c> {
         let body = res
             .text()
             .await
-            .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
+            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
             debug!("Failed to get authentication response. Body: {:?}", body);

@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+### 12th June 2024
+
+* Allow option to disable SSL via config
+
 ### 9th June 2024
 
 * Minor refactoring of unpack()

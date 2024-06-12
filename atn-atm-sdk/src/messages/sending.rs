@@ -43,7 +43,7 @@ impl<'c> ATM<'c> {
             .body(msg)
             .send()
             .await
-            .map_err(|e| ATMError::HTTPSError(format!("Could not send message: {:?}", e)))?;
+            .map_err(|e| ATMError::TransportError(format!("Could not send message: {:?}", e)))?;
 
         let status = res.status();
         debug!("API response: status({})", status);
@@ -51,7 +51,7 @@ impl<'c> ATM<'c> {
         let body = res
             .text()
             .await
-            .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
+            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
             debug!("Failed to get response body. Body: {:?}", body);

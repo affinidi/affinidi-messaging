@@ -75,7 +75,7 @@ impl<'c> ATM<'c> {
         let tokens = self.authenticate().await?;
 
         let body = serde_json::to_string(options).map_err(|e| {
-            ATMError::HTTPSError(format!(
+            ATMError::TransportError(format!(
                 "Could not serialize fetch_message() options: {:?}",
                 e
             ))
@@ -90,7 +90,7 @@ impl<'c> ATM<'c> {
             .send()
             .await
             .map_err(|e| {
-                ATMError::HTTPSError(format!("Could not send list_messages request: {:?}", e))
+                ATMError::TransportError(format!("Could not send list_messages request: {:?}", e))
             })?;
 
         let status = res.status();
@@ -99,10 +99,10 @@ impl<'c> ATM<'c> {
         let body = res
             .text()
             .await
-            .map_err(|e| ATMError::HTTPSError(format!("Couldn't get body: {:?}", e)))?;
+            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
 
         if !status.is_success() {
-            return Err(ATMError::HTTPSError(format!(
+            return Err(ATMError::TransportError(format!(
                 "Status not successful. status({}), response({})",
                 status, body
             )));
@@ -115,7 +115,7 @@ impl<'c> ATM<'c> {
         let mut list = if let Some(list) = body.data {
             list
         } else {
-            return Err(ATMError::HTTPSError("No messages found".to_string()));
+            return Err(ATMError::TransportError("No messages found".to_string()));
         };
 
         match self

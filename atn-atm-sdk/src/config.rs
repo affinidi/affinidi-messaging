@@ -18,6 +18,7 @@ pub struct Config {
     ssl_certificates: Vec<Certificate>,
     pub(crate) atm_api: String,
     pub(crate) atm_did: String,
+    pub(crate) ssl_only: bool,
 }
 
 impl Config {
@@ -45,12 +46,24 @@ impl Config {
 /// // Create a new `Config` with defaults
 /// let config = Config::builder().build();
 /// ```
-#[derive(Default)]
 pub struct ConfigBuilder {
     ssl_certificates: Vec<String>,
     my_did: Option<String>,
     atm_api: Option<String>,
     atm_did: Option<String>,
+    ssl_only: bool,
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        ConfigBuilder {
+            ssl_certificates: vec![],
+            my_did: None,
+            atm_api: None,
+            atm_did: None,
+            ssl_only: true,
+        }
+    }
 }
 
 impl ConfigBuilder {
@@ -81,6 +94,14 @@ impl ConfigBuilder {
     /// Add the DID for the ATM service itself
     pub fn with_atm_did(mut self, atm_did: &str) -> Self {
         self.atm_did = Some(atm_did.to_owned());
+        self
+    }
+
+    /// Allow non-SSL connections to the ATM service
+    /// This is not recommended for production use
+    /// Default: `true`
+    pub fn with_non_ssl(mut self) -> Self {
+        self.ssl_only = false;
         self
     }
 
@@ -142,6 +163,7 @@ impl ConfigBuilder {
             my_did,
             atm_api,
             atm_did,
+            ssl_only: self.ssl_only,
         })
     }
 }
