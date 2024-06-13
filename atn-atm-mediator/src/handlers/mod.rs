@@ -12,6 +12,7 @@ pub mod message_delete;
 pub mod message_inbound;
 pub mod message_list;
 pub mod message_outbound;
+pub mod websocket;
 
 pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
@@ -36,7 +37,9 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
             post(authenticate::authentication_challenge),
         )
         // Authentication step 2/2 - Client sends encrypted challenge to server
-        .route("/authenticate", post(authenticate::authentication_response));
+        .route("/authenticate", post(authenticate::authentication_response))
+        // Websocket endpoint for ATM clients
+        .route("/ws", get(websocket::websocket_handler));
 
     Router::new()
         .nest("/atm/v1/", app)

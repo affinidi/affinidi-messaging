@@ -1,3 +1,5 @@
+use std::{fs, io::BufReader, sync::Arc};
+
 use atn_atm_sdk::{
     config::Config,
     conversions::secret_from_str,
@@ -6,9 +8,13 @@ use atn_atm_sdk::{
     ATM,
 };
 use did_peer::DIDPeer;
+use rustls::{pki_types::CertificateDer, ClientConfig, RootCertStore};
 use serde_json::json;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::{connect_async, connect_async_tls_with_config, Connector};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter;
+use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
@@ -55,8 +61,12 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
+    // Websocket testing
+    atm.connect_websocket().await?;
+
+    /*
     // Send a trust-ping message to ATM, will generate a PONG response
-    /*let response = atm.send_ping(atm_did, true, true).await?;
+    let response = atm.send_ping(atm_did, true, true).await?;
     info!(
         "Successfully sent ping message responses({})",
         response.messages.len()
@@ -66,7 +76,7 @@ async fn main() -> Result<(), ATMError> {
     }
     for (recipient, err) in response.errors {
         warn!("recipient({}) error({})", recipient, err);
-    }*/
+    }
 
     // Do we have messages in our inbox? Or how about queued still for delivery to others?
     let inbox_list = atm.list_messages(my_did, Folder::Inbox).await?;
@@ -95,7 +105,7 @@ async fn main() -> Result<(), ATMError> {
             msg.msg_id
         );
         i += 1;
-    }
+    }*/
 
     // Retrieve the first message in the inbox
     /*if let Some(msg) = inbox_list.first() {

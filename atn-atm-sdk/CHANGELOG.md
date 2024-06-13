@@ -2,6 +2,13 @@
 
 ## Changelog history
 
+### 13th June 2024
+
+* Adding Secured WebSockets support
+* Refactored how SSL certificates are loaded by the SDK
+  * HTTP(S) requests use a different SSL/TLS Certificate model than WebSockets
+  * Internal change within SDK only. No change to client side code
+
 ### 12th June 2024
 
 * Allow option to disable SSL via config

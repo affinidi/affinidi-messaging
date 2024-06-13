@@ -45,6 +45,12 @@ async fn main() -> Result<(), ATMError> {
         ])
         .with_my_did(my_did)
         .with_atm_did(atm_did)
+        /*
+        // Use this to connect to the mediator
+        // TODO: in the future we likely want to pull this from the DID itself
+        .with_atm_api(
+            "http://msg-de-msgfa-zqhvcom3qgjl-47801559.ap-southeast-1.elb.amazonaws.com:80/atm/v1",
+        ).with_non_ssl()*/
         .build()?;
 
     // Create a new ATM Client
@@ -65,6 +71,7 @@ async fn main() -> Result<(), ATMError> {
     // Send a trust-ping message to ATM, will generate a PONG response
     let response = atm.send_ping(atm_did, true, true).await?;
     let after_ping = SystemTime::now();
+    info!("PING sent: {}", response.messages.first().unwrap().1);
 
     // Get the message ID from the response
     let msg_id = if let Some((_, msg_id)) = response.messages.first() {

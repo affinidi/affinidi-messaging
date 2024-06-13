@@ -22,6 +22,9 @@ sha256 = "1.5"
 ssi = "0.7"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
+tokio-tungstenite = { version = "0.23.0", features = [
+    "rustls-tls-native-roots",
+] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_info",
@@ -32,6 +35,9 @@ rustls = { version = "0.23", default-features = false, features = [
     "aws_lc_rs",
     "tls12",
 ] }
+rustls-native-certs = "0.7"
+rustls-pemfile = "2"
+url = "2.5"
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]
