@@ -84,6 +84,14 @@ async fn main() {
         }
     };
 
+    // Start the statistics thread
+    let _stats_database = database.clone(); // Clone the database handler for the statistics thread
+    tokio::spawn(async move {
+        atn_atm_mediator::common::statistics::statistics(_stats_database)
+            .await
+            .expect("Error starting statistics thread");
+    });
+
     // Create the shared application State
     let shared_state = SharedData {
         config: config.clone(),

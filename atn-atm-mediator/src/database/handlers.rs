@@ -139,8 +139,6 @@ impl DatabaseHandler {
             }
         }
 
-        event!(Level::INFO, "Global Metadata: {}", stats);
-
         Ok(stats)
     }
 }

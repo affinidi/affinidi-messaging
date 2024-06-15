@@ -2,6 +2,14 @@
 
 ## Changelog history
 
+### 15th June 2024
+
+* Statistics reporting thread implemented
+
+### 13th June 2024
+
+* WebSocket implementation handler implemented. More work to be done.
+
 ### 12th June 2024
 
 * Removed unused configuration options (allow/deny lists)
