@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+### 16th June 2024
+
+* Fixed a bug in store_message where time format was truncating on millisecond values < 100
+
 ### 9th June 2024
 
 * Fixed a bug in store_message redis Lua function where stream ID's were in seconds and not milliseconds.
