@@ -14,10 +14,13 @@ use rustls::ClientConfig;
 use rustls::RootCertStore;
 use ssi::did::{DIDMethod, DIDMethods};
 use ssi::did_resolve::DIDResolver as SSIDIDResolver;
+use tokio::net::TcpStream;
 use tokio_tungstenite::Connector;
+use tokio_tungstenite::MaybeTlsStream;
+use tokio_tungstenite::WebSocketStream;
 use tracing::debug;
 use tracing::span;
-use url::Url;
+use tracing::warn;
 
 mod authentication;
 pub mod config;
@@ -25,7 +28,12 @@ pub mod conversions;
 pub mod errors;
 pub mod messages;
 mod resolvers;
-pub mod websockets;
+pub mod transports;
+
+pub mod websockets {
+    #[doc(inline)]
+    pub use crate::transports::websockets::*;
+}
 
 pub struct ATM<'c> {
     pub(crate) config: Config<'c>,
@@ -36,6 +44,8 @@ pub struct ATM<'c> {
     authenticated: bool,
     jwt_tokens: Option<AuthorizationResponse>,
     ws_connector: Connector,
+    pub(crate) ws_enabled: bool,
+    pub(crate) ws_stream: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -94,12 +104,18 @@ impl<'c> ATM<'c> {
             for cert in rustls_native_certs::load_native_certs()
                 .map_err(|e| ATMError::SSLError(e.to_string()))?
             {
-                root_store.add(cert);
+                root_store.add(cert).map_err(|e| {
+                    warn!("Couldn't add cert: {:?}", e);
+                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
+                })?;
             }
         } else {
             debug!("Use custom SSL Certs");
             for cert in config.get_ssl_certificates() {
-                root_store.add(cert.to_owned());
+                root_store.add(cert.to_owned()).map_err(|e| {
+                    warn!("Couldn't add cert: {:?}", e);
+                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
+                })?;
             }
         }
 
@@ -118,6 +134,8 @@ impl<'c> ATM<'c> {
             authenticated: false,
             jwt_tokens: None,
             ws_connector,
+            ws_enabled: config.ws_enabled,
+            ws_stream: None,
         };
 
         for method in did_methods {
@@ -127,6 +145,11 @@ impl<'c> ATM<'c> {
         atm.add_did(&config.my_did).await?;
         // Add our ATM DID to the DID_RESOLVER
         atm.add_did(&config.atm_did).await?;
+
+        // Start the websocket connection if enabled
+        if atm.ws_enabled {
+            atm.start_websocket().await?;
+        }
 
         Ok(atm)
     }

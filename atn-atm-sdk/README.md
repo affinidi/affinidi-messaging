@@ -19,7 +19,80 @@ To enable logging for examples, `export RUST_LOG=none,atn_atm_sdk=debug,ping=deb
 
     `cargo run --example demo`
 
-## API Calls
+## WebSocket and HTTPS support
+
+By default, the ATM SDK will use both a WebSocket and HTTPS REST based API calls. Authentication in particular is handled via REST so that JWT access
+tokens can be retrieved, these are then used when upgrading to a WebSocket Connection.
+
+WebSocket is used for the following:
+
+1. Sending DIDComm messages, a response containing the message_id is sent via the same websocket.
+2. Receiving a stream of inbound messages to the DID used in this SDK
+
+To start using WebSockets, no action is required. A WebSocket is created when `ATM::new()` is called.
+
+You can disable WebSocket through the `ConfigBuilder::with_websocket_disabled()` function.
+
+A custom Websocket URL can be provided via `ConfigBuilder::with_atm_websocket_api(<url>)`
+NOTE: Default action is to take the `ConfigBuilder::with_atm_api()` and convert to a valid WebSocket address
+E.g. `https://atm.affinidi.com/atm/v1` would become `wss://atm.affinidi.com/atm/v1/ws`
+
+While you can disable the WebSocket, you can also start and close the WebSocket manually via:
+
+```rust
+
+let my_did = "did:example:alice";
+let bob_did = "did:example:bob";
+let atm_did = "did:example:atm";
+
+let config = Config::builder()
+        .with_ssl_certificates(&mut vec![
+            "../atn-atm-mediator/conf/keys/client.chain".into()
+        ])
+        .with_my_did(my_did)
+        .with_atm_did(atm_did)
+        .with_websocket_disabled()
+        .build()?
+let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
+
+// Send a ping via REST
+atm.send_ping(bob_did, true, true).await?;
+
+// Start the Websocket 
+atm.start_websocket().await?;
+
+// Send a ping via WebSocket
+atm.send_ping(bob_did, true, true).await?;
+
+// Close the websocket (optional)
+atm.close_websocket().await?;
+
+```
+
+## WebSocket API Calls
+
+### Send DIDComm Message via WebSocket
+
+* Sends a DIDComm packed message to ATM
+* Creating the DIDComm message is not handled by this call
+
+```rust
+async fn ws_send_didcomm_message<T>(msg: &str) -> Result<SuccessResponse<T>, ATMError>
+// Sends a DIDComm packed message to ATM
+// Can specify the return type via <T>
+
+// Example:
+
+let msg = msg.pack(to, from, options ...);
+ws_send_didcomm_message(&msg).await?;
+```
+
+Response from `ws_send_didcomm_message()` is:
+
+* Success : Result->Ok `SendMessageResponse` struct
+* Error   : Result->Err with ATMError object describing the error
+
+## REST API Calls
 
 ### DIDComm Trust-Ping
 
@@ -41,7 +114,7 @@ send_ping("did:example:target#123", true, true).await?;
 
 Response from `send_ping()` is:
 
-* Success : Result->Ok with no object
+* Success : Result->Ok with `SendMessageResponse` struct
 * Error   : Result->Err with ATMError object describing the error
 
 ### List Messages
@@ -109,7 +182,7 @@ send_didcomm_message(&msg).await?;
 
 Response from `send_didcomm_message()` is:
 
-* Success : Result->Ok `SuccessResponse<T>` struct (where the data field of `SuccessResponse` is of type `<T>`)
+* Success : Result->Ok `SendMessageResponse` struct
 * Error   : Result->Err with ATMError object describing the error
 
 ### Get DIDComm Message

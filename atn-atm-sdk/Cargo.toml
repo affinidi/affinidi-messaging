@@ -12,8 +12,9 @@ license.workspace = true
 
 [dependencies]
 async-trait = "0.1"
-did-peer = { version = "0.3", path = "../../did-peer" }
 atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
+did-peer = { version = "0.3", path = "../../did-peer" }
+futures-util = "0.3"
 http = "1"
 jsonwebtoken = "9.3"
 serde = { version = "1.0", features = ["derive", "rc"] }

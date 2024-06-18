@@ -62,7 +62,6 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
     // Websocket testing
-    atm.connect_websocket().await?;
 
     /*
     // Send a trust-ping message to ATM, will generate a PONG response

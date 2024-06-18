@@ -1,5 +1,5 @@
-use super::{GenericDataStruct, SuccessResponse};
-use crate::{errors::ATMError, ATM};
+use super::GenericDataStruct;
+use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
 use atn_atm_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -21,49 +21,7 @@ pub struct InboundMessageResponse {
 impl GenericDataStruct for InboundMessageResponse {}
 
 impl<'c> ATM<'c> {
-    /// send_didcomm_message
-    /// - msg: Packed DIDComm message that we want to send
-    pub async fn send_didcomm_message<T>(
-        &mut self,
-        msg: &str,
-    ) -> Result<SuccessResponse<T>, ATMError>
-    where
-        T: GenericDataStruct,
-    {
-        let _span = span!(Level::DEBUG, "send_message",).entered();
-        let tokens = self.authenticate().await?;
-
-        let msg = msg.to_owned();
-
-        let res = self
-            .client
-            .post(format!("{}/inbound", self.config.atm_api))
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {}", tokens.access_token))
-            .body(msg)
-            .send()
-            .await
-            .map_err(|e| ATMError::TransportError(format!("Could not send message: {:?}", e)))?;
-
-        let status = res.status();
-        debug!("API response: status({})", status);
-
-        let body = res
-            .text()
-            .await
-            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
-
-        if !status.is_success() {
-            debug!("Failed to get response body. Body: {:?}", body);
-        }
-        let body = serde_json::from_str::<SuccessResponse<T>>(&body)
-            .ok()
-            .unwrap();
-
-        Ok(body)
-    }
-
-    /// Sends a trust ping message to the specified DID
+    /// Sends a DIDComm Trust-Ping message
     /// - `to_did` - The DID to send the ping to
     /// - `signed` - Whether the ping should signed or anonymous?
     /// - `expect_response` - Whether a response is expected[^note]
@@ -74,8 +32,8 @@ impl<'c> ATM<'c> {
         to_did: &str,
         signed: bool,
         expect_response: bool,
-    ) -> Result<InboundMessageResponse, ATMError> {
-        let _span = span!(Level::DEBUG, "send_ping",).entered();
+    ) -> Result<SendMessageResponse, ATMError> {
+        let _span = span!(Level::DEBUG, "create_ping_message",).entered();
         debug!(
             "Pinging {}, signed?({}) response_expected?({})",
             to_did, signed, expect_response
@@ -131,19 +89,10 @@ impl<'c> ATM<'c> {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        // send the message
-        let response = self
-            .send_didcomm_message::<InboundMessageResponse>(&msg)
-            .await?;
-
-        debug!("Response: {:?}", response);
-
-        let response = if let Some(response) = response.data {
-            response
+        if self.ws_stream.is_some() {
+            self.ws_send_didcomm_message(&msg).await
         } else {
-            return Err(ATMError::MsgSendError("No response data".into()));
-        };
-
-        Ok(response)
+            self.send_didcomm_message(&msg).await
+        }
     }
 }

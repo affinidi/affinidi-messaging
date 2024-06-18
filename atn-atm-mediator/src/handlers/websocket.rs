@@ -26,8 +26,17 @@ pub async fn websocket_handler(
 async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Session) {
     let _span = span!(tracing::Level::DEBUG, "handle_socket");
     async move {
+        let _guard = Guard;
         info!("Websocket connection established");
     }
     .instrument(_span)
     .await
+}
+
+struct Guard;
+
+impl Drop for Guard {
+    fn drop(&mut self) {
+        info!("Websocket connection closed");
+    }
 }

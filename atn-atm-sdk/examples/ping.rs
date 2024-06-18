@@ -45,6 +45,7 @@ async fn main() -> Result<(), ATMError> {
         ])
         .with_my_did(my_did)
         .with_atm_did(atm_did)
+        .with_websocket_disabled()
         /*
         // Use this to connect to the mediator
         // TODO: in the future we likely want to pull this from the DID itself
@@ -71,23 +72,14 @@ async fn main() -> Result<(), ATMError> {
     // Send a trust-ping message to ATM, will generate a PONG response
     let response = atm.send_ping(atm_did, true, true).await?;
     let after_ping = SystemTime::now();
-    info!("PING sent: {}", response.messages.first().unwrap().1);
 
-    // Get the message ID from the response
-    let msg_id = if let Some((_, msg_id)) = response.messages.first() {
-        msg_id.clone()
-    } else {
-        error!("No message ID found in response");
-        return Err(ATMError::MsgSendError(
-            "No message ID found in response".into(),
-        ));
-    };
+    info!("PING sent: {}", response.message_digest);
 
     // Get the PONG message from ATM
     let msgs = atm
         .get_messages(&GetMessagesRequest {
             delete: false,
-            message_ids: vec![msg_id],
+            message_ids: vec![response.message_digest],
         })
         .await?;
     let after_get = SystemTime::now();
@@ -124,5 +116,33 @@ async fn main() -> Result<(), ATMError> {
         "Total trust-ping took {}ms to complete",
         after_unpack.duration_since(start).unwrap().as_millis()
     );
+
+    // Send a WebSocket message
+    info!("Starting WebSocket test...");
+    let start = SystemTime::now();
+    atm.start_websocket().await?;
+    let after_websocket = SystemTime::now();
+
+    let response = atm.send_ping(atm_did, true, true).await?;
+    let after_ping = SystemTime::now();
+
+    info!("PING sent: {}", response.message_digest);
+
+    // Print out timing information
+    info!(
+        "Creating WebSocket took {}ms :: total {}ms to complete",
+        after_websocket.duration_since(start).unwrap().as_millis(),
+        after_websocket.duration_since(start).unwrap().as_millis()
+    );
+
+    info!(
+        "Sending Ping took {}ms :: total {}ms to complete",
+        after_ping
+            .duration_since(after_websocket)
+            .unwrap()
+            .as_millis(),
+        after_ping.duration_since(start).unwrap().as_millis()
+    );
+
     Ok(())
 }

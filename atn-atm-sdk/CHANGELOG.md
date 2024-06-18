@@ -2,6 +2,11 @@
 
 ## Changelog history
 
+### 15th June 2024
+
+* get_websocket() function added to ATM
+* ATMWebSocket is now a child struct that allows for websocket specific calls
+
 ### 13th June 2024
 
 * Adding Secured WebSockets support

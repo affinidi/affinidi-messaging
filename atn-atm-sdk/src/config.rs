@@ -19,6 +19,7 @@ pub struct Config<'a> {
     pub(crate) atm_api_ws: String,
     pub(crate) atm_did: String,
     pub(crate) ssl_only: bool,
+    pub(crate) ws_enabled: bool,
 }
 
 impl<'a> Config<'a> {
@@ -53,6 +54,7 @@ pub struct ConfigBuilder {
     atm_api_ws: Option<String>,
     atm_did: Option<String>,
     ssl_only: bool,
+    ws_enabled: bool,
 }
 
 impl Default for ConfigBuilder {
@@ -64,6 +66,7 @@ impl Default for ConfigBuilder {
             atm_api_ws: None,
             atm_did: None,
             ssl_only: true,
+            ws_enabled: true,
         }
     }
 }
@@ -93,6 +96,13 @@ impl ConfigBuilder {
         self
     }
 
+    /// Add the URL for the ATM API WebSocket
+    /// Defaults: ATM API URL with `/ws` appended
+    pub fn with_atm_websocket_api(mut self, ws_api_url: &str) -> Self {
+        self.atm_api_ws = Some(ws_api_url.to_owned());
+        self
+    }
+
     /// Add the DID for the ATM service itself
     pub fn with_atm_did(mut self, atm_did: &str) -> Self {
         self.atm_did = Some(atm_did.to_owned());
@@ -104,6 +114,14 @@ impl ConfigBuilder {
     /// Default: `true`
     pub fn with_non_ssl(mut self) -> Self {
         self.ssl_only = false;
+        self
+    }
+
+    /// Disables WebSocket connections to the ATM service
+    /// This is not recommended for production use
+    /// Default: `true`
+    pub fn with_websocket_disabled(mut self) -> Self {
+        self.ws_enabled = false;
         self
     }
 
@@ -152,7 +170,9 @@ impl ConfigBuilder {
         };
 
         // convert the ATM API URL to a WebSocket URL
-        let atm_api_ws = if atm_api.starts_with("http://") {
+        let atm_api_ws = if let Some(atm_api_ws) = self.atm_api_ws {
+            atm_api_ws
+        } else if atm_api.starts_with("http://") {
             format!("ws://{}/ws", atm_api.split_at(7).1)
         } else if atm_api.starts_with("https://") {
             format!("wss://{}/ws", atm_api.split_at(8).1)
@@ -177,6 +197,7 @@ impl ConfigBuilder {
             atm_api_ws,
             atm_did,
             ssl_only: self.ssl_only,
+            ws_enabled: self.ws_enabled,
         })
     }
 }
