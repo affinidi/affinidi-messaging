@@ -6,7 +6,10 @@ use serde_json::json;
 use tracing::{debug, info, span};
 use uuid::Uuid;
 
-use crate::common::errors::{MediatorError, Session};
+use crate::{
+    common::errors::{MediatorError, Session},
+    messages::ProcessMessageResponse,
+};
 
 // Reads the body of an incoming trust-ping and whether to generate a return ping message
 #[derive(Deserialize)]
@@ -23,7 +26,10 @@ impl Default for Ping {
 }
 
 /// Process a trust-ping message and generates a response if needed
-pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message>, MediatorError> {
+pub(crate) fn process(
+    msg: &Message,
+    session: &Session,
+) -> Result<ProcessMessageResponse, MediatorError> {
     let _span = span!(
         tracing::Level::DEBUG,
         "trust_ping",
@@ -90,9 +96,12 @@ pub(crate) fn process(msg: &Message, session: &Session) -> Result<Option<Message
 
         debug!("response_msg: {:?}", response_msg);
 
-        Ok(Some(response_msg))
+        Ok(ProcessMessageResponse {
+            store_message: true,
+            message: Some(response_msg),
+        })
     } else {
         debug!("No response requested");
-        Ok(None)
+        Ok(ProcessMessageResponse::default())
     }
 }

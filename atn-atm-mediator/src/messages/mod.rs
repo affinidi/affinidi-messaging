@@ -1,13 +1,10 @@
-use std::{str::FromStr, time::SystemTime};
-
+use self::protocols::ping;
+use crate::common::errors::{MediatorError, Session};
 use atn_atm_didcomm::{
     did::DIDResolver, secrets::SecretsResolver, Message, PackEncryptedMetadata,
     PackEncryptedOptions, UnpackMetadata,
 };
-
-use crate::common::errors::{MediatorError, Session};
-
-use self::protocols::ping;
+use std::{str::FromStr, time::SystemTime};
 
 pub mod inbound;
 pub mod protocols;
@@ -34,11 +31,11 @@ impl FromStr for MessageType {
 }
 
 impl MessageType {
-    pub fn process(
+    pub(crate) fn process(
         &self,
         message: &Message,
         session: &Session,
-    ) -> Result<Option<Message>, MediatorError> {
+    ) -> Result<ProcessMessageResponse, MediatorError> {
         match self {
             Self::TrustPing => ping::process(message, session),
             Self::AffinidiAuthenticate => Err(MediatorError::NotImplemented(
@@ -49,10 +46,16 @@ impl MessageType {
     }
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct ProcessMessageResponse {
+    pub store_message: bool,
+    pub message: Option<Message>,
+}
+
 pub(crate) trait MessageHandler {
     /// Processes an incoming message, determines any additional actions to take
     /// Returns a message to store and deliver if necessary
-    fn process(&self, session: &Session) -> Result<Option<Message>, MediatorError>;
+    fn process(&self, session: &Session) -> Result<ProcessMessageResponse, MediatorError>;
 
     /// Uses the incoming unpack metadata to determine best way to pack the message
     async fn pack<S, T>(
@@ -69,7 +72,7 @@ pub(crate) trait MessageHandler {
 }
 
 impl MessageHandler for Message {
-    fn process(&self, session: &Session) -> Result<Option<Message>, MediatorError> {
+    fn process(&self, session: &Session) -> Result<ProcessMessageResponse, MediatorError> {
         let msg_type = self.type_.as_str().parse::<MessageType>()?;
 
         // Check if message expired
