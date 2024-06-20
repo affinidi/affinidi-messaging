@@ -3,7 +3,7 @@ use std::time::Duration;
 use tracing::{debug, info, span, Instrument, Level};
 
 use super::errors::MediatorError;
-use crate::database::DatabaseHandler;
+use crate::database::{stats::MetadataStats, DatabaseHandler};
 
 pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> {
     let _span = span!(Level::INFO, "statistics");
@@ -12,10 +12,15 @@ pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> 
         debug!("Starting statistics thread...");
         let mut interval = tokio::time::interval(Duration::from_secs(60));
 
+        let mut previous_stats = MetadataStats::default();
+
         loop {
             interval.tick().await;
             let stats = database.get_db_metadata().await?;
             info!("Statistics: {}", stats);
+            info!("Delta: {}", stats.delta(&previous_stats));
+
+            previous_stats = stats;
         }
     }
     .instrument(_span)

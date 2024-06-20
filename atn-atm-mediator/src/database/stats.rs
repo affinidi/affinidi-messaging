@@ -46,6 +46,24 @@ impl Display for MetadataStats {
     }
 }
 
+impl MetadataStats {
+    /// Calculate the delta between two MetadataStats
+    pub fn delta(&self, previous: &MetadataStats) -> MetadataStats {
+        MetadataStats {
+            received_bytes: self.received_bytes - previous.received_bytes,
+            sent_bytes: self.sent_bytes - previous.sent_bytes,
+            deleted_bytes: self.deleted_bytes - previous.deleted_bytes,
+            received_count: self.received_count - previous.received_count,
+            sent_count: self.sent_count - previous.sent_count,
+            deleted_count: self.deleted_count - previous.deleted_count,
+            websocket_open: self.websocket_open - previous.websocket_open,
+            websocket_close: self.websocket_close - previous.websocket_close,
+            sessions_created: self.sessions_created - previous.sessions_created,
+            sessions_success: self.sessions_success - previous.sessions_success,
+        }
+    }
+}
+
 impl DatabaseHandler {
     /// Retrieves metadata statistics that are global to the mediator database
     /// This means it may include more than this mediator's messages

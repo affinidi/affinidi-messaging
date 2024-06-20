@@ -5,6 +5,7 @@
 ### 21st June 2024
 
 * Refactored process() on inbound messages so that there is an option to store the message response - some responses are live only, if no connection then no need to do anything more.
+* Added delta difference on statistics reporting
 
 ### 20th June 2024
 

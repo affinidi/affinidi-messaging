@@ -75,7 +75,7 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                 Ok(messages) => messages,
                 Err(e) => {
                     warn!("Error processing message: {:?}", e);
-                    break;
+                    continue;
                 }
             };
 
