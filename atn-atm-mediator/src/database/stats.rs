@@ -1,10 +1,50 @@
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
+use std::fmt::{self, Display, Formatter};
 use tracing::{debug, event, Level};
 
-use crate::common::errors::MediatorError;
+/// Statistics for the mediator
+#[derive(Default, Debug)]
+pub struct MetadataStats {
+    pub received_bytes: i64,   // Total number of bytes processed
+    pub sent_bytes: i64,       // Total number of bytes sent
+    pub deleted_bytes: i64,    // Total number of bytes deleted
+    pub received_count: i64,   // Total number of messages received
+    pub sent_count: i64,       // Total number of messages sent
+    pub deleted_count: i64,    // Total number of messages deleted
+    pub websocket_open: i64,   // Total number of websocket connections opened
+    pub websocket_close: i64,  // Total number of websocket connections closed
+    pub sessions_created: i64, // Total number of sessions created
+    pub sessions_success: i64, // Total number of sessions successfully authenticated
+}
 
-use super::{DatabaseHandler, MetadataStats};
+impl Display for MetadataStats {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            r#"
+    Message counts: recv({}) sent({}) deleted({}) queued({})
+    Storage: received({}), sent({}), deleted({}), current_queued({})
+    Connections: ws_open({}) ws_close({}) ws_current({}) :: sessions_created({}), sessions_authenticated({})
+            "#,
+            self.received_count,
+            self.sent_count,
+            self.deleted_count,
+            self.received_count - self.deleted_count,
+            self.received_bytes,
+            self.sent_bytes,
+            self.deleted_bytes,
+            self.received_bytes - self.deleted_bytes,
+            self.websocket_open,
+            self.websocket_close,
+            self.websocket_open - self.websocket_close,
+            self.sessions_created,
+            self.sessions_success
+        )
+    }
+}
 
 impl DatabaseHandler {
     /// Retrieves metadata statistics that are global to the mediator database
@@ -48,6 +88,8 @@ impl DatabaseHandler {
                 "DELETED_COUNT" => stats.deleted_count = v.parse().unwrap_or(0),
                 "WEBSOCKET_OPEN" => stats.websocket_open = v.parse().unwrap_or(0),
                 "WEBSOCKET_CLOSE" => stats.websocket_close = v.parse().unwrap_or(0),
+                "SESSIONS_CREATED" => stats.sessions_created = v.parse().unwrap_or(0),
+                "SESSIONS_SUCCESS" => stats.sessions_success = v.parse().unwrap_or(0),
                 _ => {}
             }
         }

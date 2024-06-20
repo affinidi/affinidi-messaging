@@ -139,6 +139,10 @@ impl DatabaseHandler {
             .arg(session.state.to_string())
             .arg("did")
             .arg(&session.did)
+            .cmd("HINCRBY")
+            .arg("GLOBAL")
+            .arg("SESSIONS_CREATED")
+            .arg(1)
             .expire(&sid, 900)
             .query_async(&mut con)
             .await
@@ -188,6 +192,10 @@ impl DatabaseHandler {
             .arg(&sid)
             .arg("state")
             .arg(SessionState::Authenticated.to_string())
+            .cmd("HINCRBY")
+            .arg("GLOBAL")
+            .arg("SESSIONS_SUCCESS")
+            .arg(1)
             .expire(&sid, 86400)
             .query_async(&mut con)
             .await

@@ -9,6 +9,7 @@
   * DELETED_BYTES
   * SENT_BYTES
 * Improved websocket handling of closed connections with error handling
+* Added authenticated session metrics (created and success)
 
 ### 15th June 2024
 
