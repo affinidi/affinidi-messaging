@@ -102,7 +102,7 @@ local function delete_message(keys, args)
     redis.call('DEL', 'MSG:'..keys[1])
 
     -- Set Global Metrics
-    redis.call('HINCRBY', 'GLOBAL', 'RECEIVED_BYTES', -bytes)
+    redis.call('HINCRBY', 'GLOBAL', 'DELETED_BYTES', bytes)
     redis.call('HINCRBY', 'GLOBAL', 'DELETED_COUNT', 1)
 
     -- Remove the receiver records

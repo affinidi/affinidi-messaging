@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+### 20th June 2024
+
+* Changed delete_message() so it updates GLOBAL metric DELETED_BYTES
+
 ### 16th June 2024
 
 * Fixed a bug in store_message where time format was truncating on millisecond values < 100
