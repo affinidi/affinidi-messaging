@@ -15,7 +15,7 @@ pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> 
         loop {
             interval.tick().await;
             let stats = database.get_db_metadata().await?;
-            info!("Statistics: {:?}", stats);
+            info!("Statistics: {}", stats);
         }
     }
     .instrument(_span)

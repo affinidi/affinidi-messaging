@@ -9,6 +9,7 @@ use crate::common::errors::{MediatorError, Session};
 
 use self::protocols::ping;
 
+pub mod inbound;
 pub mod protocols;
 
 pub enum MessageType {

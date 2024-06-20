@@ -2,6 +2,14 @@
 
 ## Changelog history
 
+### 20th June 2024
+
+* Updating mediator statistics and metrics to improve clarity
+  * Added websocket connections
+  * DELETED_BYTES
+  * SENT_BYTES
+* Improved websocket handling of closed connections with error handling
+
 ### 15th June 2024
 
 * Statistics reporting thread implemented

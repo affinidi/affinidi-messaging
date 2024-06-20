@@ -1,12 +1,11 @@
 use std::{thread::sleep, time::Duration};
 
 use deadpool_redis::Connection;
-use redis::{from_redis_value, Value};
-use tracing::{debug, event, Level};
+use tracing::{event, Level};
 
 use crate::common::{config::Config, errors::MediatorError};
 
-use super::{DatabaseHandler, MetadataStats};
+use super::DatabaseHandler;
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
@@ -90,55 +89,5 @@ impl DatabaseHandler {
                 format!("Couldn't get database connection: {}", err),
             )
         })
-    }
-
-    /// Retrieves metadata statistics that are global to the mediator database
-    /// This means it may include more than this mediator's messages
-    pub async fn get_db_metadata(&self) -> Result<MetadataStats, MediatorError> {
-        let mut conn = self.get_connection().await?;
-
-        let mut stats = MetadataStats::default();
-
-        let result: Value = deadpool_redis::redis::cmd("HMGET")
-            .arg("GLOBAL")
-            .arg("RECEIVED_BYTES")
-            .arg("SENT_BYTES")
-            .arg("RECEIVED_COUNT")
-            .arg("SENT_COUNT")
-            .arg("DELETED_COUNT")
-            .query_async(&mut conn)
-            .await
-            .map_err(|err| {
-                event!(
-                    Level::ERROR,
-                    "Couldn't get shared METADATA from database: {}",
-                    err
-                );
-                MediatorError::DatabaseError(
-                    "NA".into(),
-                    format!("Couldn't get shared METADATA from database: {}", err),
-                )
-            })?;
-
-        let result: Vec<Value> = from_redis_value(&result).map_err(|e| {
-            MediatorError::DatabaseError(
-                "NA".into(),
-                format!("Couldn't parse GLOBAL metadata from database: {}", e),
-            )
-        })?;
-        debug!("Stats: {:?}", result);
-
-        for (i, item) in result.iter().enumerate() {
-            match i {
-                0 => stats.received_bytes = from_redis_value(item).unwrap_or(0),
-                1 => stats.sent_bytes = from_redis_value(item).unwrap_or(0),
-                2 => stats.received_count = from_redis_value(item).unwrap_or(0),
-                3 => stats.sent_count = from_redis_value(item).unwrap_or(0),
-                4 => stats.deleted_count = from_redis_value(item).unwrap_or(0),
-                _ => {}
-            }
-        }
-
-        Ok(stats)
     }
 }

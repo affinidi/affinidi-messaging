@@ -77,9 +77,12 @@ impl DatabaseHandler {
                 }
             }
 
+            // Update SEND metrics
+
             if did_hash == message.from_address.as_ref().unwrap_or(&"".to_string())
                 || did_hash == message.to_address.as_ref().unwrap_or(&"".to_string())
             {
+                let _ = self.update_send_stats(message.size as i64).await;
                 Ok(message)
             } else {
                 Err(MediatorError::DatabaseError(
