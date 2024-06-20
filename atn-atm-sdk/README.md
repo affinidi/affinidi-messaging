@@ -34,8 +34,10 @@ To start using WebSockets, no action is required. A WebSocket is created when `A
 You can disable WebSocket through the `ConfigBuilder::with_websocket_disabled()` function.
 
 A custom Websocket URL can be provided via `ConfigBuilder::with_atm_websocket_api(<url>)`
-NOTE: Default action is to take the `ConfigBuilder::with_atm_api()` and convert to a valid WebSocket address
-E.g. `https://atm.affinidi.com/atm/v1` would become `wss://atm.affinidi.com/atm/v1/ws`
+
+***NOTE:*** Default action is to take the `ConfigBuilder::with_atm_api()` and convert to a valid WebSocket address
+
+    E.g. `https://atm.affinidi.com/atm/v1` would become `wss://atm.affinidi.com/atm/v1/ws`
 
 While you can disable the WebSocket, you can also start and close the WebSocket manually via:
 
