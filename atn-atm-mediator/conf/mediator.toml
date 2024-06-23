@@ -72,3 +72,8 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
 jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
 #jwt_authorization_secret = "${AUTHORIZATION_SECRET:aws_secrets://dev/atn/atm/mediator/global/jwt_secret}"
+
+[streaming]
+### enabled: If true, can live stream messages to subscribed recipients via WebSockets
+### Default: true
+enabled = "${STREAMING_ENABLED:true}"

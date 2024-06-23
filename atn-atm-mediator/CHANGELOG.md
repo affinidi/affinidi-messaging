@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+## 24th June 2024
+
+* Added streaming.enabled configuration option
+
 ### 21st June 2024
 
 * Refactored process() on inbound messages so that there is an option to store the message response - some responses are live only, if no connection then no need to do anything more.

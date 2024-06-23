@@ -44,6 +44,12 @@ pub struct SecurityConfig {
     pub jwt_authorization_secret: String,
 }
 
+/// StreamingConfig Struct contains live streaming related configuration details
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StreamingConfig {
+    pub enabled: String,
+}
+
 /// ConfigRaw Struct is used to deserialize the configuration file
 /// We then convert this to the Config Struct
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +60,7 @@ pub struct ConfigRaw {
     pub mediator_secrets: String,
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
+    pub streaming: StreamingConfig,
 }
 
 #[derive(Clone)]
@@ -74,6 +81,7 @@ pub struct Config {
     pub ssl_key_file: String,
     pub jwt_encoding_key: Option<EncodingKey>,
     pub jwt_decoding_key: Option<DecodingKey>,
+    pub streaming_enabled: bool,
 }
 
 impl fmt::Debug for Config {
@@ -98,6 +106,7 @@ impl fmt::Debug for Config {
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
             .field("jwt_decoding_key?", &self.jwt_decoding_key.is_some())
+            .field("streaming enabled?", &self.streaming_enabled)
             .finish()
     }
 }
@@ -127,6 +136,7 @@ impl Default for Config {
             ssl_key_file: "".into(),
             jwt_encoding_key: None,
             jwt_decoding_key: None,
+            streaming_enabled: true,
         }
     }
 }
@@ -163,9 +173,10 @@ impl TryFrom<ConfigRaw> for Config {
             max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
             max_queued_messages: raw.database.max_queued_messages.parse().unwrap_or(100),
             message_expiry_minutes: raw.database.message_expiry_minutes.parse().unwrap_or(10080),
-            use_ssl: raw.security.use_ssl.parse().unwrap(),
+            use_ssl: raw.security.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: raw.security.ssl_certificate_file,
             ssl_key_file: raw.security.ssl_key_file,
+            streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             ..Default::default()
         };
 
