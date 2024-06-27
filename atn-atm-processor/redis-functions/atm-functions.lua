@@ -186,6 +186,53 @@ local function fetch_messages(keys, args)
     return fetched_messages
 end
 
+-- clean_start_streaming
+-- keys = uuid
+-- returns number of sessions cleaned up
+local function clean_start_streaming(keys, args)
+    -- Correct number of keys?
+    if #keys ~= 1  then
+        return redis.error_reply('clean_start_streaming: only accepts one key')
+    end
+
+    -- Correct number of args?
+    if #args ~= 0 then
+        return redis.error_reply('clean_start_streaming: No arguments required')
+    end
+
+    -- set response type to Version 3
+    redis.setresp(3)
+
+    -- Prepend an exclusive start_id if it exists
+    local key = 'STREAMING_SESSIONS:'..keys[1]
+
+    redis.log(redis.LOG_WARNING, 'clean_start_streaming: key = '..key)
+    -- Clean up sessions
+    local counter = 0
+    while (true) do
+        local response = redis.call('SPOP', key, 1)
+
+        -- No more items in the set
+        if next(response.set) == nil then 
+            break
+        end
+
+        local session = nil
+        for k,v in pairs(response.set) do
+            session = k
+            counter = counter+1
+        end
+
+        redis.log(redis.LOG_WARNING, 'clean_start_streaming: session = '..session)
+
+        -- remove from global session list
+        redis.call('HDEL', 'GLOBAL_STREAMING', session)
+    end
+
+    return counter
+end
+
 redis.register_function('store_message', store_message)
 redis.register_function('delete_message', delete_message)
 redis.register_function('fetch_messages', fetch_messages)
+redis.register_function('clean_start_streaming', clean_start_streaming)

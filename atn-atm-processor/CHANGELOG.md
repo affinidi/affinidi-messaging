@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+### 24th June 2024
+
+* Adding websocket clean_start_streaming() function. This removes any existing session details.
+
 ### 20th June 2024
 
 * Changed delete_message() so it updates GLOBAL metric DELETED_BYTES
