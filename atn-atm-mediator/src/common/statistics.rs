@@ -5,6 +5,8 @@ use tracing::{debug, info, span, Instrument, Level};
 use super::errors::MediatorError;
 use crate::database::{stats::MetadataStats, DatabaseHandler};
 
+/// Periodically logs statistics about the database.
+/// Is spawned as a task from main().
 pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> {
     let _span = span!(Level::INFO, "statistics");
 

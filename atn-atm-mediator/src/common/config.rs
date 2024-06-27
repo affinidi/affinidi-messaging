@@ -48,6 +48,7 @@ pub struct SecurityConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StreamingConfig {
     pub enabled: String,
+    pub uuid: String,
 }
 
 /// ConfigRaw Struct is used to deserialize the configuration file
@@ -82,6 +83,7 @@ pub struct Config {
     pub jwt_encoding_key: Option<EncodingKey>,
     pub jwt_decoding_key: Option<DecodingKey>,
     pub streaming_enabled: bool,
+    pub streaming_uuid: String,
 }
 
 impl fmt::Debug for Config {
@@ -106,7 +108,8 @@ impl fmt::Debug for Config {
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
             .field("jwt_decoding_key?", &self.jwt_decoding_key.is_some())
-            .field("streaming enabled?", &self.streaming_enabled)
+            .field("streaming_enabled?", &self.streaming_enabled)
+            .field("streaming_uuid", &self.streaming_uuid)
             .finish()
     }
 }
@@ -137,6 +140,7 @@ impl Default for Config {
             jwt_encoding_key: None,
             jwt_decoding_key: None,
             streaming_enabled: true,
+            streaming_uuid: "".into(),
         }
     }
 }
@@ -227,6 +231,11 @@ impl TryFrom<ConfigRaw> for Config {
             )
         })?;
         config.jwt_decoding_key = Some(DecodingKey::from_ed_der(pair.public_key().as_ref()));
+
+        // Get Subscriber unique hostname
+        if config.streaming_enabled {
+            config.streaming_uuid = get_hostname(&raw.streaming.uuid)?;
+        }
 
         Ok(config)
     }
@@ -493,4 +502,30 @@ async fn config_jwt_secret(
             format!("Could not create JWT key pair. {}", err),
         )
     })
+}
+
+fn get_hostname(host_name: &str) -> Result<String, MediatorError> {
+    if host_name.starts_with("hostname://") {
+        Ok(hostname::get()
+            .map_err(|e| {
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    format!("Couldn't get hostname. Reason: {}", e),
+                )
+            })?
+            .into_string()
+            .map_err(|e| {
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    format!("Couldn't get hostname. Reason: {:?}", e),
+                )
+            })?)
+    } else if host_name.starts_with("string://") {
+        Ok(host_name.split_at(9).1.to_string())
+    } else {
+        Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid hostname format!".into(),
+        ))
+    }
 }

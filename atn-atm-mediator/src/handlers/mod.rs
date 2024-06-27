@@ -13,6 +13,7 @@ pub mod message_inbound;
 pub mod message_list;
 pub mod message_outbound;
 pub mod websocket;
+pub mod websocket_streaming;
 
 pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()

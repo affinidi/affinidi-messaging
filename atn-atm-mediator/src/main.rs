@@ -92,6 +92,17 @@ async fn main() {
             .expect("Error starting statistics thread");
     });
 
+    // Start the streaming thread if enabled
+    if config.streaming_enabled {
+        let _database = database.clone(); // Clone the database handler for the subscriber thread
+        let uuid = config.streaming_uuid.clone();
+        tokio::spawn(async move {
+            atn_atm_mediator::handlers::websocket_streaming::ws_streaming(_database, uuid)
+                .await
+                .expect("Error starting websocket_streaming thread");
+        });
+    }
+
     // Create the shared application State
     let shared_state = SharedData {
         config: config.clone(),

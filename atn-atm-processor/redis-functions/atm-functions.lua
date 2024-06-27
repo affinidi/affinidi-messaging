@@ -206,7 +206,6 @@ local function clean_start_streaming(keys, args)
     -- Prepend an exclusive start_id if it exists
     local key = 'STREAMING_SESSIONS:'..keys[1]
 
-    redis.log(redis.LOG_WARNING, 'clean_start_streaming: key = '..key)
     -- Clean up sessions
     local counter = 0
     while (true) do
@@ -223,7 +222,6 @@ local function clean_start_streaming(keys, args)
             counter = counter+1
         end
 
-        redis.log(redis.LOG_WARNING, 'clean_start_streaming: session = '..session)
 
         -- remove from global session list
         redis.call('HDEL', 'GLOBAL_STREAMING', session)

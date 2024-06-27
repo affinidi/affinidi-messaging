@@ -77,3 +77,11 @@ jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIE
 ### enabled: If true, can live stream messages to subscribed recipients via WebSockets
 ### Default: true
 enabled = "${STREAMING_ENABLED:true}"
+
+### uuid: Each subscriber needs a unique identifier, this is used to setup session tracking in the backend
+### Default: hostname"
+### Supported Formats:
+### - hostname://
+### - string://<uuid> - Use the UUID as is
+### NOTE: Having multiple subscribers with the same UUID will cause issues
+uuid = "${STREAMING_UUID:hostname://}"

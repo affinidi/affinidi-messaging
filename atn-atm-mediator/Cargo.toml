@@ -28,7 +28,7 @@ deadpool-redis = { version = "0.15", features = ["rt_tokio_1"] }
 did-method-key = "0.2"
 did-peer = { version = "0.3", path = "../../did-peer" }
 atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
-# didcomm-affinidi = { version = "0.1", path = "../didcomm-affinidi" }
+hostname = "0.4 "
 http = "1"
 jsonwebtoken = "9.3"
 itertools = "0.13"
