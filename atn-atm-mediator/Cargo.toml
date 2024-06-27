@@ -45,6 +45,7 @@ sha256 = "1.5"
 ssi = "0.7"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
+tokio-stream = "0.1"
 toml = "0.8"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 tracing = { version = "0.1", features = [

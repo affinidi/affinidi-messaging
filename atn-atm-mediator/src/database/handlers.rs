@@ -1,6 +1,7 @@
 use std::{thread::sleep, time::Duration};
 
 use deadpool_redis::Connection;
+use redis::aio::PubSub;
 use tracing::{event, Level};
 
 use crate::common::{config::Config, errors::MediatorError};
@@ -39,9 +40,12 @@ impl DatabaseHandler {
                 )
             })?;
 
-        let database = Self { pool };
+        let database = Self {
+            pool,
+            redis_url: config.database_url.clone(),
+        };
         loop {
-            let mut conn = match database.get_connection().await {
+            let mut conn = match database.get_async_connection().await {
                 Ok(conn) => conn,
                 Err(err) => {
                     event!(Level::WARN, "Error getting connection to database: {}", err);
@@ -81,12 +85,31 @@ impl DatabaseHandler {
     }
 
     /// Returns a redis async database connector or returns an Error
-    pub async fn get_connection(&self) -> Result<Connection, MediatorError> {
+    /// This is the main method to get a connection to the database
+    pub async fn get_async_connection(&self) -> Result<Connection, MediatorError> {
         self.pool.get().await.map_err(|err| {
             event!(Level::ERROR, "Couldn't get database connection: {}", err);
             MediatorError::DatabaseError(
                 "NA".into(),
                 format!("Couldn't get database connection: {}", err),
+            )
+        })
+    }
+
+    /// Returns a redis database connector or returns an Error
+    /// This should only be used for pubsub operations
+    pub async fn get_pubsub_connection(&self) -> Result<PubSub, MediatorError> {
+        let client = redis::Client::open(self.redis_url.clone()).map_err(|err| {
+            MediatorError::DatabaseError(
+                "NA".into(),
+                format!("Couldn't open redis pubsub connection. Reason: {}", err),
+            )
+        })?;
+
+        client.get_async_pubsub().await.map_err(|err| {
+            MediatorError::DatabaseError(
+                "NA".into(),
+                format!("Couldn't get redis pubsub connection. Reason: {}", err),
             )
         })
     }

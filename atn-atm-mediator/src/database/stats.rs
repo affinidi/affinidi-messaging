@@ -68,7 +68,7 @@ impl DatabaseHandler {
     /// Retrieves metadata statistics that are global to the mediator database
     /// This means it may include more than this mediator's messages
     pub async fn get_db_metadata(&self) -> Result<MetadataStats, MediatorError> {
-        let mut conn = self.get_connection().await?;
+        let mut conn = self.get_async_connection().await?;
 
         let mut stats = MetadataStats::default();
 
@@ -117,7 +117,7 @@ impl DatabaseHandler {
 
     /// Updates GLOBAL send metrics
     pub async fn update_send_stats(&self, sent_bytes: i64) -> Result<(), MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         deadpool_redis::redis::pipe()
             .atomic()
@@ -142,7 +142,7 @@ impl DatabaseHandler {
 
     /// Increment WebSocket open count
     pub async fn global_stats_increment_websocket_open(&self) -> Result<(), MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
@@ -165,7 +165,7 @@ impl DatabaseHandler {
 
     /// Increment WebSocket close count
     pub async fn global_stats_increment_websocket_close(&self) -> Result<(), MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")

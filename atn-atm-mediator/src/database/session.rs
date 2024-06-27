@@ -123,7 +123,7 @@ impl DatabaseHandler {
     /// Creates a new session in the database
     /// Typically called when sending the initial challenge to the client
     pub async fn create_session(&self, session: &Session) -> Result<(), MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         let sid = format!("SESSION:{}", session.session_id);
 
@@ -160,7 +160,7 @@ impl DatabaseHandler {
 
     /// Retrieves a session from the database
     pub async fn get_session(&self, session_id: &str) -> Result<Session, MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         let result: HashMap<String, String> = deadpool_redis::redis::cmd("HGETALL")
             .arg(format!("SESSION:{}", session_id))
@@ -182,7 +182,7 @@ impl DatabaseHandler {
         &self,
         session_id: &str,
     ) -> Result<(), MediatorError> {
-        let mut con = self.get_connection().await?;
+        let mut con = self.get_async_connection().await?;
 
         let sid = format!("SESSION:{}", session_id);
 

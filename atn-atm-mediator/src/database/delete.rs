@@ -20,7 +20,7 @@ impl DatabaseHandler {
             did_hash = did_hash
         );
         async move {
-            let mut conn = self.get_connection().await?;
+            let mut conn = self.get_async_connection().await?;
             let response: String = deadpool_redis::redis::cmd("FCALL")
                 .arg("delete_message")
                 .arg(1)

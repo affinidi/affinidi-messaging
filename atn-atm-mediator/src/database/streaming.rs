@@ -5,7 +5,7 @@ use tracing::{event, Level};
 
 impl DatabaseHandler {
     pub async fn clean_start_streaming(&self, uuid: &str) -> Result<(), MediatorError> {
-        let mut conn = self.get_connection().await?;
+        let mut conn = self.get_async_connection().await?;
 
         let response: Vec<Value> = deadpool_redis::redis::pipe()
             .atomic()

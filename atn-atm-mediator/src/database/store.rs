@@ -27,7 +27,7 @@ impl DatabaseHandler {
             let message_hash = digest(message.as_bytes());
             let to_hash = digest(to_did.as_bytes());
 
-            let mut conn = self.get_connection().await?;
+            let mut conn = self.get_async_connection().await?;
             let mut tx = deadpool_redis::redis::cmd("FCALL");
 
             tx.arg("store_message")
@@ -88,7 +88,7 @@ impl DatabaseHandler {
             message_hash = message_hash
         );
         async move {
-            let mut conn = self.get_connection().await?;
+            let mut conn = self.get_async_connection().await?;
             let metadata: String = deadpool_redis::redis::cmd("HGET")
                 .arg("MESSAGE_STORE")
                 .arg(&["METADATA:", message_hash].concat())

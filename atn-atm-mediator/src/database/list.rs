@@ -26,7 +26,7 @@ impl DatabaseHandler {
             range = format!("{:?}", range)
         );
         async move {
-            let mut conn = self.get_connection().await?;
+            let mut conn = self.get_async_connection().await?;
 
             let key = match folder {
                 Folder::Inbox => format!("RECEIVE_Q:{}", did_hash),
