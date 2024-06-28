@@ -3,6 +3,7 @@ use atn_atm_mediator::{
     handlers::{application_routes, health_checker_handler},
     init,
     resolvers::affinidi_dids::AffinidiDIDResolver,
+    tasks::websocket_streaming::StreamingTask,
     SharedData,
 };
 use axum::{routing::get, Router};
@@ -87,21 +88,22 @@ async fn main() {
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread
     tokio::spawn(async move {
-        atn_atm_mediator::common::statistics::statistics(_stats_database)
+        atn_atm_mediator::tasks::statistics::statistics(_stats_database)
             .await
             .expect("Error starting statistics thread");
     });
 
     // Start the streaming thread if enabled
-    if config.streaming_enabled {
+    let (streaming_task, _) = if config.streaming_enabled {
         let _database = database.clone(); // Clone the database handler for the subscriber thread
         let uuid = config.streaming_uuid.clone();
-        tokio::spawn(async move {
-            atn_atm_mediator::handlers::websocket_streaming::ws_streaming(_database, uuid)
-                .await
-                .expect("Error starting websocket_streaming thread");
-        });
-    }
+        let (_task, _handle) = StreamingTask::new(_database.clone(), &uuid)
+            .await
+            .expect("Error starting streaming task");
+        (Some(_task), Some(_handle))
+    } else {
+        (None, None)
+    };
 
     // Create the shared application State
     let shared_state = SharedData {
@@ -109,6 +111,7 @@ async fn main() {
         service_start_timestamp: chrono::Utc::now(),
         did_resolver,
         database,
+        streaming_task,
     };
 
     // build our application routes

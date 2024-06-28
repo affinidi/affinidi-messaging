@@ -7,9 +7,15 @@ use axum::{
     },
     response::IntoResponse,
 };
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tracing::{debug, info, span, warn, Instrument};
 
-use crate::{common::errors::Session, messages::inbound::handle_inbound, SharedData};
+use crate::{
+    common::errors::Session,
+    messages::inbound::handle_inbound,
+    tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
+    SharedData,
+};
 
 // Handles the switching of the protocol to a websocket connection
 pub async fn websocket_handler(
@@ -36,8 +42,23 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
     );
     async move {
         let _ = state.database.global_stats_increment_websocket_open().await;
-
         info!("Websocket connection established");
+
+        // Test of communicating to the streaming task
+        let rx = if let Some(streaming) = &state.streaming_task {
+            let (tx, mut rx): (Sender<String>, Receiver<String>) = mpsc::channel(5);
+
+            let a = StreamingUpdate {
+                did_hash: session.did_hash.clone(),
+                state: StreamingUpdateState::Start(tx),
+            };
+            streaming.channel.send(a).await;
+
+            Some(rx)
+        } else {
+            None
+        };
+
         loop {
             let msg = if let Some(msg) = socket.recv().await {
                 match msg {

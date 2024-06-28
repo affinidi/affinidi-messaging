@@ -2,8 +2,10 @@ use std::time::Duration;
 
 use tracing::{debug, info, span, Instrument, Level};
 
-use super::errors::MediatorError;
-use crate::database::{stats::MetadataStats, DatabaseHandler};
+use crate::{
+    common::errors::MediatorError,
+    database::{stats::MetadataStats, DatabaseHandler},
+};
 
 /// Periodically logs statistics about the database.
 /// Is spawned as a task from main().

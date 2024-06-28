@@ -13,6 +13,7 @@ use common::{
 use database::DatabaseHandler;
 use http::request::Parts;
 use resolvers::affinidi_dids::AffinidiDIDResolver;
+use tasks::websocket_streaming::StreamingTask;
 use tracing::{event, level_filters::LevelFilter, Level};
 use tracing_subscriber::{reload::Handle, Registry};
 
@@ -21,6 +22,7 @@ pub mod database;
 pub mod handlers;
 pub mod messages;
 pub mod resolvers;
+pub mod tasks;
 
 #[derive(Clone)]
 pub struct SharedData {
@@ -28,6 +30,7 @@ pub struct SharedData {
     pub service_start_timestamp: DateTime<Utc>,
     pub did_resolver: AffinidiDIDResolver,
     pub database: DatabaseHandler,
+    pub streaming_task: Option<StreamingTask>,
 }
 
 impl Debug for SharedData {
