@@ -133,6 +133,11 @@ impl MessageBuilder {
         }
     }
 
+    pub fn body(mut self, body: Value) -> Self {
+        self.body = body;
+        self
+    }
+
     pub fn to(mut self, to: String) -> Self {
         if let Some(ref mut sto) = self.to {
             sto.push(to);
