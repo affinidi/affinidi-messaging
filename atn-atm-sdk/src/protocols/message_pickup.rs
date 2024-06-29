@@ -1,0 +1,96 @@
+use std::time::SystemTime;
+
+use atn_atm_didcomm::{Message, PackEncryptedOptions};
+use serde_json::{json, Value};
+use tracing::{debug, span, Level};
+use uuid::Uuid;
+
+use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
+
+#[derive(Default)]
+pub struct MessagePickup {}
+
+impl MessagePickup {
+    /// Sends a Message Pickup 3.0 `Status Request` message
+    /// atm           : The ATM SDK to use
+    /// recipient_did : Optional, allows you to ask for status for a specific DID. If none, will ask for default DID in ATM
+    /// mediator_did  : Optional, allows you to ask a specific mediator. If none, will ask for default mediator in ATM
+    pub async fn send_status_request<'c>(
+        &self,
+        atm: &'c mut ATM<'_>,
+        recipient_did: Option<String>,
+        mediator_did: Option<String>,
+    ) -> Result<SendMessageResponse, ATMError> {
+        let _span = span!(Level::DEBUG, "send_status_request",).entered();
+        debug!(
+            "Status Request to recipient_did: {:?}, mediator_did: {:?}",
+            recipient_did, mediator_did
+        );
+
+        // Check that DID(s) exist in DIDResolver, add it if not
+        if let Some(recipient_did) = &recipient_did {
+            if !atm.did_resolver.contains(recipient_did) {
+                debug!(
+                    "Recipient DID ({}) not found in resolver, adding...",
+                    recipient_did
+                );
+                atm.add_did(recipient_did).await?;
+            }
+        }
+        if let Some(mediator_did) = &mediator_did {
+            if !atm.did_resolver.contains(mediator_did) {
+                debug!(
+                    "Mediator DID ({}) not found in resolver, adding...",
+                    mediator_did
+                );
+                atm.add_did(mediator_did).await?;
+            }
+        }
+
+        let mut msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/status-request".to_owned(),
+            json!({}),
+        )
+        .header("return_route".into(), Value::String("all".into()));
+
+        if let Some(recipient_did) = &recipient_did {
+            msg = msg.body(json!({"recipient_did": recipient_did}));
+        }
+
+        let to_did = if let Some(mediator_did) = mediator_did {
+            mediator_did
+        } else {
+            atm.config.atm_did.clone()
+        };
+        msg = msg.to(to_did.clone());
+
+        msg = msg.from(atm.config.my_did.clone());
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let msg = msg.created_time(now).expires_time(now + 300).finalize();
+
+        debug!("Status-Request message: {:?}", msg);
+
+        // Pack the message
+        let (msg, _) = msg
+            .pack_encrypted(
+                &to_did,
+                Some(&atm.config.my_did),
+                Some(&atm.config.my_did),
+                &atm.did_resolver,
+                &atm.secrets_resolver,
+                &PackEncryptedOptions::default(),
+            )
+            .await
+            .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+        if atm.ws_stream.is_some() {
+            atm.ws_send_didcomm_message(&msg).await
+        } else {
+            atm.send_didcomm_message(&msg).await
+        }
+    }
+}

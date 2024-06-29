@@ -27,6 +27,7 @@ pub mod config;
 pub mod conversions;
 pub mod errors;
 pub mod messages;
+pub mod protocols;
 mod resolvers;
 pub mod transports;
 
@@ -145,6 +146,11 @@ impl<'c> ATM<'c> {
         atm.add_did(&config.my_did).await?;
         // Add our ATM DID to the DID_RESOLVER
         atm.add_did(&config.atm_did).await?;
+
+        // Add any pre-loaded secrets
+        for secret in config.secrets {
+            atm.add_secret(secret);
+        }
 
         // Start the websocket connection if enabled
         if atm.ws_enabled {

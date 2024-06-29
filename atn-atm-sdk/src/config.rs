@@ -1,4 +1,5 @@
 use crate::errors::ATMError;
+use atn_atm_didcomm::secrets::Secret;
 use rustls::pki_types::CertificateDer;
 use std::{fs::File, io::BufReader};
 use tracing::error;
@@ -20,6 +21,7 @@ pub struct Config<'a> {
     pub(crate) atm_did: String,
     pub(crate) ssl_only: bool,
     pub(crate) ws_enabled: bool,
+    pub(crate) secrets: Vec<Secret>,
 }
 
 impl<'a> Config<'a> {
@@ -55,6 +57,7 @@ pub struct ConfigBuilder {
     atm_did: Option<String>,
     ssl_only: bool,
     ws_enabled: bool,
+    secrets: Vec<Secret>,
 }
 
 impl Default for ConfigBuilder {
@@ -67,6 +70,7 @@ impl Default for ConfigBuilder {
             atm_did: None,
             ssl_only: true,
             ws_enabled: true,
+            secrets: Vec::new(),
         }
     }
 }
@@ -122,6 +126,12 @@ impl ConfigBuilder {
     /// Default: `true`
     pub fn with_websocket_disabled(mut self) -> Self {
         self.ws_enabled = false;
+        self
+    }
+
+    /// Add a secret to the SDK
+    pub fn with_secret(mut self, secret: Secret) -> Self {
+        self.secrets.push(secret);
         self
     }
 
@@ -198,6 +208,7 @@ impl ConfigBuilder {
             atm_did,
             ssl_only: self.ssl_only,
             ws_enabled: self.ws_enabled,
+            secrets: self.secrets,
         })
     }
 }

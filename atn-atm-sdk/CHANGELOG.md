@@ -2,6 +2,12 @@
 
 ## Changelog history
 
+### 29th June 2024
+
+* Added ability to pre-load secrets when creating a new ATM client
+* This fixes an issue where WebSocket auth requires secrets to be loaded before trying to start
+* Implemented Message-Pickup protocol - Status-Request
+
 ### 15th June 2024
 
 * get_websocket() function added to ATM
