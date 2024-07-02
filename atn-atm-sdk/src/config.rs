@@ -130,6 +130,7 @@ impl ConfigBuilder {
     }
 
     /// Add a secret to the SDK
+    /// This is required to auto-start the websocket connection
     pub fn with_secret(mut self, secret: Secret) -> Self {
         self.secrets.push(secret);
         self

@@ -7,10 +7,10 @@ use tracing::{debug, span, Level};
 impl<'c> ATM<'c> {
     /// send_didcomm_message
     /// - msg: Packed DIDComm message that we want to send
-    pub(crate) async fn ws_send_didcomm_message(
+    pub(crate) async fn ws_send_didcomm_message<T>(
         &mut self,
         message: &str,
-    ) -> Result<SendMessageResponse, ATMError> {
+    ) -> Result<SendMessageResponse<T>, ATMError> {
         let _span = span!(Level::DEBUG, "send_didcomm_message",).entered();
 
         let ws_stream = if let Some(ws_stream) = self.ws_stream.as_mut() {
@@ -31,6 +31,7 @@ impl<'c> ATM<'c> {
         Ok(SendMessageResponse {
             message_digest,
             bytes_sent: message.len() as u32,
+            http_response: None,
         })
     }
 }

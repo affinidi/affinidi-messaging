@@ -41,18 +41,34 @@ pub(crate) fn process(
         .unwrap()
         .as_secs();
 
+    if let Some(expires) = msg.expires_time {
+        if expires <= now {
+            debug!(
+                "Message expired at ({}) now({}) seconds_ago({})",
+                expires,
+                now,
+                now - expires
+            );
+            return Err(MediatorError::MessageExpired(
+                session.session_id.clone(),
+                expires.to_string(),
+                now.to_string(),
+            ));
+        }
+    }
+
     let to = if let Some(to) = &msg.to {
         if let Some(first) = to.first() {
             first.to_owned()
         } else {
             return Err(MediatorError::RequestDataError(
-                "-1".into(),
+                session.session_id.clone(),
                 "Message missing valid 'to' field, expect at least one address in array.".into(),
             ));
         }
     } else {
         return Err(MediatorError::RequestDataError(
-            "-1".into(),
+            session.session_id.clone(),
             "Message missing 'to' field".into(),
         ));
     };
@@ -76,7 +92,7 @@ pub(crate) fn process(
             from.to_owned()
         } else {
             return Err(MediatorError::RequestDataError(
-                "-1".into(),
+                session.session_id.clone(),
                 "Anonymous Trust-Ping is asking for a response, this is an invalid request!".into(),
             ));
         };

@@ -92,15 +92,15 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
             };
 
             // Process the message
-            let messages = match handle_inbound(&state, &session, &msg).await {
-                Ok(messages) => messages,
+            let response = match handle_inbound(&state, &session, &msg).await {
+                Ok(response) => response,
                 Err(e) => {
                     warn!("Error processing message: {:?}", e);
                     continue;
                 }
             };
 
-            debug!("Sending response: {} messages", messages.messages.len());
+            //debug!("Sending response: {} messages", messages.messages.len());
 
             // Send responses
         }

@@ -1,14 +1,37 @@
 use std::time::SystemTime;
 
 use atn_atm_didcomm::{Message, PackEncryptedOptions};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
+use crate::{errors::ATMError, messages::GenericDataStruct, transports::SendMessageResponse, ATM};
 
 #[derive(Default)]
 pub struct MessagePickup {}
+
+// Reads the body of an incoming Message Pickup 3.0 Status Request Message
+#[derive(Default, Deserialize)]
+pub struct MessagePickupStatusRequest {
+    pub recipient_did: Option<String>,
+}
+
+// Body of a StatusRequest reply
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct MessagePickupStatusReply {
+    pub recipient_did: String,
+    pub message_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub longest_waited_seconds: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub newest_received_time: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oldest_received_time: Option<u64>,
+    pub total_bytes: u64,
+    pub live_delivery: bool,
+}
+impl GenericDataStruct for MessagePickupStatusReply {}
 
 impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Status Request` message
@@ -20,7 +43,7 @@ impl MessagePickup {
         atm: &'c mut ATM<'_>,
         recipient_did: Option<String>,
         mediator_did: Option<String>,
-    ) -> Result<SendMessageResponse, ATMError> {
+    ) -> Result<SendMessageResponse<MessagePickupStatusReply>, ATMError> {
         let _span = span!(Level::DEBUG, "send_status_request",).entered();
         debug!(
             "Status Request to recipient_did: {:?}, mediator_did: {:?}",
@@ -90,7 +113,7 @@ impl MessagePickup {
         if atm.ws_stream.is_some() {
             atm.ws_send_didcomm_message(&msg).await
         } else {
-            atm.send_didcomm_message(&msg).await
+            atm.send_didcomm_message(&msg, true).await
         }
     }
 }

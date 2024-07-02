@@ -5,7 +5,7 @@ use atn_atm_sdk::{
 };
 use did_peer::DIDPeer;
 use serde_json::json;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -58,22 +58,16 @@ async fn main() -> Result<(), ATMError> {
     // Create a new ATM Client
     let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
 
-    // Add our secrets to ATM Client - stays local.
-    //atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
-    //atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
-
-    atm.start_websocket().await?;
-
-    // You normally don't need to call authenticate() as it is called automatically
-    // We do this here so we can time the auth cycle
-    atm.authenticate().await?;
-
     let protocols = Protocols::default();
 
-    protocols
+    atm.close_websocket().await?;
+
+    let a = protocols
         .message_pickup
         .send_status_request(&mut atm, None, None)
         .await?;
+
+    debug!("{:?}", a);
 
     Ok(())
 }

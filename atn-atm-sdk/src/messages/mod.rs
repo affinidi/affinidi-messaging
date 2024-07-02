@@ -144,3 +144,7 @@ impl Display for FetchDeletePolicy {
 
 /// Helps with deserializing the generic data field in the SuccessResponse struct
 pub trait GenericDataStruct: DeserializeOwned + Serialize {}
+
+#[derive(Serialize, Deserialize)]
+pub struct EmptyResponse;
+impl GenericDataStruct for EmptyResponse {}

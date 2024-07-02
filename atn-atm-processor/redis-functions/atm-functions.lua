@@ -41,8 +41,8 @@ local function store_message(keys, args)
     redis.call('RPUSH', 'MSG_EXPIRY', keys[1]..':'..time)
 
     -- Update the receiver records
-    redis.call('HINCRBY', 'DID:'..args[4], 'QUEUE_BYTES', bytes)
-    redis.call('HINCRBY', 'DID:'..args[4], 'QUEUE_COUNT', 1)
+    redis.call('HINCRBY', 'DID:'..args[4], 'RECEIVE_QUEUE_BYTES', bytes)
+    redis.call('HINCRBY', 'DID:'..args[4], 'RECEIVE_QUEUE_COUNT', 1)
     -- If changing the fields in the future, update the fetch_messages function
     local RQ = redis.call('XADD', 'RECEIVE_Q:'..args[4], time..'-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM', args[5])
     
@@ -50,8 +50,8 @@ local function store_message(keys, args)
     local SQ = nil
     if table.getn(args) == 6 then
         -- Update the sender records
-        redis.call('HINCRBY', 'DID:'..args[6], 'QUEUE_BYTES', bytes)
-        redis.call('HINCRBY', 'DID:'..args[6], 'QUEUE_COUNT', 1)
+        redis.call('HINCRBY', 'DID:'..args[6], 'SEND_QUEUE_BYTES', bytes)
+        redis.call('HINCRBY', 'DID:'..args[6], 'SEND_QUEUE_COUNT', 1)
         SQ = redis.call('XADD', 'SEND_Q:'..args[6], time..'-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'TO', args[3])
     end
 
@@ -106,16 +106,16 @@ local function delete_message(keys, args)
     redis.call('HINCRBY', 'GLOBAL', 'DELETED_COUNT', 1)
 
     -- Remove the receiver records
-    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'QUEUE_BYTES', -bytes)
-    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'QUEUE_COUNT', -1)
+    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'RECEIVE_QUEUE_BYTES', -bytes)
+    redis.call('HINCRBY', 'DID:'..meta.map.TO, 'RECEIVE_QUEUE_COUNT', -1)
     redis.call('XDEL', 'RECEIVE_Q:'..meta.map.TO, meta.map.RECEIVE_ID)
     
     -- Remove the sender records
     local SQ = nil
     if meta.map.SEND_ID ~= nil then
         -- Remove the sender records
-        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_BYTES', -bytes)
-        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'QUEUE_COUNT', -1)
+        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'SEND_QUEUE_BYTES', -bytes)
+        redis.call('HINCRBY', 'DID:'..meta.map.FROM, 'SEND_QUEUE_COUNT', -1)
         SQ = redis.call('XDEL', 'SEND_Q:'..meta.map.FROM, meta.map.SEND_ID)
     end
 
@@ -230,7 +230,54 @@ local function clean_start_streaming(keys, args)
     return counter
 end
 
+-- get_status_reply
+-- keys = did_hash that we are getting status for
+-- returns Message Pickup 3.0 Status details
+local function get_status_reply(keys, args)
+    -- Correct number of keys?
+    if #keys ~= 1  then
+        return redis.error_reply('get_status_reply: only accepts one key (recipient_did_hash)')
+    end
+
+    -- Correct number of args?
+    if #args ~= 0 then
+        return redis.error_reply('get_status_reply: No arguments required')
+    end
+
+    -- set response type to Version 3
+    redis.setresp(3)
+
+    local response = {}
+    response.map = {}
+    response.map.recipient_did = keys[1]
+
+    -- Set the message count and total bytes
+    local r = redis.call('HMGET', 'DID:'..keys[1], 'RECEIVE_QUEUE_COUNT', 'RECEIVE_QUEUE_BYTES')
+    response.map.message_count = tonumber(r[1])
+    response.map.total_bytes = tonumber(r[2])
+
+    -- Get the oldest and newest message information
+    local r = redis.pcall('XINFO', 'STREAM', 'RECEIVE_Q:'..keys[1])
+    if r['err'] == nil then 
+        response.map.oldest_received = r.map['first-entry'][1]
+        response.map.newest_received = r.map['last-entry'][1]
+        response.map.queue_count = r.map['length']
+    end
+
+    -- Get live streaming status
+    local r = redis.call("HEXISTS", "GLOBAL_STREAMING", keys[1])
+    if r == 0 then 
+        response.map.live_delivery = false
+    else
+        response.map.live_delivery = true
+    end
+    
+    return response
+end
+
+
 redis.register_function('store_message', store_message)
 redis.register_function('delete_message', delete_message)
 redis.register_function('fetch_messages', fetch_messages)
 redis.register_function('clean_start_streaming', clean_start_streaming)
+redis.register_function('get_status_reply', get_status_reply)

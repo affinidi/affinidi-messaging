@@ -1,4 +1,4 @@
-use super::GenericDataStruct;
+use super::{EmptyResponse, GenericDataStruct};
 use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
 use atn_atm_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
@@ -7,18 +7,30 @@ use std::time::SystemTime;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-/// Response from the ATM API when sending a message
-/// Contains a list of messages that were sent
+/// Response from the ATM API when sending messages (inbound messages)
+/// Stored messages will have a list of messages that were stored
+/// Ephemeral messages contain the actual message response (it is not stored anywhere)
+/// Empty is used when there is no expected response
+#[derive(Serialize, Deserialize)]
+pub enum InboundMessageResponse {
+    Stored(InboundMessageList),
+    Ephemeral(String),
+    Empty,
+}
+impl GenericDataStruct for InboundMessageResponse {}
+
+/// Response from the ATM API when sending a message that is stored
+/// Contains a list of messages that were stored
 /// - messages : List of successful stored messages (recipient, message_ids)
 /// - errors   : List of errors that occurred while storing messages (recipient, error)
 ///
-/// NOTE: Sending a single message can result in multiple forward messages being sent!
+/// NOTE: Sending a single message can result in multiple forward messages being stored!
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct InboundMessageResponse {
+pub struct InboundMessageList {
     pub messages: Vec<(String, String)>,
     pub errors: Vec<(String, String)>,
 }
-impl GenericDataStruct for InboundMessageResponse {}
+impl GenericDataStruct for InboundMessageList {}
 
 impl<'c> ATM<'c> {
     /// Sends a DIDComm Trust-Ping message
@@ -32,7 +44,7 @@ impl<'c> ATM<'c> {
         to_did: &str,
         signed: bool,
         expect_response: bool,
-    ) -> Result<SendMessageResponse, ATMError> {
+    ) -> Result<SendMessageResponse<EmptyResponse>, ATMError> {
         let _span = span!(Level::DEBUG, "create_ping_message",).entered();
         debug!(
             "Pinging {}, signed?({}) response_expected?({})",
@@ -92,7 +104,7 @@ impl<'c> ATM<'c> {
         if self.ws_stream.is_some() {
             self.ws_send_didcomm_message(&msg).await
         } else {
-            self.send_didcomm_message(&msg).await
+            self.send_didcomm_message(&msg, false).await
         }
     }
 }

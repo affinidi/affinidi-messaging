@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use atn_atm_didcomm::did::DIDDoc;
 use atn_atm_didcomm::did::DIDResolver as DidcommDIDResolver;
 use atn_atm_didcomm::secrets::Secret;
@@ -14,6 +12,7 @@ use rustls::ClientConfig;
 use rustls::RootCertStore;
 use ssi::did::{DIDMethod, DIDMethods};
 use ssi::did_resolve::DIDResolver as SSIDIDResolver;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_tungstenite::Connector;
 use tokio_tungstenite::MaybeTlsStream;

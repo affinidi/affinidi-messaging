@@ -1,28 +1,20 @@
-use crate::{errors::ATMError, messages::GenericDataStruct, transports::SendMessageResponse, ATM};
-use serde::{Deserialize, Serialize};
+use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
+use serde::Deserialize;
 use sha256::digest;
 use tracing::{debug, span, Level};
-
-/// Response from the ATM API when sending a message
-/// Contains a list of messages that were sent
-/// - messages : List of successful stored messages (recipient, message_ids)
-/// - errors   : List of errors that occurred while storing messages (recipient, error)
-///
-/// NOTE: Sending a single message can result in multiple forward messages being sent!
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct InboundMessageResponse {
-    pub messages: Vec<(String, String)>,
-    pub errors: Vec<(String, String)>,
-}
-impl GenericDataStruct for InboundMessageResponse {}
 
 impl<'c> ATM<'c> {
     /// send_didcomm_message
     /// - msg: Packed DIDComm message that we want to send
-    pub async fn send_didcomm_message(
+    /// - return_response: Whether to return the response from the API
+    pub async fn send_didcomm_message<T>(
         &mut self,
         message: &str,
-    ) -> Result<SendMessageResponse, ATMError> {
+        return_response: bool,
+    ) -> Result<SendMessageResponse<T>, ATMError>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
         let _span = span!(Level::DEBUG, "send_message",).entered();
         let tokens = self.authenticate().await?;
 
@@ -52,10 +44,19 @@ impl<'c> ATM<'c> {
                 status, body
             )));
         }
+        debug!("body =\n{}", body);
+        let http_response: Option<T> = if return_response {
+            Some(serde_json::from_str(&body).map_err(|e| {
+                ATMError::TransportError(format!("Couldn't parse response: {:?}", e))
+            })?)
+        } else {
+            None
+        };
 
         Ok(SendMessageResponse {
             message_digest: digest(message),
             bytes_sent: message.len() as u32,
+            http_response,
         })
     }
 }
