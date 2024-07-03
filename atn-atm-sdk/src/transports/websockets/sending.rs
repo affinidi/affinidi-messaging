@@ -1,4 +1,8 @@
-use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
+use crate::{
+    errors::ATMError,
+    transports::{SendMessageResponse, WebSocketSendResponse},
+    ATM,
+};
 use futures_util::SinkExt;
 use sha256::digest;
 use tokio_tungstenite::tungstenite::Message;
@@ -10,6 +14,7 @@ impl<'c> ATM<'c> {
     pub(crate) async fn ws_send_didcomm_message<T>(
         &mut self,
         message: &str,
+        message_id: &str,
     ) -> Result<SendMessageResponse<T>, ATMError> {
         let _span = span!(Level::DEBUG, "send_didcomm_message",).entered();
 
@@ -28,10 +33,10 @@ impl<'c> ATM<'c> {
             .map_err(|e| ATMError::TransportError(format!("Could not send message: {:?}", e)))?;
 
         debug!("Message ({}) sent successfully", message_digest);
-        Ok(SendMessageResponse {
+        Ok(SendMessageResponse::WebSocket(WebSocketSendResponse {
             message_digest,
             bytes_sent: message.len() as u32,
-            http_response: None,
-        })
+            message_id: message_id.into(),
+        }))
     }
 }

@@ -1,11 +1,10 @@
-use std::time::SystemTime;
-
 use atn_atm_sdk::{
-    config::Config, conversions::secret_from_str, errors::ATMError, protocols::Protocols, ATM,
+    config::Config, conversions::secret_from_str, errors::ATMError, protocols::Protocols,
+    transports::SendMessageResponse, ATM,
 };
 use did_peer::DIDPeer;
 use serde_json::json;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -46,28 +45,30 @@ async fn main() -> Result<(), ATMError> {
         .with_atm_did(atm_did)
         .with_secret(secret_from_str(&format!("{}#key-1", my_did), &v1))
         .with_secret(secret_from_str(&format!("{}#key-2", my_did), &e1))
-        //.with_websocket_disabled() // There is a bug with secrets provided after this
-        /*
-        // Use this to connect to the mediator
-        // TODO: in the future we likely want to pull this from the DID itself
-        .with_atm_api(
-            "http://msg-de-msgfa-zqhvcom3qgjl-47801559.ap-southeast-1.elb.amazonaws.com:80/atm/v1",
-        ).with_non_ssl()*/
         .build()?;
 
     // Create a new ATM Client
     let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
 
+    // Going to work with higher level DIDComm protocols
     let protocols = Protocols::default();
 
+    // For this example, we are forcing REST API only by closing the websocket
+    // NOTE: We could have done this when we configured the ATM, but we are doing it here for demonstration purposes
     atm.close_websocket().await?;
 
-    let a = protocols
+    // Send a Message Pickup 3.0 Status Request
+    let response = protocols
         .message_pickup
         .send_status_request(&mut atm, None, None)
         .await?;
 
-    debug!("{:?}", a);
+    // Check if we received a status
+    if let SendMessageResponse::RestAPI(Some(status)) = response {
+        info!("Status: {:?}", status);
+    } else {
+        warn!("No status received");
+    }
 
     Ok(())
 }

@@ -1,6 +1,9 @@
-use crate::{errors::ATMError, transports::SendMessageResponse, ATM};
-use serde::Deserialize;
-use sha256::digest;
+use crate::{
+    errors::ATMError,
+    messages::{GenericDataStruct, SuccessResponse},
+    transports::SendMessageResponse,
+    ATM,
+};
 use tracing::{debug, span, Level};
 
 impl<'c> ATM<'c> {
@@ -13,7 +16,7 @@ impl<'c> ATM<'c> {
         return_response: bool,
     ) -> Result<SendMessageResponse<T>, ATMError>
     where
-        T: for<'de> Deserialize<'de>,
+        T: GenericDataStruct,
     {
         let _span = span!(Level::DEBUG, "send_message",).entered();
         let tokens = self.authenticate().await?;
@@ -46,17 +49,14 @@ impl<'c> ATM<'c> {
         }
         debug!("body =\n{}", body);
         let http_response: Option<T> = if return_response {
-            Some(serde_json::from_str(&body).map_err(|e| {
+            let r: SuccessResponse<T> = serde_json::from_str(&body).map_err(|e| {
                 ATMError::TransportError(format!("Couldn't parse response: {:?}", e))
-            })?)
+            })?;
+            r.data
         } else {
             None
         };
 
-        Ok(SendMessageResponse {
-            message_digest: digest(message),
-            bytes_sent: message.len() as u32,
-            http_response,
-        })
+        Ok(SendMessageResponse::RestAPI(http_response))
     }
 }

@@ -2,11 +2,11 @@ use std::time::SystemTime;
 
 use atn_atm_sdk::{
     config::Config, conversions::secret_from_str, errors::ATMError, messages::GetMessagesRequest,
-    ATM,
+    protocols::Protocols, ATM,
 };
 use did_peer::DIDPeer;
 use serde_json::json;
-use tracing::{error, info};
+use tracing::info;
 use tracing_subscriber::filter;
 
 #[tokio::main]
@@ -61,6 +61,8 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
+    let protocols = Protocols::default();
+
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();
 
@@ -70,16 +72,19 @@ async fn main() -> Result<(), ATMError> {
     let after_auth = SystemTime::now();
 
     // Send a trust-ping message to ATM, will generate a PONG response
-    let response = atm.send_ping(atm_did, true, true).await?;
+    let response = protocols
+        .trust_ping
+        .send_ping(&mut atm, atm_did, true, true)
+        .await?;
     let after_ping = SystemTime::now();
 
-    info!("PING sent: {}", response.message_digest);
+    info!("PING sent: {}", response.message_hash);
 
     // Get the PONG message from ATM
     let msgs = atm
         .get_messages(&GetMessagesRequest {
             delete: false,
-            message_ids: vec![response.message_digest],
+            message_ids: vec![response.message_hash],
         })
         .await?;
     let after_get = SystemTime::now();
@@ -123,10 +128,13 @@ async fn main() -> Result<(), ATMError> {
     atm.start_websocket().await?;
     let after_websocket = SystemTime::now();
 
-    let response = atm.send_ping(atm_did, true, true).await?;
+    let response = protocols
+        .trust_ping
+        .send_ping(&mut atm, atm_did, true, true)
+        .await?;
     let after_ping = SystemTime::now();
 
-    info!("PING sent: {}", response.message_digest);
+    info!("PING sent: {}", response.message_hash);
 
     // Print out timing information
     info!(

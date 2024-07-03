@@ -6,7 +6,12 @@ use serde_json::{json, Value};
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, messages::GenericDataStruct, transports::SendMessageResponse, ATM};
+use crate::{
+    errors::ATMError,
+    messages::{sending::InboundMessageResponse, GenericDataStruct},
+    transports::SendMessageResponse,
+    ATM,
+};
 
 #[derive(Default)]
 pub struct MessagePickup {}
@@ -94,6 +99,7 @@ impl MessagePickup {
             .unwrap()
             .as_secs();
         let msg = msg.created_time(now).expires_time(now + 300).finalize();
+        let msg_id = msg.id.clone();
 
         debug!("Status-Request message: {:?}", msg);
 
@@ -111,9 +117,31 @@ impl MessagePickup {
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
         if atm.ws_stream.is_some() {
-            atm.ws_send_didcomm_message(&msg).await
+            atm.ws_send_didcomm_message(&msg, &msg_id).await
         } else {
-            atm.send_didcomm_message(&msg, true).await
+            type MessageString = String;
+            impl GenericDataStruct for MessageString {}
+
+            let a = atm
+                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
+                .await?;
+
+            debug!("Response: {:?}", a);
+
+            // Unpack the response
+            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
+                a
+            {
+                let (unpacked, _) = atm.unpack(&message).await?;
+                debug!("Good ({})", unpacked.body);
+                let status: MessagePickupStatusReply = serde_json::from_value(unpacked.body)
+                    .map_err(|err| {
+                        ATMError::MsgSendError(format!("Error unpacking response: {}", err))
+                    })?;
+                Ok(SendMessageResponse::RestAPI(Some(status)))
+            } else {
+                Err(ATMError::MsgSendError("No response from API".into()))
+            }
         }
     }
 }
