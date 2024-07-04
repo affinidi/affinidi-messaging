@@ -15,12 +15,14 @@ use tracing::error;
 #[derive(Clone)]
 pub struct Config<'a> {
     pub(crate) my_did: String,
-    ssl_certificates: Vec<CertificateDer<'a>>,
+    pub(crate) ssl_certificates: Vec<CertificateDer<'a>>,
     pub(crate) atm_api: String,
     pub(crate) atm_api_ws: String,
     pub(crate) atm_did: String,
     pub(crate) ssl_only: bool,
     pub(crate) ws_enabled: bool,
+    pub(crate) fetch_cache_limit_count: u32,
+    pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
 }
 
@@ -57,6 +59,8 @@ pub struct ConfigBuilder {
     atm_did: Option<String>,
     ssl_only: bool,
     ws_enabled: bool,
+    fetch_cache_limit_count: u32,
+    fetch_cache_limit_bytes: u64,
     secrets: Vec<Secret>,
 }
 
@@ -70,6 +74,8 @@ impl Default for ConfigBuilder {
             atm_did: None,
             ssl_only: true,
             ws_enabled: true,
+            fetch_cache_limit_count: 100,
+            fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
             secrets: Vec::new(),
         }
     }
@@ -136,6 +142,20 @@ impl ConfigBuilder {
         self
     }
 
+    /// Set the maximum number of messages to cache in the fetch task
+    /// Default: 100
+    pub fn with_fetch_cache_limit_count(mut self, count: u32) -> Self {
+        self.fetch_cache_limit_count = count;
+        self
+    }
+
+    /// Set the maximum total size of messages to cache in the fetch task in bytes
+    /// Default: 10MB (1024*1024*10)
+    pub fn with_fetch_cache_limit_bytes(mut self, count: u64) -> Self {
+        self.fetch_cache_limit_bytes = count;
+        self
+    }
+
     pub fn build<'a>(self) -> Result<Config<'a>, ATMError> {
         // Process any custom SSL certificates
         let mut certs = vec![];
@@ -151,7 +171,7 @@ impl ConfigBuilder {
 
             for cert in rustls_pemfile::certs(&mut reader) {
                 match cert {
-                    Ok(cert) => certs.push(cert),
+                    Ok(cert) => certs.push(cert.into_owned()),
                     Err(e) => {
                         failed_certs = true;
                         error!("Couldn't parse SSL certificate! Reason: {}", e)
@@ -209,6 +229,8 @@ impl ConfigBuilder {
             atm_did,
             ssl_only: self.ssl_only,
             ws_enabled: self.ws_enabled,
+            fetch_cache_limit_count: self.fetch_cache_limit_count,
+            fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
         })
     }

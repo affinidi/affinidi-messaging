@@ -42,7 +42,7 @@ pub async fn message_inbound_handler(
     );
     async move {
         let s = serde_json::to_string(&body).unwrap();
-        let messages = handle_inbound(&state, &session, &s).await?;
+        let response = handle_inbound(&state, &session, &s).await?;
 
         Ok((
             StatusCode::OK,
@@ -52,7 +52,7 @@ pub async fn message_inbound_handler(
                 errorCode: 0,
                 errorCodeStr: "NA".to_string(),
                 message: "Success".to_string(),
-                data: Some(messages),
+                data: Some(response),
             }),
         ))
     }

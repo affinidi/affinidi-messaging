@@ -1,13 +1,19 @@
-use crate::{errors::ATMError, ATM};
+use std::sync::Arc;
+
+use crate::{config::Config, errors::ATMError, ATM};
+use did_peer::DIDPeer;
 use http::header::AUTHORIZATION;
-use tokio::net::TcpStream;
-use tokio_tungstenite::{
-    connect_async_tls_with_config, tungstenite::client::IntoClientRequest, MaybeTlsStream,
-    WebSocketStream,
+use rustls::pki_types::CertificateDer;
+use ssi::did::DIDMethods;
+use tokio::{
+    sync::{mpsc, RwLock},
+    task::JoinHandle,
 };
+use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::client::IntoClientRequest};
 use tracing::{debug, span, Instrument, Level};
 
 pub mod sending;
+pub mod ws_handler;
 
 impl<'c> ATM<'c> {
     /// Starts websocket connection to the ATM API
@@ -21,64 +27,67 @@ impl<'c> ATM<'c> {
     /// // Get a websocket connection (should be mutable as it will be used to send messages)
     /// let mut ws = atm.get_websocket().await?;
     /// ```
-    pub async fn start_websocket(
-        &mut self,
-    ) -> Result<&mut WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
-        let _span = span!(Level::DEBUG, "start_websocket");
-        async move {
-            // Check if authenticated
-            let tokens = self.authenticate().await?;
+    pub async fn start_websocket(&mut self) -> Result<(), ATMError> {
+        // Some hackery to get around the Rust lifetimes by various items in the SDK
+        // Create a copy of ATM with owned values
+        let mut config = Config {
+            ssl_certificates: Vec::new(),
+            ..self.config.clone()
+        };
 
-            // Create a custom websocket request, turn this into a client_request
-            // Allows adding custom headers later
-            let mut request = self
-                .config
-                .atm_api_ws
-                .clone()
-                .into_client_request()
-                .map_err(|e| {
-                    ATMError::TransportError(format!(
-                        "Could not create websocket request. Reason: {}",
-                        e
-                    ))
-                })?;
-
-            // Add the Authorization header to the request
-            let headers = request.headers_mut();
-            headers.insert(
-                AUTHORIZATION,
-                format!("Bearer {}", tokens.access_token)
-                    .parse()
-                    .map_err(|e| {
-                        ATMError::TransportError(format!(
-                            "Could not set Authorization header: {:?}",
-                            e
-                        ))
-                    })?,
-            );
-
-            // Connect to the websocket
-            let (ws_stream, _) = connect_async_tls_with_config(
-                request,
-                None,
-                false,
-                Some(self.ws_connector.clone()),
-            )
-            .await
-            .expect("Failed to connect");
-
-            self.ws_stream = Some(ws_stream);
-
-            Ok(self.ws_stream.as_mut().unwrap())
+        for cert in &self.config.ssl_certificates {
+            config.ssl_certificates.push(cert.clone().into_owned())
         }
-        .instrument(_span)
-        .await
+
+        let mut atm = ATM {
+            config,
+            did_methods_resolver: DIDMethods::default(),
+            did_resolver: self.did_resolver.clone(),
+            secrets_resolver: self.secrets_resolver.clone(),
+            client: self.client.clone(),
+            authenticated: self.authenticated,
+            jwt_tokens: self.jwt_tokens.clone(),
+            ws_connector: self.ws_connector.clone(),
+            ws_enabled: self.ws_enabled,
+            ws_handler: None,
+            ws_send_stream: None,
+            ws_websocket: None,
+        };
+
+        // TODO: This is another dirty hack, there doesn't seem to be a nice way to add traits dynamically
+        atm.add_did_method(Box::new(DIDPeer));
+
+        // Create a new channel with a capacity of at most 32.
+        let (tx, mut rx) = mpsc::channel::<String>(32);
+
+        self.ws_send_stream = Some(tx);
+
+        // Start the websocket connection
+        let mut web_socket = self._create_socket(&mut atm).await?;
+        self.ws_websocket = Some(self._create_socket(&mut atm).await?);
+
+        self.ws_handler = Some(tokio::spawn(async move {
+            let _ = ATM::ws_handler(&mut atm, &mut rx, &mut web_socket).await;
+        }));
+
+        Ok(())
     }
 
     /// Close the WebSocket connection gracefully
-    pub async fn close_websocket(&mut self) -> Result<(), ATMError> {
+    pub async fn abort_websocket(&mut self) -> Result<(), ATMError> {
+        // Close the websocket connection
+
+        if let Some(websocket) = self.ws_websocket.as_mut() {
+            let _ = websocket.close(None).await;
+        }
+
+        // Abort the fetch task if running
+        //if let Some(ws_handler) = &self.ws_handler {
+        //     ws_handler.abort();
+        // }
+        /*
         if let Some(ws_stream) = self.ws_stream.as_mut() {
-            match ws_stream.close(None).await {
+            match ws_stream.write().await.close(None).await {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(ATMError::TransportError(format!(
@@ -92,6 +101,12 @@ impl<'c> ATM<'c> {
         }
 
         self.ws_stream = None;
+
+        // Abort the fetch task if running
+        if let Some(fetch_task) = &self.fetch_task_handle {
+            fetch_task.abort();
+        }*/
+
         Ok(())
     }
 }

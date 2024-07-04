@@ -72,8 +72,8 @@ pub(crate) async fn handle_inbound(
         let response = msg.process(state, session).await?;
         debug!("message processed:\n{:#?}", response);
 
-        // Store the message if necessary
-        if response.store_message {
+        // Pack the message and store it if necessary
+        let packed_message = if response.store_message {
             let mut stored_messages = InboundMessageList::default();
             if let Some(response) = &response.message {
                 // Pack the message for the next recipient(s)
@@ -128,7 +128,7 @@ pub(crate) async fn handle_inbound(
                     }
                 }
             }
-            Ok(InboundMessageResponse::Stored(stored_messages))
+            InboundMessageResponse::Stored(stored_messages)
         } else if let Some(message) = response.message {
             let (packed, _) = message
                 .pack(
@@ -139,14 +139,18 @@ pub(crate) async fn handle_inbound(
                     &did_resolver,
                 )
                 .await?;
-            Ok(InboundMessageResponse::Ephemeral(packed))
+            InboundMessageResponse::Ephemeral(packed)
         } else {
             error!("No message to return");
-            Err(MediatorError::InternalError(
+            return Err(MediatorError::InternalError(
                 session.session_id.clone(),
                 "Expected a message to return, but got None".into(),
-            ))
-        }
+            ));
+        };
+
+        // Live stream the message?
+
+        Ok(packed_message)
     }
     .instrument(_span)
     .await

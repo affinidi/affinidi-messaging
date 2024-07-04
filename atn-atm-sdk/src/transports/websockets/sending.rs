@@ -3,9 +3,7 @@ use crate::{
     transports::{SendMessageResponse, WebSocketSendResponse},
     ATM,
 };
-use futures_util::SinkExt;
 use sha256::digest;
-use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, span, Level};
 
 impl<'c> ATM<'c> {
@@ -18,19 +16,28 @@ impl<'c> ATM<'c> {
     ) -> Result<SendMessageResponse<T>, ATMError> {
         let _span = span!(Level::DEBUG, "send_didcomm_message",).entered();
 
-        let ws_stream = if let Some(ws_stream) = self.ws_stream.as_mut() {
-            ws_stream
+        let ws_stream = if let Some(ws_stream) = &self.ws_send_stream {
+            ws_stream.clone()
         } else {
-            self.start_websocket().await?
+            self.start_websocket().await?;
+            self.ws_send_stream.clone().ok_or_else(|| {
+                ATMError::TransportError("Could not get websocket stream".to_string())
+            })?
         };
 
         let message_digest = digest(message);
 
         debug!("Sending message: {:?}", message);
+
+        ws_stream.send(message.to_owned()).await.map_err(|err| {
+            ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
+        })?;
+        /*
         ws_stream
             .send(Message::Text(message.to_owned()))
             .await
             .map_err(|e| ATMError::TransportError(format!("Could not send message: {:?}", e)))?;
+        */
 
         debug!("Message ({}) sent successfully", message_digest);
         Ok(SendMessageResponse::WebSocket(WebSocketSendResponse {

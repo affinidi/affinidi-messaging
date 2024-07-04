@@ -55,7 +55,7 @@ async fn main() -> Result<(), ATMError> {
 
     // For this example, we are forcing REST API only by closing the websocket
     // NOTE: We could have done this when we configured the ATM, but we are doing it here for demonstration purposes
-    atm.close_websocket().await?;
+    //atm.close_websocket().await?;
 
     // Send a Message Pickup 3.0 Status Request
     let response = protocols
@@ -66,6 +66,8 @@ async fn main() -> Result<(), ATMError> {
     // Check if we received a status
     if let SendMessageResponse::RestAPI(Some(status)) = response {
         info!("Status: {:?}", status);
+    } else if let SendMessageResponse::WebSocket(response) = response {
+        info!("WebSocket Status: {:?}", response);
     } else {
         warn!("No status received");
     }

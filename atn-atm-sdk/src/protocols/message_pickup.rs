@@ -116,7 +116,7 @@ impl MessagePickup {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if atm.ws_stream.is_some() {
+        if atm.ws_send_stream.is_some() {
             atm.ws_send_didcomm_message(&msg, &msg_id).await
         } else {
             type MessageString = String;

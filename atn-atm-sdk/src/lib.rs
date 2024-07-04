@@ -4,22 +4,20 @@ use atn_atm_didcomm::secrets::Secret;
 use config::Config;
 use errors::ATMError;
 use messages::AuthorizationResponse;
-use reqwest::Certificate;
-use reqwest::Client;
+use reqwest::{Certificate, Client};
 use resolvers::did_resolver::AffinidiDIDResolver;
 use resolvers::secrets_resolver::AffinidiSecrets;
-use rustls::ClientConfig;
-use rustls::RootCertStore;
+use rustls::{ClientConfig, RootCertStore};
 use ssi::did::{DIDMethod, DIDMethods};
 use ssi::did_resolve::DIDResolver as SSIDIDResolver;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc::Sender;
+use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
 use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::WebSocketStream;
-use tracing::debug;
-use tracing::span;
-use tracing::warn;
+use tracing::{debug, span, warn};
 
 mod authentication;
 pub mod config;
@@ -45,7 +43,9 @@ pub struct ATM<'c> {
     jwt_tokens: Option<AuthorizationResponse>,
     ws_connector: Connector,
     pub(crate) ws_enabled: bool,
-    pub(crate) ws_stream: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    ws_handler: Option<JoinHandle<()>>,
+    ws_send_stream: Option<Sender<String>>,
+    ws_websocket: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -135,7 +135,9 @@ impl<'c> ATM<'c> {
             jwt_tokens: None,
             ws_connector,
             ws_enabled: config.ws_enabled,
-            ws_stream: None,
+            ws_handler: None,
+            ws_send_stream: None,
+            ws_websocket: None,
         };
 
         for method in did_methods {
@@ -155,6 +157,7 @@ impl<'c> ATM<'c> {
         if atm.ws_enabled {
             atm.start_websocket().await?;
         }
+        debug!("ATM SDK initialized");
 
         Ok(atm)
     }

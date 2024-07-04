@@ -100,7 +100,7 @@ impl TrustPing {
         msg_info.message_hash = digest(&msg).to_string();
         msg_info.bytes = msg.len() as u32;
 
-        if atm.ws_stream.is_some() {
+        if atm.ws_send_stream.is_some() {
             atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_info.message_id)
                 .await?;
         } else {

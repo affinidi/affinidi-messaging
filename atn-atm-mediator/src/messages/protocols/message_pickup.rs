@@ -7,7 +7,7 @@ use redis::{from_redis_value, Value};
 use serde_json::json;
 use sha256::digest;
 use std::time::SystemTime;
-use tracing::{debug, event, info, span, Instrument, Level};
+use tracing::{debug, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
@@ -144,7 +144,7 @@ pub(crate) async fn status_request(
     debug!("Body: recipient_did: {}", recipient_did);
 
     info!(
-        "MessagePickup Status-Request received from: ({}) recipient_did({:?})",
+        "MessagePickup Status-Request received from: ({}) recipient_did_hash({:?})",
         msg.from.clone().unwrap_or_else(|| "ANONYMOUS".to_string()),
         recipient_did
     );
@@ -233,8 +233,9 @@ async fn generate_status_reply(
                         status.total_bytes = v;
                     }
                 }
+                "recipient_did" => continue,
                 _ => {
-                    debug!("Unknown key: ({:?}) with value: ({:?})", k, v);
+                    warn!("Unknown key: ({:?}) with value: ({:?})", k, v);
                 }
             }
         }
