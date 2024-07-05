@@ -1,16 +1,7 @@
-use std::sync::Arc;
-
 use crate::{config::Config, errors::ATMError, ATM};
 use did_peer::DIDPeer;
-use http::header::AUTHORIZATION;
-use rustls::pki_types::CertificateDer;
 use ssi::did::DIDMethods;
-use tokio::{
-    sync::{mpsc, RwLock},
-    task::JoinHandle,
-};
-use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::client::IntoClientRequest};
-use tracing::{debug, span, Instrument, Level};
+use tokio::sync::mpsc;
 
 pub mod sending;
 pub mod ws_handler;

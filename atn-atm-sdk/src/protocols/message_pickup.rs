@@ -158,7 +158,7 @@ impl MessagePickup {
             .unwrap()
             .as_secs();
 
-        let mut msg = Message::build(
+        let msg = Message::build(
             Uuid::new_v4().into(),
             "https://didcomm.org/messagepickup/3.0/live-delivery-change".to_owned(),
             json!({"live_delivery": live_delivery}),
