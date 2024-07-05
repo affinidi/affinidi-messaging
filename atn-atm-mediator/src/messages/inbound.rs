@@ -17,11 +17,7 @@ pub(crate) async fn handle_inbound(
     session: &Session,
     message: &str,
 ) -> Result<InboundMessageResponse, MediatorError> {
-    let _span = span!(
-        tracing::Level::DEBUG,
-        "handle_inbound",
-        session_id = session.session_id.as_str()
-    );
+    let _span = span!(tracing::Level::DEBUG, "handle_inbound",);
 
     async move {
         let mut did_method_resolver = DIDMethods::default();
@@ -149,6 +145,16 @@ pub(crate) async fn handle_inbound(
         };
 
         // Live stream the message?
+        if let Some(uuid) = state.database.is_live_streaming(&session.did_hash).await {
+            debug!("Live streaming message to UUID: {}", uuid);
+
+            state
+                .database
+                .publish_live_message(&session.did_hash, &uuid, message)
+                .await?;
+        } else {
+            debug!("Not live streaming messages...");
+        }
 
         Ok(packed_message)
     }
