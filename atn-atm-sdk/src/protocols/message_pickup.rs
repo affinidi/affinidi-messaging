@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::ATMError,
-    messages::{sending::InboundMessageResponse, GenericDataStruct},
+    messages::{sending::InboundMessageResponse, EmptyResponse, GenericDataStruct},
     transports::SendMessageResponse,
     ATM,
 };
@@ -143,5 +143,52 @@ impl MessagePickup {
                 Err(ATMError::MsgSendError("No response from API".into()))
             }
         }
+    }
+
+    pub async fn toggle_live_delivery<'c>(
+        &self,
+        atm: &'c mut ATM<'_>,
+        live_delivery: bool,
+    ) -> Result<(), ATMError> {
+        let _span = span!(Level::DEBUG, "toggle_live_delivery",).entered();
+        debug!("Setting live_delivery to {}", live_delivery);
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/live-delivery-change".to_owned(),
+            json!({"live_delivery": live_delivery}),
+        )
+        .header("return_route".into(), Value::String("all".into()))
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+        let msg_id = msg.id.clone();
+
+        // Pack the message
+        let (msg, _) = msg
+            .pack_encrypted(
+                &atm.config.atm_did,
+                Some(&atm.config.my_did),
+                Some(&atm.config.my_did),
+                &atm.did_resolver,
+                &atm.secrets_resolver,
+                &PackEncryptedOptions::default(),
+            )
+            .await
+            .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+        if atm.ws_send_stream.is_some() {
+            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
+                .await?;
+        } else {
+            atm.send_didcomm_message::<InboundMessageResponse>(&msg, true)
+                .await?;
+        }
+        Ok(())
     }
 }

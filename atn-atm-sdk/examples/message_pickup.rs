@@ -57,6 +57,12 @@ async fn main() -> Result<(), ATMError> {
     // NOTE: We could have done this when we configured the ATM, but we are doing it here for demonstration purposes
     //atm.close_websocket().await?;
 
+    // Enable live streaming
+    protocols
+        .message_pickup
+        .toggle_live_delivery(&mut atm, true)
+        .await?;
+
     // Send a Message Pickup 3.0 Status Request
     let response = protocols
         .message_pickup
