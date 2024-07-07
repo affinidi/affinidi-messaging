@@ -1,8 +1,7 @@
 use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use crate::{common::errors::MediatorError, tasks::websocket_streaming::PubSubRecord};
 use deadpool_redis::Connection;
 use redis::{from_redis_value, Value};
-use serde_json::json;
 use tracing::{debug, error, event, Level};
 
 impl DatabaseHandler {
@@ -98,11 +97,34 @@ impl DatabaseHandler {
         stream_uuid: &str,
         message: &str,
     ) -> Result<(), MediatorError> {
+        let record = match serde_json::to_string(&PubSubRecord {
+            did_hash: did_hash.to_string(),
+            message: message.to_string(),
+        }) {
+            Ok(record) => record,
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "publish_live_message() for did_hash({}) failed to serialize message. Reason: {}",
+                    did_hash,
+                    err
+                );
+                return Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!(
+                        "publish_live_message() for did_hash({}) failed to serialize message. Reason: {}",
+                        did_hash,
+                        err
+                    ),
+                ));
+            }
+        };
+
         let mut conn = self.get_async_connection().await?;
 
         match deadpool_redis::redis::cmd("PUBLISH")
             .arg(["CHANNEL:", stream_uuid].concat())
-            .arg(json!({ "did_hash": did_hash, "message": message }).to_string())
+            .arg(record)
             .query_async::<Connection, Value>(&mut conn)
             .await
         {

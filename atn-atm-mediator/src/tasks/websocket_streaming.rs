@@ -1,9 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
 use redis::aio::PubSub;
+use serde::{Deserialize, Serialize};
 use tokio::{select, sync::mpsc, task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
-use tracing::{debug, error, info, span, Instrument, Level};
+use tracing::{debug, error, info, span, warn, Instrument, Level};
 
 use crate::{common::errors::MediatorError, database::DatabaseHandler};
 
@@ -35,6 +36,12 @@ pub struct StreamingTask {
     pub channel: mpsc::Sender<StreamingUpdate>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PubSubRecord {
+    pub did_hash: String,
+    pub message: String,
+}
+
 impl StreamingTask {
     /// Creates the streaming task handler
     pub async fn new(
@@ -57,7 +64,7 @@ impl StreamingTask {
                 let _task = task.clone();
                 tokio::spawn(async move {
                     _task
-                        .ws_streaming(database, &mut rx, _mediator_uuid)
+                        .ws_streaming_task(database, &mut rx, _mediator_uuid)
                         .await
                         .expect("Error starting websocket_streaming thread");
                 })
@@ -99,16 +106,16 @@ impl StreamingTask {
 
     /// Streams messages to subscribed clients over websocket.
     /// Is spawned as a task
-    async fn ws_streaming(
+    async fn ws_streaming_task(
         &self,
         database: DatabaseHandler,
         channel: &mut mpsc::Receiver<StreamingUpdate>,
         uuid: String,
     ) -> Result<(), MediatorError> {
-        let _span = span!(Level::INFO, "ws_streaming", uuid = uuid);
+        let _span = span!(Level::INFO, "ws_streaming_task", uuid = uuid);
 
         async move {
-            debug!("Starting ws_streaming thread...");
+            debug!("Starting...");
 
             // Clean up any existing sessions left over from previous runs
             database.streaming_clean_start(&uuid).await?;
@@ -128,7 +135,27 @@ impl StreamingTask {
                     value = stream.next() => {
                         if let Some(msg) = value {
                             if let Ok(payload) = msg.get_payload::<String>() {
-                                info!("Received message: {}", payload);
+                                let payload: PubSubRecord = serde_json::from_str(&payload).unwrap();
+
+                                // Find the MPSC transmit channel for the associated DID hash
+                                if let Some((tx, active)) = clients.get(&payload.did_hash) {
+                                    if *active {
+                                        // Send the message to the client
+                                        if let Err(err) = tx.send(payload.message.clone()).await {
+                                            error!("Error sending message to client ({}): {}", payload.did_hash, err);
+                                        } else {
+                                            info!("Sent message to client ({})", payload.did_hash);
+                                        }
+                                    } else {
+                                        warn!("pub/sub msg received for did_hash({}) but it is not active", payload.did_hash);
+                                        if let Err(err) = database.streaming_remove_client(&payload.did_hash, &uuid).await {
+                                            error!("Error stopping streaming for client ({}): {}", payload.did_hash, err);
+                                        }
+                                    }
+                                } else {
+                                    warn!("pub/sub msg received for did_hash({}) but it doesn't exist in clients HashMap", payload.did_hash);
+                                }
+
                             } else {
                                 error!("Error getting payload from message");
                                 continue;
@@ -169,7 +196,7 @@ impl StreamingTask {
                                 },
                                 StreamingUpdateState::Stop => {
                                     // Set active to false
-                                   /* if let Some((_, active)) = clients.get_mut(&value.did_hash) {
+                                    if let Some((_, active)) = clients.get_mut(&value.did_hash) {
                                         info!("Stopping streaming for DID: ({})", value.did_hash);
                                         *active = false;
                                     };
@@ -177,16 +204,13 @@ impl StreamingTask {
                                     if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
-                                    */
                                 },
                                 StreamingUpdateState::Deregister => {
-                                    /*
                                     info!("Deregistering streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()-1);
                                     if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
                                     clients.remove(value.did_hash.as_str());
-                                    */
                                 }
                             }
                         }
