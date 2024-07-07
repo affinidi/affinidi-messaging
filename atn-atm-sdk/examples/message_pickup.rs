@@ -64,10 +64,10 @@ async fn main() -> Result<(), ATMError> {
         .await?;
 
     // Send a Message Pickup 3.0 Status Request
-    let response = protocols
-        .message_pickup
-        .send_status_request(&mut atm, None, None)
-        .await?;
+    /*let response = protocols
+    .message_pickup
+    .send_status_request(&mut atm, None, None)
+    .await?;
 
     // Check if we received a status
     if let SendMessageResponse::RestAPI(Some(status)) = response {
@@ -76,7 +76,9 @@ async fn main() -> Result<(), ATMError> {
         info!("WebSocket Status: {:?}", response);
     } else {
         warn!("No status received");
-    }
+    }*/
+
+    //atm.abort_websocket_task().await?;
 
     Ok(())
 }

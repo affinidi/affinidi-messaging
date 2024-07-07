@@ -41,23 +41,31 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         session = session.session_id
     );
     async move {
-        let _ = state.database.global_stats_increment_websocket_open().await;
-        info!("Websocket connection established");
-
-        // Test of communicating to the streaming task
+        // Register the transmission channel between websocket_streaming task and this websocket.
         let rx = if let Some(streaming) = &state.streaming_task {
             let (tx, mut rx): (Sender<String>, Receiver<String>) = mpsc::channel(5);
 
-            let a = StreamingUpdate {
+            let start = StreamingUpdate {
                 did_hash: session.did_hash.clone(),
-                state: StreamingUpdateState::Start(tx),
+                state: StreamingUpdateState::Register(tx),
             };
-            streaming.channel.send(a).await;
+            match streaming.channel.send(start).await {
+                Ok(_) => {
+                    debug!("Sent start message to streaming task");
+                }
+                Err(e) => {
+                    warn!("Error sending start message to streaming task: {:?}", e);
+                    return;
+                }
+            }
 
             Some(rx)
         } else {
             None
         };
+
+        let _ = state.database.global_stats_increment_websocket_open().await;
+        info!("Websocket connection established");
 
         loop {
             let msg = if let Some(msg) = socket.recv().await {
@@ -103,6 +111,15 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
             //debug!("Sending response: {} messages", messages.messages.len());
 
             // Send responses
+        }
+
+        // Remove this websocket and associated info from the streaming task
+        if let Some(streaming) = &state.streaming_task {
+            let stop = StreamingUpdate {
+                did_hash: session.did_hash.clone(),
+                state: StreamingUpdateState::Deregister,
+            };
+            let _ = streaming.channel.send(stop).await;
         }
 
         // We're done, close the connection

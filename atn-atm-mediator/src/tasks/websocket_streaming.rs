@@ -11,11 +11,15 @@ use crate::{common::errors::MediatorError, database::DatabaseHandler};
 // https://github.com/redis-rs/redis-rs/issues/509
 
 /// Used when updating the streaming state.
+/// Register: Creates the hash map entry for the DID hash and TX Channel
 /// Start: Start streaming messages to clients.
 /// Stop: Stop streaming messages to clients.
+/// Deregister: Remove the hash map entry for the DID hash.
 pub enum StreamingUpdateState {
-    Start(mpsc::Sender<String>),
+    Register(mpsc::Sender<String>),
+    Start,
     Stop,
+    Deregister,
 }
 
 /// Used to update the streaming state.
@@ -107,9 +111,10 @@ impl StreamingTask {
             debug!("Starting ws_streaming thread...");
 
             // Clean up any existing sessions left over from previous runs
-            database.clean_start_streaming(&uuid).await?;
+            database.streaming_clean_start(&uuid).await?;
 
-            let mut clients: HashMap<String, mpsc::Sender<String>> = HashMap::new();
+            // Create a hashmap to store the clients and if they are active (true = yes)
+            let mut clients: HashMap<String, (mpsc::Sender<String>, bool)> = HashMap::new();
 
             // Start streaming messages to clients
             let mut pubsub = self._start_pubsub(database.clone(), &uuid).await?;
@@ -148,13 +153,40 @@ impl StreamingTask {
                     value = channel.recv() => {
                         if let Some(value) = value {
                             match value.state {
-                                StreamingUpdateState::Start(client_tx) => {
-                                    info!("Starting streaming for DID: {}", value.did_hash);
-                                    clients.insert(value.did_hash.clone(), client_tx);
-                                }
+                                StreamingUpdateState::Register(client_tx) => {
+                                    info!("Registered streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()+1);
+                                    clients.insert(value.did_hash.clone(), (client_tx, false));
+                                },
+                                StreamingUpdateState::Start => {
+                                    if let Some((_, active)) = clients.get_mut(&value.did_hash) {
+                                        info!("Starting streaming for DID: ({})", value.did_hash);
+                                        *active = true;
+                                    };
+
+                                    if let Err(err) = database.streaming_add_client(&value.did_hash, &uuid).await {
+                                        error!("Error starting streaming to client ({}) streaming: {}",value.did_hash, err);
+                                    }
+                                },
                                 StreamingUpdateState::Stop => {
-                                    info!("Stopping streaming for DID: {}", value.did_hash);
+                                    // Set active to false
+                                   /* if let Some((_, active)) = clients.get_mut(&value.did_hash) {
+                                        info!("Stopping streaming for DID: ({})", value.did_hash);
+                                        *active = false;
+                                    };
+
+                                    if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
+                                        error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
+                                    }
+                                    */
+                                },
+                                StreamingUpdateState::Deregister => {
+                                    /*
+                                    info!("Deregistering streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()-1);
+                                    if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
+                                        error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
+                                    }
                                     clients.remove(value.did_hash.as_str());
+                                    */
                                 }
                             }
                         }

@@ -145,12 +145,16 @@ pub(crate) async fn handle_inbound(
         };
 
         // Live stream the message?
-        if let Some(uuid) = state.database.is_live_streaming(&session.did_hash).await {
+        if let Some(uuid) = state
+            .database
+            .streaming_is_client_live(&session.did_hash)
+            .await
+        {
             debug!("Live streaming message to UUID: {}", uuid);
 
             state
                 .database
-                .publish_live_message(&session.did_hash, &uuid, message)
+                .streaming_publish_message(&session.did_hash, &uuid, message)
                 .await?;
         } else {
             debug!("Not live streaming messages...");

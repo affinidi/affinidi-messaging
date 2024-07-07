@@ -125,7 +125,7 @@ async fn main() -> Result<(), ATMError> {
     // Send a WebSocket message
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
-    atm.start_websocket().await?;
+    atm.start_websocket_task().await?;
     let after_websocket = SystemTime::now();
 
     let response = protocols

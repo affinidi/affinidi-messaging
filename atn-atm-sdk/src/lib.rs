@@ -11,12 +11,10 @@ use rustls::{ClientConfig, RootCertStore};
 use ssi::did::{DIDMethod, DIDMethods};
 use ssi::did_resolve::DIDResolver as SSIDIDResolver;
 use std::sync::Arc;
-use tokio::net::TcpStream;
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
-use tokio_tungstenite::MaybeTlsStream;
-use tokio_tungstenite::WebSocketStream;
 use tracing::{debug, span, warn};
 
 mod authentication;
@@ -45,7 +43,7 @@ pub struct ATM<'c> {
     pub(crate) ws_enabled: bool,
     ws_handler: Option<JoinHandle<()>>,
     ws_send_stream: Option<Sender<String>>,
-    ws_websocket: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    ws_recv_stream: Option<Receiver<String>>,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -137,7 +135,7 @@ impl<'c> ATM<'c> {
             ws_enabled: config.ws_enabled,
             ws_handler: None,
             ws_send_stream: None,
-            ws_websocket: None,
+            ws_recv_stream: None,
         };
 
         for method in did_methods {
@@ -155,7 +153,7 @@ impl<'c> ATM<'c> {
 
         // Start the websocket connection if enabled
         if atm.ws_enabled {
-            atm.start_websocket().await?;
+            atm.start_websocket_task().await?;
         }
         debug!("ATM SDK initialized");
 

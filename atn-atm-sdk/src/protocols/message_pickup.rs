@@ -22,6 +22,12 @@ pub struct MessagePickupStatusRequest {
     pub recipient_did: Option<String>,
 }
 
+// Reads the body of an incoming Message Pickup 3.0 Live Delivery Message
+#[derive(Default, Deserialize)]
+pub struct MessagePickupLiveDelivery {
+    pub live_delivery: bool,
+}
+
 // Body of a StatusRequest reply
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct MessagePickupStatusReply {
@@ -151,7 +157,7 @@ impl MessagePickup {
         live_delivery: bool,
     ) -> Result<(), ATMError> {
         let _span = span!(Level::DEBUG, "toggle_live_delivery",).entered();
-        debug!("Setting live_delivery to {}", live_delivery);
+        debug!("Setting live_delivery to ({})", live_delivery);
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -166,6 +172,8 @@ impl MessagePickup {
         .header("return_route".into(), Value::String("all".into()))
         .created_time(now)
         .expires_time(now + 300)
+        .from(atm.config.my_did.clone())
+        .to(atm.config.atm_did.clone())
         .finalize();
         let msg_id = msg.id.clone();
 

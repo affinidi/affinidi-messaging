@@ -32,6 +32,9 @@ impl FromStr for MessageType {
             "https://didcomm.org/messagepickup/3.0/status-request" => {
                 Ok(Self::MessagePickupStatusRequest)
             }
+            "https://didcomm.org/messagepickup/3.0/live-delivery-change" => {
+                Ok(Self::MessagePickupLiveDeliveryChange)
+            }
             _ => Err(MediatorError::ParseError(
                 "-1".into(),
                 s.into(),
@@ -61,10 +64,9 @@ impl MessageType {
                 session.session_id.clone(),
                 "NOT IMPLEMENTED".into(),
             )),
-            Self::MessagePickupLiveDeliveryChange => Err(MediatorError::NotImplemented(
-                session.session_id.clone(),
-                "NOT IMPLEMENTED".into(),
-            )),
+            Self::MessagePickupLiveDeliveryChange => {
+                message_pickup::toggle_live_delivery(message, state, session).await
+            }
             Self::AffinidiAuthenticate => Err(MediatorError::NotImplemented(
                 session.session_id.clone(),
                 "Affinidi Authentication is only handled by the Authorization handler".into(),

@@ -19,7 +19,7 @@ impl<'c> ATM<'c> {
         let ws_stream = if let Some(ws_stream) = &self.ws_send_stream {
             ws_stream.clone()
         } else {
-            self.start_websocket().await?;
+            self.start_websocket_task().await?;
             self.ws_send_stream.clone().ok_or_else(|| {
                 ATMError::TransportError("Could not get websocket stream".to_string())
             })?

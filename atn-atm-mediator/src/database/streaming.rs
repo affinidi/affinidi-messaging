@@ -6,7 +6,7 @@ use serde_json::json;
 use tracing::{debug, error, event, Level};
 
 impl DatabaseHandler {
-    pub async fn clean_start_streaming(&self, uuid: &str) -> Result<(), MediatorError> {
+    pub async fn streaming_clean_start(&self, uuid: &str) -> Result<(), MediatorError> {
         let mut conn = self.get_async_connection().await?;
 
         let response: Vec<Value> = deadpool_redis::redis::pipe()
@@ -57,7 +57,7 @@ impl DatabaseHandler {
 
     /// Checks if the given DID hash is live streaming
     /// Returns the streaming service ID that the client is connecting to if the DID hash is live streaming
-    pub async fn is_live_streaming(&self, did_hash: &str) -> Option<String> {
+    pub async fn streaming_is_client_live(&self, did_hash: &str) -> Option<String> {
         let mut conn = if let Ok(conn) = self.get_async_connection().await {
             conn
         } else {
@@ -92,7 +92,7 @@ impl DatabaseHandler {
     ///       While it would be more efficient in some ways, it would also mean pushing the full message to Redis
     ///       on every delivery, as messages get larger this would become less efficient.
     ///       So best compromise is to have the client check if live-streaming is active, then send the message
-    pub async fn publish_live_message(
+    pub async fn streaming_publish_message(
         &self,
         did_hash: &str,
         stream_uuid: &str,
@@ -130,6 +130,103 @@ impl DatabaseHandler {
                         err
                     ),
                 ))
+            }
+        }
+    }
+
+    /// Adds a client to the live streaming service
+    pub async fn streaming_add_client(
+        &self,
+        did_hash: &str,
+        stream_uuid: &str,
+    ) -> Result<(), MediatorError> {
+        let mut conn = self.get_async_connection().await?;
+
+        match deadpool_redis::redis::pipe()
+            .atomic()
+            .cmd("SADD")
+            .arg(["STREAMING_SESSIONS:", stream_uuid].concat())
+            .arg(did_hash)
+            .cmd("HSET")
+            .arg("GLOBAL_STREAMING")
+            .arg(did_hash)
+            .arg(stream_uuid)
+            .query_async::<Connection, Value>(&mut conn)
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "added did_hash({}) to live streaming service({})",
+                    did_hash, stream_uuid
+                );
+
+                Ok(())
+            }
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "streaming_add_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    did_hash,
+                    stream_uuid,
+                    err
+                );
+                Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!(
+                        "streaming_add_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                        did_hash,
+                        stream_uuid,
+                        err
+                    ),
+                ))
+            }
+        }
+    }
+
+    /// Removes a client from the live streaming service
+    pub async fn streaming_remove_client(
+        &self,
+        did_hash: &str,
+        stream_uuid: &str,
+    ) -> Result<(), MediatorError> {
+        let mut conn = self.get_async_connection().await?;
+
+        match deadpool_redis::redis::pipe()
+            .atomic()
+            .cmd("SREM")
+            .arg(["STREAMING_SESSIONS:", stream_uuid].concat())
+            .arg(did_hash)
+            .cmd("HDEL")
+            .arg("GLOBAL_STREAMING")
+            .arg(did_hash)
+            .query_async::<Connection, Value>(&mut conn)
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "removed did_hash({}) from live streaming service({})",
+                    did_hash, stream_uuid
+                );
+
+                Ok(())
+            }
+            Err(err) => {
+                event!(
+                Level::ERROR,
+                "streaming_remove_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                did_hash,
+                stream_uuid,
+                err
+            );
+                Err(MediatorError::DatabaseError(
+                "NA".into(),
+                format!(
+                    "streaming_remove_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    did_hash,
+                    stream_uuid,
+                    err
+                ),
+            ))
             }
         }
     }

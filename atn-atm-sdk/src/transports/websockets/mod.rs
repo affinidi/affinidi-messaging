@@ -2,6 +2,7 @@ use crate::{config::Config, errors::ATMError, ATM};
 use did_peer::DIDPeer;
 use ssi::did::DIDMethods;
 use tokio::sync::mpsc;
+use tracing::debug;
 
 pub mod sending;
 pub mod ws_handler;
@@ -18,7 +19,7 @@ impl<'c> ATM<'c> {
     /// // Get a websocket connection (should be mutable as it will be used to send messages)
     /// let mut ws = atm.get_websocket().await?;
     /// ```
-    pub async fn start_websocket(&mut self) -> Result<(), ATMError> {
+    pub async fn start_websocket_task(&mut self) -> Result<(), ATMError> {
         // Some hackery to get around the Rust lifetimes by various items in the SDK
         // Create a copy of ATM with owned values
         let mut config = Config {
@@ -42,61 +43,45 @@ impl<'c> ATM<'c> {
             ws_enabled: self.ws_enabled,
             ws_handler: None,
             ws_send_stream: None,
-            ws_websocket: None,
+            ws_recv_stream: None,
         };
 
         // TODO: This is another dirty hack, there doesn't seem to be a nice way to add traits dynamically
         atm.add_did_method(Box::new(DIDPeer));
 
-        // Create a new channel with a capacity of at most 32.
+        // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
         let (tx, mut rx) = mpsc::channel::<String>(32);
-
         self.ws_send_stream = Some(tx);
 
+        // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
+        let (tx2, rx2) = mpsc::channel::<String>(32);
+        self.ws_recv_stream = Some(rx2);
+
         // Start the websocket connection
-        let mut web_socket = self._create_socket(&mut atm).await?;
-        self.ws_websocket = Some(self._create_socket(&mut atm).await?);
+        //let mut web_socket = self._create_socket(&mut atm).await?;
+        //self.ws_websocket = Some(self._create_socket(&mut atm).await?);
+        // self.ws_websocket = Some(web_socket);
 
         self.ws_handler = Some(tokio::spawn(async move {
-            let _ = ATM::ws_handler(&mut atm, &mut rx, &mut web_socket).await;
+            let _ = ATM::ws_handler(&mut atm, &mut rx, &tx2).await;
         }));
+
+        if let Some(ws_recv) = self.ws_recv_stream.as_mut() {
+            if let Some(msg) = ws_recv.recv().await {
+                debug!("Received message from websocket handler: {}", msg);
+            }
+        }
+
+        debug!("Websocket connection and handler started");
 
         Ok(())
     }
 
-    /// Close the WebSocket connection gracefully
-    pub async fn abort_websocket(&mut self) -> Result<(), ATMError> {
-        // Close the websocket connection
-
-        if let Some(websocket) = self.ws_websocket.as_mut() {
-            let _ = websocket.close(None).await;
+    /// Close the WebSocket task gracefully
+    pub async fn abort_websocket_task(&mut self) -> Result<(), ATMError> {
+        if let Some(channel) = self.ws_send_stream.as_mut() {
+            let _ = channel.send("EXIT".to_string()).await;
         }
-
-        // Abort the fetch task if running
-        //if let Some(ws_handler) = &self.ws_handler {
-        //     ws_handler.abort();
-        // }
-        /*
-        if let Some(ws_stream) = self.ws_stream.as_mut() {
-            match ws_stream.write().await.close(None).await {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(ATMError::TransportError(format!(
-                        "Failed to close websocket connection: {:?}",
-                        e
-                    )))
-                }
-            }
-        } else {
-            debug!("No websocket connection to close");
-        }
-
-        self.ws_stream = None;
-
-        // Abort the fetch task if running
-        if let Some(fetch_task) = &self.fetch_task_handle {
-            fetch_task.abort();
-        }*/
 
         Ok(())
     }

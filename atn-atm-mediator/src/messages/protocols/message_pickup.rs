@@ -1,19 +1,17 @@
 use atn_atm_didcomm::Message;
 use atn_atm_sdk::protocols::message_pickup::{
-    MessagePickupStatusReply, MessagePickupStatusRequest,
+    MessagePickupLiveDelivery, MessagePickupStatusReply, MessagePickupStatusRequest,
 };
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
 use serde_json::json;
 use sha256::digest;
 use std::time::SystemTime;
-use tracing::{debug, event, info, span, warn, Instrument, Level};
+use tracing::{debug, error, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::{MediatorError, Session},
-    messages::ProcessMessageResponse,
-    SharedData,
+    common::errors::{MediatorError, Session}, messages::ProcessMessageResponse, tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState}, SharedData
 };
 
 /// Process a Status Request message and generates a response
@@ -75,9 +73,7 @@ pub(crate) async fn status_request(
     }
 
     // Message can not be anonymous
-    let from = if let Some(from) = &msg.from {
-        from.to_owned()
-    } else {
+    if msg.from.is_none() {
         return Err(MediatorError::RequestDataError(
             session.session_id.clone(),
             "Message Pickup 3.0 Status-Request can not be anonymous as it is needed from to validate permissions".into(),
@@ -271,4 +267,145 @@ async fn generate_status_reply(
     }
     .instrument(_span)
     .await
+}
+
+/// Allows for turning on and off live delivery within ATM for a client
+pub(crate) async fn toggle_live_delivery(
+    msg: &Message,
+    state: &SharedData,
+    session: &Session,
+) -> Result<ProcessMessageResponse, MediatorError> {
+    let _span = span!(tracing::Level::DEBUG, "toggle_live_delivery",);
+    async move {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    if let Some(expires) = msg.expires_time {
+        if expires <= now {
+            debug!(
+                "Message expired at ({}) now({}) seconds_ago({})",
+                expires,
+                now,
+                now - expires
+            );
+            return Err(MediatorError::MessageExpired(
+                session.session_id.clone(),
+                expires.to_string(),
+                now.to_string(),
+            ));
+        }
+    }
+
+    // Ensure to: exists and is valid
+    let to = if let Some(to) = &msg.to {
+        if let Some(first) = to.first() {
+            first.to_owned()
+        } else {
+            return Err(MediatorError::RequestDataError(
+                session.session_id.clone(),
+                "Message missing valid 'to' field, expect at least one address in array.".into(),
+            ));
+        }
+    } else {
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "Message missing 'to' field".into(),
+        ));
+    };
+    debug!("To: {}", to);
+
+    // Must be addressed to ATM
+    if to != state.config.mediator_did {
+        debug!(
+            "to: ({}) doesn't match ATM DID ({})",
+            to, state.config.mediator_did
+        );
+        return Err(MediatorError::RequestDataError(session.session_id.clone(),
+         format!("message to: ({}) didn't match ATM DID ({}). Live Delivery messages must be addressed directly to ATM!",
+          to, state.config.mediator_did)));
+    }
+
+    // Message can not be anonymous
+    if msg.from.is_none() {
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "Message Pickup 3.0 Status-Request can not be anonymous as it is needed from to validate permissions".into(),
+        ));
+    };
+
+    // Check for extra-header `return_route`
+    if let Some(header) = msg.extra_headers.get("return_route") {
+        if header.as_str() != Some("all") {
+            debug!(
+                "return_route: extra-header exists. Expected (all) but received ({})",
+                header
+            );
+            return Err(MediatorError::RequestDataError(
+                session.session_id.clone(),
+                format!(
+                    "return_route: extra-header exists. Expected (all) but received ({})",
+                    header
+                ),
+            ));
+        }
+    } else {
+        debug!("return_route: extra-header does not exist!");
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "return_route: extra-header does not exist! It should!".into(),
+        ));
+    }
+
+    // Get or create the thread id for the response
+    let thid = if let Some(thid) = &msg.thid {
+        thid.to_owned()
+    } else {
+        msg.id.clone()
+    };
+    debug!("thid = ({})", thid);
+
+    // Pull live_delivery from message body
+    let live_delivery: bool = if let Ok(body) =
+        serde_json::from_value::<MessagePickupLiveDelivery>(msg.body.to_owned())
+    {
+        body.live_delivery
+    } else {
+        error!("Failed to parse live_delivery from message body");
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "Failed to parse live_delivery from message body".into(),
+        ));
+    };
+    debug!("Body: live_delivery: {}", live_delivery);
+
+    info!(
+        "MessagePickup live_delivery received from: ({}) live_delivery?({})",
+        msg.from.clone().unwrap_or_else(|| "ANONYMOUS".to_string()),
+        live_delivery
+    );
+
+    // Take action to change live delivery status
+    if live_delivery {
+        // Enable Live delivery
+        if let Some(stream_task) = &state.streaming_task {
+            stream_task.channel.send(StreamingUpdate { did_hash: session.did_hash.clone(), state: StreamingUpdateState::Start}).await.map_err(|e| {
+                error!("Error sending start message to streaming task: {:?}", e);
+                MediatorError::InternalError(session.session_id.clone(), "Error sending start message to streaming task".into())
+            })?;
+        }
+        
+    } else {
+        // Disable live delivery
+        if let Some(stream_task) = &state.streaming_task {
+            stream_task.channel.send(StreamingUpdate { did_hash: session.did_hash.clone(), state: StreamingUpdateState::Stop}).await.map_err(|e| {
+                error!("Error sending stop message to streaming task: {:?}", e);
+                MediatorError::InternalError(session.session_id.clone(), "Error sending stop message to streaming task".into())
+            })?;
+        }
+    }
+
+    generate_status_reply(state, session, &session.did_hash, &thid).await
+}.instrument(_span).await
 }
