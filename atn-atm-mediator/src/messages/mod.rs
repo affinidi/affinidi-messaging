@@ -78,6 +78,7 @@ impl MessageType {
 #[derive(Debug, Default)]
 pub(crate) struct ProcessMessageResponse {
     pub store_message: bool,
+    pub force_live_delivery: bool, // Will force a live delivery attempt.
     pub message: Option<Message>,
 }
 

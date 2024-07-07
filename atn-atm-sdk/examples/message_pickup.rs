@@ -63,11 +63,12 @@ async fn main() -> Result<(), ATMError> {
         .toggle_live_delivery(&mut atm, true)
         .await?;
 
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     // Send a Message Pickup 3.0 Status Request
-    /*let response = protocols
-    .message_pickup
-    .send_status_request(&mut atm, None, None)
-    .await?;
+    let response = protocols
+        .message_pickup
+        .send_status_request(&mut atm, None, None)
+        .await?;
 
     // Check if we received a status
     if let SendMessageResponse::RestAPI(Some(status)) = response {
@@ -76,7 +77,15 @@ async fn main() -> Result<(), ATMError> {
         info!("WebSocket Status: {:?}", response);
     } else {
         warn!("No status received");
-    }*/
+    }
+
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    // Disable live streaming
+    protocols
+        .message_pickup
+        .toggle_live_delivery(&mut atm, false)
+        .await?;
 
     //atm.abort_websocket_task().await?;
 

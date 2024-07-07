@@ -154,7 +154,12 @@ pub(crate) async fn handle_inbound(
 
             state
                 .database
-                .streaming_publish_message(&session.did_hash, &uuid, message)
+                .streaming_publish_message(
+                    &session.did_hash,
+                    &uuid,
+                    message,
+                    response.force_live_delivery,
+                )
                 .await?;
         } else {
             debug!("Not live streaming messages...");

@@ -114,6 +114,7 @@ pub(crate) fn process(
 
         Ok(ProcessMessageResponse {
             store_message: true,
+            force_live_delivery: false,
             message: Some(response_msg),
         })
     } else {

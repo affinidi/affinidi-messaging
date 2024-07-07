@@ -145,7 +145,7 @@ pub(crate) async fn status_request(
         recipient_did
     );
 
-    generate_status_reply(state, session, &recipient_did, &thid).await
+    generate_status_reply(state, session, &recipient_did, &thid, false).await
 }.instrument(_span).await
 }
 
@@ -155,6 +155,7 @@ async fn generate_status_reply(
     session: &Session,
     did_hash: &str,
     thid: &str,
+    force_live_delivery: bool,
 ) -> Result<ProcessMessageResponse, MediatorError> {
     let _span = span!(tracing::Level::DEBUG, "generate_status_reply",);
 
@@ -262,6 +263,7 @@ async fn generate_status_reply(
 
         Ok(ProcessMessageResponse {
             store_message: false,
+            force_live_delivery,
             message: Some(status_msg),
         })
     }
@@ -406,6 +408,6 @@ pub(crate) async fn toggle_live_delivery(
         }
     }
 
-    generate_status_reply(state, session, &session.did_hash, &thid).await
+    generate_status_reply(state, session, &session.did_hash, &thid, true).await
 }.instrument(_span).await
 }

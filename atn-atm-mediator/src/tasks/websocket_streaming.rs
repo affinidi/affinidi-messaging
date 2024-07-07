@@ -36,10 +36,17 @@ pub struct StreamingTask {
     pub channel: mpsc::Sender<StreamingUpdate>,
 }
 
+/// This is the format of the JSON message that is sent to the pub/sub channel.
+/// did_hash : SHA256 hash of the DID
+/// message : The message to send to the client
+/// force_delivery : If true, the message will be sent to the client even if they are not active.
+///
+/// NOTE: The force_delivery is required as when changing live_delivery status, standard says to send a status message
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PubSubRecord {
     pub did_hash: String,
     pub message: String,
+    pub force_delivery: bool,
 }
 
 impl StreamingTask {
@@ -139,7 +146,7 @@ impl StreamingTask {
 
                                 // Find the MPSC transmit channel for the associated DID hash
                                 if let Some((tx, active)) = clients.get(&payload.did_hash) {
-                                    if *active {
+                                    if payload.force_delivery ||  *active {
                                         // Send the message to the client
                                         if let Err(err) = tx.send(payload.message.clone()).await {
                                             error!("Error sending message to client ({}): {}", payload.did_hash, err);

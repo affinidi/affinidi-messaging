@@ -96,10 +96,12 @@ impl DatabaseHandler {
         did_hash: &str,
         stream_uuid: &str,
         message: &str,
+        force_delivery: bool,
     ) -> Result<(), MediatorError> {
         let record = match serde_json::to_string(&PubSubRecord {
             did_hash: did_hash.to_string(),
             message: message.to_string(),
+            force_delivery,
         }) {
             Ok(record) => record,
             Err(err) => {
