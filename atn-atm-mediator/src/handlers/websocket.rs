@@ -71,9 +71,9 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
             let msg = if let Some(msg) = socket.recv().await {
                 match msg {
                     Ok(msg) => {
-                        info!("Received message: {:?}", msg);
+                        info!("ws: Received message: {:?}", msg);
                         if let Message::Text(msg) = msg {
-                            debug!("Received text message: {:?}", msg);
+                            debug!("ws: Received text message: {:?}", msg);
                             msg
                         } else {
                             warn!("Received non-text message, ignoring");
