@@ -1,5 +1,3 @@
-use std::io::ErrorKind;
-
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -7,8 +5,11 @@ use axum::{
     },
     response::IntoResponse,
 };
-use tokio::sync::mpsc::{self, Receiver, Sender};
-use tracing::{debug, info, span, warn, Instrument};
+use tokio::{
+    select,
+    sync::mpsc::{self, Receiver, Sender},
+};
+use tracing::{debug, error, info, span, warn, Instrument};
 
 use crate::{
     common::errors::Session,
@@ -42,8 +43,8 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
     );
     async move {
         // Register the transmission channel between websocket_streaming task and this websocket.
-        let rx = if let Some(streaming) = &state.streaming_task {
-            let (tx, mut rx): (Sender<String>, Receiver<String>) = mpsc::channel(5);
+        let (tx, mut rx): (Sender<String>, Receiver<String>) = mpsc::channel(5);
+        if let Some(streaming) = &state.streaming_task {
 
             let start = StreamingUpdate {
                 did_hash: session.did_hash.clone(),
@@ -58,59 +59,51 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                     return;
                 }
             }
-
-            Some(rx)
-        } else {
-            None
-        };
+        }
 
         let _ = state.database.global_stats_increment_websocket_open().await;
         info!("Websocket connection established");
 
         loop {
-            let msg = if let Some(msg) = socket.recv().await {
-                match msg {
-                    Ok(msg) => {
+            select! {
+                value = socket.recv() => {
+                    if let Some(msg) = value {
                         info!("ws: Received message: {:?}", msg);
-                        if let Message::Text(msg) = msg {
-                            debug!("ws: Received text message: {:?}", msg);
-                            msg
-                        } else {
-                            warn!("Received non-text message, ignoring");
-                            continue;
-                        }
-                    }
-                    Err(e) => {
-                        let inner = e.into_inner();
-                        if let Some(err) = inner.source() {
-                            if let Some(io_error) = err.downcast_ref::<std::io::Error>() {
-                                if io_error.kind() == ErrorKind::UnexpectedEof {
-                                    // WebSocket closed - can safely ignore and exit
-                                    break;
-                                }
+                        if let Ok(msg) = msg {
+                            if let Message::Text(msg) = msg {
+                                debug!("ws: Received text message: {:?}", msg);
+
+                                // Process the message, which also takes care of any storing and live-streaming of the message
+                                match handle_inbound(&state, &session, &msg).await {
+                                    Ok(response) => {
+                                        debug!("Successful handling of message - finished processing");
+                                        response
+                                    }
+                                    Err(e) => {
+                                        warn!("Error processing message: {:?}", e);
+                                        continue;
+                                    }
+                                };
+                            } else {
+                                warn!("Received non-text message, ignoring");
+                                continue;
                             }
                         }
-                        warn!("Error receiving message: {}", inner.to_string());
+                    } else {
+                        debug!("Received None, closing connection");
                         break;
                     }
                 }
-            } else {
-                debug!("Received None, closing connection");
-                break;
-            };
-
-            // Process the message
-            let response = match handle_inbound(&state, &session, &msg).await {
-                Ok(response) => response,
-                Err(e) => {
-                    warn!("Error processing message: {:?}", e);
-                    continue;
+                value = rx.recv() => {
+                    if let Some(msg) = value {
+                        error!("ws: Received message from streaming task: {:?}", msg);
+                        //let _ = socket.send(Message::Text(msg)).await;
+                    } else {
+                        debug!("Received None from streaming task, closing connection");
+                        break;
+                    }
                 }
-            };
-
-            //debug!("Sending response: {} messages", messages.messages.len());
-
-            // Send responses
+            }
         }
 
         // Remove this websocket and associated info from the streaming task

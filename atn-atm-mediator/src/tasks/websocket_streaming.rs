@@ -155,7 +155,7 @@ impl StreamingTask {
                                         }
                                     } else {
                                         warn!("pub/sub msg received for did_hash({}) but it is not active", payload.did_hash);
-                                        if let Err(err) = database.streaming_remove_client(&payload.did_hash, &uuid).await {
+                                        if let Err(err) = database.streaming_stop_live(&payload.did_hash, &uuid).await {
                                             error!("Error stopping streaming for client ({}): {}", payload.did_hash, err);
                                         }
                                     }
@@ -190,6 +190,10 @@ impl StreamingTask {
                                 StreamingUpdateState::Register(client_tx) => {
                                     info!("Registered streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()+1);
                                     clients.insert(value.did_hash.clone(), (client_tx, false));
+
+                                    if let Err(err) = database.streaming_register_client(&value.did_hash, &uuid).await {
+                                        error!("Error starting streaming to client ({}) streaming: {}",value.did_hash, err);
+                                    }
                                 },
                                 StreamingUpdateState::Start => {
                                     if let Some((_, active)) = clients.get_mut(&value.did_hash) {
@@ -197,7 +201,7 @@ impl StreamingTask {
                                         *active = true;
                                     };
 
-                                    if let Err(err) = database.streaming_add_client(&value.did_hash, &uuid).await {
+                                    if let Err(err) = database.streaming_start_live(&value.did_hash, &uuid).await {
                                         error!("Error starting streaming to client ({}) streaming: {}",value.did_hash, err);
                                     }
                                 },
@@ -208,13 +212,13 @@ impl StreamingTask {
                                         *active = false;
                                     };
 
-                                    if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
+                                    if let Err(err) = database.streaming_stop_live(&value.did_hash, &uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
                                 },
                                 StreamingUpdateState::Deregister => {
                                     info!("Deregistering streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()-1);
-                                    if let Err(err) = database.streaming_remove_client(&value.did_hash, &uuid).await {
+                                    if let Err(err) = database.streaming_deregister_client(&value.did_hash, &uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
                                     clients.remove(value.did_hash.as_str());

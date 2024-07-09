@@ -55,8 +55,14 @@ impl DatabaseHandler {
     }
 
     /// Checks if the given DID hash is live streaming
+    /// did_hash: The DID hash to check
+    /// force_delivery: If true, the message will be delivered even if the client is not live streaming
     /// Returns the streaming service ID that the client is connecting to if the DID hash is live streaming
-    pub async fn streaming_is_client_live(&self, did_hash: &str) -> Option<String> {
+    pub async fn streaming_is_client_live(
+        &self,
+        did_hash: &str,
+        force_delivery: bool,
+    ) -> Option<String> {
         let mut conn = if let Ok(conn) = self.get_async_connection().await {
             conn
         } else {
@@ -67,10 +73,33 @@ impl DatabaseHandler {
         match deadpool_redis::redis::cmd("HGET")
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
-            .query_async(&mut conn)
+            .query_async::<Connection, Option<String>>(&mut conn)
             .await
         {
-            Ok(uuid) => uuid,
+            Ok(response) => {
+                if let Some(row) = response {
+                    let parts: Vec<&str> = row.split(':').collect();
+
+                    if parts.len() == 2 {
+                        if parts[1] == "TRUE" {
+                            // Client is live streaming
+                            Some(parts[0].to_string())
+                        } else if force_delivery {
+                            // Client is not live streaming, but we are forcing delivery
+                            Some(parts[0].to_string())
+                        } else {
+                            // Client is not live streaming
+                            None
+                        }
+                    } else {
+                        // Invalid Redis data
+                        None
+                    }
+                } else {
+                    // No Redis data found.
+                    None
+                }
+            }
             Err(err) => {
                 event!(
                     Level::ERROR,
@@ -158,8 +187,8 @@ impl DatabaseHandler {
         }
     }
 
-    /// Adds a client to the live streaming service
-    pub async fn streaming_add_client(
+    /// Registers a client to the live streaming service
+    pub async fn streaming_register_client(
         &self,
         did_hash: &str,
         stream_uuid: &str,
@@ -174,22 +203,19 @@ impl DatabaseHandler {
             .cmd("HSET")
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
-            .arg(stream_uuid)
+            .arg([stream_uuid, ":FALSE"].concat())
             .query_async::<Connection, Value>(&mut conn)
             .await
         {
             Ok(_) => {
-                debug!(
-                    "added did_hash({}) to live streaming service({})",
-                    did_hash, stream_uuid
-                );
+                debug!("did_hash({}) registered to ({})", did_hash, stream_uuid);
 
                 Ok(())
             }
             Err(err) => {
                 event!(
                     Level::ERROR,
-                    "streaming_add_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    "streaming_register_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                     did_hash,
                     stream_uuid,
                     err
@@ -197,7 +223,7 @@ impl DatabaseHandler {
                 Err(MediatorError::DatabaseError(
                     "NA".into(),
                     format!(
-                        "streaming_add_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                        "streaming_register_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                         did_hash,
                         stream_uuid,
                         err
@@ -207,8 +233,96 @@ impl DatabaseHandler {
         }
     }
 
-    /// Removes a client from the live streaming service
-    pub async fn streaming_remove_client(
+    /// Enables live streaming for the client
+    pub async fn streaming_start_live(
+        &self,
+        did_hash: &str,
+        stream_uuid: &str,
+    ) -> Result<(), MediatorError> {
+        let mut conn = self.get_async_connection().await?;
+
+        match deadpool_redis::redis::cmd("HSET")
+            .arg("GLOBAL_STREAMING")
+            .arg(did_hash)
+            .arg([stream_uuid, ":", "TRUE"].concat())
+            .query_async::<Connection, Value>(&mut conn)
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "did_hash({}) started live streaming from ({})",
+                    did_hash, stream_uuid
+                );
+
+                Ok(())
+            }
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "streaming_start_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    did_hash,
+                    stream_uuid,
+                    err
+                );
+                Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!(
+                        "streaming_start_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                        did_hash,
+                        stream_uuid,
+                        err
+                    ),
+                ))
+            }
+        }
+    }
+
+    /// Disables live streaming for a client
+    pub async fn streaming_stop_live(
+        &self,
+        did_hash: &str,
+        stream_uuid: &str,
+    ) -> Result<(), MediatorError> {
+        let mut conn = self.get_async_connection().await?;
+
+        match deadpool_redis::redis::cmd("HSET")
+            .arg("GLOBAL_STREAMING")
+            .arg(did_hash)
+            .arg([stream_uuid, ":", "FALSE"].concat())
+            .query_async::<Connection, Value>(&mut conn)
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "did_hash({}) stopped live streaming from ({})",
+                    did_hash, stream_uuid
+                );
+
+                Ok(())
+            }
+            Err(err) => {
+                event!(
+                Level::ERROR,
+                "streaming_stop_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                did_hash,
+                stream_uuid,
+                err
+            );
+                Err(MediatorError::DatabaseError(
+                "NA".into(),
+                format!(
+                    "streaming_stop_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    did_hash,
+                    stream_uuid,
+                    err
+                ),
+            ))
+            }
+        }
+    }
+
+    /// Removes client from live streaming service
+    pub async fn streaming_deregister_client(
         &self,
         did_hash: &str,
         stream_uuid: &str,
@@ -227,17 +341,14 @@ impl DatabaseHandler {
             .await
         {
             Ok(_) => {
-                debug!(
-                    "removed did_hash({}) from live streaming service({})",
-                    did_hash, stream_uuid
-                );
+                debug!("did_hash({}) deregistered from ({})", did_hash, stream_uuid);
 
                 Ok(())
             }
             Err(err) => {
                 event!(
                 Level::ERROR,
-                "streaming_remove_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                "streaming_deregister_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                 did_hash,
                 stream_uuid,
                 err
@@ -245,7 +356,7 @@ impl DatabaseHandler {
                 Err(MediatorError::DatabaseError(
                 "NA".into(),
                 format!(
-                    "streaming_remove_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                    "streaming_deregister_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                     did_hash,
                     stream_uuid,
                     err
