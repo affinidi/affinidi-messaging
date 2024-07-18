@@ -2,7 +2,8 @@ use crate::{config::Config, errors::ATMError, ATM};
 use did_peer::DIDPeer;
 use ssi::did::DIDMethods;
 use tokio::sync::mpsc;
-use tracing::debug;
+use tracing::{debug, error, warn};
+use ws_handler::WSCommand;
 
 pub mod sending;
 pub mod ws_handler;
@@ -46,15 +47,17 @@ impl<'c> ATM<'c> {
             ws_recv_stream: None,
         };
 
+        error!("secrets: {}", atm.secrets_resolver.len());
+
         // TODO: This is another dirty hack, there doesn't seem to be a nice way to add traits dynamically
         atm.add_did_method(Box::new(DIDPeer));
 
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
-        let (tx, mut rx) = mpsc::channel::<String>(32);
+        let (tx, mut rx) = mpsc::channel::<WSCommand>(32);
         self.ws_send_stream = Some(tx);
 
         // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
-        let (tx2, rx2) = mpsc::channel::<String>(32);
+        let (tx2, rx2) = mpsc::channel::<WSCommand>(32);
         self.ws_recv_stream = Some(rx2);
 
         // Start the websocket connection
@@ -67,8 +70,16 @@ impl<'c> ATM<'c> {
         }));
 
         if let Some(ws_recv) = self.ws_recv_stream.as_mut() {
+            // Wait for Started message
             if let Some(msg) = ws_recv.recv().await {
-                debug!("Received message from websocket handler: {}", msg);
+                match msg {
+                    WSCommand::Started => {
+                        debug!("Websocket connection started");
+                    }
+                    _ => {
+                        warn!("Unnknown message from ws_handler: {:?}", msg);
+                    }
+                }
             }
         }
 
@@ -80,7 +91,7 @@ impl<'c> ATM<'c> {
     /// Close the WebSocket task gracefully
     pub async fn abort_websocket_task(&mut self) -> Result<(), ATMError> {
         if let Some(channel) = self.ws_send_stream.as_mut() {
-            let _ = channel.send("EXIT".to_string()).await;
+            let _ = channel.send(WSCommand::Exit).await;
         }
 
         Ok(())

@@ -84,7 +84,7 @@ async fn main() -> Result<(), ATMError> {
     let msgs = atm
         .get_messages(&GetMessagesRequest {
             delete: false,
-            message_ids: vec![response.message_hash],
+            message_ids: vec![response.response.unwrap()],
         })
         .await?;
     let after_get = SystemTime::now();
@@ -122,6 +122,7 @@ async fn main() -> Result<(), ATMError> {
         after_unpack.duration_since(start).unwrap().as_millis()
     );
 
+    /*
     // Send a WebSocket message
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
@@ -150,7 +151,7 @@ async fn main() -> Result<(), ATMError> {
             .unwrap()
             .as_millis(),
         after_ping.duration_since(start).unwrap().as_millis()
-    );
+    );*/
 
     Ok(())
 }

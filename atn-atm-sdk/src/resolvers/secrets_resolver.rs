@@ -19,6 +19,10 @@ impl AffinidiSecrets {
         debug!("Adding secret ({})", secret.id);
         self.known_secrets.push(secret);
     }
+
+    pub fn len(&self) -> usize {
+        self.known_secrets.len()
+    }
 }
 
 #[async_trait]

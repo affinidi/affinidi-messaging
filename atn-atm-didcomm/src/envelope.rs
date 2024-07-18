@@ -90,8 +90,8 @@ impl MetaEnvelope {
         did_methods: &DIDMethods<'_>,
     ) -> Result<Self>
     where
-        T: DIDResolver,
-        S: SecretsResolver,
+        T: DIDResolver + Send,
+        S: SecretsResolver + Send,
     {
         let mut envelope = Self::default();
         envelope.envelope = Some(Envelope::from_str(msg)?);

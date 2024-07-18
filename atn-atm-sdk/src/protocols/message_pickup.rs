@@ -1,15 +1,17 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
-use atn_atm_didcomm::{Message, PackEncryptedOptions};
+use atn_atm_didcomm::{Message, PackEncryptedOptions, UnpackMetadata};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{debug, span, Level};
+use tokio::select;
+use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
     errors::ATMError,
     messages::{sending::InboundMessageResponse, EmptyResponse, GenericDataStruct},
     transports::SendMessageResponse,
+    websockets::ws_handler::WSCommand,
     ATM,
 };
 
@@ -198,5 +200,144 @@ impl MessagePickup {
                 .await?;
         }
         Ok(())
+    }
+
+    /// Waits for the next message to be received via websocket live delivery
+    /// atm  : The ATM SDK to use
+    /// wait : How long to wait (in milliseconds) for a message before returning None
+    ///        If 0, will block forever until a message is received
+    /// Returns a tuple of the message and metadata, or None if no message was received
+    /// NOTE: You still need to delete the message from the server after receiving it
+    pub async fn live_stream_next<'c>(
+        &self,
+        atm: &'c mut ATM<'_>,
+        wait: Duration,
+    ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
+        let _span = span!(Level::DEBUG, "live_stream_next");
+
+        async move {
+            let binding = atm.ws_recv_stream.as_mut();
+            let stream = if let Some(stream) = binding {
+                stream
+            } else {
+                return Err(ATMError::TransportError("No websocket recv stream".into()));
+            };
+
+            // Send the next request to the ws_handler
+            if let Some(tx_stream) = &atm.ws_send_stream {
+                tx_stream.send(WSCommand::Next).await.map_err(|err| {
+                    ATMError::TransportError(format!(
+                        "Could not send message to ws_handler: {:?}",
+                        err
+                    ))
+                })?;
+                debug!("sent next request to ws_handler");
+            } else {
+                return Err(ATMError::TransportError("No websocket send stream".into()));
+            }
+
+            // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
+            let sleep: tokio::time::Sleep = tokio::time::sleep(wait);
+
+            select! {
+                _ = sleep, if wait.as_millis() > 0 => {
+                    debug!("Timeout reached, no message received");
+                    Ok(None)
+                }
+                value = stream.recv() => {
+                    if let Some(msg) = value {
+                        match msg {
+                            WSCommand::MessageReceived(message, meta) => {
+                                Ok(Some((message, meta)))
+                            }
+                            _ => {
+                                Err(ATMError::MsgReceiveError("Unexpected message type".into()))
+                            }
+                        }
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Attempts to retrieve a specific message from the server via websocket live delivery
+    /// atm  : The ATM SDK to use
+    /// msg_id : The ID of the message to retrieve (matches on either `id` or `pthid`)
+    /// wait : How long to wait (in milliseconds) for a message before returning None
+    ///        If 0, will not block
+    /// Returns a tuple of the message and metadata, or None if no message was received
+    /// NOTE: You still need to delete the message from the server after receiving it
+    pub async fn live_stream_get<'c>(
+        &self,
+        atm: &'c mut ATM<'_>,
+        msg_id: &str,
+        wait: Duration,
+    ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
+        let _span = span!(Level::DEBUG, "live_stream_get");
+
+        async move {
+            let binding = atm.ws_recv_stream.as_mut();
+            let stream = if let Some(stream) = binding {
+                stream
+            } else {
+                return Err(ATMError::TransportError("No websocket stream".into()));
+            };
+
+            // Send the get request to the ws_handler
+            let tx_stream = if let Some(tx_stream) = &atm.ws_send_stream {
+                tx_stream
+                    .send(WSCommand::Get(msg_id.to_string()))
+                    .await
+                    .map_err(|err| {
+                        ATMError::TransportError(format!(
+                            "Could not send get message to ws_handler: {:?}",
+                            err
+                        ))
+                    })?;
+                debug!("sent get request to ws_handler");
+                tx_stream
+            } else {
+                return Err(ATMError::TransportError("No websocket send stream".into()));
+            };
+
+            // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
+            let sleep = tokio::time::sleep(wait);
+            tokio::pin!(sleep);
+
+            loop {
+            select! {
+                _ = &mut sleep, if wait.as_millis() > 0 => {
+                    debug!("Timeout reached, no message received");
+                    tx_stream.send(WSCommand::TimeOut(msg_id.to_string())).await.map_err(|err| {
+                        ATMError::TransportError(format!("Could not send timeout message to ws_handler: {:?}", err))
+                    })?;
+                    return Ok(None);
+                }
+                value = stream.recv() => {
+                    if let Some(msg) = value {
+                        match msg {
+                            WSCommand::MessageReceived(message, meta) => {
+                                return Ok(Some((message, meta)));
+                            }
+                            WSCommand::NotFound => {
+                                // Do nothing, keep waiting
+                            }
+                            _ => {
+                                return Err(ATMError::MsgReceiveError("Unexpected message type".into()));
+                            }
+                        }
+                    } else {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+    }
+        .instrument(_span)
+        .await
     }
 }

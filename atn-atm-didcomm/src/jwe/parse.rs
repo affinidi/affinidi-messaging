@@ -245,6 +245,8 @@ impl ParsedJWE {
         envelope.metadata.encrypted_to_kids =
             Some(self.to_kids.iter().map(|k| k.to_owned()).collect());
 
+        debug!("envelope\n{:#?}", envelope);
+
         envelope.to_kids_found = secrets_resolver.find_secrets(&self.to_kids).await?;
 
         if envelope.to_kids_found.is_empty() {

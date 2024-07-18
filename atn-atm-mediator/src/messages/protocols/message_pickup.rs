@@ -145,17 +145,22 @@ pub(crate) async fn status_request(
         recipient_did
     );
 
-    generate_status_reply(state, session, &recipient_did, &thid, false).await
+    generate_status_reply(state, session, &recipient_did, &thid, false, None).await
 }.instrument(_span).await
 }
 
 /// Creates the reply to a valid StatusRequest message
+/// force_live_delivery: If true, will force the message to be live streamed even if live streaming is disabled.
+///           Required due to the protocol specification to send a status update on live_streaming changes
+/// override_live_delivery: If Some(bool), will override the live delivery status of the recipient
+///           Because we are async handling streaming updates, we send the response before the streaming task has updated the status
 async fn generate_status_reply(
     state: &SharedData,
     session: &Session,
     did_hash: &str,
     thid: &str,
     force_live_delivery: bool,
+    override_live_delivery: Option<bool>,
 ) -> Result<ProcessMessageResponse, MediatorError> {
     let _span = span!(tracing::Level::DEBUG, "generate_status_reply",);
 
@@ -235,6 +240,10 @@ async fn generate_status_reply(
                     warn!("Unknown key: ({:?}) with value: ({:?})", k, v);
                 }
             }
+        }
+
+        if let Some(live_delivery) = override_live_delivery {
+            status.live_delivery = live_delivery;
         }
 
         let now = SystemTime::now()
@@ -408,6 +417,6 @@ pub(crate) async fn toggle_live_delivery(
             }
         }
 
-        generate_status_reply(state, session, &session.did_hash, &thid, true).await
+        generate_status_reply(state, session, &session.did_hash, &thid, true, Some(live_delivery)).await
     }.instrument(_span).await
 }

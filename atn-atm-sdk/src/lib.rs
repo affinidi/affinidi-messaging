@@ -16,6 +16,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
 use tracing::{debug, span, warn};
+use websockets::ws_handler::WSCommand;
 
 mod authentication;
 pub mod config;
@@ -42,8 +43,8 @@ pub struct ATM<'c> {
     ws_connector: Connector,
     pub(crate) ws_enabled: bool,
     ws_handler: Option<JoinHandle<()>>,
-    ws_send_stream: Option<Sender<String>>,
-    ws_recv_stream: Option<Receiver<String>>,
+    ws_send_stream: Option<Sender<WSCommand>>,
+    ws_recv_stream: Option<Receiver<WSCommand>>,
 }
 
 /// Affinidi Trusted Messaging SDK

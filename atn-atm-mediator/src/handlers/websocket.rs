@@ -96,8 +96,8 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                 }
                 value = rx.recv() => {
                     if let Some(msg) = value {
-                        error!("ws: Received message from streaming task: {:?}", msg);
-                        //let _ = socket.send(Message::Text(msg)).await;
+                        debug!("ws: Received message from streaming task: {:?}", msg);
+                        let _ = socket.send(Message::Text(msg)).await;
                     } else {
                         debug!("Received None from streaming task, closing connection");
                         break;

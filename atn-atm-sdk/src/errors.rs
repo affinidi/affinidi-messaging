@@ -13,6 +13,8 @@ pub enum ATMError {
     TransportError(String),
     #[error("Message sending error: {0}")]
     MsgSendError(String),
+    #[error("Message receive error: {0}")]
+    MsgReceiveError(String),
     #[error("Config error: {0}")]
     ConfigError(String),
     #[error("Authentication error: {0}")]

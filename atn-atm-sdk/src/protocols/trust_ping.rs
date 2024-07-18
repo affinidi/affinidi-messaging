@@ -6,7 +6,12 @@ use sha256::digest;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, messages::EmptyResponse, ATM};
+use crate::{
+    errors::ATMError,
+    messages::{sending::InboundMessageResponse, EmptyResponse},
+    transports::SendMessageResponse,
+    ATM,
+};
 
 #[derive(Default)]
 pub struct TrustPing {}
@@ -19,6 +24,7 @@ pub struct TrustPingSent {
     pub message_id: String,
     pub message_hash: String,
     pub bytes: u32,
+    pub response: Option<String>,
 }
 
 impl TrustPing {
@@ -80,6 +86,7 @@ impl TrustPing {
             message_id: msg.id.clone(),
             message_hash: "".to_string(),
             bytes: 0,
+            response: None,
         };
 
         debug!("Ping message: {:?}", msg);
@@ -104,8 +111,21 @@ impl TrustPing {
             atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_info.message_id)
                 .await?;
         } else {
-            atm.send_didcomm_message::<EmptyResponse>(&msg, false)
+            let response = atm
+                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
                 .await?;
+            msg_info.response =
+                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Stored(m))) =
+                    response
+                {
+                    if let Some((_, msg_id)) = m.messages.first() {
+                        Some(msg_id.to_owned())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
         }
         Ok(msg_info)
     }

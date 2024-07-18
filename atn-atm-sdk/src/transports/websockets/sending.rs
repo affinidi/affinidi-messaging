@@ -1,6 +1,7 @@
 use crate::{
     errors::ATMError,
     transports::{SendMessageResponse, WebSocketSendResponse},
+    websockets::ws_handler::WSCommand,
     ATM,
 };
 use sha256::digest;
@@ -29,9 +30,12 @@ impl<'c> ATM<'c> {
 
         debug!("Sending message: {:?}", message);
 
-        ws_stream.send(message.to_owned()).await.map_err(|err| {
-            ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
-        })?;
+        ws_stream
+            .send(WSCommand::Send(message.to_owned()))
+            .await
+            .map_err(|err| {
+                ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
+            })?;
         /*
         ws_stream
             .send(Message::Text(message.to_owned()))

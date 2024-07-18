@@ -4,10 +4,11 @@ use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use atn_atm_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use did_peer::DIDPeer;
 use ssi::did::DIDMethods;
-use tracing::{debug, error, span, warn, Instrument};
+use tracing::{debug, error, span, trace, warn, Instrument};
 
 use crate::{
     common::errors::{MediatorError, Session},
+    database::DatabaseHandler,
     messages::MessageHandler,
     SharedData,
 };
@@ -65,13 +66,13 @@ pub(crate) async fn handle_inbound(
         debug!("message unpacked:\n{:#?}", msg);
 
         // Process the message
-        let response = msg.process(state, session).await?;
-        debug!("message processed:\n{:#?}", response);
+        let message_response = msg.process(state, session).await?;
+        debug!("message processed:\n{:#?}", message_response);
 
         // Pack the message and store it if necessary
-        let packed_message = if response.store_message {
+        let packed_message = if message_response.store_message {
             let mut stored_messages = InboundMessageList::default();
-            if let Some(response) = &response.message {
+            if let Some(response) = &message_response.message {
                 // Pack the message for the next recipient(s)
                 let to_dids = if let Some(to_did) = &response.to {
                     to_did
@@ -88,7 +89,7 @@ pub(crate) async fn handle_inbound(
                 );
 
                 for recipient in to_dids {
-                    let (msg_str, _msg_metadata) = response
+                    let (packed, _msg_metadata) = response
                         .pack(
                             recipient,
                             &state.config.mediator_did,
@@ -98,11 +99,30 @@ pub(crate) async fn handle_inbound(
                         )
                         .await?;
 
+                    // Live stream the message?
+                    if let Some(stream_uuid) = state
+                        .database
+                        .streaming_is_client_live(
+                            &session.did_hash,
+                            message_response.force_live_delivery,
+                        )
+                        .await
+                    {
+                        _live_stream(
+                            &state.database,
+                            &session.did_hash,
+                            &stream_uuid,
+                            &packed,
+                            message_response.force_live_delivery,
+                        )
+                        .await;
+                    }
+
                     match state
                         .database
                         .store_message(
                             &session.session_id,
-                            &msg_str,
+                            &packed,
                             recipient,
                             Some(&state.config.mediator_did),
                         )
@@ -125,8 +145,8 @@ pub(crate) async fn handle_inbound(
                 }
             }
             InboundMessageResponse::Stored(stored_messages)
-        } else if let Some(message) = response.message {
-            let (packed, _) = message
+        } else if let Some(message) = message_response.message {
+            let (packed, meta) = message
                 .pack(
                     &session.did,
                     &state.config.mediator_did,
@@ -135,6 +155,23 @@ pub(crate) async fn handle_inbound(
                     &did_resolver,
                 )
                 .await?;
+            trace!("Ephemeral message packed (meta):\n{:#?}", meta);
+            trace!("Ephemeral message (msg):\n{:#?}", packed);
+            // Live stream the message?
+            if let Some(stream_uuid) = state
+                .database
+                .streaming_is_client_live(&session.did_hash, message_response.force_live_delivery)
+                .await
+            {
+                _live_stream(
+                    &state.database,
+                    &session.did_hash,
+                    &stream_uuid,
+                    &packed,
+                    message_response.force_live_delivery,
+                )
+                .await;
+            }
             InboundMessageResponse::Ephemeral(packed)
         } else {
             error!("No message to return");
@@ -144,29 +181,26 @@ pub(crate) async fn handle_inbound(
             ));
         };
 
-        // Live stream the message?
-        if let Some(uuid) = state
-            .database
-            .streaming_is_client_live(&session.did_hash, response.force_live_delivery)
-            .await
-        {
-            debug!("Live streaming message to UUID: {}", uuid);
-
-            state
-                .database
-                .streaming_publish_message(
-                    &session.did_hash,
-                    &uuid,
-                    message,
-                    response.force_live_delivery,
-                )
-                .await?;
-        } else {
-            debug!("Not live streaming messages...");
-        }
-
         Ok(packed_message)
     }
     .instrument(_span)
     .await
+}
+
+/// If live streaming is enabled, this function will send the message to the live stream
+/// Ok to ignore errors here
+async fn _live_stream(
+    database: &DatabaseHandler,
+    did_hash: &str,
+    stream_uuid: &str,
+    message: &str,
+    force_live_delivery: bool,
+) {
+    if database
+        .streaming_publish_message(did_hash, stream_uuid, message, force_live_delivery)
+        .await
+        .is_ok()
+    {
+        debug!("Live streaming message to UUID: {}", stream_uuid);
+    }
 }
