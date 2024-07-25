@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+## 20th July 2024
+
+* Message Pickup Message-Delivery and Messages Received implemented
+
 ## 24th June 2024
 
 * Added streaming.enabled configuration option

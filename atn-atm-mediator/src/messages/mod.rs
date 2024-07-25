@@ -35,6 +35,9 @@ impl FromStr for MessageType {
             "https://didcomm.org/messagepickup/3.0/live-delivery-change" => {
                 Ok(Self::MessagePickupLiveDeliveryChange)
             }
+            "https://didcomm.org/messagepickup/3.0/delivery-request" => {
+                Ok(Self::MessagePickupDeliveryRequest)
+            }
             _ => Err(MediatorError::ParseError(
                 "-1".into(),
                 s.into(),
@@ -56,10 +59,9 @@ impl MessageType {
             Self::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await
             }
-            Self::MessagePickupDeliveryRequest => Err(MediatorError::NotImplemented(
-                session.session_id.clone(),
-                "NOT IMPLEMENTED".into(),
-            )),
+            Self::MessagePickupDeliveryRequest => {
+                message_pickup::delivery_request(message, state, session).await
+            }
             Self::MessagePickupMessagesReceived => Err(MediatorError::NotImplemented(
                 session.session_id.clone(),
                 "NOT IMPLEMENTED".into(),

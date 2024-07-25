@@ -1,10 +1,10 @@
-use std::time::{Duration, SystemTime};
-
-use atn_atm_didcomm::{Message, PackEncryptedOptions, UnpackMetadata};
+use atn_atm_didcomm::{AttachmentData, Message, PackEncryptedOptions, UnpackMetadata};
+use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::{Duration, SystemTime};
 use tokio::select;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{debug, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
@@ -45,6 +45,23 @@ pub struct MessagePickupStatusReply {
     pub live_delivery: bool,
 }
 impl GenericDataStruct for MessagePickupStatusReply {}
+
+// Reads the body of an incoming Message Pickup 3.0 Delivery Request Message
+#[derive(Default, Deserialize, Serialize)]
+pub struct MessagePickupDeliveryRequest {
+    pub recipient_did: String,
+    pub limit: usize,
+}
+
+/// Handles the return from a message delivery request
+/// returns
+/// - StatusReply : No messages available
+/// - MessageDelivery : A DIDComm message containing messages
+#[derive(Serialize, Deserialize)]
+enum DeliveryRequestResponse {
+    StatusReply(MessagePickupStatusReply),
+    MessageDelivery(String),
+}
 
 impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Status Request` message
@@ -141,7 +158,6 @@ impl MessagePickup {
                 a
             {
                 let (unpacked, _) = atm.unpack(&message).await?;
-                debug!("Good ({})", unpacked.body);
                 let status: MessagePickupStatusReply = serde_json::from_value(unpacked.body)
                     .map_err(|err| {
                         ATMError::MsgSendError(format!("Error unpacking response: {}", err))
@@ -339,5 +355,192 @@ impl MessagePickup {
     }
         .instrument(_span)
         .await
+    }
+
+    /// Sends a Message Pickup 3.0 `Delivery Request` message
+    /// atm           : The ATM SDK to use
+    /// recipient_did : Optional, allows you to ask for status for a specific DID. If none, will ask for default DID in ATM
+    /// mediator_did  : Optional, allows you to ask a specific mediator. If none, will ask for default mediator in ATM
+    /// limit         : # of messages to retrieve, defaults to 10 if None
+    /// wait          : Time Duration to wait for a response from websocket. Default (10 Seconds)
+    pub async fn send_delivery_request<'c>(
+        &self,
+        atm: &'c mut ATM<'c>,
+        recipient_did: Option<String>,
+        mediator_did: Option<String>,
+        limit: Option<usize>,
+        wait: Option<Duration>,
+    ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
+        let _span = span!(Level::DEBUG, "send_delivery_request",).entered();
+        debug!(
+            "Delivery Request to recipient_did: {:?}, mediator_did: {:?} limit: {:?}",
+            recipient_did, mediator_did, limit
+        );
+
+        // Check that DID(s) exist in DIDResolver, add it if not
+        if let Some(recipient_did) = &recipient_did {
+            if !atm.did_resolver.contains(recipient_did) {
+                debug!(
+                    "Recipient DID ({}) not found in resolver, adding...",
+                    recipient_did
+                );
+                atm.add_did(recipient_did).await?;
+            }
+        }
+        if let Some(mediator_did) = &mediator_did {
+            if !atm.did_resolver.contains(mediator_did) {
+                debug!(
+                    "Mediator DID ({}) not found in resolver, adding...",
+                    mediator_did
+                );
+                atm.add_did(mediator_did).await?;
+            }
+        }
+
+        let body = MessagePickupDeliveryRequest {
+            recipient_did: if let Some(recipient) = recipient_did {
+                recipient
+            } else {
+                atm.config.my_did.clone()
+            },
+            limit: if let Some(limit) = limit { limit } else { 10 },
+        };
+
+        let mut msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/delivery-request".to_owned(),
+            serde_json::to_value(body).unwrap(),
+        )
+        .header("return_route".into(), Value::String("all".into()));
+
+        let to_did = if let Some(mediator_did) = mediator_did {
+            mediator_did
+        } else {
+            atm.config.atm_did.clone()
+        };
+        msg = msg.to(to_did.clone());
+
+        msg = msg.from(atm.config.my_did.clone());
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let msg = msg.created_time(now).expires_time(now + 300).finalize();
+        let msg_id = msg.id.clone();
+
+        debug!("Delivery-Request message: {:?}", msg);
+
+        // Pack the message
+        let (msg, _) = msg
+            .pack_encrypted(
+                &to_did,
+                Some(&atm.config.my_did),
+                Some(&atm.config.my_did),
+                &atm.did_resolver,
+                &atm.secrets_resolver,
+                &PackEncryptedOptions::default(),
+            )
+            .await
+            .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+        if atm.ws_send_stream.is_some() {
+            let wait_duration = if let Some(wait) = wait {
+                wait
+            } else {
+                Duration::from_secs(10)
+            };
+
+            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
+                .await?;
+
+            if let Some((message, _)) = self.live_stream_get(atm, &msg_id, wait_duration).await? {
+                debug!("unpacked: {:#?}", message);
+            }
+
+            // wait for the response from the server
+            let message = self
+                .live_stream_get(
+                    atm,
+                    &msg_id,
+                    wait.unwrap_or_else(|| Duration::from_secs(10)),
+                )
+                .await?;
+
+            if let Some((message, _)) = message {
+                self._handle_delivery(atm, &message).await
+            } else {
+                Err(ATMError::MsgSendError("No response from API".into()))
+            }
+        } else {
+            let a = atm
+                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
+                .await?;
+
+            debug!("Response: {:?}", a);
+
+            // Unpack the response
+            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
+                a
+            {
+                let (unpacked, _) = atm.unpack(&message).await?;
+
+                debug!("unpacked: {:#?}", unpacked);
+
+                self._handle_delivery(atm, &unpacked).await
+            } else {
+                Err(ATMError::MsgSendError("No response from API".into()))
+            }
+        }
+    }
+
+    /// Iterates through each attachment and unpacks each message into an array to return
+    pub(crate) async fn _handle_delivery<'c>(
+        &self,
+        atm: &mut ATM<'c>,
+        message: &Message,
+    ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
+        let mut response: Vec<(Message, UnpackMetadata)> = Vec::new();
+
+        if let Some(attachments) = &message.attachments {
+            for attachment in attachments {
+                match &attachment.data {
+                    AttachmentData::Base64 { value } => {
+                        let decoded = match BASE64_URL_SAFE_NO_PAD.decode(value.base64.clone()) {
+                            Ok(decoded) => match String::from_utf8(decoded) {
+                                Ok(decoded) => decoded,
+                                Err(e) => {
+                                    warn!(
+                                            "Error encoding vec[u8] to string: ({:?}). Attachment ID ({:?})",
+                                            e, attachment.id
+                                        );
+                                    continue;
+                                }
+                            },
+                            Err(e) => {
+                                warn!(
+                                    "Error decoding base64: ({:?}). Attachment ID ({:?})",
+                                    e, attachment.id
+                                );
+                                continue;
+                            }
+                        };
+
+                        match atm.unpack(&decoded).await {
+                            Ok((m, u)) => response.push((m, u)),
+                            Err(e) => {
+                                warn!("Error unpacking message: ({:?})", e);
+                                continue;
+                            }
+                        };
+                    }
+                    _ => {
+                        warn!("Attachment type not supported: {:?}", attachment.data);
+                        continue;
+                    }
+                };
+            }
+        }
+
+        Ok(response)
     }
 }

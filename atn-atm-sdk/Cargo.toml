@@ -13,6 +13,7 @@ license.workspace = true
 [dependencies]
 async-trait = "0.1"
 atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
+base64 = "0.22"
 did-peer = { version = "0.3", path = "../../did-peer" }
 futures-util = "0.3"
 http = "1"

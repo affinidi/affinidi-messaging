@@ -2,6 +2,16 @@
 
 ## Changelog history
 
+### 20th July 2024
+
+* Message Pickup Message-Delivery and Messages Received implemented
+
+### 18th July 2024
+
+* Message Pickup live-streaming implemented
+* Ability to call next() and get() on websocket
+* WebSocket cache implemented
+
 ### 29th June 2024
 
 * Added ability to pre-load secrets when creating a new ATM client

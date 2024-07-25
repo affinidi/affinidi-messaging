@@ -1,7 +1,7 @@
-use atn_atm_didcomm::Message;
-use atn_atm_sdk::protocols::message_pickup::{
-    MessagePickupLiveDelivery, MessagePickupStatusReply, MessagePickupStatusRequest,
-};
+use atn_atm_didcomm::{Attachment, Message};
+use atn_atm_sdk::{messages::fetch::FetchOptions, protocols::message_pickup::{
+    MessagePickupDeliveryRequest, MessagePickupLiveDelivery, MessagePickupStatusReply, MessagePickupStatusRequest
+}};
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
 use serde_json::json;
@@ -9,6 +9,7 @@ use sha256::digest;
 use std::time::SystemTime;
 use tracing::{debug, error, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
+use base64::prelude::*;
 
 use crate::{
     common::errors::{MediatorError, Session}, messages::ProcessMessageResponse, tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState}, SharedData
@@ -419,4 +420,160 @@ pub(crate) async fn toggle_live_delivery(
 
         generate_status_reply(state, session, &session.did_hash, &thid, true, Some(live_delivery)).await
     }.instrument(_span).await
+}
+
+/// Process a Delivery Request message and generates a response
+pub(crate) async fn delivery_request(
+    msg: &Message,
+    state: &SharedData,
+    session: &Session,
+) -> Result<ProcessMessageResponse, MediatorError> {
+    let _span = span!(tracing::Level::DEBUG, "delivery_request",);
+    async move {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    if let Some(expires) = msg.expires_time {
+        if expires <= now {
+            debug!(
+                "Message expired at ({}) now({}) seconds_ago({})",
+                expires,
+                now,
+                now - expires
+            );
+            return Err(MediatorError::MessageExpired(
+                session.session_id.clone(),
+                expires.to_string(),
+                now.to_string(),
+            ));
+        }
+    }
+
+    // Ensure to: exists and is valid
+    let to = if let Some(to) = &msg.to {
+        if let Some(first) = to.first() {
+            first.to_owned()
+        } else {
+            return Err(MediatorError::RequestDataError(
+                session.session_id.clone(),
+                "Message missing valid 'to' field, expect at least one address in array.".into(),
+            ));
+        }
+    } else {
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "Message missing 'to' field".into(),
+        ));
+    };
+    debug!("To: {}", to);
+
+    // Must be addressed to ATM
+    if to != state.config.mediator_did {
+        debug!(
+            "to: ({}) doesn't match ATM DID ({})",
+            to, state.config.mediator_did
+        );
+        return Err(MediatorError::RequestDataError(session.session_id.clone(),
+         format!("message to: ({}) didn't match ATM DID ({}). Status Request messages must be addressed directly to ATM!",
+          to, state.config.mediator_did)));
+    }
+
+    // Message can not be anonymous
+    if msg.from.is_none() {
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "Message Pickup 3.0 Status-Request can not be anonymous as it is needed from to validate permissions".into(),
+        ));
+    };
+
+    // Check for extra-header `return_route`
+    if let Some(header) = msg.extra_headers.get("return_route") {
+        if header.as_str() != Some("all") {
+            debug!(
+                "return_route: extra-header exists. Expected (all) but received ({})",
+                header
+            );
+            return Err(MediatorError::RequestDataError(
+                session.session_id.clone(),
+                format!(
+                    "return_route: extra-header exists. Expected (all) but received ({})",
+                    header
+                ),
+            ));
+        }
+    } else {
+        debug!("return_route: extra-header does not exist!");
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            "return_route: extra-header does not exist! It should!".into(),
+        ));
+    }
+
+    // Get or create the thread id for the response
+    let thid = if let Some(thid) = &msg.thid {
+        thid.to_owned()
+    } else {
+        msg.id.clone()
+    };
+    debug!("thid = ({})", thid);
+
+    // Pull recipient_did and limit from message body
+    let (recipient_did, limit): (String, usize) = match
+        serde_json::from_value::<MessagePickupDeliveryRequest>(msg.body.to_owned())
+    {
+        Ok(body) => 
+        (body.recipient_did, body.limit),
+        Err(e) => 
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            format!("delivery-request body isn't valid. Reason: {}", e),
+        ))
+    };
+
+    let recipient_did_hash = digest(recipient_did.clone());
+
+    debug!("Body: recipient_did: {}, limit: {}", recipient_did_hash, limit);
+
+    info!(
+        "MessagePickup Delivery-Request received from: ({}) recipient_did({}) limit({})",
+        msg.from.clone().unwrap_or_else(|| "ANONYMOUS".to_string()),
+        recipient_did_hash, limit
+    );
+
+    // All the parsing is done, lets attempt to retrieve messages
+    let messages = state.database.fetch_messages(&session.session_id, &recipient_did_hash, &FetchOptions {   limit, ..Default::default() }).await?;
+    debug!("msgs fetched: {}", messages.success.len());
+
+    if !messages.success.is_empty() {
+        let response_msg = Message::build(Uuid::new_v4().into(), "https://didcomm.org/messagepickup/3.0/delivery".to_string(), json!({"recipient_did": recipient_did})).thid(thid.clone());
+
+        let mut attachments: Vec<Attachment> = Vec::new();
+
+        for element in messages.success {
+            if let Some(msg) = element.msg {
+                let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(msg)).id(element.msg_id);
+
+                attachments.push(attachment.finalize())
+            }
+        }
+
+        let response_msg = response_msg.attachments(attachments).to(session.did.clone())
+        .from(state.config.mediator_did.clone())
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+
+        debug!("delivery message =\n{:?}", response_msg);
+
+        Ok(ProcessMessageResponse {
+            store_message: false,
+            force_live_delivery: false,
+            message: Some(response_msg),
+        })
+    } else {
+        generate_status_reply(state, session, &recipient_did_hash, &thid, false, None).await
+    }
+}.instrument(_span).await
 }

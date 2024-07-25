@@ -96,6 +96,17 @@ async fn main() -> Result<(), ATMError> {
         info!("Message: {:?}", message);
     }*/
 
+    error!("Testing delivery-request()!");
+    let response = protocols
+        .message_pickup
+        .send_delivery_request(&mut atm, None, None, None, None)
+        .await?;
+
+    for (message, _) in response {
+        info!("Message: {}", message.id);
+    }
+
+    /*
     tokio::time::sleep(Duration::from_secs(1)).await;
     error!("Testing live_stream_get()!");
 
@@ -114,6 +125,7 @@ async fn main() -> Result<(), ATMError> {
             info!("Message: {:?}", message);
         }
     }
+    */
 
     // Disable live streaming
     /*protocols
