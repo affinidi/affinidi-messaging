@@ -4,6 +4,7 @@ use atn_atm_didcomm::secrets::Secret;
 use config::Config;
 use errors::ATMError;
 use messages::AuthorizationResponse;
+use protocols::Protocols;
 use reqwest::{Certificate, Client};
 use resolvers::did_resolver::AffinidiDIDResolver;
 use resolvers::secrets_resolver::AffinidiSecrets;
@@ -45,6 +46,7 @@ pub struct ATM<'c> {
     ws_handler: Option<JoinHandle<()>>,
     ws_send_stream: Option<Sender<WSCommand>>,
     ws_recv_stream: Option<Receiver<WSCommand>>,
+    pub protocols: Protocols,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -137,6 +139,7 @@ impl<'c> ATM<'c> {
             ws_handler: None,
             ws_send_stream: None,
             ws_recv_stream: None,
+            protocols: Protocols::new(),
         };
 
         for method in did_methods {

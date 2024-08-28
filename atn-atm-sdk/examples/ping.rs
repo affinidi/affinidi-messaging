@@ -61,7 +61,7 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
-    let protocols = Protocols::default();
+    let protocols = Protocols::new(&mut atm);
 
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();

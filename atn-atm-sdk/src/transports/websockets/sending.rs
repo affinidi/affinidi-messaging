@@ -36,12 +36,6 @@ impl<'c> ATM<'c> {
             .map_err(|err| {
                 ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
             })?;
-        /*
-        ws_stream
-            .send(Message::Text(message.to_owned()))
-            .await
-            .map_err(|e| ATMError::TransportError(format!("Could not send message: {:?}", e)))?;
-        */
 
         debug!("Message ({}) sent successfully", message_digest);
         Ok(SendMessageResponse::WebSocket(WebSocketSendResponse {

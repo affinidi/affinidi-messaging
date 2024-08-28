@@ -77,7 +77,7 @@ impl<'c> ATM<'c> {
                         debug!("Websocket connection started");
                     }
                     _ => {
-                        warn!("Unnknown message from ws_handler: {:?}", msg);
+                        warn!("Unknown message from ws_handler: {:?}", msg);
                     }
                 }
             }

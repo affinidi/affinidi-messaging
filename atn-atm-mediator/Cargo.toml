@@ -21,12 +21,12 @@ aws-sdk-secretsmanager = "1.26.0"
 aws-sdk-ssm = "1.26.0"
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
-axum-server = { version = "0.6", features = ["tls-rustls"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
 chrono = "0.4"
 deadpool-redis = { version = "0.15", features = ["rt_tokio_1"] }
 did-method-key = "0.2"
-did-peer = { version = "0.3", path = "../../did-peer" }
+did-peer = { version = "0.4", path = "../../did-peer" }
 atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
 hostname = "0.4 "
 http = "1"
