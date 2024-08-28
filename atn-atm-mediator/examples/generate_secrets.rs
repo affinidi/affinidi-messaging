@@ -140,15 +140,7 @@ async fn main() -> std::io::Result<()> {
 
     let json_string = serde_json::to_string_pretty(&secrets_json)?;
 
-    let current_file_path = Path::new(file!());
-    let current_dir = current_file_path.parent().unwrap();
-
-    // Construct the relative path to the desired file location
-    let output_secrets_path: PathBuf = current_dir.join("../conf/output.json");
-
-    println!("output {}", output_secrets_path.display());
-
-    let mut file = File::create("./conf/generated-secrets.json")?;
+    let mut file = File::create("./conf/secrets.json-generated")?;
     file.write_all(json_string.as_bytes())?;
 
     Ok(())
