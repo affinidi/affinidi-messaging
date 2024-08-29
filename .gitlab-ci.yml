@@ -19,3 +19,7 @@ clippy:
 fmt:
   rules:
     - when: never
+
+license:
+  rules:
+    - when: never
