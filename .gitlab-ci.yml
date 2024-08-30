@@ -12,7 +12,8 @@ clippy-processor:
   extends: .common
   before_script:
     - cd processor/
-
+  script:
+    - cargo clippy --color always --no-deps -- --deny warnings
 
 build:
   rules:
