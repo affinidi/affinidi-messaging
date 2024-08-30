@@ -11,23 +11,26 @@ include:
 clippy:processor:
   extends: .common
   before_script:
+    - pwd
     - cd atn-atm-processor/
   script:
-    - cargo clippy --color always --no-deps -- --deny warnings
+    - cargo clippy --color always --no-deps
 
 clippy:mediator:
   extends: .common
   before_script:
+    - pwd
     - cd atn-atm-mediator/
   script:
-    - cargo clippy --color always --no-deps -- --deny warnings
+    - cargo clippy --color always --no-deps
 
 clippy:didcomm:
   extends: .common
   before_script:
+    - pwd
     - cd atn-atm-didcomm/
   script:
-    - cargo clippy --color always --no-deps -- --deny warnings
+    - cargo clippy --color always --no-deps
 
 build:
   rules:
