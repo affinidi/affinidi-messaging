@@ -8,6 +8,12 @@ include:
 # as for now they are referenced via '../'
 # which breaks the jobs.
 
+clippy-processor:
+  extends: .common
+  before_script:
+    - cd processor/
+
+
 build:
   rules:
     - when: never
