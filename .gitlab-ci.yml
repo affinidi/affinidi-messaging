@@ -8,10 +8,24 @@ include:
 # as for now they are referenced via '../'
 # which breaks the jobs.
 
-clippy-processor:
+clippy:processor:
   extends: .common
   before_script:
-    - cd processor/
+    - cd atn-atm-processor/
+  script:
+    - cargo clippy --color always --no-deps -- --deny warnings
+
+clippy:mediator:
+  extends: .common
+  before_script:
+    - cd atn-atm-mediator/
+  script:
+    - cargo clippy --color always --no-deps -- --deny warnings
+
+clippy:didcomm:
+  extends: .common
+  before_script:
+    - cd atn-atm-didcomm/
   script:
     - cargo clippy --color always --no-deps -- --deny warnings
 
