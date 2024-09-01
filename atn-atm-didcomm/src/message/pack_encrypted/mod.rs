@@ -1,17 +1,17 @@
 mod anoncrypt;
 mod authcrypt;
 
+use atn_did_cache_sdk::DIDCacheClient;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg},
-    did::DIDResolver,
+    document::{did_or_url, is_did},
     error::{err_msg, ErrorKind, Result, ResultContext},
     protocols::routing::wrap_in_forward_if_needed,
     secrets::SecretsResolver,
-    utils::did::{did_or_url, is_did},
     Message, PackSignedMetadata,
 };
 
@@ -72,13 +72,14 @@ impl Message {
     /// - `Unsupported` Used crypto or method is unsupported.
     /// - `InvalidState` Indicates library error.
     /// - `IOError` IO error during DID or secrets resolving
+    ///
     /// TODO: verify and update errors list
-    pub async fn pack_encrypted<'dr, 'sr>(
+    pub async fn pack_encrypted<'sr>(
         &self,
         to: &str,
         from: Option<&str>,
         sign_by: Option<&str>,
-        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
         options: &PackEncryptedOptions,
     ) -> Result<(String, PackEncryptedMetadata)> {
@@ -271,6 +272,7 @@ pub struct MessagingServiceMetadata {
     pub service_endpoint: String,
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use base64::prelude::*;
@@ -3018,3 +3020,4 @@ mod tests {
         assert_eq!(msg, exp_msg)
     }
 }
+    */

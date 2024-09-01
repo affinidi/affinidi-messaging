@@ -1,16 +1,12 @@
-use atn_atm_didcomm::did::DIDDoc;
-use atn_atm_didcomm::did::DIDResolver as DidcommDIDResolver;
 use atn_atm_didcomm::secrets::Secret;
+use atn_did_cache_sdk::DIDCacheClient;
 use config::Config;
 use errors::ATMError;
 use messages::AuthorizationResponse;
-use protocols::Protocols;
 use reqwest::{Certificate, Client};
-use resolvers::did_resolver::AffinidiDIDResolver;
 use resolvers::secrets_resolver::AffinidiSecrets;
 use rustls::{ClientConfig, RootCertStore};
-use ssi::did::{DIDMethod, DIDMethods};
-use ssi::did_resolve::DIDResolver as SSIDIDResolver;
+use ssi::dids::Document;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
@@ -35,8 +31,7 @@ pub mod websockets {
 
 pub struct ATM<'c> {
     pub(crate) config: Config<'c>,
-    did_methods_resolver: DIDMethods<'c>,
-    did_resolver: AffinidiDIDResolver,
+    did_resolver: DIDCacheClient,
     secrets_resolver: AffinidiSecrets,
     pub(crate) client: Client,
     authenticated: bool,
@@ -46,7 +41,6 @@ pub struct ATM<'c> {
     ws_handler: Option<JoinHandle<()>>,
     ws_send_stream: Option<Sender<WSCommand>>,
     ws_recv_stream: Option<Receiver<WSCommand>>,
-    pub protocols: Protocols,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -67,10 +61,7 @@ pub struct ATM<'c> {
 impl<'c> ATM<'c> {
     /// Creates a new instance of the SDK with a given configuration
     /// You need to add at least the DID Method for the SDK DID to work
-    pub async fn new(
-        config: Config<'c>,
-        did_methods: Vec<Box<dyn DIDMethod>>,
-    ) -> Result<ATM<'c>, ATMError> {
+    pub async fn new(config: Config<'c>) -> Result<ATM<'c>, ATMError> {
         // Set a process wide default crypto provider.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
@@ -102,8 +93,9 @@ impl<'c> ATM<'c> {
         let mut root_store = RootCertStore::empty();
         if config.get_ssl_certificates().is_empty() {
             debug!("Use native SSL Certs");
-            for cert in rustls_native_certs::load_native_certs()
-                .map_err(|e| ATMError::SSLError(e.to_string()))?
+
+            for cert in
+                rustls_native_certs::load_native_certs().expect("Could not load platform certs")
             {
                 root_store.add(cert).map_err(|e| {
                     warn!("Couldn't add cert: {:?}", e);
@@ -126,10 +118,23 @@ impl<'c> ATM<'c> {
 
         let ws_connector = Connector::Rustls(Arc::new(ws_config));
 
+        let did_resolver = match DIDCacheClient::new(
+            atn_did_cache_sdk::config::ClientConfigBuilder::default().build(),
+        )
+        .await
+        {
+            Ok(config) => config,
+            Err(err) => {
+                return Err(ATMError::DIDError(format!(
+                    "Couldn't create DID resolver! Reason: {}",
+                    err
+                )))
+            }
+        };
+
         let mut atm = ATM {
             config: config.clone(),
-            did_methods_resolver: DIDMethods::default(),
-            did_resolver: AffinidiDIDResolver::new(vec![]),
+            did_resolver,
             secrets_resolver: AffinidiSecrets::new(vec![]),
             client,
             authenticated: false,
@@ -139,12 +144,8 @@ impl<'c> ATM<'c> {
             ws_handler: None,
             ws_send_stream: None,
             ws_recv_stream: None,
-            protocols: Protocols::new(),
         };
 
-        for method in did_methods {
-            atm.add_did_method(method);
-        }
         // Add our own DID to the DID_RESOLVER
         atm.add_did(&config.my_did).await?;
         // Add our ATM DID to the DID_RESOLVER
@@ -164,47 +165,20 @@ impl<'c> ATM<'c> {
         Ok(atm)
     }
 
-    /// Adds a DID Method that the resolvers can work with
-    /// NOTE: DIDMethod is a trait from the `ssi` crate
-    /// NOTE: As a result we add them after the initial creation of the ATM
-    ///       So that we get around silly Rust borrowing rules on dyn traits
-    ///
-    /// Example:
-    /// ```
-    /// atm.add_did_method(Box::new(DIDPeer));
-    /// ```
-    pub fn add_did_method(&mut self, did_method: Box<dyn DIDMethod>) -> &Self {
-        self.did_methods_resolver.insert(did_method);
-        self
-    }
-
     /// Adds a DID to the resolver
     /// This resolves the DID to the DID Document, and adds it to the list of known DIDs
     /// Returns the DIDDoc itself if successful, or an SDK Error
-    pub async fn add_did(&mut self, did: &str) -> Result<DIDDoc, ATMError> {
+    pub async fn add_did(&mut self, did: &str) -> Result<Document, ATMError> {
         let _span = span!(tracing::Level::DEBUG, "add_did", did = did).entered();
         debug!("Adding DID to resolver");
-        let (res_meta, doc_opt, _) = self
-            .did_methods_resolver
-            .resolve(did, &Default::default())
-            .await;
 
-        let doc = if let Some(doc) = doc_opt {
-            doc
-        } else {
-            debug!("Couldn't resolve DID, returning error");
-            return Err(ATMError::DIDError(format!(
-                "Could not resolve DID ({}). Reason: {}",
-                did,
-                res_meta.error.unwrap_or("Unknown".to_string())
-            )));
-        };
-
-        let doc = conversions::convert_did_format(&doc).await?;
-        self.did_resolver.insert(&doc);
-        debug!("Successfully added DID to resolver");
-
-        Ok(doc)
+        match self.did_resolver.resolve(did).await {
+            Ok(results) => Ok(results.doc),
+            Err(err) => Err(ATMError::DIDError(format!(
+                "Couldn't resolve did ({}). Reason: {}",
+                did, err
+            ))),
+        }
     }
 
     /// Adds required secrets to the secrets resolver

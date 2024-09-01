@@ -8,24 +8,22 @@ use askar_crypto::{
     },
     kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
 };
+use atn_did_cache_sdk::{document::DocumentExt, DIDCacheClient};
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg},
-    did::DIDResolver,
+    document::{did_or_url, DIDCommVerificationMethodExt},
     error::{err_msg, ErrorKind, Result, ResultContext},
     jwe,
     secrets::SecretsResolver,
-    utils::{
-        crypto::{AsKnownKeyPair, KnownKeyAlg},
-        did::did_or_url,
-    },
+    utils::crypto::{AsKnownKeyPair, AsKnownKeyPairSecret, KnownKeyAlg},
 };
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn authcrypt<'dr, 'sr>(
+pub(crate) async fn authcrypt<'sr>(
     to: &str,
     from: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+    did_resolver: &DIDCacheClient,
     secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
     msg: &[u8],
     enc_alg_auth: &AuthCryptAlg,
@@ -36,28 +34,28 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
 
     // TODO: Avoid resolving of same dids multiple times
     // Now we resolve separately in authcrypt, anoncrypt and sign
-    let to_ddoc = did_resolver
-        .resolve(to_did)
-        .await
-        .context("Unable resolve recipient did")?
-        .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Recipient did not found"))?;
+    let to_ddoc = match did_resolver.resolve(to_did).await {
+        Ok(response) => response.doc,
+        Err(_) => {
+            return Err(err_msg(
+                ErrorKind::DIDNotResolved,
+                "Recipient did not found",
+            ));
+        }
+    };
 
     let (from_did, from_kid) = did_or_url(from);
 
-    let from_ddoc = did_resolver
-        .resolve(from_did)
-        .await
-        .context("Unable resolve sender did")?
-        .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Sender did not found"))?;
+    let from_ddoc = match did_resolver.resolve(from_did).await {
+        Ok(response) => response.doc,
+        Err(_) => {
+            return Err(err_msg(ErrorKind::DIDNotResolved, "Sender did not found"));
+        }
+    };
 
     // Initial list of sender keys is all key_agreements of sender did doc
     // or filtered to keep only provided key
-    let from_kids: Vec<String> = from_ddoc
-        .key_agreement
-        .iter()
-        .filter(|kid| from_kid.map(|from_kid| kid == &from_kid).unwrap_or(true))
-        .map(|s| s.to_string())
-        .collect();
+    let from_kids = from_ddoc.find_key_agreement(from_kid);
 
     if from_kids.is_empty() {
         Err(err_msg(
@@ -102,12 +100,7 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
 
     // Initial list of recipient keys is all key_agreements of recipient did doc
     // or filtered to keep only provided key
-    let to_kids: Vec<_> = to_ddoc
-        .key_agreement
-        .iter()
-        .filter(|kid| to_kid.map(|to_kid| kid == &to_kid).unwrap_or(true))
-        .map(|s| s.as_str())
-        .collect();
+    let to_kids = to_ddoc.find_key_agreement(to_kid);
 
     if to_kids.is_empty() {
         Err(err_msg(
@@ -141,11 +134,25 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
     // by key alg
     let from_key = from_keys
         .iter()
-        .filter(|key| key.key_alg() != KnownKeyAlg::Unsupported)
+        .filter(|key| {
+            if let Some(jwk) = key.get_jwk() {
+                key.key_alg(&jwk) != KnownKeyAlg::Unsupported
+            } else {
+                false
+            }
+        })
         .find(|from_key| {
-            to_keys
-                .iter()
-                .any(|to_key| to_key.key_alg() == from_key.key_alg())
+            if let Some(from_jwk) = from_key.get_jwk() {
+                to_keys.iter().any(|to_key| {
+                    if let Some(to_jwk) = to_key.get_jwk() {
+                        to_key.key_alg(&to_jwk) == from_key.key_alg(&from_jwk)
+                    } else {
+                        false
+                    }
+                })
+            } else {
+                false
+            }
         })
         .copied()
         .ok_or_else(|| {
@@ -162,19 +169,35 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
         .context("Unable resolve sender secret")?
         .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Sender secret not found"))?;
 
-    let key_alg = from_key.key_alg();
+    let from_jwk = from_key.get_jwk().unwrap();
+    let key_alg = from_key.key_alg(&from_jwk);
 
     // Keep only recipient keys compatible with sender key
     let to_keys: Vec<_> = to_keys
         .into_iter()
-        .filter(|key| key.key_alg() == key_alg)
+        .filter(|key| {
+            if let Some(jwk) = key.get_jwk() {
+                key.key_alg(&jwk) == key_alg
+            } else {
+                false
+            }
+        })
         .collect();
 
     let msg = match key_alg {
         KnownKeyAlg::X25519 => {
             let _to_keys = to_keys
                 .iter()
-                .map(|vm| vm.as_x25519().map(|k| (&vm.id, k)))
+                .map(|vm| {
+                    if let Some(jwk) = vm.get_jwk() {
+                        vm.as_x25519(&jwk).map(|k| (&vm.id, k))
+                    } else {
+                        Err(err_msg(
+                            ErrorKind::NoCompatibleCrypto,
+                            "Couldn't create JWK for x25519",
+                        ))
+                    }
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             let to_keys: Vec<_> = _to_keys
@@ -247,7 +270,16 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
         KnownKeyAlg::P256 => {
             let _to_keys = to_keys
                 .iter()
-                .map(|vm| vm.as_p256().map(|k| (&vm.id, k)))
+                .map(|vm| {
+                    if let Some(jwk) = vm.get_jwk() {
+                        vm.as_p256(&jwk).map(|k| (&vm.id, k))
+                    } else {
+                        Err(err_msg(
+                            ErrorKind::NoCompatibleCrypto,
+                            "Couldn't create JWK for p_256",
+                        ))
+                    }
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             let to_keys: Vec<_> = _to_keys
@@ -320,7 +352,16 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
         KnownKeyAlg::K256 => {
             let _to_keys = to_keys
                 .iter()
-                .map(|vm| vm.as_k256().map(|k| (&vm.id, k)))
+                .map(|vm| {
+                    if let Some(jwk) = vm.get_jwk() {
+                        vm.as_k256(&jwk).map(|k| (&vm.id, k))
+                    } else {
+                        Err(err_msg(
+                            ErrorKind::NoCompatibleCrypto,
+                            "Couldn't create JWK for k_256",
+                        ))
+                    }
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             let to_keys: Vec<_> = _to_keys
@@ -396,6 +437,6 @@ pub(crate) async fn authcrypt<'dr, 'sr>(
         ))?,
     };
 
-    let to_kids: Vec<_> = to_keys.into_iter().map(|vm| vm.id.clone()).collect();
-    Ok((msg, from_key.id.clone(), to_kids))
+    let to_kids: Vec<_> = to_keys.into_iter().map(|vm| vm.id.to_string()).collect();
+    Ok((msg, from_key.id.to_string(), to_kids))
 }

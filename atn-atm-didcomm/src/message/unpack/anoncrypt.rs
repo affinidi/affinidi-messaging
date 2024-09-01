@@ -12,14 +12,12 @@ use std::str::FromStr;
 
 use crate::{
     algorithms::AnonCryptAlg,
+    document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
     jwe,
     secrets::SecretsResolver,
-    utils::{
-        crypto::{AsKnownKeyPair, KnownKeyPair},
-        did::did_or_url,
-    },
+    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
     UnpackOptions,
 };
 
@@ -71,16 +69,13 @@ pub(crate) async fn _try_unpack_anoncrypt(
     let mut payload: Option<Vec<u8>> = None;
 
     for to_kid in to_kids_found {
-        let to_key = secrets_resolver
-            .get_secret(&to_kid)
-            .await?
-            .ok_or_else(|| {
-                err_msg(
-                    ErrorKind::InvalidState,
-                    "Recipient secret not found after existence checking",
-                )
-            })?
-            .as_key_pair()?;
+        let to_key = secrets_resolver.get_secret(&to_kid).await?.ok_or_else(|| {
+            err_msg(
+                ErrorKind::InvalidState,
+                "Recipient secret not found after existence checking",
+            )
+        })?;
+        let to_key = to_key.as_key_pair()?;
 
         let _payload = match (to_key, &jwe.protected.enc) {
             (KnownKeyPair::X25519(ref to_key), jwe::EncAlgorithm::A256cbcHs512) => {

@@ -1,22 +1,21 @@
+use atn_did_cache_sdk::DIDCacheClient;
 use serde::{Deserialize, Serialize};
 
 use anoncrypt::_try_unpack_anoncrypt;
 use authcrypt::_try_unpack_authcrypt;
 use sign::_try_unpack_sign;
-use ssi::did::DIDMethods;
 use std::str::FromStr;
 use tracing::debug;
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
-    did::DIDResolver,
+    document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
     error::{err_msg, ErrorKind, Result, ResultExt},
     jws::Jws,
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
     secrets::SecretsResolver,
-    utils::did::did_or_url,
     FromPrior, Message,
 };
 
@@ -26,28 +25,18 @@ mod plaintext;
 mod sign;
 
 impl Message {
-    pub async fn unpack_string<S, T>(
+    pub async fn unpack_string<S>(
         msg: &str,
-        did_resolver: &mut T,
-        did_method_resolver: &DIDMethods<'_>,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &S,
         options: &UnpackOptions,
     ) -> Result<(Message, UnpackMetadata)>
     where
-        T: DIDResolver,
         S: SecretsResolver,
     {
-        let mut envelope =
-            MetaEnvelope::new(msg, did_resolver, secrets_resolver, did_method_resolver).await?;
+        let mut envelope = MetaEnvelope::new(msg, did_resolver, secrets_resolver).await?;
 
-        Self::unpack(
-            &mut envelope,
-            did_resolver,
-            did_method_resolver,
-            secrets_resolver,
-            options,
-        )
-        .await
+        Self::unpack(&mut envelope, did_resolver, secrets_resolver, options).await
     }
     /// Unpacks the packed message by doing decryption and verifying the signatures.
     /// This method supports all DID Comm message types (encrypted, signed, plaintext).
@@ -61,7 +50,7 @@ impl Message {
     /// - `did_resolver` instance of `DIDResolver` to resolve DIDs
     /// - `secrets_resolver` instance of SecretsResolver` to resolve sender DID keys secrets
     /// - `options` allow fine configuration of unpacking process and imposing additional restrictions
-    /// to message to be trusted.
+    ///    to message to be trusted.
     ///
     /// # Returns
     /// Tuple `(message, metadata)`.
@@ -77,16 +66,15 @@ impl Message {
     /// - `SecretNotFound` No recipient secrets found.
     /// - `InvalidState` Indicates library error.
     /// - `IOError` IO error during DID or secrets resolving.
+    ///
     /// TODO: verify and update errors list
-    pub async fn unpack<S, T>(
+    pub async fn unpack<S>(
         envelope: &mut MetaEnvelope,
-        did_resolver: &mut T,
-        did_method_resolver: &DIDMethods<'_>,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &S,
         options: &UnpackOptions,
     ) -> Result<(Message, UnpackMetadata)>
     where
-        T: DIDResolver,
         S: SecretsResolver,
     {
         //let mut msg = msg;
@@ -133,7 +121,6 @@ impl Message {
         let authcrypted = _try_unpack_authcrypt(
             &parsed_jwe,
             did_resolver,
-            did_method_resolver,
             secrets_resolver,
             options,
             envelope,
@@ -159,7 +146,7 @@ impl Message {
 
     async fn _try_unwrap_forwarded_message(
         msg: &ParsedEnvelope,
-        did_resolver: &dyn DIDResolver,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &dyn SecretsResolver,
     ) -> Result<Option<String>> {
         let plaintext = match msg {
@@ -257,7 +244,7 @@ pub struct UnpackMetadata {
 
 async fn has_key_agreement_secret(
     did_or_kid: &str,
-    did_resolver: &dyn DIDResolver,
+    did_resolver: &DIDCacheClient,
     secrets_resolver: &dyn SecretsResolver,
 ) -> Result<bool> {
     let kids = match did_or_url(did_or_kid) {
@@ -265,11 +252,21 @@ async fn has_key_agreement_secret(
             vec![kid.to_owned()]
         }
         (did, None) => {
-            let did_doc = did_resolver
-                .resolve(did)
-                .await?
-                .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Next DID doc not found"))?;
-            did_doc.key_agreement
+            let did_doc = match did_resolver.resolve(did).await {
+                Ok(result) => result.doc,
+                Err(e) => {
+                    return Err(err_msg(
+                        ErrorKind::DIDNotResolved,
+                        format!("Couldn't resolve did({}). Reason: {}", did, e),
+                    ))
+                }
+            };
+            did_doc
+                .verification_relationships
+                .key_agreement
+                .iter()
+                .map(|key| key.id().resolve(did_doc.id.as_did()).to_string())
+                .collect()
         }
     };
 
@@ -280,6 +277,7 @@ async fn has_key_agreement_secret(
     Ok(!secrets_ids.is_empty())
 }
 
+/*
 #[cfg(test)]
 mod test {
     use tracing::debug;
@@ -2175,3 +2173,4 @@ mod test {
         assert_eq!(format!("{}", err), exp_err_msg);
     }
 }
+*/

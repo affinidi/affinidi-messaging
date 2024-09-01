@@ -7,25 +7,23 @@ use askar_crypto::{
     },
     kdf::ecdh_1pu::Ecdh1PU,
 };
-use ssi::did::DIDMethods;
+use atn_did_cache_sdk::DIDCacheClient;
 use std::str::FromStr;
 use tracing::{debug, event, Level};
 
 use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
     algorithms::AuthCryptAlg,
-    did::DIDResolver,
     error::{err_msg, ErrorKind, Result, ResultExt},
     jwe,
     secrets::SecretsResolver,
-    utils::crypto::{AsKnownKeyPair, KnownKeyPair},
+    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
     UnpackOptions,
 };
 
 pub(crate) async fn _try_unpack_authcrypt(
     jwe: &ParsedEnvelope,
-    did_resolver: &mut dyn DIDResolver,
-    did_methods: &DIDMethods<'_>,
+    did_resolver: &DIDCacheClient,
     secrets_resolver: &dyn SecretsResolver,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
@@ -46,7 +44,7 @@ pub(crate) async fn _try_unpack_authcrypt(
 
     if jwe.apu.is_some() && envelope.from_kid.is_none() {
         debug!("Recalculating envelope meta-data from APU");
-        jwe.fill_envelope_from(envelope, did_resolver, secrets_resolver, did_methods)
+        jwe.fill_envelope_from(envelope, did_resolver, secrets_resolver)
             .await?;
     }
 
@@ -54,16 +52,13 @@ pub(crate) async fn _try_unpack_authcrypt(
 
     debug!("{} to_kids found", &envelope.to_kids_found.len());
     for to_kid in &envelope.to_kids_found {
-        let to_key = secrets_resolver
-            .get_secret(to_kid)
-            .await?
-            .ok_or_else(|| {
-                err_msg(
-                    ErrorKind::InvalidState,
-                    "Recipient secret not found after existence checking",
-                )
-            })?
-            .as_key_pair()?;
+        let to_key = secrets_resolver.get_secret(to_kid).await?.ok_or_else(|| {
+            err_msg(
+                ErrorKind::InvalidState,
+                "Recipient secret not found after existence checking",
+            )
+        })?;
+        let to_key = to_key.as_key_pair()?;
 
         let _payload = match (
             envelope.from_key.as_ref().unwrap(),

@@ -9,7 +9,7 @@ use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
-use tracing::{debug, error, info, span, warn, Instrument};
+use tracing::{debug, info, span, warn, Instrument};
 
 use crate::{
     common::errors::Session,

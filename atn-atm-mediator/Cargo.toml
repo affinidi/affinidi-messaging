@@ -14,6 +14,7 @@ license.workspace = true
 async-convert = "1"
 async-trait = "0.1"
 atn-atm-sdk = { version = "0.1", path = "../atn-atm-sdk" }
+atn-did-cache-sdk = { version = "0.1", path = "../../atn-did/atn-did-cache-sdk" }
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.29"
 aws-sdk-memorydb = "1.26.0"
@@ -24,25 +25,27 @@ axum-extra = { version = "0.9.3", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
 chrono = "0.4"
-deadpool-redis = { version = "0.15", features = ["rt_tokio_1"] }
-did-method-key = "0.2"
-did-peer = { version = "0.4", path = "../../did-peer" }
+deadpool-redis = { version = "0.16", features = ["rt_tokio_1"] }
 atn-atm-didcomm = { version = "0.5", path = "../atn-atm-didcomm" }
-hostname = "0.4 "
+hostname = "0.4"
 http = "1"
 jsonwebtoken = "9.3"
 itertools = "0.13"
 rand = "0.8"
-redis = { version = "0.25.3", features = [
+redis = { version = "0.26", features = [
     "tokio-rustls-comp",
     "tls-rustls-insecure",
 ] }
 regex = "1"
 ring = { version = "0.17", features = ["std"] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws_lc_rs",
+    "tls12",
+] }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha256 = "1.5"
-ssi = "0.7"
+ssi = "0.8"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-stream = "0.1"
@@ -61,8 +64,4 @@ rcgen = { version = "0.13", default-features = false, features = [
     "pem",
 ] }
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
-rustls = { version = "0.23", default-features = false, features = [
-    "aws_lc_rs",
-    "tls12",
-] }
 time = "0.3"

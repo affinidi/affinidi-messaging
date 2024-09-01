@@ -1,6 +1,5 @@
 use super::DatabaseHandler;
 use crate::{common::errors::MediatorError, tasks::websocket_streaming::PubSubRecord};
-use deadpool_redis::Connection;
 use redis::{from_redis_value, Value};
 use tracing::{debug, error, event, Level};
 
@@ -73,7 +72,7 @@ impl DatabaseHandler {
         match deadpool_redis::redis::cmd("HGET")
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
-            .query_async::<Connection, Option<String>>(&mut conn)
+            .query_async::<Option<String>>(&mut conn)
             .await
         {
             Ok(response) => {
@@ -156,7 +155,7 @@ impl DatabaseHandler {
         match deadpool_redis::redis::cmd("PUBLISH")
             .arg(["CHANNEL:", stream_uuid].concat())
             .arg(record)
-            .query_async::<Connection, Value>(&mut conn)
+            .query_async::<Value>(&mut conn)
             .await
         {
             Ok(_) => {
@@ -204,7 +203,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":FALSE"].concat())
-            .query_async::<Connection, Value>(&mut conn)
+            .query_async::<Value>(&mut conn)
             .await
         {
             Ok(_) => {
@@ -245,7 +244,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":", "TRUE"].concat())
-            .query_async::<Connection, Value>(&mut conn)
+            .query_async::<Value>(&mut conn)
             .await
         {
             Ok(_) => {
@@ -289,7 +288,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":", "FALSE"].concat())
-            .query_async::<Connection, Value>(&mut conn)
+            .query_async::<Value>(&mut conn)
             .await
         {
             Ok(_) => {
@@ -337,7 +336,7 @@ impl DatabaseHandler {
             .cmd("HDEL")
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
-            .query_async::<Connection, Value>(&mut conn)
+            .query_async::<Value>(&mut conn)
             .await
         {
             Ok(_) => {

@@ -1,11 +1,12 @@
-use crate::did::DIDResolver;
+use atn_did_cache_sdk::DIDCacheClient;
+
 use crate::envelope::{MetaEnvelope, ParsedEnvelope};
 use crate::error::Result;
 use crate::{FromPrior, Message};
 
 pub(crate) async fn _try_unpack_plaintext(
     msg: &ParsedEnvelope,
-    did_resolver: &dyn DIDResolver,
+    did_resolver: &DIDCacheClient,
     envelope: &mut MetaEnvelope,
 ) -> Result<Option<Message>> {
     let msg = match msg {

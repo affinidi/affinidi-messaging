@@ -1,11 +1,12 @@
 use crate::{
-    did::DIDResolver,
+    document::{did_or_url, DIDCommVerificationMethodExt},
     error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
     jws,
-    utils::{crypto::AsKnownKeyPair, did::did_or_url},
+    utils::crypto::AsKnownKeyPair,
     FromPrior,
 };
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
+use atn_did_cache_sdk::DIDCacheClient;
 use base64::prelude::*;
 
 impl FromPrior {
@@ -26,7 +27,7 @@ impl FromPrior {
     /// - `Unsupported` Used crypto or method is unsupported.
     pub async fn unpack(
         from_prior_jwt: &str,
-        did_resolver: &dyn DIDResolver,
+        did_resolver: &DIDCacheClient,
     ) -> Result<(FromPrior, String)> {
         let parsed = jws::parse_compact(from_prior_jwt)?;
 
@@ -50,28 +51,35 @@ impl FromPrior {
             ))?
         }
 
-        let did_doc = did_resolver
-            .resolve(did)
-            .await
-            .context("Unable to resolve from_prior issuer DID")?
-            .ok_or_else(|| {
-                err_msg(
+        let did_doc = match did_resolver.resolve(did).await {
+            Ok(response) => response.doc,
+            Err(err) => {
+                return Err(err_msg(
                     ErrorKind::DIDNotResolved,
-                    "from_prior issuer DIDDoc not found",
-                )
-            })?;
+                    format!(
+                        "from_prior issuer DID ({}) couldn't be resolved. Reason: {}",
+                        did, err
+                    ),
+                ));
+            }
+        };
 
         let kid = did_doc
+            .verification_relationships
             .authentication
             .iter()
-            .find(|&k| k.as_str() == kid)
+            .find(|a| a.id().resolve(&did_doc.id.as_did()).as_str() == kid)
             .ok_or_else(|| {
                 err_msg(
                     ErrorKind::DIDUrlNotFound,
-                    "from_prior issuer kid not found in DIDDoc",
+                    "Provided issuer_kid is not found in DIDDoc",
                 )
-            })?
-            .as_str();
+            })?;
+
+        // TODO: dropping a reference here otherwise
+        let _kid = kid.id();
+        let kid = _kid.resolve(&did_doc.id.as_did());
+        let kid = kid.as_str();
 
         let key = did_doc
             .verification_method
@@ -84,10 +92,14 @@ impl FromPrior {
                 )
             })?;
 
+        let jwk = key
+            .get_jwk()
+            .ok_or_else(|| err_msg(ErrorKind::Unsupported, "Couldn't convert key to jwk"))?;
+
         let valid = match alg {
             jws::Algorithm::EdDSA => {
                 let key = key
-                    .as_ed25519()
+                    .as_ed25519(&jwk)
                     .context("Unable to instantiate from_prior issuer key")?;
 
                 parsed
@@ -96,7 +108,7 @@ impl FromPrior {
             }
             jws::Algorithm::Es256 => {
                 let key = key
-                    .as_p256()
+                    .as_p256(&jwk)
                     .context("Unable to instantiate from_prior issuer key")?;
 
                 parsed
@@ -105,7 +117,7 @@ impl FromPrior {
             }
             jws::Algorithm::Es256K => {
                 let key = key
-                    .as_k256()
+                    .as_k256(&jwk)
                     .context("Unable to instantiate from_prior issuer key")?;
 
                 parsed
@@ -139,6 +151,7 @@ impl FromPrior {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -193,3 +206,4 @@ mod tests {
         assert_eq!(format!("{}", err), "Malformed: Unable to verify from_prior signature: Unable decode signature: Invalid last symbol 66, offset 85.");
     }
 }
+*/

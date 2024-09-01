@@ -1,18 +1,15 @@
+use crate::document::{did_or_url, DIDCommVerificationMethodExt};
 use crate::envelope::MetaEnvelope;
 use crate::error::ToResult;
 use crate::utils::crypto::AsKnownKeyPair;
-use crate::utils::did::did_or_url;
-use crate::utils::did_conversion::convert_did;
 use crate::{
     error::{err_msg, ErrorKind, Result, ResultExt},
     jwe::envelope::{Jwe, ProtectedHeader},
 };
+use atn_did_cache_sdk::document::DocumentExt;
+use atn_did_cache_sdk::DIDCacheClient;
 use base64::prelude::*;
-use did_peer::DIDPeer;
 use sha2::{Digest, Sha256};
-use ssi::did::DIDMethods;
-use ssi::did_resolve::DIDResolver;
-use ssi::did_resolve::ResolutionInputMetadata;
 use tracing::debug;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -112,9 +109,8 @@ impl ParsedJWE {
     pub async fn fill_envelope_from(
         &self,
         envelope: &mut MetaEnvelope,
-        did_resolver: &mut dyn crate::did::DIDResolver,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &dyn crate::secrets::SecretsResolver,
-        did_methods: &DIDMethods<'_>,
     ) -> Result<&Self> {
         debug!("Checking if APU exists in JWE?");
         if let Some(apu) = &self.apu {
@@ -133,85 +129,48 @@ impl ParsedJWE {
 
             envelope.from_did = Some(from_did.into());
 
-            if from_did.starts_with("did:example:") {
-                // this is used for local tests
-                envelope.from_ddoc = did_resolver.resolve(from_did).await?;
-            } else {
-                let (_, doc_opt, _) = did_methods
-                    .resolve(
-                        envelope.from_did.as_ref().unwrap(),
-                        &ResolutionInputMetadata::default(),
-                    )
-                    .await;
+            envelope.from_ddoc = Some(
+                did_resolver
+                    .resolve(from_did)
+                    .await
+                    .map_err(|e| err_msg(ErrorKind::DIDNotResolved, e))?
+                    .doc,
+            );
 
-                let doc = doc_opt.ok_or_else(|| {
-                    err_msg(
-                        ErrorKind::Malformed,
-                        format!(
-                            "Could not resolve senders DID ({})",
-                            envelope.from_did.as_ref().unwrap()
-                        ),
-                    )
-                })?;
-
-                // TODO: This is only required for DID-Peer so we should be careful of this for other methods.
-                // IT WILL FAIL!!!
-                let doc = if let Ok(doc) = DIDPeer::expand_keys(&doc).await {
-                    doc
+            if let Some(doc) = &envelope.from_ddoc {
+                // Valid DID Document
+                if doc.contains_key_agreement(from_kid) {
+                    // Do we have a key agreement?
+                    envelope.from_kid = Some(from_kid.into());
                 } else {
-                    return Err(err_msg(
-                        ErrorKind::Malformed,
-                        format!(
-                            "Could not resolve senders DID ({})",
-                            envelope.from_did.as_ref().unwrap()
-                        ),
-                    ));
-                };
+                    Err(err_msg(
+                        ErrorKind::DIDUrlNotFound,
+                        "Sender kid not found in did",
+                    ))?;
+                }
 
-                envelope.from_ddoc = match convert_did(&doc) {
-                    Ok(ddoc) => Some(ddoc),
-                    Err(e) => {
-                        return Err(err_msg(
-                            ErrorKind::DIDNotResolved,
-                            format!("Couldn't convert DID. Reason: {}", e),
-                        ));
-                    }
-                };
-
-                // Add the Document to the list of DID Documents
-                did_resolver.insert(envelope.from_ddoc.as_ref().unwrap());
-            }
-
-            envelope.from_kid = Some(
-                envelope
-                    .from_ddoc
-                    .as_ref()
-                    .unwrap()
-                    .key_agreement
-                    .iter()
-                    .find(|&k| k.as_str() == from_kid)
-                    .ok_or_else(|| {
-                        err_msg(ErrorKind::DIDUrlNotFound, "Sender kid not found in did")
-                    })?
-                    .to_string(),
-            );
-
-            envelope.from_key = Some(
-                envelope
-                    .from_ddoc
-                    .as_ref()
-                    .unwrap()
-                    .verification_method
-                    .iter()
-                    .find(|&vm| vm.id == from_kid)
-                    .ok_or_else(|| {
+                // COnvert keys from the verification method that matches the sender key-id
+                if let Some(vm) = doc.get_verification_method(from_kid) {
+                    let jwk = vm.get_jwk().ok_or_else(|| {
                         err_msg(
-                            ErrorKind::DIDUrlNotFound,
-                            "Sender verification method not found in did",
+                            ErrorKind::Malformed,
+                            "Can't convert verification method to a JWK",
                         )
-                    })?
-                    .as_key_pair()?,
-            );
+                    })?;
+                    let key_pair = vm.as_key_pair(&jwk).map_err(|e| {
+                        err_msg(
+                            ErrorKind::Malformed,
+                            format!("Can't convert verification method to a key pair: {}", e),
+                        )
+                    })?;
+                    envelope.from_key = Some(key_pair);
+                } else {
+                    Err(err_msg(
+                        ErrorKind::DIDUrlNotFound,
+                        "Sender verification method not found in did",
+                    ))?;
+                }
+            }
 
             envelope.metadata.authenticated = true;
             envelope.metadata.encrypted = true;

@@ -4,9 +4,9 @@ use crate::{
     SharedData,
 };
 use atn_atm_didcomm::{
-    did::DIDResolver, secrets::SecretsResolver, Message, PackEncryptedMetadata,
-    PackEncryptedOptions, UnpackMetadata,
+    secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
+use atn_did_cache_sdk::DIDCacheClient;
 use protocols::message_pickup;
 use std::{str::FromStr, time::SystemTime};
 
@@ -94,17 +94,16 @@ pub(crate) trait MessageHandler {
     ) -> Result<ProcessMessageResponse, MediatorError>;
 
     /// Uses the incoming unpack metadata to determine best way to pack the message
-    async fn pack<S, T>(
+    async fn pack<S>(
         &self,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
-        did_resolver: &T,
+        did_resolver: &DIDCacheClient,
     ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
-        S: SecretsResolver,
-        T: DIDResolver;
+        S: SecretsResolver;
 }
 
 impl MessageHandler for Message {
@@ -133,17 +132,16 @@ impl MessageHandler for Message {
         msg_type.process(self, state, session).await
     }
 
-    async fn pack<S, T>(
+    async fn pack<S>(
         &self,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
-        did_resolver: &T,
+        did_resolver: &DIDCacheClient,
     ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
         S: SecretsResolver,
-        T: DIDResolver,
     {
         if metadata.encrypted {
             // Respond with an encrypted message

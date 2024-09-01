@@ -1,20 +1,15 @@
-use super::{did_conversion::convert_did, errors::MediatorError};
+use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use async_convert::{async_trait, TryFrom};
-use atn_atm_didcomm::did::DIDDoc;
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
-use did_peer::DIDPeer;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
-use ssi::{
-    did::DIDMethods,
-    did_resolve::{DIDResolver, ResolutionInputMetadata},
-};
+
 use std::{
     env, fmt,
     fs::File,
@@ -69,7 +64,6 @@ pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
-    pub mediator_did_doc: DIDDoc,
     pub mediator_secrets: AffinidiSecrets,
     pub database_url: String,
     pub database_pool_size: usize,
@@ -120,13 +114,6 @@ impl Default for Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
             mediator_did: "".into(),
-            mediator_did_doc: DIDDoc {
-                id: "".into(),
-                key_agreement: Vec::new(),
-                authentication: Vec::new(),
-                verification_method: Vec::new(),
-                service: Vec::new(),
-            },
             mediator_secrets: AffinidiSecrets::new(vec![]),
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
@@ -183,36 +170,6 @@ impl TryFrom<ConfigRaw> for Config {
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             ..Default::default()
         };
-
-        // Resolve mediator DID Doc and expand keys
-        let mut did_resolver = DIDMethods::default();
-        did_resolver.insert(Box::new(DIDPeer));
-
-        let (_, doc_opt, _) = did_resolver
-            .resolve(&config.mediator_did, &ResolutionInputMetadata::default())
-            .await;
-
-        let doc_opt = match doc_opt {
-            Some(doc) => doc,
-            None => {
-                return Err(MediatorError::ConfigError(
-                    "NA".into(),
-                    format!("Could not resolve mediator DID ({})", config.mediator_did),
-                ));
-            }
-        };
-
-        let doc_opt = match DIDPeer::expand_keys(&doc_opt).await {
-            Ok(doc_opt) => doc_opt,
-            Err(err) => {
-                return Err(MediatorError::ConfigError(
-                    "NA".into(),
-                    format!("Could not expand mediator DID ({})", err),
-                ));
-            }
-        };
-
-        config.mediator_did_doc = convert_did(&doc_opt)?;
 
         // Load mediator secrets
         config.mediator_secrets = load_secrets(&raw.mediator_secrets, &aws_config).await?;

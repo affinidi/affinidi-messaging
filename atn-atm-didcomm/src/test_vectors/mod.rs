@@ -1,5 +1,4 @@
 mod common;
-mod did_doc;
 mod encrypted;
 mod from_prior;
 mod from_prior_jwt;
@@ -9,8 +8,6 @@ mod secrets;
 mod signed;
 
 pub use common::*;
-
-pub use did_doc::*;
 
 pub use encrypted::*;
 

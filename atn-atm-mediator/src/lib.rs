@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use atn_did_cache_sdk::DIDCacheClient;
 use axum::{
     async_trait,
     extract::{FromRef, FromRequestParts},
@@ -12,7 +13,6 @@ use common::{
 };
 use database::DatabaseHandler;
 use http::request::Parts;
-use resolvers::affinidi_dids::AffinidiDIDResolver;
 use tasks::websocket_streaming::StreamingTask;
 use tracing::{event, level_filters::LevelFilter, Level};
 use tracing_subscriber::{reload::Handle, Registry};
@@ -28,7 +28,7 @@ pub mod tasks;
 pub struct SharedData {
     pub config: Config,
     pub service_start_timestamp: DateTime<Utc>,
-    pub did_resolver: AffinidiDIDResolver,
+    pub did_resolver: DIDCacheClient,
     pub database: DatabaseHandler,
     pub streaming_task: Option<StreamingTask>,
 }

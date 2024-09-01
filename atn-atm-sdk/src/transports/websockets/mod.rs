@@ -1,6 +1,4 @@
 use crate::{config::Config, errors::ATMError, ATM};
-use did_peer::DIDPeer;
-use ssi::did::DIDMethods;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 use ws_handler::WSCommand;
@@ -34,7 +32,6 @@ impl<'c> ATM<'c> {
 
         let mut atm = ATM {
             config,
-            did_methods_resolver: DIDMethods::default(),
             did_resolver: self.did_resolver.clone(),
             secrets_resolver: self.secrets_resolver.clone(),
             client: self.client.clone(),
@@ -48,9 +45,6 @@ impl<'c> ATM<'c> {
         };
 
         error!("secrets: {}", atm.secrets_resolver.len());
-
-        // TODO: This is another dirty hack, there doesn't seem to be a nice way to add traits dynamically
-        atm.add_did_method(Box::new(DIDPeer));
 
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
         let (tx, mut rx) = mpsc::channel::<WSCommand>(32);

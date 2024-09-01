@@ -1,11 +1,9 @@
+use crate::error::{Error, ErrorKind, Result, ResultExt};
 use askar_crypto::{
     alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair, x25519::X25519KeyPair},
     jwk::{FromJwk, ToJwk},
 };
-
 use serde_json::Value;
-
-use crate::error::{Error, ErrorKind, Result, ResultExt};
 
 pub(crate) trait FromJwkValue: FromJwk {
     /// Import the key from a JWK string reference

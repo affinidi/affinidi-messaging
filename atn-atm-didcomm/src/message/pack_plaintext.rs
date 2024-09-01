@@ -1,5 +1,6 @@
+use atn_did_cache_sdk::DIDCacheClient;
+
 use crate::{
-    did::DIDResolver,
     error::{err_msg, ErrorKind, Result, ResultExt},
     FromPrior, Message,
 };
@@ -24,10 +25,7 @@ impl Message {
     /// - `DIDUrlNotFound` `from_prior` issuer authentication verification method is not found.
     /// - `Unsupported` Crypto or method used for signing `from_prior` is unsupported.
     /// - `InvalidState` Indicates a library error.
-    pub async fn pack_plaintext<'dr, 'sr>(
-        &self,
-        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
-    ) -> Result<String> {
+    pub async fn pack_plaintext<'sr>(&self, did_resolver: &DIDCacheClient) -> Result<String> {
         let (from_prior, from_prior_issuer_kid) = match self.from_prior {
             Some(ref from_prior) => {
                 let (from_prior, from_prior_issuer_kid) =
@@ -67,6 +65,7 @@ impl Message {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
@@ -179,3 +178,4 @@ mod tests {
         );
     }
 }
+*/

@@ -11,6 +11,7 @@ use askar_crypto::{
     kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
     repr::{KeySecretBytes, ToSecretBytes},
 };
+use ssi::JWK;
 
 use crate::error::{err_msg, Error, ErrorKind, Result};
 
@@ -158,6 +159,56 @@ pub enum KnownKeyPair {
 }
 
 pub trait AsKnownKeyPair {
+    fn key_alg(&self, jwk: &JWK) -> KnownKeyAlg;
+    fn as_key_pair(&self, jwk: &JWK) -> Result<KnownKeyPair>;
+
+    fn as_ed25519(&self, jwk: &JWK) -> Result<Ed25519KeyPair> {
+        if self.key_alg(jwk) != KnownKeyAlg::Ed25519 {
+            Err(err_msg(ErrorKind::InvalidState, "Unexpected key alg"))?
+        }
+
+        match self.as_key_pair(jwk)? {
+            KnownKeyPair::Ed25519(k) => Ok(k),
+            _ => Err(err_msg(ErrorKind::InvalidState, "Unexpected key pair type"))?,
+        }
+    }
+
+    fn as_x25519(&self, jwk: &JWK) -> Result<X25519KeyPair> {
+        if self.key_alg(jwk) != KnownKeyAlg::X25519 {
+            Err(err_msg(ErrorKind::InvalidState, "Unexpected key alg"))?
+        }
+
+        match self.as_key_pair(jwk)? {
+            KnownKeyPair::X25519(k) => Ok(k),
+            _ => Err(err_msg(ErrorKind::InvalidState, "Unexpected key pair type"))?,
+        }
+    }
+
+    fn as_p256(&self, jwk: &JWK) -> Result<P256KeyPair> {
+        if self.key_alg(jwk) != KnownKeyAlg::P256 {
+            Err(err_msg(ErrorKind::InvalidState, "Unexpected key alg"))?
+        }
+
+        match self.as_key_pair(jwk)? {
+            KnownKeyPair::P256(k) => Ok(k),
+            _ => Err(err_msg(ErrorKind::InvalidState, "Unexpected key pair type"))?,
+        }
+    }
+
+    fn as_k256(&self, jwk: &JWK) -> Result<K256KeyPair> {
+        if self.key_alg(jwk) != KnownKeyAlg::K256 {
+            Err(err_msg(ErrorKind::InvalidState, "Unexpected key alg"))?
+        }
+
+        match self.as_key_pair(jwk)? {
+            KnownKeyPair::K256(k) => Ok(k),
+            _ => Err(err_msg(ErrorKind::InvalidState, "Unexpected key pair type"))?,
+        }
+    }
+}
+
+/// Older trait form original crate
+pub trait AsKnownKeyPairSecret {
     fn key_alg(&self) -> KnownKeyAlg;
     fn as_key_pair(&self) -> Result<KnownKeyPair>;
 

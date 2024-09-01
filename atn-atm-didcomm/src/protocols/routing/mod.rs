@@ -2,15 +2,21 @@ mod forward;
 
 use std::collections::HashMap;
 
+use atn_did_cache_sdk::DIDCacheClient;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use ssi::dids::{
+    document::{service::Endpoint, Service},
+    Document,
+};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
     algorithms::AnonCryptAlg,
-    did::{DIDCommMessagingService, DIDResolver, Service, ServiceKind},
-    error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
+    document::is_did,
+    error::{err_msg, ErrorKind, Result, ResultExt},
     message::{anoncrypt, MessagingServiceMetadata},
-    utils::did::{did_or_url, is_did},
     Attachment, AttachmentData, Message, PackEncryptedOptions,
 };
 
@@ -20,78 +26,171 @@ pub(crate) const FORWARD_MSG_TYPE: &str = "https://didcomm.org/routing/2.0/forwa
 
 pub(crate) const DIDCOMM_V2_PROFILE: &str = "didcomm/v2";
 
-async fn find_did_comm_service<'dr>(
-    did: &str,
-    service_id: Option<&str>,
-    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
-) -> Result<Option<(String, DIDCommMessagingService)>> {
-    let did_doc = did_resolver
-        .resolve(did)
-        .await
-        .context("Unable resolve DID")?
-        .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "DID not found"))?;
+/// Properties for DIDCommMessagingService
+/// (https://identity.foundation/didcomm-messaging/spec/#did-document-service-endpoint).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DIDCommMessagingService {
+    pub uri: String,
 
-    match service_id {
-        Some(service_id) => {
-            let service: &Service = did_doc
-                .service
-                .iter()
-                .find(|&service| service.id == service_id)
-                .ok_or_else(|| {
-                    err_msg(
-                        ErrorKind::IllegalArgument,
-                        "Service with the specified ID not found",
-                    )
-                })?;
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accept: Option<Vec<String>>,
 
-            match service.service_endpoint {
-                ServiceKind::DIDCommMessaging { ref value } => match value.accept.as_ref() {
-                    Some(accept) => {
-                        if accept.is_empty() || accept.contains(&DIDCOMM_V2_PROFILE.into()) {
-                            Ok(Some((service.id.clone(), value.clone())))
-                        } else {
-                            Err(err_msg(
-                                ErrorKind::IllegalArgument,
-                                "Service with the specified ID does not accept didcomm/v2 profile",
-                            ))
-                        }
-                    }
-                    None => Ok(Some((service.id.clone(), value.clone()))),
-                },
-                _ => Err(err_msg(
-                    ErrorKind::IllegalArgument,
-                    "Service with the specified ID is not of DIDCommMessaging type",
-                )),
-            }
-        }
+    #[serde(default)]
+    pub routing_keys: Vec<String>,
+}
 
-        None => Ok(did_doc
-            .service
-            .iter()
-            .find_map(|service| match service.service_endpoint {
-                ServiceKind::DIDCommMessaging { ref value } => match value.accept.as_ref() {
-                    Some(accept) => {
-                        if accept.is_empty() || accept.contains(&DIDCOMM_V2_PROFILE.into()) {
-                            Some((service.id.clone(), value.clone()))
-                        } else {
-                            None
-                        }
-                    }
-                    None => Some((service.id.clone(), value.clone())),
-                },
-                _ => None,
-            })),
+/// Service type must match `DIDCommMessaging`
+fn check_service_type(service: &Service) -> Result<()> {
+    // Check of the service_endpoint is of type DIDCommMessaging
+    if service
+        .type_
+        .first()
+        .map(|t| t == "DIDCommMessaging")
+        .is_some()
+    {
+        Ok(())
+    } else {
+        Err(err_msg(
+            ErrorKind::InvalidState,
+            format!(
+                "Service ({}) is not type `DIDCommMessaging. Instead it is ({})",
+                service.id,
+                service.type_.first().unwrap_or(&"".to_string())
+            ),
+        ))
     }
 }
 
-async fn resolve_did_comm_services_chain<'dr>(
+/// Checks if a defined service meets the criteria for a DIDComm v2 service
+fn check_service(service: &Service) -> Result<Option<(String, DIDCommMessagingService)>> {
+    check_service_type(service)?;
+
+    if let Some(service_endpoint) = &service.service_endpoint {
+        // Only accepts DIDComm Version 2 specification
+        // Check that this service endpoint supports didcomm/v2
+
+        let endpoint = service_endpoint.into_iter().find(|endpoint| {
+            if let Endpoint::Map(ref value) = endpoint {
+                if let Some(accept) = value.get("accept") {
+                    let a: Vec<String> = match serde_json::from_value(accept.clone()) {
+                        Ok(value) => value,
+                        Err(e) => {
+                            warn!(
+                                "Error parsing accept field ({:?}) on service id({}): {}",
+                                accept, service.id, e
+                            );
+                            return false;
+                        }
+                    };
+
+                    a.contains(&DIDCOMM_V2_PROFILE.to_string())
+                } else {
+                    // If accept is not defined, then it is assumed that it accepts all profiles
+                    true
+                }
+            } else {
+                false
+            }
+        });
+
+        if let Some(endpoint) = endpoint {
+            let value = match endpoint {
+                Endpoint::Map(map) => map,
+                _ => {
+                    return Err(err_msg(
+                        ErrorKind::InvalidState,
+                        format!(
+                            "Service ({}) has an invalid serviceEndpoint definition",
+                            service.id
+                        ),
+                    ));
+                }
+            };
+
+            let found_service: DIDCommMessagingService = serde_json::from_value(value.clone())
+                .map_err(|_| {
+                    err_msg(
+                        ErrorKind::InvalidState,
+                        format!(
+                            "Service ({}) has an invalid serviceEndpoint definition",
+                            service.id
+                        ),
+                    )
+                })?;
+
+            Ok(Some((service.id.to_string(), found_service)))
+        } else {
+            Err(err_msg(
+                ErrorKind::IllegalArgument,
+                "Service with the specified ID does not accept didcomm/v2 profile",
+            ))
+        }
+    } else {
+        // if there is no serviceEndpoint, then we can't proceed
+
+        Err(err_msg(
+            ErrorKind::InvalidState,
+            format!(
+                "Service ({}) has no serviceEndpoint definitions",
+                service.id
+            ),
+        ))
+    }
+}
+
+/// Returns a Service Endpoint definition if it exists
+/// If a service_id is specified, then we look for that explicitly
+/// service_id: is a DID URL fragment that refers to a specific service endpoint in the DID document.
+///             E.g. did:peer:2...#service-1 should be specified as service_id = "service-1"
+///
+/// Returns
+/// - Ok(None) if no service endpoint can be found and no service_id was given
+/// - Ok(DIDCommMessagingService) - service endpoint found
+/// - Err(err) - service_id provided, but couldn't find/match to it.
+fn find_did_comm_service(
+    did_doc: &Document,
+    service_id: Option<&str>,
+) -> Result<Option<(String, DIDCommMessagingService)>> {
+    match service_id {
+        Some(service_id) => {
+            let service = did_doc.service(service_id).ok_or_else(|| {
+                err_msg(
+                    ErrorKind::InvalidState,
+                    "Service with the specified ID not found in the DID document",
+                )
+            })?;
+
+            check_service(service)
+        }
+        None => {
+            let service = did_doc
+                .service
+                .iter()
+                .find_map(|service| match check_service(service) {
+                    Ok(service) => service,
+                    Err(_) => None,
+                });
+
+            Ok(service)
+        }
+    }
+}
+
+async fn resolve_did_comm_services_chain(
     to: &str,
     service_id: Option<&str>,
-    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+    resolver: &DIDCacheClient,
 ) -> Result<Vec<(String, DIDCommMessagingService)>> {
-    let (to_did, _) = did_or_url(to);
+    let result = resolver.resolve(to).await.map_err(|e| {
+        err_msg(
+            ErrorKind::DIDNotResolved,
+            format!("Couldn't resolve DID({}). Reason: {}", to, e),
+        )
+    })?;
 
-    let service = find_did_comm_service(to_did, service_id, did_resolver).await?;
+    let service = find_did_comm_service(&result.doc, service_id)?;
 
     if service.is_none() {
         return Ok(vec![]);
@@ -112,15 +211,20 @@ async fn resolve_did_comm_services_chain<'dr>(
             ));
         }
 
-        service = find_did_comm_service(service_endpoint, None, did_resolver)
-            .await?
-            .ok_or_else(|| {
-                err_msg(
-                    // TODO: Think on introducing a more appropriate error kind
-                    ErrorKind::InvalidState,
-                    "Referenced mediator does not provide any DIDCommMessaging services",
-                )
-            })?;
+        let resolved = resolver.resolve(service_endpoint).await.map_err(|e| {
+            err_msg(
+                ErrorKind::DIDNotResolved,
+                format!("Couldn't resolve DID({}). Reason: {}", to, e),
+            )
+        })?;
+
+        service = find_did_comm_service(&resolved.doc, None)?.ok_or_else(|| {
+            err_msg(
+                // TODO: Think on introducing a more appropriate error kind
+                ErrorKind::InvalidState,
+                "Referenced mediator does not provide any DIDCommMessaging services",
+            )
+        })?;
 
         services.insert(0, service.clone());
         service_endpoint = &service.1.uri;
@@ -219,8 +323,8 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
 /// - `headers` (optional) Additional headers to each Forward message of the onion.
 /// - `to` Recipient (a key identifier or DID) of the message being wrapped into Forward onion.
 /// - `routing_keys` Routing keys (each one is a key identifier or DID) to use for encryption of
-/// Forward messages in the onion. The keys must be ordered along the route (so in the opposite
-/// direction to the wrapping steps).
+///    Forward messages in the onion. The keys must be ordered along the route (so in the opposite
+///    direction to the wrapping steps).
 /// - `enc_alg_anon` Algorithm to use for wrapping into each Forward message of the onion.
 /// - `did_resolver` instance of `DIDResolver` to resolve DIDs.
 ///
@@ -233,13 +337,13 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
 /// - `DIDUrlNotFound` Issuer authentication verification method is not found.
 /// - `Unsupported` Used crypto or method is unsupported.
 /// - `InvalidState` Indicates a library error.
-pub async fn wrap_in_forward<'dr>(
+pub async fn wrap_in_forward(
     msg: &str,
     headers: Option<&HashMap<String, Value>>,
     to: &str,
     routing_keys: &[String],
     enc_alg_anon: &AnonCryptAlg,
-    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+    did_resolver: &DIDCacheClient,
 ) -> Result<String> {
     let mut tos = routing_keys.to_vec();
 
@@ -262,10 +366,10 @@ pub async fn wrap_in_forward<'dr>(
     Ok(msg)
 }
 
-pub(crate) async fn wrap_in_forward_if_needed<'dr>(
+pub(crate) async fn wrap_in_forward_if_needed(
     msg: &str,
     to: &str,
-    did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+    did_resolver: &DIDCacheClient,
     options: &PackEncryptedOptions,
 ) -> Result<Option<(String, MessagingServiceMetadata)>> {
     if !options.forward {

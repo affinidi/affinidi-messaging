@@ -3,14 +3,13 @@ use atn_atm_didcomm::{
     Message, PackEncryptedOptions,
 };
 use atn_atm_mediator::{
-    common::{did_conversion::convert_did, errors::SuccessResponse},
+    common::errors::SuccessResponse,
     handlers::authenticate::{AuthenticationChallenge, AuthorizationResponse},
-    resolvers::{affinidi_dids::AffinidiDIDResolver, affinidi_secrets::AffinidiSecrets},
+    resolvers::affinidi_secrets::AffinidiSecrets,
 };
-use did_peer::DIDPeer;
+use atn_did_cache_sdk::DIDCacheClient;
 use reqwest::{Certificate, Client};
 use serde_json::json;
-use ssi::{did::DIDMethod, did_resolve::ResolutionInputMetadata};
 use std::{
     fs,
     io::{self, Read},
@@ -23,8 +22,10 @@ static MEDIATOR_DID: &str = "did:peer:2.Vz6MkiXGPX2fvUinqRETvsbS2PDjwSksnoU9X94e
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    // Load DID's
-    let did_resolver = load_dids().await;
+    let did_resolver =
+        DIDCacheClient::new(atn_did_cache_sdk::config::ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
     let v1_secret = Secret {
         id: [MY_DID.to_string(), "#key-1".to_string()].concat(),
@@ -161,25 +162,6 @@ async fn main() -> std::io::Result<()> {
     println!("Unpacked message is\n{:#?}\n", a.unwrap().0);*/
 
     Ok(())
-}
-
-async fn load_dids() -> AffinidiDIDResolver {
-    let peer_method = DIDPeer;
-    let (_, d1, _) = peer_method
-        .to_resolver()
-        .resolve(MY_DID, &ResolutionInputMetadata::default())
-        .await;
-    let d1 = DIDPeer::expand_keys(&d1.unwrap()).await;
-    let d1 = convert_did(&d1.unwrap()).unwrap();
-
-    let (_, d2, _) = peer_method
-        .to_resolver()
-        .resolve(MEDIATOR_DID, &ResolutionInputMetadata::default())
-        .await;
-    let d2 = DIDPeer::expand_keys(&d2.unwrap()).await;
-    let d2 = convert_did(&d2.unwrap()).unwrap();
-
-    AffinidiDIDResolver::new(vec![d1, d2])
 }
 
 /// Creates an Affinidi Trusted Messaging Authentication Challenge Response Message

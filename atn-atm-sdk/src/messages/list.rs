@@ -16,12 +16,6 @@ impl<'c> ATM<'c> {
         let _span = span!(Level::DEBUG, "list_messages", folder = folder.to_string()).entered();
         debug!("listing folder({}) for DID({})", did, folder);
 
-        // Check that DID exists in DIDResolver, add it if not
-        if !self.did_resolver.contains(did) {
-            debug!("DID not found in resolver, adding...");
-            self.add_did(did).await?;
-        }
-
         // Check if authenticated
         let tokens = self.authenticate().await?;
 

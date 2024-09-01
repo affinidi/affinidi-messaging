@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, net::SocketAddr, time::SystemTime};
+use std::{net::SocketAddr, time::SystemTime};
 
 use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use atn_atm_sdk::messages::GenericDataStruct;
@@ -6,12 +6,10 @@ use axum::{
     extract::{ConnectInfo, State},
     Json,
 };
-use did_peer::DIDPeer;
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
-use ssi::did::DIDMethods;
 use tracing::{debug, info, warn};
 
 use crate::{
@@ -102,34 +100,23 @@ pub async fn authentication_response(
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthorizationResponse>>), AppError> {
     let s = serde_json::to_string(&body).unwrap();
 
-    let mut did_method_resolver = DIDMethods::default();
-    did_method_resolver.insert(Box::new(DIDPeer));
-    let mut did_resolver = state.did_resolver.clone();
-
-    let mut envelope = match MetaEnvelope::new(
-        &s,
-        did_resolver.borrow_mut(),
-        &state.config.mediator_secrets,
-        &did_method_resolver,
-    )
-    .await
-    {
-        Ok(envelope) => envelope,
-        Err(e) => {
-            return Err(MediatorError::ParseError(
-                "UNKNOWN".to_string(),
-                "Raw inbound DIDComm message".into(),
-                e.to_string(),
-            )
-            .into());
-        }
-    };
+    let mut envelope =
+        match MetaEnvelope::new(&s, &state.did_resolver, &state.config.mediator_secrets).await {
+            Ok(envelope) => envelope,
+            Err(e) => {
+                return Err(MediatorError::ParseError(
+                    "UNKNOWN".to_string(),
+                    "Raw inbound DIDComm message".into(),
+                    e.to_string(),
+                )
+                .into());
+            }
+        };
 
     // Unpack the message
     let (msg, _) = match Message::unpack(
         &mut envelope,
-        &mut did_resolver,
-        &did_method_resolver,
+        &state.did_resolver,
         &state.config.mediator_secrets,
         &UnpackOptions::default(),
     )

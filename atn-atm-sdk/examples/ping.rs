@@ -4,7 +4,6 @@ use atn_atm_sdk::{
     config::Config, conversions::secret_from_str, errors::ATMError, messages::GetMessagesRequest,
     protocols::Protocols, ATM,
 };
-use did_peer::DIDPeer;
 use serde_json::json;
 use tracing::info;
 use tracing_subscriber::filter;
@@ -55,13 +54,12 @@ async fn main() -> Result<(), ATMError> {
         .build()?;
 
     // Create a new ATM Client
-    let mut atm = ATM::new(config, vec![Box::new(DIDPeer)]).await?;
+    let mut atm = ATM::new(config).await?;
+    let protocols = Protocols::new();
 
     // Add our secrets to ATM Client - stays local.
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
-
-    let protocols = Protocols::new(&mut atm);
 
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();

@@ -1,17 +1,12 @@
-use std::borrow::BorrowMut;
-
-use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
-use atn_atm_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
-use did_peer::DIDPeer;
-use ssi::did::DIDMethods;
-use tracing::{debug, error, span, trace, warn, Instrument};
-
 use crate::{
     common::errors::{MediatorError, Session},
     database::DatabaseHandler,
     messages::MessageHandler,
     SharedData,
 };
+use atn_atm_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use atn_atm_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
+use tracing::{debug, error, span, trace, warn, Instrument};
 
 pub(crate) async fn handle_inbound(
     state: &SharedData,
@@ -21,34 +16,25 @@ pub(crate) async fn handle_inbound(
     let _span = span!(tracing::Level::DEBUG, "handle_inbound",);
 
     async move {
-        let mut did_method_resolver = DIDMethods::default();
-        did_method_resolver.insert(Box::new(DIDPeer));
-        let mut did_resolver = state.did_resolver.clone();
-
-        let mut envelope = match MetaEnvelope::new(
-            message,
-            did_resolver.borrow_mut(),
-            &state.config.mediator_secrets,
-            &did_method_resolver,
-        )
-        .await
-        {
-            Ok(envelope) => envelope,
-            Err(e) => {
-                return Err(MediatorError::ParseError(
-                    session.session_id.clone(),
-                    "Raw inbound DIDComm message".into(),
-                    e.to_string(),
-                ));
-            }
-        };
+        let mut envelope =
+            match MetaEnvelope::new(message, &state.did_resolver, &state.config.mediator_secrets)
+                .await
+            {
+                Ok(envelope) => envelope,
+                Err(e) => {
+                    return Err(MediatorError::ParseError(
+                        session.session_id.clone(),
+                        "Raw inbound DIDComm message".into(),
+                        e.to_string(),
+                    ));
+                }
+            };
         debug!("message converted to MetaEnvelope");
 
         // Unpack the message
         let (msg, metadata) = match Message::unpack(
             &mut envelope,
-            &mut did_resolver,
-            &did_method_resolver,
+            &state.did_resolver,
             &state.config.mediator_secrets,
             &UnpackOptions::default(),
         )
@@ -95,7 +81,7 @@ pub(crate) async fn handle_inbound(
                             &state.config.mediator_did,
                             &metadata,
                             &state.config.mediator_secrets,
-                            &did_resolver,
+                            &state.did_resolver,
                         )
                         .await?;
 
@@ -152,7 +138,7 @@ pub(crate) async fn handle_inbound(
                     &state.config.mediator_did,
                     &metadata,
                     &state.config.mediator_secrets,
-                    &did_resolver,
+                    &state.did_resolver,
                 )
                 .await?;
             trace!("Ephemeral message packed (meta):\n{:#?}", meta);

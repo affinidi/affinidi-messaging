@@ -1,13 +1,15 @@
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
+use atn_did_cache_sdk::document::DocumentExt;
+use atn_did_cache_sdk::DIDCacheClient;
 use tracing::debug;
 
+use crate::document::{did_or_url, DIDCommVerificationMethodExt};
 use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
     algorithms::SignAlg,
-    did::DIDResolver,
     error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
     jws,
-    utils::{crypto::AsKnownKeyPair, did::did_or_url},
+    utils::crypto::AsKnownKeyPair,
     UnpackOptions,
 };
 use base64::prelude::*;
@@ -15,7 +17,7 @@ use std::str::FromStr;
 
 pub(crate) async fn _try_unpack_sign(
     msg: &ParsedEnvelope,
-    did_resolver: &dyn DIDResolver,
+    did_resolver: &DIDCacheClient,
     _opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
 ) -> Result<Option<ParsedEnvelope>> {
@@ -69,23 +71,22 @@ pub(crate) async fn _try_unpack_sign(
         ))?
     }
 
-    let signer_ddoc = did_resolver
-        .resolve(signer_did)
-        .await
-        .context("Unable resolve signer did")?
-        .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Signer did not found"))?;
+    let signer_ddoc = match did_resolver.resolve(signer_did).await {
+        Ok(response) => response.doc,
+        Err(_) => return Err(err_msg(ErrorKind::DIDNotResolved, "Signer did not found"))?,
+    };
 
-    let signer_kid = signer_ddoc
-        .authentication
-        .iter()
-        .find(|&k| k.as_str() == signer_kid)
-        .ok_or_else(|| err_msg(ErrorKind::DIDUrlNotFound, "Signer kid not found in did"))?
-        .as_str();
+    if !signer_ddoc.contains_authentication(signer_kid) {
+        return Err(err_msg(
+            ErrorKind::DIDUrlNotFound,
+            "Signer kid not found in did",
+        ));
+    }
 
     let signer_key = signer_ddoc
         .verification_method
         .iter()
-        .find(|&vm| vm.id == signer_kid)
+        .find(|&vm| &vm.id.to_string() == signer_kid)
         .ok_or_else(|| {
             err_msg(
                 ErrorKind::DIDUrlNotFound,
@@ -93,12 +94,21 @@ pub(crate) async fn _try_unpack_sign(
             )
         })?;
 
+    let signer_key_jwk = if let Some(jwk) = signer_key.get_jwk() {
+        jwk
+    } else {
+        return Err(err_msg(
+            ErrorKind::NoCompatibleCrypto,
+            "Couldn't convert signing key to JWK",
+        ));
+    };
+
     let valid = match alg {
         jws::Algorithm::EdDSA => {
             envelope.metadata.sign_alg = Some(SignAlg::EdDSA);
 
             let signer_key = signer_key
-                .as_ed25519()
+                .as_ed25519(&signer_key_jwk)
                 .context("Unable instantiate signer key")?;
 
             parsed_jws
@@ -109,7 +119,7 @@ pub(crate) async fn _try_unpack_sign(
             envelope.metadata.sign_alg = Some(SignAlg::ES256);
 
             let signer_key = signer_key
-                .as_p256()
+                .as_p256(&signer_key_jwk)
                 .context("Unable instantiate signer key")?;
 
             parsed_jws
@@ -120,7 +130,7 @@ pub(crate) async fn _try_unpack_sign(
             envelope.metadata.sign_alg = Some(SignAlg::ES256K);
 
             let signer_key = signer_key
-                .as_k256()
+                .as_k256(&signer_key_jwk)
                 .context("Unable instantiate signer key")?;
 
             parsed_jws

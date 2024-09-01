@@ -2,10 +2,10 @@ use atn_atm_mediator::{
     database::DatabaseHandler,
     handlers::{application_routes, health_checker_handler},
     init,
-    resolvers::affinidi_dids::AffinidiDIDResolver,
     tasks::websocket_streaming::StreamingTask,
     SharedData,
 };
+use atn_did_cache_sdk::DIDCacheClient;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use http::Method;
@@ -73,8 +73,6 @@ async fn main() {
         .await
         .expect("Couldn't initialize mediator!");
 
-    let did_resolver = AffinidiDIDResolver::new(vec![config.mediator_did_doc.clone()]);
-
     // Start setting up the database durability and handling
     let database = match DatabaseHandler::new(&config).await {
         Ok(db) => db,
@@ -104,6 +102,11 @@ async fn main() {
     } else {
         (None, None)
     };
+
+    let did_resolver =
+        DIDCacheClient::new(atn_did_cache_sdk::config::ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
     // Create the shared application State
     let shared_state = SharedData {
@@ -149,10 +152,13 @@ async fn main() {
             "This mediator is using SSL/TLS for secure communication."
         );
         // configure certificate and private key used by https
+        // TODO: Build a proper TLS Config
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let ssl_config =
             RustlsConfig::from_pem_file(config.ssl_certificate_file, config.ssl_key_file)
                 .await
                 .expect("bad certificate/key");
+
         axum_server::bind_rustls(config.listen_address.parse().unwrap(), ssl_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await

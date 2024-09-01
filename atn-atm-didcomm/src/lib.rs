@@ -18,7 +18,7 @@ pub(crate) use crate as atn_atm_didcomm;
 pub mod test_vectors;
 
 pub mod algorithms;
-pub mod did;
+pub(crate) mod document;
 pub mod envelope;
 pub mod error;
 pub mod protocols;
@@ -32,12 +32,12 @@ pub use message::{
 
 #[cfg(test)]
 mod tests {
+    use atn_did_cache_sdk::config::ClientConfigBuilder;
+    use atn_did_cache_sdk::DIDCacheClient;
     use serde_json::json;
-    use ssi::did::DIDMethods;
 
     use crate::{
-        did::resolvers::ExampleDIDResolver, secrets::resolvers::ExampleSecretsResolver, Message,
-        PackEncryptedOptions, UnpackOptions,
+        secrets::resolvers::ExampleSecretsResolver, Message, PackEncryptedOptions, UnpackOptions,
     };
 
     #[tokio::test]
@@ -59,7 +59,9 @@ mod tests {
 
         // --- Packing message ---
 
-        let sender_did_resolver = ExampleDIDResolver::new(vec![]);
+        let sender_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
         let sender_secrets_resolver = ExampleSecretsResolver::new(vec![]);
 
         let (packed_msg, metadata) = msg
@@ -88,14 +90,14 @@ mod tests {
 
         // --- Unpacking message ---
 
-        let mut recipient_did_resolver = ExampleDIDResolver::new(vec![]);
+        let recipient_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
         let recipient_secrets_resolver = ExampleSecretsResolver::new(vec![]);
 
-        let did_method_resolver = DIDMethods::default();
         let (msg, metadata) = Message::unpack_string(
             &packed_msg,
-            &mut recipient_did_resolver,
-            &did_method_resolver,
+            &recipient_did_resolver,
             &recipient_secrets_resolver,
             &UnpackOptions::default(),
         )

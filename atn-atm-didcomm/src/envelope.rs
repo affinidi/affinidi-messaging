@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 use crate::{
-    did::{DIDDoc, DIDResolver},
     error::{err_msg, Error, ErrorKind, Result, ToResult},
     secrets::SecretsResolver,
     utils::crypto::KnownKeyPair,
     UnpackMetadata,
 };
+use atn_did_cache_sdk::DIDCacheClient;
 use serde::Deserialize;
-use ssi::did::DIDMethods;
+use ssi::dids::Document;
 
 use crate::{
     jwe::{envelope::Jwe, ParsedJWE},
@@ -75,7 +75,7 @@ pub struct MetaEnvelope {
     pub metadata: UnpackMetadata,
     pub from_kid: Option<String>,       // Key ID of Sender
     pub from_did: Option<String>,       // DID of Sender (did:method:identifier)
-    pub from_ddoc: Option<DIDDoc>,      // DID Document of Sender
+    pub from_ddoc: Option<Document>,    // DID Document of Sender
     pub from_key: Option<KnownKeyPair>, // Key of Sender
     pub to_kid: Option<String>,
     pub to_did: Option<String>,
@@ -83,14 +83,12 @@ pub struct MetaEnvelope {
 }
 
 impl MetaEnvelope {
-    pub async fn new<T, S>(
+    pub async fn new<S>(
         msg: &str,
-        did_resolver: &mut T,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &S,
-        did_methods: &DIDMethods<'_>,
     ) -> Result<Self>
     where
-        T: DIDResolver + Send,
         S: SecretsResolver + Send,
     {
         let mut envelope = Self::default();
@@ -104,23 +102,20 @@ impl MetaEnvelope {
                 .verify_didcomm()?,
         );
 
-        envelope
-            ._from(did_resolver, secrets_resolver, did_methods)
-            .await?;
+        envelope._from(did_resolver, secrets_resolver).await?;
 
         Ok(envelope)
     }
 
     async fn _from(
         &mut self,
-        did_resolver: &mut dyn DIDResolver,
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &dyn SecretsResolver,
-        did_methods: &DIDMethods<'_>,
     ) -> Result<&Self> {
         match self.parsed_envelope.as_ref() {
             Some(ParsedEnvelope::Jwe(jwe)) => {
                 jwe.to_owned()
-                    .fill_envelope_from(self, did_resolver, secrets_resolver, did_methods)
+                    .fill_envelope_from(self, did_resolver, secrets_resolver)
                     .await?;
             }
             Some(ParsedEnvelope::Jws(_)) => {}

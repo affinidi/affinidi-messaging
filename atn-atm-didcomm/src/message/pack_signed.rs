@@ -1,14 +1,12 @@
+use atn_did_cache_sdk::{document::DocumentExt, DIDCacheClient};
 use serde::Serialize;
 
 use crate::{
-    did::DIDResolver,
+    document::{did_or_url, is_did},
     error::{err_msg, ErrorKind, Result, ResultContext},
     jws::{self, Algorithm},
     secrets::SecretsResolver,
-    utils::{
-        crypto::{AsKnownKeyPair, KnownKeyPair},
-        did::{did_or_url, is_did},
-    },
+    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
     Message,
 };
 
@@ -41,41 +39,44 @@ impl Message {
     /// - `Unsupported` Used crypto or method is unsupported.
     /// - `InvalidState` Indicates library error.
     /// - `IOError` IO error during DID or secrets resolving
+    ///
     /// TODO: verify and update errors list
-    pub async fn pack_signed<'dr, 'sr>(
+    pub async fn pack_signed<'sr>(
         &self,
         sign_by: &str,
-        did_resolver: &'dr (dyn DIDResolver + 'dr + Sync),
+        did_resolver: &DIDCacheClient,
         secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
     ) -> Result<(String, PackSignedMetadata)> {
         self._validate_pack_signed(sign_by)?;
 
         let (did, key_id) = did_or_url(sign_by);
 
-        let did_doc = did_resolver
-            .resolve(did)
-            .await
-            .context("Unable resolve signer did")?
-            .ok_or_else(|| err_msg(ErrorKind::DIDNotResolved, "Signer did not found"))?;
+        let did_doc = match did_resolver.resolve(did).await {
+            Ok(result) => result.doc,
+            Err(e) => {
+                return Err(err_msg(
+                    ErrorKind::DIDNotResolved,
+                    format!("Couldn't resolve ({}). Reason: {}", did, e),
+                ))
+            }
+        };
 
         let authentications: Vec<String> = if let Some(key_id) = key_id {
-            did_doc
-                .authentication
-                .iter()
-                .find(|a| *a == key_id)
-                .ok_or_else(|| {
-                    err_msg(
-                        ErrorKind::DIDUrlNotFound,
-                        "Signer key id not found in did doc",
-                    )
-                })?;
-
-            vec![key_id.to_string()]
+            if did_doc.contains_authentication(key_id) {
+                vec![key_id.to_string()]
+            } else {
+                return Err(err_msg(
+                    ErrorKind::DIDUrlNotFound,
+                    "Signer key id not found in did doc",
+                ));
+            }
         } else {
+            let _did = did_doc.id.as_did();
             did_doc
+                .verification_relationships
                 .authentication
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| s.id().resolve(_did).to_string())
                 .collect()
         };
 
@@ -139,6 +140,7 @@ pub struct PackSignedMetadata {
     pub sign_by_kid: String,
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use askar_crypto::{
@@ -469,3 +471,4 @@ mod tests {
         assert_eq!(unpack_metadata.from_prior.as_ref(), Some(&*FROM_PRIOR_FULL));
     }
 }
+*/

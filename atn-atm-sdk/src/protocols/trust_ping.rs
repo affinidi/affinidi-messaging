@@ -48,12 +48,6 @@ impl TrustPing {
             to_did, signed, expect_response
         );
 
-        // Check that DID exists in DIDResolver, add it if not
-        if !atm.did_resolver.contains(to_did) {
-            debug!("DID not found in resolver, adding...");
-            atm.add_did(to_did).await?;
-        }
-
         // If an anonymous ping is being sent, we should ensure that expect_response is false
         let expect_response = if !signed && expect_response {
             debug!("Anonymous pings cannot expect a response, changing to false...");
