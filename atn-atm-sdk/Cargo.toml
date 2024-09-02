@@ -1,6 +1,6 @@
 [package]
 name = "atn-atm-sdk"
-version = "0.1.1"
+version = "0.1.2"
 description = "Affinidi Trusted Messaging SDK"
 edition.workspace = true
 authors.workspace = true

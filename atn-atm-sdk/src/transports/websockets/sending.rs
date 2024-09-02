@@ -9,8 +9,9 @@ use tracing::{debug, span, Level};
 
 impl<'c> ATM<'c> {
     /// send_didcomm_message
-    /// - msg: Packed DIDComm message that we want to send
-    pub(crate) async fn ws_send_didcomm_message<T>(
+    /// - message: Packed DIDComm message that we want to send
+    /// - message_id: The message ID of the message
+    pub async fn ws_send_didcomm_message<T>(
         &mut self,
         message: &str,
         message_id: &str,

@@ -6,6 +6,7 @@ pub mod delete;
 pub mod fetch;
 pub mod get;
 pub mod list;
+pub mod pack;
 pub mod sending;
 pub mod unpack;
 

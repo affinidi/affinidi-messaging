@@ -2,6 +2,17 @@
 
 ## Changelog history
 
+### 2nd Sept 2024 (v0.1.2)
+
+* Added DIDComm pack_* methods so you can pack/unpack directly using the ATM-SDK
+* pack_encrypted() - encrypted and optionally signed message
+* pack_signed() - plaintext and signed message
+* pack_plaintext() - plaintext! not encrypted, not signed
+* unpack() - unpacks any format DIDComm message
+* NOTE: You are responsible for sending this message to the mediator as a separate step.
+*        HTTP(S)   : Call atm.send.didcomm_message(&message, true|false)
+*        WebSocket : Call atm.ws-send_didcomm_message(&message, &message_id) 
+
 ### 20th July 2024
 
 * Message Pickup Message-Delivery and Messages Received implemented
