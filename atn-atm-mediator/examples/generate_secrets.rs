@@ -1,23 +1,22 @@
 use std::fs::File;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use did_method_key::DIDKey;
+
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
 use serde_json::json;
 use ssi::{
-    did::{DIDMethod, Source},
+    dids::DIDKey,
     jwk::{Params, JWK},
 };
 
 struct LocalDidPeerKeys {
-  v_d: Option<String>,
-  v_x: Option<String>,
-  e_d: Option<String>,
-  e_x: Option<String>,
-  e_y: Option<String>,
+    v_d: Option<String>,
+    v_x: Option<String>,
+    e_d: Option<String>,
+    e_x: Option<String>,
+    e_y: Option<String>,
 }
 
 #[tokio::main]
@@ -25,14 +24,14 @@ async fn main() -> std::io::Result<()> {
     // Generate keys for encryption and verification
     let v_ed25519_key = JWK::generate_ed25519().unwrap();
 
-    let e_secp256k1_key = JWK::generate_secp256k1().unwrap();
+    let e_secp256k1_key = JWK::generate_secp256k1();
 
     let mut local_did_peer_keys = LocalDidPeerKeys {
-      v_d: None,
-      v_x: None,
-      e_d: None,
-      e_x: None,
-      e_y: None,
+        v_d: None,
+        v_x: None,
+        e_d: None,
+        e_x: None,
+        e_y: None,
     };
 
     // Print the private keys in case you want to save them for later
@@ -54,7 +53,6 @@ async fn main() -> std::io::Result<()> {
         local_did_peer_keys.v_x = Some(String::from(map.public_key.clone()));
     }
     println!();
-
 
     if let Params::EC(map) = e_secp256k1_key.clone().params {
         println!(
@@ -80,9 +78,8 @@ async fn main() -> std::io::Result<()> {
     println!();
 
     // Create the did:key DID's for each key above
-    let did_key = DIDKey;
-    let v_did_key = did_key.generate(&Source::Key(&v_ed25519_key)).unwrap();
-    let e_did_key = did_key.generate(&Source::Key(&e_secp256k1_key)).unwrap();
+    let v_did_key = DIDKey::generate(&v_ed25519_key).unwrap();
+    let e_did_key = DIDKey::generate(&e_secp256k1_key).unwrap();
 
     // Put these keys in order and specify the type of each key (we strip the did:key: from the front)
     let keys = vec![
@@ -100,6 +97,7 @@ async fn main() -> std::io::Result<()> {
 
     // Create a service definition
     let services = vec![DIDPeerService {
+        id: None,
         _type: "dm".into(),
         service_end_point: PeerServiceEndPoint::Long(PeerServiceEndPointLong {
             uri: "https://localhost:7037/".into(),

@@ -59,6 +59,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]
+did-peer.workspace = true
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
