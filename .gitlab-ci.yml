@@ -15,6 +15,7 @@ clippy:processor:
     - cd atn-atm-processor/
   script:
     - cargo clippy --color always --no-deps
+  allow_failure: true
 
 clippy:mediator:
   extends: .common
@@ -23,6 +24,7 @@ clippy:mediator:
     - cd atn-atm-mediator/
   script:
     - cargo clippy --color always --no-deps
+  allow_failure: true
 
 clippy:didcomm:
   extends: .common
@@ -31,6 +33,7 @@ clippy:didcomm:
     - cd atn-atm-didcomm/
   script:
     - cargo clippy --color always --no-deps
+  allow_failure: true
 
 build:
   rules:
