@@ -91,7 +91,7 @@ impl DatabaseHandler {
             let mut conn = self.get_async_connection().await?;
             let metadata: String = deadpool_redis::redis::cmd("HGET")
                 .arg("MESSAGE_STORE")
-                .arg(&["METADATA:", message_hash].concat())
+                .arg(["METADATA:", message_hash].concat())
                 .query_async(&mut conn)
                 .await
                 .map_err(|err| {

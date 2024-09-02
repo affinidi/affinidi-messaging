@@ -3,13 +3,23 @@ use std::time::Duration;
 use atn_atm_sdk::{
     config::Config, conversions::secret_from_str, errors::ATMError, protocols::Protocols, ATM,
 };
-
+use clap::Parser;
 use serde_json::json;
 use tracing::{error, info};
 use tracing_subscriber::filter;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// network address if running in network mode (ws://127.0.0.1:8080/did/v1/ws)
+    #[arg(short, long)]
+    network_address: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
+    let args = Args::parse();
+
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
@@ -38,18 +48,24 @@ async fn main() -> Result<(), ATMError> {
 
     let atm_did = "did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
 
-    let config = Config::builder()
+    let mut config = Config::builder()
         .with_ssl_certificates(&mut vec![
             "../atn-atm-mediator/conf/keys/client.chain".into()
         ])
         .with_my_did(my_did)
         .with_atm_did(atm_did)
         .with_secret(secret_from_str(&format!("{}#key-1", my_did), &v1))
-        .with_secret(secret_from_str(&format!("{}#key-2", my_did), &e1))
-        .build()?;
+        .with_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
+
+    if let Some(address) = &args.network_address {
+        println!("Running in network mode with address: {}", address);
+        config = config.with_atm_api(address);
+    } else {
+        println!("Running in local mode.");
+    }
 
     // Create a new ATM Client
-    let mut atm = ATM::new(config).await?;
+    let mut atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
     /*let message = r#"

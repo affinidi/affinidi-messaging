@@ -80,6 +80,33 @@ impl DatabaseHandler {
             }
         }
 
+        // Check and load LUA scripts as required
+        {
+            let mut conn = database.get_async_connection().await?;
+            let function_load: Result<String, deadpool_redis::redis::RedisError> =
+                deadpool_redis::redis::cmd("FUNCTION")
+                    .arg("LOAD")
+                    .arg(config.lua_scripts.clone())
+                    .query_async(&mut conn)
+                    .await;
+            match function_load {
+                Ok(function_load) => {
+                    event!(
+                        Level::INFO,
+                        "database response for FUNCTION LOAD: ({})",
+                        function_load
+                    );
+                }
+                Err(err) => {
+                    event!(
+                        Level::WARN,
+                        "database response for FUNCTION LOAD: ({})",
+                        err
+                    );
+                }
+            }
+        }
+
         database.get_db_metadata().await?;
         Ok(database)
     }

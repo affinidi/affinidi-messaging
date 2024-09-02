@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use std::{
     env, fmt,
-    fs::File,
+    fs::{self, File},
     io::{self, BufRead},
     path::Path,
 };
@@ -23,6 +23,7 @@ use tracing_subscriber::filter::LevelFilter;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub database_url: String,
+    pub lua_scripts: String,
     pub database_pool_size: String,
     pub database_timeout: String,
     pub max_message_size: String,
@@ -66,6 +67,7 @@ pub struct Config {
     pub mediator_did: String,
     pub mediator_secrets: AffinidiSecrets,
     pub database_url: String,
+    pub lua_scripts: String,
     pub database_pool_size: usize,
     pub database_timeout: u32,
     pub max_message_size: u32,
@@ -93,6 +95,7 @@ impl fmt::Debug for Config {
             )
             .field("use_ssl", &self.use_ssl)
             .field("database_url", &self.database_url)
+            .field("lua_scripts", &self.lua_scripts)
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
             .field("max_message_size", &self.max_message_size)
@@ -116,6 +119,7 @@ impl Default for Config {
             mediator_did: "".into(),
             mediator_secrets: AffinidiSecrets::new(vec![]),
             database_url: "redis://127.0.0.1/".into(),
+            lua_scripts: "".into(),
             database_pool_size: 10,
             database_timeout: 2,
             max_message_size: 1048576,
@@ -159,6 +163,7 @@ impl TryFrom<ConfigRaw> for Config {
             listen_address: raw.listen_address,
             mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
             database_url: raw.database.database_url,
+            lua_scripts: read_lua_scripts(&raw.database.lua_scripts).await?,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
             max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
@@ -254,6 +259,39 @@ async fn load_secrets(
             )
         })?,
     ))
+}
+
+async fn read_lua_scripts(lua_scripts: &str) -> Result<String, MediatorError> {
+    let parts: Vec<&str> = lua_scripts.split("://").collect();
+    if parts.len() != 2 {
+        return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid `lua_scripts` format".into(),
+        ));
+    }
+
+    info!(
+        "Loading lua_scripts method({}) path({})",
+        parts[0], parts[1]
+    );
+    let content: String = match parts[0] {
+        // "file" => read_file_lines(parts[1], false)?.concat(),
+        "file" => fs::read_to_string(parts[1]).map_err(|err| {
+            event!(Level::ERROR, "Could not open file({}). {}", parts[1], err);
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not open file({}). {}", parts[1], err),
+            )
+        })?,
+        "inline" => parts[1].to_string(),
+        _ => {
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "Invalid `lua_scripts` format! Expecting file:// or inline:// ...".into(),
+            ))
+        }
+    };
+    Ok(content)
 }
 
 /// Read the primary configuration file for the mediator

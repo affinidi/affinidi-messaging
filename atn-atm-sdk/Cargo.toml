@@ -44,3 +44,4 @@ url = "2.5"
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]
+clap.workspace = true

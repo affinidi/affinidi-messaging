@@ -29,6 +29,10 @@ mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
 ### Default: redis://127.0.0.1/
 database_url = "${REDIS_URL:redis://127.0.0.1/}"
 
+### lua_scripts: path to lua scripts used in Redis
+### Default: file://../atn-atm-processor/redis-functions/atm-functions.lua
+lua_scripts = "${MEDIATOR_LUA_SCRIPTS:file://../atn-atm-processor/redis-functions/atm-functions.lua}"
+
 ### database_pool_size: Number of connections to the database
 ### Default: 10
 database_pool_size = "${DATABASE_POOL_SIZE:10}"

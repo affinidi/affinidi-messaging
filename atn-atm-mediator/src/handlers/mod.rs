@@ -54,7 +54,7 @@ pub async fn health_checker_handler(State(state): State<SharedData>) -> impl Int
     );
 
     let response_json = serde_json::json!({
-        "STATUS": "success".to_string(),
+        "status": "success".to_string(),
         "message": message,
     });
     Json(response_json)
