@@ -213,6 +213,27 @@ Working with `GetMessageResponse`:
 * get_errors    `Vec<(String, String)>` : List of failed gets on message_ids + error message
 * delete_errors `vec<(String, String)>` : List of failed deletes on message_ids + error message
 
+### Pack a DIDComm message
+
+* There are three methods to pack (create) a DIDComm message
+  * pack_encrypted(message, from, sign_by)
+    * encrypts message, if `from` is None, then anonymous encrypt, if `sign_by` is specified then will cryptographically sign the message
+  * pack_signed(message, sign_by)
+    * signs a plaintext message using the `sign_by` key
+  * pack_plaintext(message)
+    * creates an unencrypted, no-signature plaintext DIDComm message
+
+```rust
+// Example: Send an encrypted and signed message
+let message = Message::build()...;
+let (message, meta_data) = atm.pack_encrypted(&message, Some(from_did), Some(from_did)).await?;
+```
+
+Response from `unpack()` is:
+
+* Success : Result->Ok (`Message`, `UnpackMetadata`)
+* Error   : Result->Err with ATMError object describing the error
+
 ### Unpack a DIDComm message
 
 * A wrapper for DIDComm Message::unpack() that simplifies the setup of resolvers etc already done for ATM

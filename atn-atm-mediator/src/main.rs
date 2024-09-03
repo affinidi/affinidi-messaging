@@ -103,10 +103,10 @@ async fn main() {
         (None, None)
     };
 
-    let did_resolver =
-        DIDCacheClient::new(atn_did_cache_sdk::config::ClientConfigBuilder::default().build())
-            .await
-            .unwrap();
+    // Create the DID Resolver
+    let did_resolver = DIDCacheClient::new(config.did_resolver_config.clone())
+        .await
+        .unwrap();
 
     // Create the shared application State
     let shared_state = SharedData {

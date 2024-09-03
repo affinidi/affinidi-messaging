@@ -118,17 +118,22 @@ impl<'c> ATM<'c> {
 
         let ws_connector = Connector::Rustls(Arc::new(ws_config));
 
-        let did_resolver = match DIDCacheClient::new(
-            atn_did_cache_sdk::config::ClientConfigBuilder::default().build(),
-        )
-        .await
-        {
-            Ok(config) => config,
-            Err(err) => {
-                return Err(ATMError::DIDError(format!(
-                    "Couldn't create DID resolver! Reason: {}",
-                    err
-                )))
+        // Set up the DID Resolver
+        let did_resolver = if let Some(did_resolver) = &config.did_resolver {
+            did_resolver.clone()
+        } else {
+            match DIDCacheClient::new(
+                atn_did_cache_sdk::config::ClientConfigBuilder::default().build(),
+            )
+            .await
+            {
+                Ok(config) => config,
+                Err(err) => {
+                    return Err(ATMError::DIDError(format!(
+                        "Couldn't create DID resolver! Reason: {}",
+                        err
+                    )))
+                }
             }
         };
 

@@ -2,6 +2,11 @@
 
 ## Changelog history
 
+### 3rd Sept 2024 (v0.1.3)
+
+* Added the ability create a atn-did-cache outside of the atn-atm-sdk and share it the ATM SDK
+  * Allows for sharing of DID cache inside and outside of ATM for efficiency.
+
 ### 2nd Sept 2024 (v0.1.2)
 
 * Added DIDComm pack_* methods so you can pack/unpack directly using the ATM-SDK

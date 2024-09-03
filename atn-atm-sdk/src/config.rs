@@ -1,5 +1,6 @@
 use crate::errors::ATMError;
 use atn_atm_didcomm::secrets::Secret;
+use atn_did_cache_sdk::DIDCacheClient;
 use rustls::pki_types::CertificateDer;
 use std::{fs::File, io::BufReader};
 use tracing::error;
@@ -24,6 +25,7 @@ pub struct Config<'a> {
     pub(crate) fetch_cache_limit_count: u32,
     pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
+    pub(crate) did_resolver: Option<DIDCacheClient>,
 }
 
 impl<'a> Config<'a> {
@@ -62,6 +64,7 @@ pub struct ConfigBuilder {
     fetch_cache_limit_count: u32,
     fetch_cache_limit_bytes: u64,
     secrets: Vec<Secret>,
+    did_resolver: Option<DIDCacheClient>,
 }
 
 impl Default for ConfigBuilder {
@@ -77,6 +80,7 @@ impl Default for ConfigBuilder {
             fetch_cache_limit_count: 100,
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
             secrets: Vec::new(),
+            did_resolver: None,
         }
     }
 }
@@ -156,6 +160,14 @@ impl ConfigBuilder {
         self
     }
 
+    /// Use an external DID resolver for the SDK
+    /// Useful if you want to configure the DID resolver externally.
+    /// Default: ATM SDK will instantiate a local DID resolver
+    pub fn with_external_did_resolver(mut self, did_resolver: &DIDCacheClient) -> Self {
+        self.did_resolver = Some(did_resolver.clone());
+        self
+    }
+
     pub fn build<'a>(self) -> Result<Config<'a>, ATMError> {
         // Process any custom SSL certificates
         let mut certs = vec![];
@@ -232,6 +244,7 @@ impl ConfigBuilder {
             fetch_cache_limit_count: self.fetch_cache_limit_count,
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
+            did_resolver: self.did_resolver,
         })
     }
 }

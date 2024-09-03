@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+## 3rd September 2024
+
+* Added the ability to configure the Mediator DID Cache settings via mediator configuration
+
 ## 20th July 2024
 
 * Message Pickup Message-Delivery and Messages Received implemented

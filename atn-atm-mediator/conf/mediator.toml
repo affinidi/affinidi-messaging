@@ -89,3 +89,24 @@ enabled = "${STREAMING_ENABLED:true}"
 ### - string://<uuid> - Use the UUID as is
 ### NOTE: Having multiple subscribers with the same UUID will cause issues
 uuid = "${STREAMING_UUID:hostname://}"
+
+[did_resolver]
+### service_address: Address of the DID resolver service
+### Default: None (Uses local DID resolver
+#address = "${DID_RESOLVER_ADDRESS:ws://127.0.0.1:8080/did/v1/ws}"
+
+### cache_capacity: Number of DID's to cache in memory
+### Default: 1000
+cache_capacity = "${DID_RESOLVER_CACHE_CAPACITY:1000}"
+
+### cache_ttl: Time to live in seconds for DID's in the cache
+### Default: 300 (5 minutes)
+cache_ttl = "${DID_RESOLVER_CACHE_TTL:300}"
+
+### network_timeout: Timeout in milliseconds for DID Resolver operations
+### Default: 5000 milliseconds (you need to account for 3rd party DID resolution latency (blockchains, www etc)
+network_timeout = "${DID_RESOLVER_NETWORK_TIMEOUT:5000}"
+
+### network_limit: Maximum number of concurrent requests to the DID resolver
+### Default: 100
+network_limit = "${DID_RESOLVER_NETWORK_LIMIT:100}"

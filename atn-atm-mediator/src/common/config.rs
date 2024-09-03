@@ -1,6 +1,7 @@
 use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use async_convert::{async_trait, TryFrom};
+use atn_did_cache_sdk::config::{ClientConfig, ClientConfigBuilder};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
@@ -47,6 +48,32 @@ pub struct StreamingConfig {
     pub uuid: String,
 }
 
+/// DIDResolverConfig Struct contains live streaming related configuration details
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DIDResolverConfig {
+    pub address: Option<String>,
+    pub cache_capacity: String,
+    pub cache_ttl: String,
+    pub network_timeout: String,
+    pub network_limit: String,
+}
+
+impl DIDResolverConfig {
+    pub fn convert(&self) -> ClientConfig {
+        let mut config = ClientConfigBuilder::default()
+            .with_cache_capacity(self.cache_capacity.parse().unwrap_or(1000))
+            .with_cache_ttl(self.cache_ttl.parse().unwrap_or(300))
+            .with_network_timeout(self.network_timeout.parse().unwrap_or(5))
+            .with_network_cache_limit_count(self.network_limit.parse().unwrap_or(100));
+
+        if let Some(address) = &self.address {
+            config = config.with_network_mode(address);
+        }
+
+        config.build()
+    }
+}
+
 /// ConfigRaw Struct is used to deserialize the configuration file
 /// We then convert this to the Config Struct
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,6 +85,7 @@ pub struct ConfigRaw {
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
     pub streaming: StreamingConfig,
+    pub did_resolver: DIDResolverConfig,
 }
 
 #[derive(Clone)]
@@ -80,6 +108,7 @@ pub struct Config {
     pub jwt_decoding_key: Option<DecodingKey>,
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
+    pub did_resolver_config: ClientConfig,
 }
 
 impl fmt::Debug for Config {
@@ -95,7 +124,6 @@ impl fmt::Debug for Config {
             )
             .field("use_ssl", &self.use_ssl)
             .field("database_url", &self.database_url)
-            .field("lua_scripts", &self.lua_scripts)
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
             .field("max_message_size", &self.max_message_size)
@@ -107,12 +135,20 @@ impl fmt::Debug for Config {
             .field("jwt_decoding_key?", &self.jwt_decoding_key.is_some())
             .field("streaming_enabled?", &self.streaming_enabled)
             .field("streaming_uuid", &self.streaming_uuid)
+            .field("DID Resolver config", &self.did_resolver_config)
             .finish()
     }
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let did_resolver_config = ClientConfigBuilder::default()
+            .with_cache_capacity(1000)
+            .with_cache_ttl(300)
+            .with_network_timeout(5)
+            .with_network_cache_limit_count(100)
+            .build();
+
         Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
@@ -132,6 +168,7 @@ impl Default for Config {
             jwt_decoding_key: None,
             streaming_enabled: true,
             streaming_uuid: "".into(),
+            did_resolver_config,
         }
     }
 }
@@ -173,6 +210,7 @@ impl TryFrom<ConfigRaw> for Config {
             ssl_certificate_file: raw.security.ssl_certificate_file,
             ssl_key_file: raw.security.ssl_key_file,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
+            did_resolver_config: raw.did_resolver.convert(),
             ..Default::default()
         };
 

@@ -4,6 +4,7 @@ use atn_atm_sdk::{
     config::Config, conversions::secret_from_str, errors::ATMError, messages::GetMessagesRequest,
     protocols::Protocols, ATM,
 };
+use atn_did_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
 use clap::Parser;
 use serde_json::json;
 use tracing::info;
@@ -48,13 +49,19 @@ async fn main() -> Result<(), ATMError> {
 
     let atm_did = "did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19";
 
+    // ATM SDK supports an externally created DID Cache Resolver
+    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        .await
+        .expect("Couldn't create DID Resolver!");
+
     let mut config = Config::builder()
         .with_ssl_certificates(&mut vec![
             "../atn-atm-mediator/conf/keys/client.chain".into()
         ])
         .with_my_did(my_did)
         .with_atm_did(atm_did)
-        .with_websocket_disabled();
+        .with_websocket_disabled()
+        .with_external_did_resolver(&did_resolver);
     /*
     // Use this to connect to the mediator
     // TODO: in the future we likely want to pull this from the DID itself
