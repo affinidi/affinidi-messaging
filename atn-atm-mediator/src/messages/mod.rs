@@ -8,18 +8,20 @@ use atn_atm_didcomm::{
 };
 use atn_did_cache_sdk::DIDCacheClient;
 use protocols::message_pickup;
+use protocols::routing;
 use std::{str::FromStr, time::SystemTime};
 
 pub mod inbound;
 pub mod protocols;
 
 pub enum MessageType {
-    TrustPing,                       // Trust Ping Protocol
     AffinidiAuthenticate,            // Affinidi Authentication Response
+    ForwardRequest,                  // DidComm Routing 2.0 Forward Request
     MessagePickupStatusRequest,      // Message Pickup 3.0 Status Request
     MessagePickupDeliveryRequest,    // Message Pickup 3.0 Delivery Request
     MessagePickupMessagesReceived,   // Message Pickup 3.0 Messages Received (ok to delete)
     MessagePickupLiveDeliveryChange, // Message Pickup 3.0 Live-delivery-change (Streaming enabled)
+    TrustPing,                       // Trust Ping Protocol
 }
 
 impl FromStr for MessageType {
@@ -37,6 +39,9 @@ impl FromStr for MessageType {
             }
             "https://didcomm.org/messagepickup/3.0/delivery-request" => {
                 Ok(Self::MessagePickupDeliveryRequest)
+            }
+            "https://didcomm.org/routing/2.0/forward" => {
+                Ok(Self::ForwardRequest)
             }
             _ => Err(MediatorError::ParseError(
                 "-1".into(),
@@ -73,6 +78,7 @@ impl MessageType {
                 session.session_id.clone(),
                 "Affinidi Authentication is only handled by the Authorization handler".into(),
             )),
+            Self::ForwardRequest => routing::process(message, session),
         }
     }
 }
