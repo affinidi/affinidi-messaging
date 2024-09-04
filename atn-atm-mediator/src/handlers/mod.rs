@@ -42,7 +42,7 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
         // Websocket endpoint for ATM clients
         .route("/ws", get(websocket::websocket_handler))
         .route(
-            "/.well-known/did.json",
+            "/.well-known/did",
             get(well_known_did_fetch::well_known_did_fetch_handler),
         );
 

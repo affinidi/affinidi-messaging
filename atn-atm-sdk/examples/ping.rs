@@ -88,13 +88,7 @@ async fn main() -> Result<(), ATMError> {
     let start = SystemTime::now();
 
     let well_know_res = atm.well_known_did_json().await?;
-    println!(
-        "DID_DOCUMENT: {}",
-        serde_json::to_string(&well_know_res).map_err(|e| ATMError::TransportError(format!(
-            "Couldn't stringify response: {:?}",
-            e
-        )))?
-    );
+    println!("DID: {}", well_know_res);
 
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle

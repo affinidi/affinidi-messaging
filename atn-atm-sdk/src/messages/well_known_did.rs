@@ -1,27 +1,23 @@
-use crate::{
-    errors::ATMError,
-    messages::{DIDDocument, SuccessResponse},
-    ATM,
-};
+use crate::{errors::ATMError, ATM};
 use tracing::{debug, span, Level};
 
 impl<'c> ATM<'c> {
     /// Returns a list of messages that are stored in the ATM
     /// - messages : List of message IDs to retrieve
-    pub async fn well_known_did_json(&mut self) -> Result<DIDDocument, ATMError> {
+    pub async fn well_known_did_json(&mut self) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did_json").entered();
 
-        debug!("Sending well_known_did_json request");
+        debug!("Sending well_known_did request");
 
-        let atm_api = self.config.clone().atm_api;
+        let well_known_did_atm_api = format!("{}/.well-known/did", self.config.clone().atm_api);
         debug!(
-            "API well_known_did_json_api({})",
-            format!("{}/.well-known/did.json", atm_api)
+            "API well_known_did_api({})",
+            format!("{}/.well-known/did", well_known_did_atm_api)
         );
 
         let res = self
             .client
-            .get(format!("{}/.well-known/did.json", atm_api))
+            .get(well_known_did_atm_api)
             .header("Content-Type", "application/json")
             .send()
             .await
@@ -34,38 +30,20 @@ impl<'c> ATM<'c> {
 
         let status = res.status();
         debug!("API response: status({})", status);
-        // let string_body = res
-        //     .text()
-        //     .await
-        //     .map_err(|e| ATMError::TransportError(format!("Couldn't get string body: {:?}", e)))?;
+        let string_body = res
+            .text()
+            .await
+            .map_err(|e| ATMError::TransportError(format!("Couldn't get string body: {:?}", e)))?;
 
-        let body: SuccessResponse<DIDDocument> = res.json().await.map_err(|e| {
-            ATMError::TransportError(format!("Couldn't get didDocument body: {:?}", e))
-        })?;
-
-        // let body_parsed: SuccessResponse<DIDDocument> = serde_json::from_str(&string_body)
-        //     .map_err(|e| {
-        //         ATMError::TransportError(format!("Couldn't get didDocument body: {:?}", e))
-        //     })?;
-        let did_doc_parsed = body.data.unwrap();
         if !status.is_success() {
             return Err(ATMError::TransportError(format!(
                 "Status not successful. status({}), response({})",
-                status,
-                serde_json::to_string(&did_doc_parsed).map_err(|e| ATMError::TransportError(
-                    format!("Couldn't stringify body: {:?}", e)
-                ))?
+                status, string_body
             )));
         }
 
-        // debug!(
-        //     "API response: body({})",
-        //     serde_json::to_string(body).map_err(|e| ATMError::TransportError(format!(
-        //         "Couldn't stringify body: {:?}",
-        //         e
-        //     )))?
-        // );
+        debug!("API response: body({})", string_body);
 
-        Ok(did_doc_parsed)
+        Ok(string_body)
     }
 }
