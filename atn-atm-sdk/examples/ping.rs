@@ -87,9 +87,19 @@ async fn main() -> Result<(), ATMError> {
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();
 
+    let well_know_res = atm.well_known_did_json().await?;
+    println!(
+        "DID_DOCUMENT: {}",
+        serde_json::to_string(&well_know_res).map_err(|e| ATMError::TransportError(format!(
+            "Couldn't stringify response: {:?}",
+            e
+        )))?
+    );
+
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle
     atm.authenticate().await?;
+
     let after_auth = SystemTime::now();
 
     // Send a trust-ping message to ATM, will generate a PONG response

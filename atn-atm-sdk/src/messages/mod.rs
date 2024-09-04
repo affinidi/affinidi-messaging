@@ -9,6 +9,7 @@ pub mod list;
 pub mod pack;
 pub mod sending;
 pub mod unpack;
+pub mod well_known_did;
 
 /// Generic response structure for all responses from the ATM API
 #[derive(Serialize, Deserialize, Debug)]
@@ -149,3 +150,44 @@ pub trait GenericDataStruct: DeserializeOwned + Serialize {}
 #[derive(Serialize, Deserialize)]
 pub struct EmptyResponse;
 impl GenericDataStruct for EmptyResponse {}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct DIDDocument {
+    #[serde(rename = "@context")]
+    pub context: Vec<String>,
+    pub id: String,
+    pub verificationMethod: Vec<VerificationMethod>,
+    pub authentication: Vec<String>,
+    pub assertionMethod: Vec<String>,
+    pub service: Vec<ServiceElement>,
+    pub keyAgreement: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct VerificationMethod {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub key_type: String,
+    pub controller: String,
+    pub publicKeyMultibase: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct ServiceElement {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub service_type: String,
+    pub serviceEndpoint: ServiceEndpointElement,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ServiceEndpointElement {
+    pub accept: Vec<String>,
+    pub routing_keys: Vec<String>,
+    uri: String,
+}
+
+impl GenericDataStruct for DIDDocument {}

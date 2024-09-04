@@ -13,6 +13,7 @@ pub mod message_inbound;
 pub mod message_list;
 pub mod message_outbound;
 pub mod websocket;
+pub mod well_known_did_fetch;
 
 pub fn application_routes(shared_data: &SharedData) -> Router {
     let app = Router::new()
@@ -39,7 +40,11 @@ pub fn application_routes(shared_data: &SharedData) -> Router {
         // Authentication step 2/2 - Client sends encrypted challenge to server
         .route("/authenticate", post(authenticate::authentication_response))
         // Websocket endpoint for ATM clients
-        .route("/ws", get(websocket::websocket_handler));
+        .route("/ws", get(websocket::websocket_handler))
+        .route(
+            "/.well-known/did.json",
+            get(well_known_did_fetch::well_known_did_fetch_handler),
+        );
 
     Router::new()
         .nest("/atm/v1/", app)
