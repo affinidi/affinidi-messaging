@@ -77,6 +77,12 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
 #jwt_authorization_secret = "${AUTHORIZATION_SECRET:aws_secrets://dev/atn/atm/mediator/global/jwt_secret}"
 
+### cors_allow_origin: Comma separated list of origins that are allowed to access this service
+### Default: *
+### NOTE: Use * to allow all origins, otherwise for production you should limit the origins
+### Example: "https://affinidi.com,https://example2.com"
+# cors_allow_origin = "${CORS_ALLOW_ORIGIN:https://affinidi.com}"
+
 [streaming]
 ### enabled: If true, can live stream messages to subscribed recipients via WebSockets
 ### Default: true
@@ -110,3 +116,9 @@ network_timeout = "${DID_RESOLVER_NETWORK_TIMEOUT:5000}"
 ### network_limit: Maximum number of concurrent requests to the DID resolver
 ### Default: 100
 network_limit = "${DID_RESOLVER_NETWORK_LIMIT:100}"
+
+[other]
+### to_recipients_limit: Maximum number of recipients in a single message
+### Default: 100
+### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients
+to_recipients_limit = "${TO_RECIPIENTS_LIMIT:100}"

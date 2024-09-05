@@ -6,10 +6,12 @@ use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
+use http::HeaderValue;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use tower_http::cors::{Any, CorsLayer};
 
 use std::{
     env, fmt,
@@ -39,6 +41,7 @@ pub struct SecurityConfig {
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
     pub jwt_authorization_secret: String,
+    pub cors_allow_origin: Option<String>,
 }
 
 /// StreamingConfig Struct contains live streaming related configuration details
@@ -56,6 +59,12 @@ pub struct DIDResolverConfig {
     pub cache_ttl: String,
     pub network_timeout: String,
     pub network_limit: String,
+}
+
+/// OtherConfig Struct contains other configuration options
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OtherConfig {
+    pub to_recipients_limit: String,
 }
 
 impl DIDResolverConfig {
@@ -86,6 +95,7 @@ pub struct ConfigRaw {
     pub security: SecurityConfig,
     pub streaming: StreamingConfig,
     pub did_resolver: DIDResolverConfig,
+    pub other: OtherConfig,
 }
 
 #[derive(Clone)]
@@ -109,6 +119,8 @@ pub struct Config {
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
     pub did_resolver_config: ClientConfig,
+    pub to_recipients_limit: usize,
+    pub cors_allow_origin: CorsLayer,
 }
 
 impl fmt::Debug for Config {
@@ -123,6 +135,7 @@ impl fmt::Debug for Config {
                 &format!("({}) secrets loaded", self.mediator_secrets.len()),
             )
             .field("use_ssl", &self.use_ssl)
+            .field("cors_allow_origin", &self.cors_allow_origin)
             .field("database_url", &self.database_url)
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
@@ -136,6 +149,7 @@ impl fmt::Debug for Config {
             .field("streaming_enabled?", &self.streaming_enabled)
             .field("streaming_uuid", &self.streaming_uuid)
             .field("DID Resolver config", &self.did_resolver_config)
+            .field("to_recipients_limit", &self.to_recipients_limit)
             .finish()
     }
 }
@@ -169,6 +183,8 @@ impl Default for Config {
             streaming_enabled: true,
             streaming_uuid: "".into(),
             did_resolver_config,
+            to_recipients_limit: 100,
+            cors_allow_origin: CorsLayer::new().allow_origin(Any),
         }
     }
 }
@@ -211,8 +227,14 @@ impl TryFrom<ConfigRaw> for Config {
             ssl_key_file: raw.security.ssl_key_file,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
+            to_recipients_limit: raw.other.to_recipients_limit.parse().unwrap_or(100),
             ..Default::default()
         };
+
+        if let Some(cors_allow_origin) = &raw.security.cors_allow_origin {
+            config.cors_allow_origin =
+                CorsLayer::new().allow_origin(parse_cors_allow_origin(cors_allow_origin)?);
+        }
 
         // Load mediator secrets
         config.mediator_secrets = load_secrets(&raw.mediator_secrets, &aws_config).await?;
@@ -239,6 +261,15 @@ impl TryFrom<ConfigRaw> for Config {
 
         Ok(config)
     }
+}
+
+fn parse_cors_allow_origin(cors_allow_origin: &str) -> Result<Vec<HeaderValue>, MediatorError> {
+    let origins: Vec<HeaderValue> = cors_allow_origin
+        .split(',')
+        .map(|o| o.parse::<HeaderValue>().unwrap())
+        .collect();
+
+    Ok(origins)
 }
 
 /// Loads the secret data into the Config file.
@@ -341,7 +372,7 @@ pub fn read_config_file(file_name: &str) -> Result<ConfigRaw, MediatorError> {
     let raw_config = read_file_lines(file_name)?;
 
     event!(Level::DEBUG, "raw_config = {:?}", raw_config);
-    let config_with_vars = expand_env_vars(&raw_config);
+    let config_with_vars = expand_env_vars(&raw_config)?;
     match toml::from_str(&config_with_vars.join("\n")) {
         Ok(config) => Ok(config),
         Err(err) => {
@@ -400,8 +431,15 @@ where
 /// Replaces all strings ${VAR_NAME:default_value}
 /// with the corresponding environment variables (e.g. value of ${VAR_NAME})
 /// or with `default_value` if the variable is not defined.
-fn expand_env_vars(raw_config: &Vec<String>) -> Vec<String> {
-    let re = Regex::new(r"\$\{(?P<env_var>[A-Z_]{1,}[0-9A-Z_]*):(?P<default_value>.*)\}").unwrap();
+fn expand_env_vars(raw_config: &Vec<String>) -> Result<Vec<String>, MediatorError> {
+    let re = Regex::new(r"\$\{(?P<env_var>[A-Z_]{1,}[0-9A-Z_]*):(?P<default_value>.*)\}").map_err(
+        |e| {
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Couldn't create ENV Regex. Reason: {}", e),
+            )
+        },
+    )?;
     let mut result: Vec<String> = Vec::new();
     for line in raw_config {
         result.push(
@@ -412,7 +450,7 @@ fn expand_env_vars(raw_config: &Vec<String>) -> Vec<String> {
             .into_owned(),
         );
     }
-    result
+    Ok(result)
 }
 
 /// Converts the mediator_did config to a valid DID depending on source
@@ -467,10 +505,17 @@ async fn read_did_config(
             }
 
             parameter.value.ok_or_else(|| {
-                event!(Level::ERROR, "No parameter string found in response");
+                event!(
+                    Level::ERROR,
+                    "Parameter ({:?}) found, but no parameter value found in response",
+                    parameter.name
+                );
                 MediatorError::ConfigError(
                     "NA".into(),
-                    "No parameter string found in response".into(),
+                    format!(
+                        "Parameter ({:?}) found, but no parameter value found in response",
+                        parameter.name
+                    ),
                 )
             })?
         }

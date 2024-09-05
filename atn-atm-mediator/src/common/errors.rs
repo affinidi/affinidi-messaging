@@ -323,7 +323,7 @@ impl<T: GenericDataStruct> SuccessResponse<T> {
 pub fn create_session_id() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(8)
+        .take(12)
         .map(char::from)
         .collect()
 }

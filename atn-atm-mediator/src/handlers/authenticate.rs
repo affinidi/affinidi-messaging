@@ -52,7 +52,7 @@ pub async fn authentication_challenge(
     Json(body): Json<ChallengeBody>,
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
     let session = Session {
-        session_id: create_random_string(8),
+        session_id: create_random_string(12),
         challenge: create_random_string(32),
         remote_address: connect_info.to_string(),
         state: SessionState::ChallengeSent,

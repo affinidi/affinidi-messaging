@@ -10,10 +10,7 @@ use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use http::Method;
 use std::{env, net::SocketAddr};
-use tower_http::{
-    cors::CorsLayer,
-    trace::{self, TraceLayer},
-};
+use tower_http::trace::{self, TraceLayer};
 use tracing::{event, Level};
 use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
@@ -124,8 +121,8 @@ async fn main() {
     let app = Router::new()
         .merge(app)
         .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
+            config
+                .cors_allow_origin
                 .allow_headers([http::header::CONTENT_TYPE])
                 .allow_methods([
                     Method::GET,

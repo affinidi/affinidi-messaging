@@ -74,6 +74,13 @@ pub(crate) async fn handle_inbound(
                     to_dids
                 );
 
+                if to_dids.len() > state.config.to_recipients_limit {
+                    return Err(MediatorError::MessagePackError(
+                        session.session_id.clone(),
+                        format!("Recipient count({}) exceeds limit", to_dids.len()),
+                    ));
+                }
+
                 for recipient in to_dids {
                     let (packed, _msg_metadata) = response
                         .pack(
