@@ -12,7 +12,7 @@ clippy:processor:
   extends: .common
   before_script:
     - pwd
-    - cd atn-atm-processor/
+    - cd affinidi-messaging-processor/
   script:
     - cargo clippy --color always --no-deps
   allow_failure: true
@@ -21,7 +21,7 @@ clippy:mediator:
   extends: .common
   before_script:
     - pwd
-    - cd atn-atm-mediator/
+    - cd affinidi-messaging-mediator/
   script:
     - cargo clippy --color always --no-deps
   allow_failure: true
@@ -30,7 +30,7 @@ clippy:didcomm:
   extends: .common
   before_script:
     - pwd
-    - cd atn-atm-didcomm/
+    - cd affinidi-messaging-didcomm/
   script:
     - cargo clippy --color always --no-deps
   allow_failure: true
