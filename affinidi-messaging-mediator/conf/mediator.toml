@@ -1,0 +1,145 @@
+### log_level: trace debug info warn error
+### default: info
+log_level = "debug"
+
+### listen_address: <ip_address>:<tcp_port> that this service will listen on.
+### Default: 0.0.0.0:7037
+listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
+
+### mediator_did: DID of the mediator
+### REQUIRED: DID of the mediator
+### Supported formats:
+### - did://did:peer:<version>:<base58-encoded-verification-key>
+### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
+mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
+#mediator_did = "${MEDIATOR_DID:aws_parameter_store:///dev/atn/atm/global/did}"
+
+### mediator_secrets: Secrets of the mediator
+### REQUIRED: Location of secrets
+### Supported formats:
+### - file://<path> - Load secrets from a file
+### - aws_secrets://<secret_name> - Load secrets from AWS Secrets Manager
+### See secrets.json-example for the format of the secrets
+### NOTE: The key identifiers (id) must match the key identifiers in the mediator_did
+#mediator_secrets = "${MEDIATOR_SECRETS:aws_secrets://dev/atn/atm/mediator/global/secrets}"
+mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
+
+[server]
+### http_size_limit: Maximum size of a http request payload in bytes
+### Default: 10485760 (10MB)
+### It is recommended to use infrastructure level limitation instead of application level limitations
+http_size_limit = "${HTTP_SIZE_LIMIT:10485760}"
+
+### ws_size_limit: Maximum size of a http request payload in bytes
+### Default: 10485760 (10MB)
+### It is recommended to use infrastructure level limitation instead of application level limitations
+ws_size_limit = "${WS_SIZE_LIMIT:10485760}"
+
+[database]
+### database_url: URL of the Redis compatable database
+### Default: redis://127.0.0.1/
+database_url = "${REDIS_URL:redis://127.0.0.1/}"
+
+### lua_scripts: path to lua scripts used in Redis
+### Default: file://../affinidi-messaging-processor/redis-functions/atm-functions.lua
+lua_scripts = "${MEDIATOR_LUA_SCRIPTS:file://../affinidi-messaging-processor/redis-functions/atm-functions.lua}"
+
+### database_pool_size: Number of connections to the database
+### Default: 10
+database_pool_size = "${DATABASE_POOL_SIZE:10}"
+
+### database_timeout: Timeout for database operations in seconds
+### Default: 2
+database_timeout = "${DATABASE_TIMEOUT:2}"
+
+### max_message_size: Maximum size of a message in bytes
+### Default: 1048576 (1MB)
+max_message_size = "${MAX_MESSAGE_SIZE:1048576}"
+
+### max_queued_messages: How many messages will we queue for a single recipient or a single sender
+### Default: 100
+### NOTE: This is a per-recipient or per-sender limit
+max_queued_messages = "${MAX_QUEUED_MESSAGES:100}"
+
+### message_expiry_minutes: Time to live in minutes for messages stored
+### Messages will expire after this limit
+### Default: 10080 (7 days)
+message_expiry_minutes = "${MESSAGE_EXPIRY_MINUTES:10080}"
+
+[security]
+### If true (default) SSL is enabled.
+### default: true
+### NOTE: do not use `false` in prod unless TLS is terminated outside of the service
+use_ssl = "${USE_SSL:true}"
+
+### Note: If you comment out the following SSL configs,  will default back to non-TLS mode.
+###       Useful if doing testing/debugging without requiring SSL certificate checks
+### ssl_certificate_file: <path> file that contains the SSL certificate for this service
+ssl_certificate_file = "${SSL_CERTIFICATE_FILE:conf/keys/end.cert}"
+
+### ssl_key_file: <path> file that contains the SSL certificate key
+ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
+
+### jwt_authorization_secret
+### REQUIRED: Key string that is used to sign JWT tokens
+### Supported Formats:
+### - string://<key> - Use the key as is
+### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
+jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
+#jwt_authorization_secret = "${AUTHORIZATION_SECRET:aws_secrets://dev/atn/atm/mediator/global/jwt_secret}"
+
+### cors_allow_origin: Comma separated list of origins that are allowed to access this service
+### Default: *
+### NOTE: Use * to allow all origins, otherwise for production you should limit the origins
+### Example: "https://affinidi.com,https://example2.com"
+# cors_allow_origin = "${CORS_ALLOW_ORIGIN:https://affinidi.com}"
+
+[streaming]
+### enabled: If true, can live stream messages to subscribed recipients via WebSockets
+### Default: true
+enabled = "${STREAMING_ENABLED:true}"
+
+### uuid: Each subscriber needs a unique identifier, this is used to setup session tracking in the backend
+### Default: hostname"
+### Supported Formats:
+### - hostname://
+### - string://<uuid> - Use the UUID as is
+### NOTE: Having multiple subscribers with the same UUID will cause issues
+uuid = "${STREAMING_UUID:hostname://}"
+
+[did_resolver]
+### service_address: Address of the DID resolver service
+### Default: None (Uses local DID resolver
+#address = "${DID_RESOLVER_ADDRESS:ws://127.0.0.1:8080/did/v1/ws}"
+
+### cache_capacity: Number of DID's to cache in memory
+### Default: 1000
+cache_capacity = "${DID_RESOLVER_CACHE_CAPACITY:1000}"
+
+### cache_ttl: Time to live in seconds for DID's in the cache
+### Default: 300 (5 minutes)
+cache_ttl = "${DID_RESOLVER_CACHE_TTL:300}"
+
+### network_timeout: Timeout in milliseconds for DID Resolver operations
+### Default: 5000 milliseconds (you need to account for 3rd party DID resolution latency (blockchains, www etc)
+network_timeout = "${DID_RESOLVER_NETWORK_TIMEOUT:5000}"
+
+### network_limit: Maximum number of concurrent requests to the DID resolver
+### Default: 100
+network_limit = "${DID_RESOLVER_NETWORK_LIMIT:100}"
+
+[other]
+### to_recipients_limit: Maximum number of recipients in a single message
+### Default: 100
+### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients
+to_recipients_limit = "${TO_RECIPIENTS_LIMIT:100}"
+
+### approximate maximum amount of crypto operations per one message
+### it is used to protect the mediator from DoS type attacts.
+### Default: 1000
+crypto_operations_per_message_limit = "${CRYPTO_OPERATIONS_PER_MESSAGE_LIMIT:1000}"
+
+### to_keys_per_recipient_limit: Maximum number of keys in a single recipient did
+### Default: 100
+### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients and thousands keys of them
+to_keys_per_recipient_limit = "${TO_KEYS_PER_DID_LIMIT:100}"

@@ -1,0 +1,13 @@
+[package]
+name = "affinidi-messaging-processing"
+version = "0.1.1"
+description = "Affinidi Messaging Processor"
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
