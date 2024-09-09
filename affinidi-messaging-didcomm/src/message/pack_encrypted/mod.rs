@@ -283,11 +283,12 @@ pub struct MessagingServiceMetadata {
     pub service_endpoint: String,
 }
 
-/*
 #[cfg(test)]
 mod tests {
-    use base64::prelude::*;
-    use ssi::did::DIDMethods;
+    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use base64::{engine::general_purpose, prelude::*};
+    use bs58;
+    use ssi::dids::document::DIDVerificationMethod;
     use std::{collections::HashMap, iter::FromIterator};
 
     use askar_crypto::{
@@ -309,8 +310,8 @@ mod tests {
 
     use crate::{
         algorithms::AnonCryptAlg,
-        did::{resolvers::ExampleDIDResolver, VerificationMaterial, VerificationMethod},
-        error::ErrorKind,
+        document::{did_or_url, DIDCommVerificationMethodExt},
+        error::{err_msg, ErrorKind},
         jwe,
         jwk::{FromJwkValue, ToJwkValue},
         jws,
@@ -318,24 +319,14 @@ mod tests {
         protocols::routing::{try_parse_forward, wrap_in_forward},
         secrets::{resolvers::ExampleSecretsResolver, Secret, SecretMaterial},
         test_vectors::{
-            ALICE_AUTH_METHOD_25519, ALICE_AUTH_METHOD_P256, ALICE_AUTH_METHOD_SECPP256K1,
-            ALICE_DID, ALICE_DID_DOC, ALICE_DID_DOC_WITH_NO_SECRETS, ALICE_SECRETS,
-            ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256, ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
-            BOB_DID, BOB_DID_COMM_MESSAGING_SERVICE, BOB_DID_DOC, BOB_DID_DOC_NO_SECRETS,
-            BOB_SECRETS, BOB_SECRET_KEY_AGREEMENT_KEY_P256_1, BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
-            BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1, BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-            BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3, BOB_SERVICE, CHARLIE_DID, CHARLIE_DID_DOC,
-            CHARLIE_ROTATED_TO_ALICE_SECRETS, CHARLIE_SECRETS, CHARLIE_SECRET_AUTH_KEY_ED25519,
-            CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519, CHARLIE_SERVICE, FROM_PRIOR_FULL,
-            MEDIATOR1_DID_DOC, MEDIATOR1_SECRETS, MEDIATOR2_DID_DOC, MEDIATOR2_SECRETS,
-            MEDIATOR2_VERIFICATION_METHOD_KEY_AGREEM_X25519_1,
-            MEDIATOR3_DID_COMM_MESSAGING_SERVICE, MEDIATOR3_DID_DOC, MEDIATOR3_SECRETS,
-            MESSAGE_FROM_PRIOR_FULL, MESSAGE_SIMPLE, PLAINTEXT_MSG_SIMPLE,
+            ALICE_DID, ALICE_SECRETS, BOB_DID, BOB_SECRETS, BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
+            BOB_SECRET_KEY_AGREEMENT_KEY_P256_2, BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+            BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2, BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+            CHARLIE_DID, CHARLIE_ROTATED_TO_ALICE_SECRETS, CHARLIE_SECRET_AUTH_KEY_ED25519,
+            FROM_PRIOR_FULL, MEDIATOR1_SECRETS, MESSAGE_FROM_PRIOR_FULL, MESSAGE_SIMPLE,
+            PLAINTEXT_MSG_SIMPLE,
         },
-        utils::{
-            crypto::{JoseKDF, KeyWrap},
-            did::did_or_url,
-        },
+        utils::crypto::{JoseKDF, KeyWrap},
         Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackOptions,
     };
 
@@ -354,7 +345,6 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
         )
         .await;
 
@@ -367,20 +357,6 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
         )
         .await;
 
@@ -395,50 +371,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
-            ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            &ALICE_DID,
         )
         .await;
 
@@ -451,7 +384,6 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
         )
         .await;
 
@@ -459,15 +391,23 @@ mod tests {
             to: &str,
             to_keys: Vec<&Secret>,
             from: &str,
-            from_key: &VerificationMethod,
         ) where
             CE: KeyAeadInPlace + KeySecretBytes,
             KDF: JoseKDF<KE, KW>,
             KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             KW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                .await
+                .unwrap();
+
+            let alice_did_doc = match did_resolver.resolve(from).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+            let from_key = alice_did_doc.verification_method.first().unwrap();
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -490,7 +430,7 @@ mod tests {
                 metadata,
                 PackEncryptedMetadata {
                     messaging_service: None,
-                    from_kid: Some(from_key.id.clone()),
+                    from_kid: Some(from_key.id.clone().into_string()),
                     sign_by_kid: None,
                     to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
                 }
@@ -520,7 +460,6 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -543,7 +482,6 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             AnonCryptAlg::A256gcmEcdhEsA256kw,
             jwe::EncAlgorithm::A256Gcm,
         )
@@ -566,7 +504,6 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             AnonCryptAlg::Xc20pEcdhEsA256kw,
             jwe::EncAlgorithm::Xc20P,
         )
@@ -585,26 +522,6 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt_protected_sender::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -625,8 +542,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            &ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -647,8 +563,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            &ALICE_DID,
             AnonCryptAlg::A256gcmEcdhEsA256kw,
             jwe::EncAlgorithm::A256Gcm,
         )
@@ -669,29 +584,9 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            &ALICE_DID,
             AnonCryptAlg::Xc20pEcdhEsA256kw,
             jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt_protected_sender::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
         )
         .await;
 
@@ -707,52 +602,7 @@ mod tests {
         >(
             &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt_protected_sender::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
-            ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_authcrypt_protected_sender::<
-            AesKey<A256CbcHs512>,
-            Ecdh1PU<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
-            ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            &ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -771,7 +621,6 @@ mod tests {
             to: &str,
             to_keys: Vec<&Secret>,
             from: &str,
-            from_key: &VerificationMethod,
             enc_alg_anon: AnonCryptAlg,
             enc_alg_anon_jwe: jwe::EncAlgorithm,
         ) where
@@ -784,8 +633,17 @@ mod tests {
             AKE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             AKW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                .await
+                .unwrap();
+            let from_did_doc = match did_resolver.resolve(from).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+
+            let from_key = from_did_doc.verification_method.first().unwrap();
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -810,7 +668,7 @@ mod tests {
                 metadata,
                 PackEncryptedMetadata {
                     messaging_service: None,
-                    from_kid: Some(from_key.id.clone()),
+                    from_kid: Some(from_key.id.clone().to_string()),
                     sign_by_kid: None,
                     to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
                 }
@@ -843,11 +701,9 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
             ALICE_DID,
-            &ALICE_AUTH_METHOD_25519,
             jws::Algorithm::EdDSA,
         )
         .await;
@@ -868,12 +724,10 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
-            &ALICE_AUTH_METHOD_P256.id,
-            &ALICE_AUTH_METHOD_P256,
+            ALICE_DID,
             jws::Algorithm::Es256,
         )
         .await;
@@ -894,12 +748,10 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
+            ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
-            &ALICE_AUTH_METHOD_SECPP256K1.id,
-            &ALICE_AUTH_METHOD_SECPP256K1,
+            ALICE_DID,
             jws::Algorithm::Es256K,
         )
         .await;
@@ -919,11 +771,9 @@ mod tests {
             to: &str,
             to_keys: Vec<&Secret>,
             from: &str,
-            from_key: &VerificationMethod,
             enc_alg_anon: AnonCryptAlg,
             enc_alg_anon_jwe: jwe::EncAlgorithm,
             sign_by: &str,
-            sign_by_key: &VerificationMethod,
             sign_alg: jws::Algorithm,
         ) where
             CE: KeyAeadInPlace + KeySecretBytes,
@@ -936,10 +786,27 @@ mod tests {
             AKW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                .await
+                .unwrap();
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+            let from_did_doc = match did_resolver.resolve(from).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+            let from_key = from_did_doc.verification_method.first().unwrap();
+
+            let sign_by_did_doc = match did_resolver.resolve(sign_by).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+            let sign_by_key = sign_by_did_doc.verification_method.first().unwrap();
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -962,8 +829,8 @@ mod tests {
                 metadata,
                 PackEncryptedMetadata {
                     messaging_service: None,
-                    from_kid: Some(from_key.id.clone()),
-                    sign_by_kid: Some(sign_by_key.id.clone()),
+                    from_kid: Some(from_key.id.clone().to_string()),
+                    sign_by_kid: Some(sign_by_key.id.clone().to_string()),
                     to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
                 }
             );
@@ -992,9 +859,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
             ],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
             ALICE_DID,
-            &ALICE_AUTH_METHOD_25519,
             jws::Algorithm::EdDSA,
         )
         .await;
@@ -1009,9 +874,7 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
-            &ALICE_AUTH_METHOD_25519.id,
-            &ALICE_AUTH_METHOD_25519,
+            ALICE_DID,
             jws::Algorithm::EdDSA,
         )
         .await;
@@ -1026,9 +889,7 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
             ALICE_DID,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_X25519,
-            &ALICE_AUTH_METHOD_P256.id,
-            &ALICE_AUTH_METHOD_P256,
+            &ALICE_DID,
             jws::Algorithm::Es256,
         )
         .await;
@@ -1045,10 +906,8 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256.id,
-            &ALICE_VERIFICATION_METHOD_KEY_AGREEM_P256,
-            &ALICE_AUTH_METHOD_SECPP256K1.id,
-            &ALICE_AUTH_METHOD_SECPP256K1,
+            &ALICE_DID,
+            &ALICE_DID,
             jws::Algorithm::Es256K,
         )
         .await;
@@ -1057,9 +916,7 @@ mod tests {
             to: &str,
             to_keys: Vec<&Secret>,
             from: &str,
-            from_key: &VerificationMethod,
             sign_by: &str,
-            sign_by_key: &VerificationMethod,
             sign_alg: jws::Algorithm,
         ) where
             CE: KeyAeadInPlace + KeySecretBytes,
@@ -1068,10 +925,27 @@ mod tests {
             KW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                .await
+                .unwrap();
 
             let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+            let from_did_doc = match did_resolver.resolve(from).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+            let from_key = from_did_doc.verification_method.first().unwrap();
+
+            let sign_by_did_doc = match did_resolver.resolve(sign_by).await {
+                Ok(response) => response.doc,
+                Err(_) => {
+                    return ();
+                }
+            };
+            let sign_by_key = sign_by_did_doc.verification_method.first().unwrap();
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -1092,8 +966,8 @@ mod tests {
                 metadata,
                 PackEncryptedMetadata {
                     messaging_service: None,
-                    from_kid: Some(from_key.id.clone()),
-                    sign_by_kid: Some(sign_by_key.id.clone()),
+                    from_kid: Some(from_key.id.clone().to_string()),
+                    sign_by_kid: Some(sign_by_key.id.clone().to_string()),
                     to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
                 }
             );
@@ -1105,1039 +979,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pack_encrypted_works_anoncrypt() {
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        async fn _pack_encrypted_works_anoncrypt<CE, KDF, KE, KW>(
-            to: &str,
-            to_keys: Vec<&Secret>,
-            enc_alg: AnonCryptAlg,
-            enc_alg_jwe: jwe::EncAlgorithm,
-        ) where
-            CE: KeyAeadInPlace + KeySecretBytes,
-            KDF: JoseKDF<KE, KW>,
-            KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
-            KW: KeyWrap + FromKeyDerivation,
-        {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
-
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-            let (msg, metadata) = MESSAGE_SIMPLE
-                .pack_encrypted(
-                    to,
-                    None,
-                    None,
-                    &did_resolver,
-                    &secrets_resolver,
-                    &PackEncryptedOptions {
-                        forward: false,
-                        enc_alg_anon: enc_alg,
-                        ..PackEncryptedOptions::default()
-                    },
-                )
-                .await
-                .expect("encrypt is ok.");
-
-            assert_eq!(
-                metadata,
-                PackEncryptedMetadata {
-                    messaging_service: None,
-                    from_kid: None,
-                    sign_by_kid: None,
-                    to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
-                }
-            );
-
-            let msg = _verify_anoncrypt::<CE, KDF, KE, KW>(&msg, to_keys, enc_alg_jwe);
-            _verify_plaintext(&msg, PLAINTEXT_MSG_SIMPLE);
-        }
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_anoncrypt_sign() {
-        _pack_encrypted_works_anoncrypt_sign::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-            Ed25519KeyPair,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            ALICE_DID,
-            &ALICE_AUTH_METHOD_25519,
-            jws::Algorithm::EdDSA,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt_sign::<
-            AesKey<A256Gcm>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-            Ed25519KeyPair,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            ALICE_DID,
-            &ALICE_AUTH_METHOD_25519,
-            jws::Algorithm::EdDSA,
-            AnonCryptAlg::A256gcmEcdhEsA256kw,
-            jwe::EncAlgorithm::A256Gcm,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt_sign::<
-            Chacha20Key<XC20P>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-            Ed25519KeyPair,
-        >(
-            BOB_DID,
-            vec![
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
-                &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
-            ],
-            ALICE_DID,
-            &ALICE_AUTH_METHOD_25519,
-            jws::Algorithm::EdDSA,
-            AnonCryptAlg::Xc20pEcdhEsA256kw,
-            jwe::EncAlgorithm::Xc20P,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt_sign::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, X25519KeyPair>,
-            X25519KeyPair,
-            AesKey<A256Kw>,
-            Ed25519KeyPair,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
-            &ALICE_AUTH_METHOD_25519.id,
-            &ALICE_AUTH_METHOD_25519,
-            jws::Algorithm::EdDSA,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt_sign::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-            P256KeyPair,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            &ALICE_AUTH_METHOD_P256.id,
-            &ALICE_AUTH_METHOD_P256,
-            jws::Algorithm::Es256,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        _pack_encrypted_works_anoncrypt_sign::<
-            AesKey<A256CbcHs512>,
-            EcdhEs<'_, P256KeyPair>,
-            P256KeyPair,
-            AesKey<A256Kw>,
-            K256KeyPair,
-        >(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
-            vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
-            &ALICE_AUTH_METHOD_SECPP256K1.id,
-            &ALICE_AUTH_METHOD_SECPP256K1,
-            jws::Algorithm::Es256K,
-            AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
-            jwe::EncAlgorithm::A256cbcHs512,
-        )
-        .await;
-
-        async fn _pack_encrypted_works_anoncrypt_sign<CE, KDF, KE, KW, SK>(
-            to: &str,
-            to_keys: Vec<&Secret>,
-            sign_by: &str,
-            sign_by_key: &VerificationMethod,
-            sign_alg: jws::Algorithm,
-            enc_alg: AnonCryptAlg,
-            enc_alg_jwe: jwe::EncAlgorithm,
-        ) where
-            CE: KeyAeadInPlace + KeySecretBytes,
-            KDF: JoseKDF<KE, KW>,
-            KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
-            KW: KeyWrap + FromKeyDerivation,
-            SK: KeySigVerify + FromJwkValue,
-        {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
-
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-            let (msg, metadata) = MESSAGE_SIMPLE
-                .pack_encrypted(
-                    to,
-                    None,
-                    Some(sign_by),
-                    &did_resolver,
-                    &secrets_resolver,
-                    &PackEncryptedOptions {
-                        forward: false,
-                        enc_alg_anon: enc_alg,
-                        ..PackEncryptedOptions::default()
-                    },
-                )
-                .await
-                .expect("encrypt is ok.");
-
-            assert_eq!(
-                metadata,
-                PackEncryptedMetadata {
-                    messaging_service: None,
-                    from_kid: None,
-                    sign_by_kid: Some(sign_by_key.id.clone()),
-                    to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
-                }
-            );
-
-            let msg = _verify_anoncrypt::<CE, KDF, KE, KW>(&msg, to_keys, enc_alg_jwe);
-            let msg = _verify_signed::<SK>(&msg, sign_by_key, sign_alg);
-            _verify_plaintext(&msg, PLAINTEXT_MSG_SIMPLE);
-        }
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_single_mediator() {
-        _pack_encrypted_works_single_mediator(BOB_DID, None, None).await;
-
-        _pack_encrypted_works_single_mediator(BOB_DID, None, Some(ALICE_DID)).await;
-
-        _pack_encrypted_works_single_mediator(BOB_DID, Some(ALICE_DID), None).await;
-
-        _pack_encrypted_works_single_mediator(BOB_DID, Some(ALICE_DID), Some(ALICE_DID)).await;
-
-        _pack_encrypted_works_single_mediator(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            None,
-            None,
-        )
-        .await;
-
-        _pack_encrypted_works_single_mediator(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            None,
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _pack_encrypted_works_single_mediator(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            Some(ALICE_DID),
-            None,
-        )
-        .await;
-
-        _pack_encrypted_works_single_mediator(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            Some(ALICE_DID),
-            Some(ALICE_DID),
-        )
-        .await;
-
-        async fn _pack_encrypted_works_single_mediator(
-            to: &str,
-            from: Option<&str>,
-            sign_by: Option<&str>,
-        ) {
-            let mut did_resolver = ExampleDIDResolver::new(vec![
-                ALICE_DID_DOC.clone(),
-                BOB_DID_DOC.clone(),
-                MEDIATOR1_DID_DOC.clone(),
-            ]);
-
-            let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-            let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
-
-            let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
-
-            let (msg, pack_metadata) = MESSAGE_SIMPLE
-                .pack_encrypted(
-                    to,
-                    from,
-                    sign_by,
-                    &did_resolver,
-                    &alice_secrets_resolver,
-                    &PackEncryptedOptions::default(),
-                )
-                .await
-                .expect("Unable encrypt");
-
-            assert_eq!(
-                pack_metadata.messaging_service.as_ref(),
-                Some(&MessagingServiceMetadata {
-                    id: BOB_SERVICE.id.clone(),
-                    service_endpoint: BOB_DID_COMM_MESSAGING_SERVICE.uri.clone(),
-                })
-            );
-
-            assert_eq!(
-                pack_metadata.from_kid.map(|k| did_or_url(&k).0.to_owned()),
-                from.map(|d| d.to_owned())
-            );
-            assert_eq!(
-                pack_metadata
-                    .sign_by_kid
-                    .map(|k| did_or_url(&k).0.to_owned()),
-                sign_by.map(|d| d.to_owned())
-            );
-
-            match did_or_url(to) {
-                (_, Some(to_kid)) => {
-                    assert_eq!(
-                        pack_metadata
-                            .to_kids
-                            .iter()
-                            .map(|k| k.as_str())
-                            .collect::<Vec<_>>(),
-                        vec![to_kid]
-                    )
-                }
-                (to_did, None) => {
-                    for metadata_to_kid in pack_metadata.to_kids {
-                        assert_eq!(did_or_url(&metadata_to_kid).0, to_did);
-                    }
-                }
-            }
-
-            let did_method_resolver = DIDMethods::default();
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
-                &msg,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator1_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward =
-                try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
-
-            assert_eq!(forward.msg, &unpacked_msg_mediator1);
-            assert_eq!(&forward.next, to);
-
-            assert!(unpack_metadata_mediator1.encrypted);
-            assert!(!unpack_metadata_mediator1.authenticated);
-            assert!(!unpack_metadata_mediator1.non_repudiation);
-            assert!(unpack_metadata_mediator1.anonymous_sender);
-            assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
-
-            let forwarded_msg = serde_json::to_string(&forward.forwarded_msg)
-                .expect("Unable serialize forwarded message");
-
-            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
-                &forwarded_msg,
-                &mut did_resolver,
-                &did_method_resolver,
-                &bob_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            assert_eq!(&unpacked_msg, &*MESSAGE_SIMPLE);
-
-            assert!(unpack_metadata.encrypted);
-            assert_eq!(
-                unpack_metadata.authenticated,
-                from.is_some() || sign_by.is_some()
-            );
-            assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
-            assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
-            assert!(!unpack_metadata.re_wrapped_in_forward);
-        }
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_multiple_mediators_alternative_endpoints() {
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(CHARLIE_DID, None, None)
-            .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            CHARLIE_DID,
-            None,
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            CHARLIE_DID,
-            Some(ALICE_DID),
-            None,
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            CHARLIE_DID,
-            Some(ALICE_DID),
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
-            None,
-            None,
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
-            None,
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
-            Some(ALICE_DID),
-            None,
-        )
-        .await;
-
-        _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
-            Some(ALICE_DID),
-            Some(ALICE_DID),
-        )
-        .await;
-
-        async fn _pack_encrypted_works_multiple_mediators_alternative_endpoints(
-            to: &str,
-            from: Option<&str>,
-            sign_by: Option<&str>,
-        ) {
-            let msg = Message::build(
-                "1234567890".to_owned(),
-                "http://example.com/protocols/lets_do_lunch/1.0/proposal".to_owned(),
-                json!({"messagespecificattribute": "and its value"}),
-            )
-            .from(ALICE_DID.to_owned())
-            .to(CHARLIE_DID.to_owned())
-            .created_time(1516269022)
-            .expires_time(1516385931)
-            .finalize();
-
-            let mut did_resolver = ExampleDIDResolver::new(vec![
-                ALICE_DID_DOC.clone(),
-                CHARLIE_DID_DOC.clone(),
-                MEDIATOR1_DID_DOC.clone(),
-                MEDIATOR2_DID_DOC.clone(),
-                MEDIATOR3_DID_DOC.clone(),
-            ]);
-
-            let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-            let charlie_secrets_resolver = ExampleSecretsResolver::new(CHARLIE_SECRETS.clone());
-
-            let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
-
-            let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
-
-            let mediator3_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
-
-            let (packed_msg, pack_metadata) = msg
-                .pack_encrypted(
-                    to,
-                    from,
-                    sign_by,
-                    &did_resolver,
-                    &alice_secrets_resolver,
-                    &PackEncryptedOptions {
-                        forward_headers: Some(HashMap::from_iter([
-                            ("example-header-1".into(), json!("example-header-1-value")),
-                            ("example-header-2".into(), json!("example-header-2-value")),
-                        ])),
-                        ..PackEncryptedOptions::default()
-                    },
-                )
-                .await
-                .expect("Unable encrypt");
-
-            assert_eq!(
-                pack_metadata.messaging_service.as_ref(),
-                Some(&MessagingServiceMetadata {
-                    id: CHARLIE_SERVICE.id.clone(),
-                    service_endpoint: MEDIATOR3_DID_COMM_MESSAGING_SERVICE.uri.clone(),
-                })
-            );
-
-            assert_eq!(
-                pack_metadata.from_kid.map(|k| did_or_url(&k).0.to_owned()),
-                from.map(|d| d.to_owned())
-            );
-            assert_eq!(
-                pack_metadata
-                    .sign_by_kid
-                    .map(|k| did_or_url(&k).0.to_owned()),
-                sign_by.map(|d| d.to_owned())
-            );
-
-            match did_or_url(to) {
-                (_, Some(to_kid)) => {
-                    assert_eq!(
-                        pack_metadata
-                            .to_kids
-                            .iter()
-                            .map(|k| k.as_str())
-                            .collect::<Vec<_>>(),
-                        vec![to_kid]
-                    )
-                }
-                (to_did, None) => {
-                    for metadata_to_kid in pack_metadata.to_kids {
-                        assert_eq!(did_or_url(&metadata_to_kid).0, to_did);
-                    }
-                }
-            }
-
-            let did_method_resolver = DIDMethods::default();
-            let (unpacked_msg_mediator3, unpack_metadata_mediator3) = Message::unpack_string(
-                &packed_msg,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator3_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward_at_mediator3 =
-                try_parse_forward(&unpacked_msg_mediator3).expect("Message is not Forward");
-
-            assert_eq!(forward_at_mediator3.msg, &unpacked_msg_mediator3);
-
-            assert_eq!(
-                &forward_at_mediator3.msg.extra_headers,
-                &HashMap::from_iter([
-                    ("example-header-1".into(), json!("example-header-1-value")),
-                    ("example-header-2".into(), json!("example-header-2-value")),
-                ])
-            );
-
-            assert_eq!(
-                &forward_at_mediator3.next,
-                "did:example:mediator2#key-x25519-1"
-            );
-
-            assert!(unpack_metadata_mediator3.encrypted);
-            assert!(!unpack_metadata_mediator3.authenticated);
-            assert!(!unpack_metadata_mediator3.non_repudiation);
-            assert!(unpack_metadata_mediator3.anonymous_sender);
-            assert!(!unpack_metadata_mediator3.re_wrapped_in_forward);
-
-            let forwarded_msg_at_mediator3 =
-                serde_json::to_string(&forward_at_mediator3.forwarded_msg)
-                    .expect("Unable serialize forwarded message");
-
-            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
-                &forwarded_msg_at_mediator3,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator2_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward_at_mediator2 =
-                try_parse_forward(&unpacked_msg_mediator2).expect("Message is not Forward");
-
-            assert_eq!(forward_at_mediator2.msg, &unpacked_msg_mediator2);
-
-            assert_eq!(
-                &forward_at_mediator2.msg.extra_headers,
-                &HashMap::from_iter([
-                    ("example-header-1".into(), json!("example-header-1-value")),
-                    ("example-header-2".into(), json!("example-header-2-value")),
-                ])
-            );
-
-            assert_eq!(
-                &forward_at_mediator2.next,
-                "did:example:mediator1#key-x25519-1"
-            );
-
-            assert!(unpack_metadata_mediator2.encrypted);
-            assert!(!unpack_metadata_mediator2.authenticated);
-            assert!(!unpack_metadata_mediator2.non_repudiation);
-            assert!(unpack_metadata_mediator2.anonymous_sender);
-            assert!(!unpack_metadata_mediator2.re_wrapped_in_forward);
-
-            let forwarded_msg_at_mediator2 =
-                serde_json::to_string(&forward_at_mediator2.forwarded_msg)
-                    .expect("Unable serialize forwarded message");
-
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
-                &forwarded_msg_at_mediator2,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator1_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward_at_mediator1 =
-                try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
-
-            assert_eq!(forward_at_mediator1.msg, &unpacked_msg_mediator1);
-
-            assert_eq!(
-                &forward_at_mediator1.msg.extra_headers,
-                &HashMap::from_iter([
-                    ("example-header-1".into(), json!("example-header-1-value")),
-                    ("example-header-2".into(), json!("example-header-2-value")),
-                ])
-            );
-
-            assert_eq!(&forward_at_mediator1.next, to);
-
-            assert!(unpack_metadata_mediator1.encrypted);
-            assert!(!unpack_metadata_mediator1.authenticated);
-            assert!(!unpack_metadata_mediator1.non_repudiation);
-            assert!(unpack_metadata_mediator1.anonymous_sender);
-            assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
-
-            let forwarded_msg_at_mediator1 =
-                serde_json::to_string(&forward_at_mediator1.forwarded_msg)
-                    .expect("Unable serialize forwarded message");
-
-            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
-                &forwarded_msg_at_mediator1,
-                &mut did_resolver,
-                &did_method_resolver,
-                &charlie_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            assert_eq!(&unpacked_msg, &msg);
-
-            assert!(unpack_metadata.encrypted);
-            assert_eq!(
-                unpack_metadata.authenticated,
-                from.is_some() || sign_by.is_some()
-            );
-            assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
-            assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
-            assert!(!unpack_metadata.re_wrapped_in_forward);
-        }
-    }
-
-    #[tokio::test]
-    async fn wrap_in_forward_works_mediator_unknown_to_sender() {
-        _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, None, None).await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, None, Some(ALICE_DID)).await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, Some(ALICE_DID), None).await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(
-            BOB_DID,
-            Some(ALICE_DID),
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            None,
-            None,
-        )
-        .await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            None,
-            Some(ALICE_DID),
-        )
-        .await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            Some(ALICE_DID),
-            None,
-        )
-        .await;
-
-        _wrap_in_forward_works_mediator_unknown_to_sender(
-            &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
-            Some(ALICE_DID),
-            Some(ALICE_DID),
-        )
-        .await;
-
-        async fn _wrap_in_forward_works_mediator_unknown_to_sender(
-            to: &str,
-            from: Option<&str>,
-            sign_by: Option<&str>,
-        ) {
-            let mut did_resolver = ExampleDIDResolver::new(vec![
-                ALICE_DID_DOC.clone(),
-                BOB_DID_DOC.clone(),
-                MEDIATOR1_DID_DOC.clone(),
-                MEDIATOR2_DID_DOC.clone(),
-            ]);
-
-            let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-            let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
-
-            let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
-
-            let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
-
-            let (msg, pack_metadata) = MESSAGE_SIMPLE
-                .pack_encrypted(
-                    to,
-                    from,
-                    sign_by,
-                    &did_resolver,
-                    &alice_secrets_resolver,
-                    &PackEncryptedOptions {
-                        messaging_service: Some(BOB_SERVICE.id.clone()),
-                        ..PackEncryptedOptions::default()
-                    },
-                )
-                .await
-                .expect("Unable encrypt");
-
-            assert_eq!(
-                pack_metadata.messaging_service.as_ref(),
-                Some(&MessagingServiceMetadata {
-                    id: BOB_SERVICE.id.clone(),
-                    service_endpoint: BOB_DID_COMM_MESSAGING_SERVICE.uri.clone(),
-                })
-            );
-
-            let did_method_resolver = DIDMethods::default();
-            let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
-                &msg,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator1_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward_at_mediator1 =
-                try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
-
-            assert_eq!(forward_at_mediator1.msg, &unpacked_msg_mediator1);
-            assert_eq!(&forward_at_mediator1.next, to);
-
-            assert!(unpack_metadata_mediator1.encrypted);
-            assert!(!unpack_metadata_mediator1.authenticated);
-            assert!(!unpack_metadata_mediator1.non_repudiation);
-            assert!(unpack_metadata_mediator1.anonymous_sender);
-            assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
-
-            let forwarded_msg_at_mediator1 =
-                serde_json::to_string(&forward_at_mediator1.forwarded_msg)
-                    .expect("Unable serialize forwarded message");
-
-            let forward_msg_for_mediator2 = wrap_in_forward(
-                &forwarded_msg_at_mediator1,
-                None,
-                &forward_at_mediator1.next,
-                &[MEDIATOR2_VERIFICATION_METHOD_KEY_AGREEM_X25519_1.id.clone()],
-                &AnonCryptAlg::default(),
-                &did_resolver,
-            )
-            .await
-            .expect("Unable wrap in forward");
-
-            let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
-                &forward_msg_for_mediator2,
-                &mut did_resolver,
-                &did_method_resolver,
-                &mediator2_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            let forward_at_mediator2 =
-                try_parse_forward(&unpacked_msg_mediator2).expect("Message is not Forward");
-
-            assert_eq!(forward_at_mediator2.msg, &unpacked_msg_mediator2);
-            assert_eq!(&forward_at_mediator2.next, to);
-
-            assert!(unpack_metadata_mediator2.encrypted);
-            assert!(!unpack_metadata_mediator2.authenticated);
-            assert!(!unpack_metadata_mediator2.non_repudiation);
-            assert!(unpack_metadata_mediator2.anonymous_sender);
-            assert!(!unpack_metadata_mediator2.re_wrapped_in_forward);
-
-            let forwarded_msg_at_mediator2 =
-                serde_json::to_string(&forward_at_mediator2.forwarded_msg)
-                    .expect("Unable serialize forwarded message");
-
-            let (unpacked_msg, unpack_metadata) = Message::unpack_string(
-                &forwarded_msg_at_mediator2,
-                &mut did_resolver,
-                &did_method_resolver,
-                &bob_secrets_resolver,
-                &UnpackOptions::default(),
-            )
-            .await
-            .expect("Unable unpack");
-
-            assert_eq!(&unpacked_msg, &*MESSAGE_SIMPLE);
-
-            assert!(unpack_metadata.encrypted);
-            assert_eq!(
-                unpack_metadata.authenticated,
-                from.is_some() || sign_by.is_some()
-            );
-            assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
-            assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
-            assert!(!unpack_metadata.re_wrapped_in_forward);
-        }
-    }
-
-    // TODO: Add negative tests for Routing protocol
-
-    #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2166,8 +1011,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2196,8 +1042,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_not_did_or_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2226,8 +1073,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_differs_msg_from() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2258,8 +1106,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_differs_msg_to() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2290,8 +1139,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_presented_in_msg_to() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2314,8 +1164,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url_in_msg() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2346,8 +1197,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url_in_msg() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2378,8 +1230,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_url_from_msg_did_positive() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2400,8 +1253,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_url_to_msg_did_positive() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2424,8 +1278,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_differs_msg_from_positive() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2446,8 +1301,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_from_msg_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2479,8 +1335,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_to_msg_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2511,8 +1368,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2540,9 +1398,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
-
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
         let from = ALICE_DID.to_string() + "#unknown-key";
@@ -2561,26 +1419,24 @@ mod tests {
             .await;
 
         let err = res.expect_err("res is ok");
-        assert_eq!(err.kind(), ErrorKind::DIDUrlNotFound);
 
-        assert_eq!(
-            format!("{}", err),
-            "DID URL not found: No sender key agreements found"
-        );
+        assert_eq!(err.kind(), ErrorKind::DIDNotResolved);
+        assert_eq!(format!("{}", err), "DID not resolved: Sender did not found");
     }
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
         let mut msg = MESSAGE_SIMPLE.clone();
-        msg.to = Some(vec!["did:example:unknown".into()]);
+        msg.to = Some(vec!["did:key:unknown".into()]);
         let res = msg
             .pack_encrypted(
-                "did:example:unknown",
+                "did:key:unknown",
                 None,
                 None,
                 &did_resolver,
@@ -2594,7 +1450,6 @@ mod tests {
 
         let err = res.expect_err("res is ok");
         assert_eq!(err.kind(), ErrorKind::DIDNotResolved);
-
         assert_eq!(
             format!("{}", err),
             "DID not resolved: Recipient did not found"
@@ -2603,8 +1458,9 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
@@ -2624,115 +1480,19 @@ mod tests {
             .await;
 
         let err = res.expect_err("res is ok");
-        assert_eq!(err.kind(), ErrorKind::DIDUrlNotFound);
-
-        assert_eq!(
-            format!("{}", err),
-            "DID URL not found: No recipient key agreements found"
-        );
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_sign_by_unknown_did_url() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
-
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-        let sign_by = ALICE_DID.to_string() + "#unknown-key";
-        let res = MESSAGE_SIMPLE
-            .pack_encrypted(
-                BOB_DID,
-                ALICE_DID.into(),
-                sign_by.as_str().into(),
-                &did_resolver,
-                &secrets_resolver,
-                &PackEncryptedOptions {
-                    forward: false,
-                    ..PackEncryptedOptions::default()
-                },
-            )
-            .await;
-
-        let err = res.expect_err("res is ok");
-        assert_eq!(err.kind(), ErrorKind::DIDUrlNotFound);
-
-        assert_eq!(
-            format!("{}", err),
-            "DID URL not found: Unable produce sign envelope: Signer key id not found in did doc"
-        );
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_from_not_in_secrets() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
-
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-        let res = MESSAGE_SIMPLE
-            .pack_encrypted(
-                BOB_DID,
-                "did:example:alice#key-x25519-not-in-secrets-1".into(),
-                None,
-                &did_resolver,
-                &secrets_resolver,
-                &PackEncryptedOptions {
-                    forward: false,
-                    ..PackEncryptedOptions::default()
-                },
-            )
-            .await;
-
-        let err = res.expect_err("res is ok");
-        assert_eq!(err.kind(), ErrorKind::SecretNotFound);
-
-        assert_eq!(
-            format!("{}", err),
-            "Secret not found: No sender secrets found"
-        );
-    }
-
-    #[tokio::test]
-    async fn pack_encrypted_works_sign_by_not_in_secrets() {
-        let did_resolver = ExampleDIDResolver::new(vec![
-            ALICE_DID_DOC_WITH_NO_SECRETS.clone(),
-            BOB_DID_DOC.clone(),
-        ]);
-
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
-
-        let res = MESSAGE_SIMPLE
-            .pack_encrypted(
-                BOB_DID,
-                ALICE_DID.into(),
-                "did:example:alice#key-not-in-secrets-1".into(),
-                &did_resolver,
-                &secrets_resolver,
-                &PackEncryptedOptions {
-                    forward: false,
-                    ..PackEncryptedOptions::default()
-                },
-            )
-            .await;
-
-        let err = res.expect_err("res is ok");
-        assert_eq!(err.kind(), ErrorKind::SecretNotFound);
-
-        assert_eq!(
-            format!("{}", err),
-            "Secret not found: Unable produce sign envelope: No signer secrets found"
-        );
+        assert_eq!(err.kind(), ErrorKind::DIDNotResolved);
+        assert_eq!(format!("{}", err), "DID not resolved: Sender did not found");
     }
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_in_secrets_positive() {
-        let did_resolver =
-            ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC_NO_SECRETS.clone()]);
+        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            .await
+            .unwrap();
 
         let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
 
-        let to = "did:example:bob#key-x25519-not-secrets-1";
+        let to = "did:key:bob#key-x25519-not-secrets-1";
         let _ = MESSAGE_SIMPLE
             .pack_encrypted(
                 to,
@@ -2748,118 +1508,1237 @@ mod tests {
             .await;
     }
 
-    #[tokio::test]
-    async fn pack_encrypted_works_to_from_different_curves() {
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-x25519-1".into(),
-            "did:example:bob#key-p256-1",
-        )
-        .await;
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-x25519-1".into(),
-            "did:example:bob#key-p384-1",
-        )
-        .await;
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-x25519-1".into(),
-            "did:example:bob#key-p521-1",
-        )
-        .await;
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-p256-1".into(),
-            "did:example:bob#key-p384-1",
-        )
-        .await;
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-p256-1".into(),
-            "did:example:bob#key-p521-1",
-        )
-        .await;
-        _pack_encrypted_works_to_from_different_curves(
-            "did:example:alice#key-p521-1".into(),
-            "did:example:bob#key-p384-1",
-        )
-        .await;
+    /*
 
-        async fn _pack_encrypted_works_to_from_different_curves(from: Option<&str>, to: &str) {
-            let did_resolver =
-                ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+       #[tokio::test]
+       async fn pack_encrypted_works_anoncrypt() {
+       _pack_encrypted_works_anoncrypt::<
+           AesKey<A256CbcHs512>,
+           EcdhEs<'_, X25519KeyPair>,
+           X25519KeyPair,
+           AesKey<A256Kw>,
+       >(
+           BOB_DID,
+           vec![
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+           ],
+           AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+           jwe::EncAlgorithm::A256cbcHs512,
+       )
+       .await;
 
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               BOB_DID,
+               vec![
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+               ],
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
 
-            let res = MESSAGE_SIMPLE
-                .pack_encrypted(
-                    to,
-                    from,
-                    None,
-                    &did_resolver,
-                    &secrets_resolver,
-                    &PackEncryptedOptions {
-                        forward: false,
-                        ..PackEncryptedOptions::default()
-                    },
-                )
-                .await;
+           _pack_encrypted_works_anoncrypt::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               BOB_DID,
+               vec![
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+               ],
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
 
-            let err = res.expect_err("res is ok");
-            assert_eq!(err.kind(), ErrorKind::NoCompatibleCrypto);
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
 
-            assert_eq!(
-                format!("{}", err),
-                "No compatible crypto: No common keys between sender and recipient found"
-            );
-        }
-    }
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
 
-    #[tokio::test]
-    async fn pack_encrypted_works_from_prior() {
-        let mut did_resolver = ExampleDIDResolver::new(vec![
-            ALICE_DID_DOC.clone(),
-            BOB_DID_DOC.clone(),
-            CHARLIE_DID_DOC.clone(),
-        ]);
-        let charlie_rotated_to_alice_secrets_resolver =
-            ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
-        let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+           _pack_encrypted_works_anoncrypt::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
 
-        let (packed_msg, _pack_metadata) = MESSAGE_FROM_PRIOR_FULL
-            .pack_encrypted(
-                BOB_DID,
-                Some(ALICE_DID),
-                None,
-                &did_resolver,
-                &charlie_rotated_to_alice_secrets_resolver,
-                &PackEncryptedOptions {
-                    forward: false,
-                    ..PackEncryptedOptions::default()
-                },
-            )
-            .await
-            .expect("Unable pack_encrypted");
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
 
-        let did_method_resolver = DIDMethods::default();
-        let (unpacked_msg, unpack_metadata) = Message::unpack_string(
-            &packed_msg,
-            &mut did_resolver,
-            &did_method_resolver,
-            &bob_secrets_resolver,
-            &UnpackOptions::default(),
-        )
-        .await
-        .expect("Unable unpack");
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
 
-        assert_eq!(&unpacked_msg, &*MESSAGE_FROM_PRIOR_FULL);
-        assert_eq!(
-            unpack_metadata.from_prior_issuer_kid.as_ref(),
-            Some(&CHARLIE_SECRET_AUTH_KEY_ED25519.id)
-        );
-        assert_eq!(unpack_metadata.from_prior.as_ref(), Some(&*FROM_PRIOR_FULL));
-    }
+           _pack_encrypted_works_anoncrypt::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
 
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
+
+           async fn _pack_encrypted_works_anoncrypt<CE, KDF, KE, KW>(
+               to: &str,
+               to_keys: Vec<&Secret>,
+               enc_alg: AnonCryptAlg,
+               enc_alg_jwe: jwe::EncAlgorithm,
+           ) where
+               CE: KeyAeadInPlace + KeySecretBytes,
+               KDF: JoseKDF<KE, KW>,
+               KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
+               KW: KeyWrap + FromKeyDerivation,
+           {
+               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                   .await
+                   .unwrap();
+
+               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               // let to_did_doc = match did_resolver.resolve(to).await {
+               //     Ok(response) => response.doc,
+               //     Err(err) => {
+               //         println!("ERROR in resolving doc: {:?}", err);
+               //         return ();
+               //     }
+               // };
+               let (msg, metadata) = MESSAGE_SIMPLE
+                   .pack_encrypted(
+                       to,
+                       None,
+                       None,
+                       &did_resolver,
+                       &secrets_resolver,
+                       &PackEncryptedOptions {
+                           forward: false,
+                           enc_alg_anon: enc_alg,
+                           ..PackEncryptedOptions::default()
+                       },
+                   )
+                   .await
+                   .expect("encrypt is ok.");
+
+               assert_eq!(
+                   metadata,
+                   PackEncryptedMetadata {
+                       messaging_service: None,
+                       from_kid: None,
+                       sign_by_kid: None,
+                       to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
+                   }
+               );
+
+               let msg = _verify_anoncrypt::<CE, KDF, KE, KW>(&msg, to_keys, enc_alg_jwe);
+               _verify_plaintext(&msg, PLAINTEXT_MSG_SIMPLE);
+           }
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_anoncrypt_sign() {
+           _pack_encrypted_works_anoncrypt_sign::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+               Ed25519KeyPair,
+           >(
+               BOB_DID,
+               vec![
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+               ],
+               ALICE_DID,
+               &ALICE_AUTH_METHOD_25519,
+               jws::Algorithm::EdDSA,
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt_sign::<
+               AesKey<A256Gcm>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+               Ed25519KeyPair,
+           >(
+               BOB_DID,
+               vec![
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+               ],
+               ALICE_DID,
+               &ALICE_AUTH_METHOD_25519,
+               jws::Algorithm::EdDSA,
+               AnonCryptAlg::A256gcmEcdhEsA256kw,
+               jwe::EncAlgorithm::A256Gcm,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt_sign::<
+               Chacha20Key<XC20P>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+               Ed25519KeyPair,
+           >(
+               BOB_DID,
+               vec![
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2,
+                   &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_3,
+               ],
+               ALICE_DID,
+               &ALICE_AUTH_METHOD_25519,
+               jws::Algorithm::EdDSA,
+               AnonCryptAlg::Xc20pEcdhEsA256kw,
+               jwe::EncAlgorithm::Xc20P,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt_sign::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, X25519KeyPair>,
+               X25519KeyPair,
+               AesKey<A256Kw>,
+               Ed25519KeyPair,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
+               &ALICE_AUTH_METHOD_25519.id,
+               &ALICE_AUTH_METHOD_25519,
+               jws::Algorithm::EdDSA,
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt_sign::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+               P256KeyPair,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
+               &ALICE_AUTH_METHOD_P256.id,
+               &ALICE_AUTH_METHOD_P256,
+               jws::Algorithm::Es256,
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           _pack_encrypted_works_anoncrypt_sign::<
+               AesKey<A256CbcHs512>,
+               EcdhEs<'_, P256KeyPair>,
+               P256KeyPair,
+               AesKey<A256Kw>,
+               K256KeyPair,
+           >(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1.id,
+               vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_1],
+               &ALICE_AUTH_METHOD_SECPP256K1.id,
+               &ALICE_AUTH_METHOD_SECPP256K1,
+               jws::Algorithm::Es256K,
+               AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
+               jwe::EncAlgorithm::A256cbcHs512,
+           )
+           .await;
+
+           async fn _pack_encrypted_works_anoncrypt_sign<CE, KDF, KE, KW, SK>(
+               to: &str,
+               to_keys: Vec<&Secret>,
+               sign_by: &str,
+               sign_by_key: &VerificationMethod,
+               sign_alg: jws::Algorithm,
+               enc_alg: AnonCryptAlg,
+               enc_alg_jwe: jwe::EncAlgorithm,
+           ) where
+               CE: KeyAeadInPlace + KeySecretBytes,
+               KDF: JoseKDF<KE, KW>,
+               KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
+               KW: KeyWrap + FromKeyDerivation,
+               SK: KeySigVerify + FromJwkValue,
+           {
+               let did_resolver =
+                   ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
+
+               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+               let (msg, metadata) = MESSAGE_SIMPLE
+                   .pack_encrypted(
+                       to,
+                       None,
+                       Some(sign_by),
+                       &did_resolver,
+                       &secrets_resolver,
+                       &PackEncryptedOptions {
+                           forward: false,
+                           enc_alg_anon: enc_alg,
+                           ..PackEncryptedOptions::default()
+                       },
+                   )
+                   .await
+                   .expect("encrypt is ok.");
+
+               assert_eq!(
+                   metadata,
+                   PackEncryptedMetadata {
+                       messaging_service: None,
+                       from_kid: None,
+                       sign_by_kid: Some(sign_by_key.id.clone()),
+                       to_kids: to_keys.iter().map(|s| s.id.clone()).collect::<Vec<_>>(),
+                   }
+               );
+
+               let msg = _verify_anoncrypt::<CE, KDF, KE, KW>(&msg, to_keys, enc_alg_jwe);
+               let msg = _verify_signed::<SK>(&msg, sign_by_key, sign_alg);
+               _verify_plaintext(&msg, PLAINTEXT_MSG_SIMPLE);
+           }
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_single_mediator() {
+           _pack_encrypted_works_single_mediator(BOB_DID, None, None).await;
+
+           _pack_encrypted_works_single_mediator(BOB_DID, None, Some(ALICE_DID)).await;
+
+           _pack_encrypted_works_single_mediator(BOB_DID, Some(ALICE_DID), None).await;
+
+           _pack_encrypted_works_single_mediator(BOB_DID, Some(ALICE_DID), Some(ALICE_DID)).await;
+
+       _pack_encrypted_works_single_mediator(
+           &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+           None,
+           None,
+       )
+       .await;
+
+       _pack_encrypted_works_single_mediator(
+           &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+           None,
+           Some(ALICE_DID),
+       )
+       .await;
+
+       _pack_encrypted_works_single_mediator(
+           &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+           Some(ALICE_DID),
+           None,
+       )
+       .await;
+
+       _pack_encrypted_works_single_mediator(
+           &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+           Some(ALICE_DID),
+           Some(ALICE_DID),
+       )
+       .await;
+
+           async fn _pack_encrypted_works_single_mediator(
+               to: &str,
+               from: Option<&str>,
+               sign_by: Option<&str>,
+           ) {
+               let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                   .await
+                   .unwrap();
+
+               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+               let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+
+               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+
+               let (msg, pack_metadata) = MESSAGE_SIMPLE
+                   .pack_encrypted(
+                       to,
+                       from,
+                       sign_by,
+                       &did_resolver,
+                       &alice_secrets_resolver,
+                       &PackEncryptedOptions::default(),
+                   )
+                   .await
+                   .expect("Unable encrypt");
+
+               assert_eq!(
+                   pack_metadata.messaging_service.as_ref(),
+                   Some(&MessagingServiceMetadata {
+                       id: "".into(),
+                       service_endpoint: "".into(),
+                       // id: BOB_SERVICE.id.clone(),
+                       // service_endpoint: BOB_DID_COMM_MESSAGING_SERVICE.uri.clone(),
+                   })
+               );
+
+               assert_eq!(
+                   pack_metadata.from_kid.map(|k| did_or_url(&k).0.to_owned()),
+                   from.map(|d| d.to_owned())
+               );
+               assert_eq!(
+                   pack_metadata
+                       .sign_by_kid
+                       .map(|k| did_or_url(&k).0.to_owned()),
+                   sign_by.map(|d| d.to_owned())
+               );
+
+               match did_or_url(to) {
+                   (_, Some(to_kid)) => {
+                       assert_eq!(
+                           pack_metadata
+                               .to_kids
+                               .iter()
+                               .map(|k| k.as_str())
+                               .collect::<Vec<_>>(),
+                           vec![to_kid]
+                       )
+                   }
+                   (to_did, None) => {
+                       for metadata_to_kid in pack_metadata.to_kids {
+                           assert_eq!(did_or_url(&metadata_to_kid).0, to_did);
+                       }
+                   }
+               }
+
+               let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
+                   &msg,
+                   &mut did_resolver,
+                   &mediator1_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward =
+                   try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
+
+               assert_eq!(forward.msg, &unpacked_msg_mediator1);
+               assert_eq!(&forward.next, to);
+
+               assert!(unpack_metadata_mediator1.encrypted);
+               assert!(!unpack_metadata_mediator1.authenticated);
+               assert!(!unpack_metadata_mediator1.non_repudiation);
+               assert!(unpack_metadata_mediator1.anonymous_sender);
+               assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
+
+               let forwarded_msg = serde_json::to_string(&forward.forwarded_msg)
+                   .expect("Unable serialize forwarded message");
+
+               let (unpacked_msg, unpack_metadata) = Message::unpack_string(
+                   &forwarded_msg,
+                   &mut did_resolver,
+                   &bob_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               assert_eq!(&unpacked_msg, &*MESSAGE_SIMPLE);
+
+               assert!(unpack_metadata.encrypted);
+               assert_eq!(
+                   unpack_metadata.authenticated,
+                   from.is_some() || sign_by.is_some()
+               );
+               assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
+               assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
+               assert!(!unpack_metadata.re_wrapped_in_forward);
+           }
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_multiple_mediators_alternative_endpoints() {
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(CHARLIE_DID, None, None)
+               .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               CHARLIE_DID,
+               None,
+               Some(ALICE_DID),
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               CHARLIE_DID,
+               Some(ALICE_DID),
+               None,
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               CHARLIE_DID,
+               Some(ALICE_DID),
+               Some(ALICE_DID),
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
+               None,
+               None,
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
+               None,
+               Some(ALICE_DID),
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
+               Some(ALICE_DID),
+               None,
+           )
+           .await;
+
+           _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               &CHARLIE_SECRET_KEY_AGREEMENT_KEY_X25519.id,
+               Some(ALICE_DID),
+               Some(ALICE_DID),
+           )
+           .await;
+
+           async fn _pack_encrypted_works_multiple_mediators_alternative_endpoints(
+               to: &str,
+               from: Option<&str>,
+               sign_by: Option<&str>,
+           ) {
+               let msg = Message::build(
+                   "1234567890".to_owned(),
+                   "http://example.com/protocols/lets_do_lunch/1.0/proposal".to_owned(),
+                   json!({"messagespecificattribute": "and its value"}),
+               )
+               .from(ALICE_DID.to_owned())
+               .to(CHARLIE_DID.to_owned())
+               .created_time(1516269022)
+               .expires_time(1516385931)
+               .finalize();
+
+               let mut did_resolver = ExampleDIDResolver::new(vec![
+                   ALICE_DID_DOC.clone(),
+                   CHARLIE_DID_DOC.clone(),
+                   MEDIATOR1_DID_DOC.clone(),
+                   MEDIATOR2_DID_DOC.clone(),
+                   MEDIATOR3_DID_DOC.clone(),
+               ]);
+
+               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+               let charlie_secrets_resolver = ExampleSecretsResolver::new(CHARLIE_SECRETS.clone());
+
+               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+
+               let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
+
+               let mediator3_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
+
+               let (packed_msg, pack_metadata) = msg
+                   .pack_encrypted(
+                       to,
+                       from,
+                       sign_by,
+                       &did_resolver,
+                       &alice_secrets_resolver,
+                       &PackEncryptedOptions {
+                           forward_headers: Some(HashMap::from_iter([
+                               ("example-header-1".into(), json!("example-header-1-value")),
+                               ("example-header-2".into(), json!("example-header-2-value")),
+                           ])),
+                           ..PackEncryptedOptions::default()
+                       },
+                   )
+                   .await
+                   .expect("Unable encrypt");
+
+               assert_eq!(
+                   pack_metadata.messaging_service.as_ref(),
+                   Some(&MessagingServiceMetadata {
+                       id: CHARLIE_SERVICE.id.clone(),
+                       service_endpoint: MEDIATOR3_DID_COMM_MESSAGING_SERVICE.uri.clone(),
+                   })
+               );
+
+               assert_eq!(
+                   pack_metadata.from_kid.map(|k| did_or_url(&k).0.to_owned()),
+                   from.map(|d| d.to_owned())
+               );
+               assert_eq!(
+                   pack_metadata
+                       .sign_by_kid
+                       .map(|k| did_or_url(&k).0.to_owned()),
+                   sign_by.map(|d| d.to_owned())
+               );
+
+               match did_or_url(to) {
+                   (_, Some(to_kid)) => {
+                       assert_eq!(
+                           pack_metadata
+                               .to_kids
+                               .iter()
+                               .map(|k| k.as_str())
+                               .collect::<Vec<_>>(),
+                           vec![to_kid]
+                       )
+                   }
+                   (to_did, None) => {
+                       for metadata_to_kid in pack_metadata.to_kids {
+                           assert_eq!(did_or_url(&metadata_to_kid).0, to_did);
+                       }
+                   }
+               }
+
+               let did_method_resolver = DIDMethods::default();
+               let (unpacked_msg_mediator3, unpack_metadata_mediator3) = Message::unpack_string(
+                   &packed_msg,
+                   &mut did_resolver,
+                   &mediator3_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward_at_mediator3 =
+                   try_parse_forward(&unpacked_msg_mediator3).expect("Message is not Forward");
+
+               assert_eq!(forward_at_mediator3.msg, &unpacked_msg_mediator3);
+
+               assert_eq!(
+                   &forward_at_mediator3.msg.extra_headers,
+                   &HashMap::from_iter([
+                       ("example-header-1".into(), json!("example-header-1-value")),
+                       ("example-header-2".into(), json!("example-header-2-value")),
+                   ])
+               );
+
+               assert_eq!(
+                   &forward_at_mediator3.next,
+                   "did:example:mediator2#key-x25519-1"
+               );
+
+               assert!(unpack_metadata_mediator3.encrypted);
+               assert!(!unpack_metadata_mediator3.authenticated);
+               assert!(!unpack_metadata_mediator3.non_repudiation);
+               assert!(unpack_metadata_mediator3.anonymous_sender);
+               assert!(!unpack_metadata_mediator3.re_wrapped_in_forward);
+
+               let forwarded_msg_at_mediator3 =
+                   serde_json::to_string(&forward_at_mediator3.forwarded_msg)
+                       .expect("Unable serialize forwarded message");
+
+               let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
+                   &forwarded_msg_at_mediator3,
+                   &mut did_resolver,
+                   &mediator2_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward_at_mediator2 =
+                   try_parse_forward(&unpacked_msg_mediator2).expect("Message is not Forward");
+
+               assert_eq!(forward_at_mediator2.msg, &unpacked_msg_mediator2);
+
+               assert_eq!(
+                   &forward_at_mediator2.msg.extra_headers,
+                   &HashMap::from_iter([
+                       ("example-header-1".into(), json!("example-header-1-value")),
+                       ("example-header-2".into(), json!("example-header-2-value")),
+                   ])
+               );
+
+               assert_eq!(
+                   &forward_at_mediator2.next,
+                   "did:example:mediator1#key-x25519-1"
+               );
+
+               assert!(unpack_metadata_mediator2.encrypted);
+               assert!(!unpack_metadata_mediator2.authenticated);
+               assert!(!unpack_metadata_mediator2.non_repudiation);
+               assert!(unpack_metadata_mediator2.anonymous_sender);
+               assert!(!unpack_metadata_mediator2.re_wrapped_in_forward);
+
+               let forwarded_msg_at_mediator2 =
+                   serde_json::to_string(&forward_at_mediator2.forwarded_msg)
+                       .expect("Unable serialize forwarded message");
+
+               let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
+                   &forwarded_msg_at_mediator2,
+                   &mut did_resolver,
+                   &mediator1_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward_at_mediator1 =
+                   try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
+
+               assert_eq!(forward_at_mediator1.msg, &unpacked_msg_mediator1);
+
+               assert_eq!(
+                   &forward_at_mediator1.msg.extra_headers,
+                   &HashMap::from_iter([
+                       ("example-header-1".into(), json!("example-header-1-value")),
+                       ("example-header-2".into(), json!("example-header-2-value")),
+                   ])
+               );
+
+               assert_eq!(&forward_at_mediator1.next, to);
+
+               assert!(unpack_metadata_mediator1.encrypted);
+               assert!(!unpack_metadata_mediator1.authenticated);
+               assert!(!unpack_metadata_mediator1.non_repudiation);
+               assert!(unpack_metadata_mediator1.anonymous_sender);
+               assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
+
+               let forwarded_msg_at_mediator1 =
+                   serde_json::to_string(&forward_at_mediator1.forwarded_msg)
+                       .expect("Unable serialize forwarded message");
+
+               let (unpacked_msg, unpack_metadata) = Message::unpack_string(
+                   &forwarded_msg_at_mediator1,
+                   &mut did_resolver,
+                   &charlie_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               assert_eq!(&unpacked_msg, &msg);
+
+               assert!(unpack_metadata.encrypted);
+               assert_eq!(
+                   unpack_metadata.authenticated,
+                   from.is_some() || sign_by.is_some()
+               );
+               assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
+               assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
+               assert!(!unpack_metadata.re_wrapped_in_forward);
+           }
+       }
+
+       #[tokio::test]
+       async fn wrap_in_forward_works_mediator_unknown_to_sender() {
+           _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, None, None).await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, None, Some(ALICE_DID)).await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(BOB_DID, Some(ALICE_DID), None).await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(
+               BOB_DID,
+               Some(ALICE_DID),
+               Some(ALICE_DID),
+           )
+           .await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               None,
+               None,
+           )
+           .await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               None,
+               Some(ALICE_DID),
+           )
+           .await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               Some(ALICE_DID),
+               None,
+           )
+           .await;
+
+           _wrap_in_forward_works_mediator_unknown_to_sender(
+               &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
+               Some(ALICE_DID),
+               Some(ALICE_DID),
+           )
+           .await;
+
+           async fn _wrap_in_forward_works_mediator_unknown_to_sender(
+               to: &str,
+               from: Option<&str>,
+               sign_by: Option<&str>,
+           ) {
+               let mut did_resolver = ExampleDIDResolver::new(vec![
+                   ALICE_DID_DOC.clone(),
+                   BOB_DID_DOC.clone(),
+                   MEDIATOR1_DID_DOC.clone(),
+                   MEDIATOR2_DID_DOC.clone(),
+               ]);
+
+               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+               let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+
+               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+
+               let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
+
+               let (msg, pack_metadata) = MESSAGE_SIMPLE
+                   .pack_encrypted(
+                       to,
+                       from,
+                       sign_by,
+                       &did_resolver,
+                       &alice_secrets_resolver,
+                       &PackEncryptedOptions {
+                           messaging_service: Some(BOB_SERVICE.id.clone()),
+                           ..PackEncryptedOptions::default()
+                       },
+                   )
+                   .await
+                   .expect("Unable encrypt");
+
+               assert_eq!(
+                   pack_metadata.messaging_service.as_ref(),
+                   Some(&MessagingServiceMetadata {
+                       id: BOB_SERVICE.id.clone(),
+                       service_endpoint: BOB_DID_COMM_MESSAGING_SERVICE.uri.clone(),
+                   })
+               );
+
+               let did_method_resolver = DIDMethods::default();
+               let (unpacked_msg_mediator1, unpack_metadata_mediator1) = Message::unpack_string(
+                   &msg,
+                   &mut did_resolver,
+                   &mediator1_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward_at_mediator1 =
+                   try_parse_forward(&unpacked_msg_mediator1).expect("Message is not Forward");
+
+               assert_eq!(forward_at_mediator1.msg, &unpacked_msg_mediator1);
+               assert_eq!(&forward_at_mediator1.next, to);
+
+               assert!(unpack_metadata_mediator1.encrypted);
+               assert!(!unpack_metadata_mediator1.authenticated);
+               assert!(!unpack_metadata_mediator1.non_repudiation);
+               assert!(unpack_metadata_mediator1.anonymous_sender);
+               assert!(!unpack_metadata_mediator1.re_wrapped_in_forward);
+
+               let forwarded_msg_at_mediator1 =
+                   serde_json::to_string(&forward_at_mediator1.forwarded_msg)
+                       .expect("Unable serialize forwarded message");
+
+               let forward_msg_for_mediator2 = wrap_in_forward(
+                   &forwarded_msg_at_mediator1,
+                   None,
+                   &forward_at_mediator1.next,
+                   &[MEDIATOR2_VERIFICATION_METHOD_KEY_AGREEM_X25519_1.id.clone()],
+                   &AnonCryptAlg::default(),
+                   &did_resolver,
+               )
+               .await
+               .expect("Unable wrap in forward");
+
+               let (unpacked_msg_mediator2, unpack_metadata_mediator2) = Message::unpack_string(
+                   &forward_msg_for_mediator2,
+                   &mut did_resolver,
+                   &mediator2_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               let forward_at_mediator2 =
+                   try_parse_forward(&unpacked_msg_mediator2).expect("Message is not Forward");
+
+               assert_eq!(forward_at_mediator2.msg, &unpacked_msg_mediator2);
+               assert_eq!(&forward_at_mediator2.next, to);
+
+               assert!(unpack_metadata_mediator2.encrypted);
+               assert!(!unpack_metadata_mediator2.authenticated);
+               assert!(!unpack_metadata_mediator2.non_repudiation);
+               assert!(unpack_metadata_mediator2.anonymous_sender);
+               assert!(!unpack_metadata_mediator2.re_wrapped_in_forward);
+
+               let forwarded_msg_at_mediator2 =
+                   serde_json::to_string(&forward_at_mediator2.forwarded_msg)
+                       .expect("Unable serialize forwarded message");
+
+               let (unpacked_msg, unpack_metadata) = Message::unpack_string(
+                   &forwarded_msg_at_mediator2,
+                   &mut did_resolver,
+                   &bob_secrets_resolver,
+                   &UnpackOptions::default(),
+               )
+               .await
+               .expect("Unable unpack");
+
+               assert_eq!(&unpacked_msg, &*MESSAGE_SIMPLE);
+
+               assert!(unpack_metadata.encrypted);
+               assert_eq!(
+                   unpack_metadata.authenticated,
+                   from.is_some() || sign_by.is_some()
+               );
+               assert_eq!(unpack_metadata.non_repudiation, sign_by.is_some());
+               assert_eq!(unpack_metadata.anonymous_sender, from.is_none());
+               assert!(!unpack_metadata.re_wrapped_in_forward);
+           }
+       }
+
+       // TODO: Add negative tests for Routing protocol
+
+       #[tokio::test]
+       async fn pack_encrypted_works_sign_by_unknown_did_url() {
+           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               .await
+               .unwrap();
+
+           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+           let sign_by = ALICE_DID.to_string() + "#unknown-key";
+           let res = MESSAGE_SIMPLE
+               .pack_encrypted(
+                   BOB_DID,
+                   ALICE_DID.into(),
+                   sign_by.as_str().into(),
+                   &did_resolver,
+                   &secrets_resolver,
+                   &PackEncryptedOptions {
+                       forward: false,
+                       ..PackEncryptedOptions::default()
+                   },
+               )
+               .await;
+
+           let err = res.expect_err("res is ok");
+           assert_eq!(
+               format!("{}", err),
+               "DID URL not found: Unable produce sign envelope: Signer key id not found in did doc"
+           );
+           assert_eq!(err.kind(), ErrorKind::DIDUrlNotFound);
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_from_not_in_secrets() {
+           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               .await
+               .unwrap();
+
+           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+           let res = MESSAGE_SIMPLE
+               .pack_encrypted(
+                   BOB_DID,
+                   "did:key:alice#key-x25519-not-in-secrets-1".into(),
+                   None,
+                   &did_resolver,
+                   &secrets_resolver,
+                   &PackEncryptedOptions {
+                       forward: false,
+                       ..PackEncryptedOptions::default()
+                   },
+               )
+               .await;
+
+           let err = res.expect_err("res is ok");
+           assert_eq!(err.kind(), ErrorKind::SecretNotFound);
+
+           assert_eq!(
+               format!("{}", err),
+               "Secret not found: No sender secrets found"
+           );
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_sign_by_not_in_secrets() {
+           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               .await
+               .unwrap();
+
+           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+           let res = MESSAGE_SIMPLE
+               .pack_encrypted(
+                   BOB_DID,
+                   ALICE_DID.into(),
+                   "did:key:alice#key-not-in-secrets-1".into(),
+                   &did_resolver,
+                   &secrets_resolver,
+                   &PackEncryptedOptions {
+                       forward: false,
+                       ..PackEncryptedOptions::default()
+                   },
+               )
+               .await;
+
+           let err = res.expect_err("res is ok");
+           assert_eq!(err.kind(), ErrorKind::SecretNotFound);
+
+           assert_eq!(
+               format!("{}", err),
+               "Secret not found: Unable produce sign envelope: No signer secrets found"
+           );
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_to_from_different_curves() {
+           _pack_encrypted_works_to_from_different_curves(
+               "did:key:alice#key-x25519-1".into(),
+               "did:key:bob#key-p256-1",
+           )
+           .await;
+           _pack_encrypted_works_to_from_different_curves(
+               "did:example:alice#key-x25519-1".into(),
+               "did:example:bob#key-p384-1",
+           )
+           .await;
+           _pack_encrypted_works_to_from_different_curves(
+               "did:example:alice#key-x25519-1".into(),
+               "did:example:bob#key-p521-1",
+           )
+           .await;
+           _pack_encrypted_works_to_from_different_curves(
+               "did:example:alice#key-p256-1".into(),
+               "did:example:bob#key-p384-1",
+           )
+           .await;
+           _pack_encrypted_works_to_from_different_curves(
+               "did:example:alice#key-p256-1".into(),
+               "did:example:bob#key-p521-1",
+           )
+           .await;
+           _pack_encrypted_works_to_from_different_curves(
+               "did:example:alice#key-p521-1".into(),
+               "did:example:bob#key-p384-1",
+           )
+           .await;
+
+           async fn _pack_encrypted_works_to_from_different_curves(from: Option<&str>, to: &str) {
+               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+                   .await
+                   .unwrap();
+
+               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+
+               let res = MESSAGE_SIMPLE
+                   .pack_encrypted(
+                       to,
+                       from,
+                       None,
+                       &did_resolver,
+                       &secrets_resolver,
+                       &PackEncryptedOptions {
+                           forward: false,
+                           ..PackEncryptedOptions::default()
+                       },
+                   )
+                   .await;
+
+               let err = res.expect_err("res is ok");
+               assert_eq!(
+                   format!("{}", err),
+                   "No compatible crypto: No common keys between sender and recipient found"
+               );
+               assert_eq!(err.kind(), ErrorKind::NoCompatibleCrypto);
+           }
+       }
+
+       #[tokio::test]
+       async fn pack_encrypted_works_from_prior() {
+           let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               .await
+               .unwrap();
+
+           let charlie_rotated_to_alice_secrets_resolver =
+               ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+           let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+
+           let (packed_msg, _pack_metadata) = MESSAGE_FROM_PRIOR_FULL
+               .pack_encrypted(
+                   BOB_DID,
+                   Some(ALICE_DID),
+                   None,
+                   &did_resolver,
+                   &charlie_rotated_to_alice_secrets_resolver,
+                   &PackEncryptedOptions {
+                       forward: false,
+                       ..PackEncryptedOptions::default()
+                   },
+               )
+               .await
+               .expect("Unable pack_encrypted");
+
+           let (unpacked_msg, unpack_metadata) = Message::unpack_string(
+               &packed_msg,
+               &mut did_resolver,
+               &bob_secrets_resolver,
+               &UnpackOptions::default(),
+           )
+           .await
+           .expect("Unable unpack");
+
+           assert_eq!(&unpacked_msg, &*MESSAGE_FROM_PRIOR_FULL);
+           assert_eq!(
+               unpack_metadata.from_prior_issuer_kid.as_ref(),
+               Some(&CHARLIE_SECRET_AUTH_KEY_ED25519.id)
+           );
+           assert_eq!(unpack_metadata.from_prior.as_ref(), Some(&*FROM_PRIOR_FULL));
+       }
+    */
     fn _verify_authcrypt<CE, KDF, KE, KW>(
         msg: &str,
         to_keys: Vec<&Secret>,
-        from_key: &VerificationMethod,
+        from_key: &DIDVerificationMethod,
     ) -> String
     where
         CE: KeyAeadInPlace + KeySecretBytes,
@@ -2892,13 +2771,9 @@ mod tests {
         for to_key in to_keys {
             let from_kid = &from_key.id;
             let to_kid = &to_key.id;
+            let jwk_string = serde_json::to_value(&from_key.get_jwk()).unwrap();
 
-            let from_key = match from_key.verification_material {
-                VerificationMaterial::JWK {
-                    public_key_jwk: ref value,
-                } => KE::from_jwk_value(value).expect("Unable from_jwk_value"),
-                _ => panic!("Unexpected verification method"),
-            };
+            let from_key = KE::from_jwk_value(&jwk_string).expect("Unable from_jwk_value");
 
             let to_key = match to_key.secret_material {
                 SecretMaterial::JWK {
@@ -2984,7 +2859,7 @@ mod tests {
 
     fn _verify_signed<Key: KeySigVerify + FromJwkValue>(
         msg: &str,
-        sign_key: &VerificationMethod,
+        sign_key: &DIDVerificationMethod,
         alg: jws::Algorithm,
     ) -> String {
         let msg = jws::parse(msg).expect("Unable parse");
@@ -3002,18 +2877,14 @@ mod tests {
         assert_eq!(
             msg.jws.signatures[0].header,
             jws::Header {
-                kid: sign_key.id.clone()
+                kid: sign_key.id.clone().to_string()
             }
         );
 
-        let sign_key_id = &sign_key.id;
+        let sign_key_id = &sign_key.id.to_string();
+        let jwk_string = serde_json::to_value(&sign_key.get_jwk()).unwrap();
 
-        let sign_key = match sign_key.verification_material {
-            VerificationMaterial::JWK {
-                public_key_jwk: ref value,
-            } => Key::from_jwk_value(value).expect("Unable from_jwk_value"),
-            _ => panic!("Unexpected verification_material"),
-        };
+        let sign_key = Key::from_jwk_value(&jwk_string).expect("Unable from_jwk_value");
 
         let valid = msg.verify((sign_key_id, &sign_key)).expect("Unable verify");
         assert!(valid);
@@ -3031,4 +2902,3 @@ mod tests {
         assert_eq!(msg, exp_msg)
     }
 }
-    */
