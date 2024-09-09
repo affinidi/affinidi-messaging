@@ -90,6 +90,11 @@ jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIE
 ### Example: "https://affinidi.com,https://example2.com"
 # cors_allow_origin = "${CORS_ALLOW_ORIGIN:https://affinidi.com}"
 
+### approximate maximum amount of crypto operations per one message
+### it is used to protect the mediator from DoS type attacts.
+### Default: 1000
+crypto_operations_per_message_limit = "${CRYPTO_OPERATIONS_PER_MESSAGE_LIMIT:1000}"
+
 [streaming]
 ### enabled: If true, can live stream messages to subscribed recipients via WebSockets
 ### Default: true
