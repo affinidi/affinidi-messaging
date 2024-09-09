@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "affinidi-messaging-sdk",
+    "affinidi-messaging-mediator",
+    "affinidi-messaging-processor",
+    "affinidi-messaging-didcomm",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Glenn Gore <glenn@affinidi.com>"]
+description = "Affinidi Trust Network - Affinidi Trusted Messaging"
+readme = "README.md"
+homepage = "https://affinidi.com/"
+keywords = ["did", "ssi", "ATM"]
+publish = false
+license = "Apache-2.0"
+
+[workspace.dependencies]
+affinidi-did-resolver-cache-sdk = { version = "0.1.5" }
+did-peer = { version = "0.1.5" }
+clap = { version = "4.5", features = ["derive"] }

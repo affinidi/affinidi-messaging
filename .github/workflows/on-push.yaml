@@ -1,0 +1,15 @@
+name: on-push
+
+on:
+  push:
+    branches:
+      - main
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+
+jobs:
+  rust-workflow:
+    uses: affinidi/pipeline-rust/.github/workflows/on-push.yaml@main
+    secrets: inherit
