@@ -286,10 +286,8 @@ pub struct MessagingServiceMetadata {
 #[cfg(test)]
 mod tests {
     use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-    use base64::{engine::general_purpose, prelude::*};
-    use bs58;
+    use base64::prelude::*;
     use ssi::dids::document::DIDVerificationMethod;
-    use std::{collections::HashMap, iter::FromIterator};
 
     use askar_crypto::{
         alg::{
@@ -306,17 +304,15 @@ mod tests {
         sign::KeySigVerify,
     };
 
-    use serde_json::{json, Value};
+    use serde_json::Value;
 
     use crate::{
         algorithms::AnonCryptAlg,
-        document::{did_or_url, DIDCommVerificationMethodExt},
-        error::{err_msg, ErrorKind},
+        document::DIDCommVerificationMethodExt,
+        error::ErrorKind,
         jwe,
         jwk::{FromJwkValue, ToJwkValue},
         jws,
-        message::MessagingServiceMetadata,
-        protocols::routing::{try_parse_forward, wrap_in_forward},
         secrets::{resolvers::ExampleSecretsResolver, Secret, SecretMaterial},
         test_vectors::{
             ALICE_DID, ALICE_SECRETS, BOB_DID, BOB_SECRETS, BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
@@ -327,7 +323,7 @@ mod tests {
             PLAINTEXT_MSG_SIMPLE,
         },
         utils::crypto::{JoseKDF, KeyWrap},
-        Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackOptions,
+        PackEncryptedMetadata, PackEncryptedOptions,
     };
 
     #[tokio::test]
