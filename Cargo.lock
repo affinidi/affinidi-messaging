@@ -73,9 +73,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "531c79d4e40dc6eaa93af525d014144d9e89664ffd7076f482cb4d6f6bfc3f0f"
+checksum = "71015a9d0142ab7a667deca80e852ae199ea746ed0130d0e044e6bc5b7187479"
 dependencies = [
  "blake2",
  "did-peer",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-mediator"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -167,11 +167,11 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processing"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -2328,9 +2328,9 @@ dependencies = [
 
 [[package]]
 name = "did-peer"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc19c18a7b150ed1abb9080b66a7640b58c392672170326079e66a1974b9db5"
+checksum = "15fb7091947df955d19155860048ac93470f1fc4e6545451e7723dd0936034a3"
 dependencies = [
  "base64 0.22.1",
  "iref",

@@ -11,11 +11,11 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
+affinidi-messaging-sdk.workspace = true
+affinidi-messaging-didcomm.workspace = true
+affinidi-did-resolver-cache-sdk.workspace = true
 async-convert = "1"
 async-trait = "0.1"
-affinidi-messaging-sdk = { path = "../affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { path = "../affinidi-messaging-didcomm" }
-affinidi-did-resolver-cache-sdk.workspace = true
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.29"
 aws-sdk-memorydb = "1.26.0"
