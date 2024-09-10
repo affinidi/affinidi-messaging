@@ -40,10 +40,6 @@ ws_size_limit = "${WS_SIZE_LIMIT:10485760}"
 ### Default: redis://127.0.0.1/
 database_url = "${REDIS_URL:redis://127.0.0.1/}"
 
-### lua_scripts: path to lua scripts used in Redis
-### Default: file://../affinidi-messaging-processor/redis-functions/atm-functions.lua
-lua_scripts = "${MEDIATOR_LUA_SCRIPTS:file://../affinidi-messaging-processor/redis-functions/atm-functions.lua}"
-
 ### database_pool_size: Number of connections to the database
 ### Default: 10
 database_pool_size = "${DATABASE_POOL_SIZE:10}"
