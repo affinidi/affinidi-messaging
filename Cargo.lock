@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -119,34 +119,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "affinidi-messaging-didcomm"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62951f87ea70b6ccfaa2b6afa6bbfa2d4c595c24bed29faa9e2de5249e26f7bf"
-dependencies = [
- "affinidi-did-resolver-cache-sdk",
- "anyhow",
- "askar-crypto",
- "async-trait",
- "base64 0.22.1",
- "bs58 0.5.1",
- "serde",
- "serde-enum-str",
- "serde_json",
- "sha2 0.10.8",
- "ssi",
- "thiserror",
- "tracing",
- "uuid",
- "varint",
-]
-
-[[package]]
 name = "affinidi-messaging-mediator"
-version = "0.2.2"
+version = "0.7.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
- "affinidi-messaging-didcomm 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "affinidi-messaging-didcomm",
  "affinidi-messaging-sdk",
  "async-convert",
  "async-trait",
@@ -190,14 +167,14 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processing"
-version = "0.1.1"
+version = "0.7.0"
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.1.4"
+version = "0.7.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
- "affinidi-messaging-didcomm 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "affinidi-messaging-didcomm",
  "async-trait",
  "base64 0.22.1",
  "clap 4.5.17",

@@ -8,7 +8,7 @@ harness = false
 
 [package]
 name = 'affinidi-messaging-didcomm'
-version = '0.6.0'
+version.workspace = true
 authors = [
     'Vyacheslav Gudkov <vyacheslav.gudkov@dsr-corporation.com>',
     'Glenn Gore <glenn@affinidi.com>',

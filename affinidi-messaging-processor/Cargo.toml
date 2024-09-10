@@ -1,6 +1,6 @@
 [package]
 name = "affinidi-messaging-processing"
-version = "0.1.1"
+version.workspace = true
 description = "Affinidi Messaging Processor"
 edition.workspace = true
 authors.workspace = true
