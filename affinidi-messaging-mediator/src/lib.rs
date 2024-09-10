@@ -22,6 +22,7 @@ pub mod database;
 pub mod handlers;
 pub mod messages;
 pub mod resolvers;
+pub mod server;
 pub mod tasks;
 
 #[derive(Clone)]

@@ -8,6 +8,8 @@ use crate::common::{config::Config, errors::MediatorError};
 
 use super::DatabaseHandler;
 
+static LUA_SCRIPTS: &[u8] = include_bytes!("atm-functions.lua");
+
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
         // Creates initial pool Configuration from the redis database URL
@@ -86,7 +88,7 @@ impl DatabaseHandler {
             let function_load: Result<String, deadpool_redis::redis::RedisError> =
                 deadpool_redis::redis::cmd("FUNCTION")
                     .arg("LOAD")
-                    .arg(config.lua_scripts.clone())
+                    .arg(LUA_SCRIPTS.clone())
                     .query_async(&mut conn)
                     .await;
             match function_load {
