@@ -140,7 +140,7 @@ Response from `send_ping()` is:
 - `enum Folder` holds the folder types
 
 ```rust
-aync fn list_messages(did: &str, folder: Folder) -> Result<MessageList, ATMError>
+async fn list_messages(did: &str, folder: Folder) -> Result<MessageList, ATMError>
 // Retrieves a list of messages for the specified DID (you must own this DID)
 // - did    : DID that we want to retrieve messages from (must have authenticated as this DID)
 // - folder : Folder enum of either Inbox or Outbox
