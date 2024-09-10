@@ -1,12 +1,12 @@
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use crate::{
     database::DatabaseHandler,
     handlers::{application_routes, health_checker_handler},
     init,
+    tasks::statistics::statistics,
     tasks::websocket_streaming::StreamingTask,
     SharedData,
-    tasks::statistics::statistics,
 };
+use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use http::Method;
