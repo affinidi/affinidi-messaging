@@ -1,9 +1,6 @@
 name: on-push
 
 on:
-  push:
-    branches:
-      - main
   pull_request_target:
     types:
       - opened
@@ -11,7 +8,7 @@ on:
 
 jobs:
   rust-workflow:
-    uses: affinidi/pipeline-rust/.github/workflows/on-push.yaml@main
+    uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@main
     secrets: inherit
     with:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
