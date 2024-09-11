@@ -1,4 +1,4 @@
-name: on-push
+name: checks
 
 on:
   pull_request_target:
@@ -12,4 +12,3 @@ jobs:
     secrets: inherit
     with:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
-      publish_dry_run: false
