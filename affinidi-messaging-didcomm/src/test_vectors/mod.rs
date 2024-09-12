@@ -14,3 +14,7 @@ pub use from_prior::*;
 pub use from_prior_jwt::*;
 
 pub use secrets::*;
+
+pub use message::*;
+
+pub use plaintext::*;

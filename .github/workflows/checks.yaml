@@ -5,9 +5,9 @@ on:
     types:
       - opened
       - synchronize
-
+      
 jobs:
-  rust-workflow:
+  rust-pipeline:
     uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@main
     secrets: inherit
     with:
