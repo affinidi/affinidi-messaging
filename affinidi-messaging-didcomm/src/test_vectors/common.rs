@@ -1,8 +1,8 @@
 use base64::prelude::*;
 use serde_json::{Map, Value};
 
-pub const ALICE_DID: &str = "did:example:alice";
-pub const BOB_DID: &str = "did:example:bob";
+pub const ALICE_DID: &str = "did:key:alice";
+pub const BOB_DID: &str = "did:key:z6Mki7K3d9U5tH6P8x9g93Dh7LZ6HF1JSF3ECoZZ2PgtMoxH";
 pub const CHARLIE_DID: &str = "did:key:z6MkhKzjHrZKpxHqmW9x1BVxgKZ9n7N1WXE3jTtJC26PYASp";
 
 pub fn update_field(msg: &str, field: &str, value: &str) -> String {
