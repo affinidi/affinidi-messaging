@@ -88,7 +88,7 @@ impl DatabaseHandler {
             let function_load: Result<String, deadpool_redis::redis::RedisError> =
                 deadpool_redis::redis::cmd("FUNCTION")
                     .arg("LOAD")
-                    .arg(LUA_SCRIPTS.clone())
+                    .arg(LUA_SCRIPTS)
                     .query_async(&mut conn)
                     .await;
             match function_load {

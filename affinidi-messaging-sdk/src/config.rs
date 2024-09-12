@@ -209,7 +209,7 @@ impl ConfigBuilder {
             atm_url
         } else {
             // TODO: Change this to the production URL
-            "https://localhost:7037/atm/v1".to_string()
+            "https://localhost:7037".to_string()
         };
 
         // convert the ATM API URL to a WebSocket URL

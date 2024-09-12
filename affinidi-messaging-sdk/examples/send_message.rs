@@ -19,9 +19,10 @@ use uuid::Uuid;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// network address if running in network mode (https://localhost:7037/atm/v1)
     #[arg(short, long)]
-    network_address: Option<String>,
+    network_address: String,
+    #[arg(short, long)]
+    ssl_certificates: String,
     #[arg(short, long)]
     mediator_did: String,
 }
@@ -68,17 +69,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_atm_did(atm_did)
         .with_websocket_disabled();
 
-    if let Some(address) = &args.network_address {
-        println!("Running in network mode with address: {}", address);
-        config = config
-            .with_ssl_certificates(&mut vec!["./certs/mediator-key.pem".into()])
-            .with_atm_api(address);
-    } else {
-        println!("Running in local mode.");
-        config = config.with_ssl_certificates(&mut vec![
-            "../affinidi-messaging-mediator/conf/keys/client.chain".into(),
-        ]);
-    }
+    println!("Running with address: {}", &args.network_address);
+    config = config
+        .with_atm_api(&args.network_address)
+        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()]);
 
     // Create a new ATM Client
     let mut atm = ATM::new(config.build()?).await?;

@@ -12,7 +12,7 @@ impl<'c> ATM<'c> {
         let well_known_did_atm_api = format!("{}/.well-known/did", self.config.clone().atm_api);
         debug!(
             "API well_known_did_api({})",
-            format!("{}/.well-known/did", well_known_did_atm_api)
+            well_known_did_atm_api
         );
 
         let res = self

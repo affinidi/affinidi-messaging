@@ -24,6 +24,7 @@ use tracing_subscriber::filter::LevelFilter;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
+    pub api_prefix: String,
     pub http_size_limit: String,
     pub ws_size_limit: String,
 }
@@ -115,6 +116,7 @@ pub struct Config {
     pub database_url: String,
     pub database_pool_size: usize,
     pub database_timeout: u32,
+    pub api_prefix: String,
     pub http_size_limit: u32,
     pub ws_size_limit: u32,
     pub max_message_size: u32,
@@ -161,6 +163,7 @@ impl fmt::Debug for Config {
             .field("streaming_uuid", &self.streaming_uuid)
             .field("DID Resolver config", &self.did_resolver_config)
             .field("to_recipients_limit", &self.to_recipients_limit)
+            .field("api_prefix", &self.api_prefix)
             .field("http_size_limit", &self.http_size_limit)
             .field("ws_size_limit", &self.ws_size_limit)
             .field(
@@ -206,6 +209,7 @@ impl Default for Config {
             to_recipients_limit: 100,
             cors_allow_origin: CorsLayer::new().allow_origin(Any),
             ws_size_limit: 10485760,
+            api_prefix: "/mediator/v1/".into(),
             http_size_limit: 10485760,
             crypto_operations_per_message_limit: 1_000,
             to_keys_per_recipient_limit: 100,
@@ -251,6 +255,7 @@ impl TryFrom<ConfigRaw> for Config {
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
             to_recipients_limit: raw.other.to_recipients_limit.parse().unwrap_or(100),
+            api_prefix: raw.server.api_prefix,
             http_size_limit: raw.server.http_size_limit.parse().unwrap_or(10485760),
             ws_size_limit: raw.server.ws_size_limit.parse().unwrap_or(10485760),
             crypto_operations_per_message_limit: raw
