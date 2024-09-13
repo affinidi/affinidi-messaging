@@ -20,16 +20,32 @@ export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug
 
 # no "did://" prefix for examples
 export MEDIATOR_DID=<MEDIATOR_DID>
-
-cargo run --example message_pickup -- --mediator-did $MEDIATOR_DID
+# default, local mediator endpoint
+export MEDIATOR_ENDPOINT=https://localhost:7037/mediator/v1
+# relative path to local mediator cert file
+export MEDIATOR_SSL_CERTIFICATES="../affinidi-messaging-mediator/conf/keys/client.chain"
 
 # send a trust ping
-cargo run --example ping -- --mediator-did $MEDIATOR_DID
+cargo run --example ping -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --mediator-did $MEDIATOR_DID
+
+cargo run --example message_pickup -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --mediator-did $MEDIATOR_DID
 
 # send message to another DID
-cargo run --example send_message_to_me -- --mediator-did $MEDIATOR_DID
+cargo run --example send_message_to_me -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --mediator-did $MEDIATOR_DID
 
-cargo run --example send_message -- --mediator-did $MEDIATOR_DID
+cargo run --example send_message -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --mediator-did $MEDIATOR_DID
 ```
 
 ## WebSocket and HTTPS support
@@ -50,7 +66,7 @@ A custom Websocket URL can be provided via `ConfigBuilder::with_atm_websocket_ap
 
 **_NOTE:_** Default action is to take the `ConfigBuilder::with_atm_api()` and convert to a valid WebSocket address
 
-    E.g. `https://atm.affinidi.com/atm/v1` would become `wss://atm.affinidi.com/atm/v1/ws`
+    E.g. `https://localhost:7037/mediator/v1` would become `wss://localhost:7037/mediator/v1/ws`
 
 While you can disable the WebSocket, you can also start and close the WebSocket manually via:
 

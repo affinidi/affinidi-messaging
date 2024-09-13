@@ -25,6 +25,10 @@ mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzU
 mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
 
 [server]
+### api_prefix: API prefix
+### Default: /mediator/v1/
+api_prefix = "/"
+
 ### http_size_limit: Maximum size of a http request payload in bytes
 ### Default: 10485760 (10MB)
 ### It is recommended to use infrastructure level limitation instead of application level limitations
