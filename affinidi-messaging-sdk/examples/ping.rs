@@ -83,7 +83,7 @@ async fn main() -> Result<(), ATMError> {
     let start = SystemTime::now();
 
     let well_know_res = atm.well_known_did_json().await?;
-    println!("did resolved: {}", well_know_res);
+    println!("did resolved: {:?}", well_know_res.data);
 
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle

@@ -21,7 +21,7 @@ export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug,send_mes
 # no "did://" prefix for examples
 export MEDIATOR_DID=<MEDIATOR_DID>
 # default, local mediator endpoint
-export MEDIATOR_ENDPOINT=https://localhost:7037
+export MEDIATOR_ENDPOINT=https://localhost:7037/mediator/v1
 # relative path to local mediator cert file
 export MEDIATOR_TLS_CERTIFICATES="../affinidi-messaging-mediator/conf/keys/client.chain"
 
@@ -45,7 +45,7 @@ cargo run --example send_message_to_me -- \
 # send a message to another recipient Bob
 cargo run --example send_message_to_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
 
 # pickup a message from another sender Alice
