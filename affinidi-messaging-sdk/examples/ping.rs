@@ -32,6 +32,10 @@ async fn main() -> Result<(), ATMError> {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
+    info!("Running with address: {}", &args.network_address);
+    info!("Running with mediator_did: {}", &args.mediator_did);
+    info!("Running with ssl_certificates: {}", &args.ssl_certificates);
+
     let my_did = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
     // Signing and verification key
     let v1 = json!({
@@ -63,7 +67,6 @@ async fn main() -> Result<(), ATMError> {
         .with_websocket_disabled()
         .with_external_did_resolver(&did_resolver);
 
-    println!("Running with address: {}", &args.network_address);
     config = config
         .with_atm_api(&args.network_address)
         .with_ssl_certificates(&mut vec![args.ssl_certificates.into()]);
@@ -80,7 +83,7 @@ async fn main() -> Result<(), ATMError> {
     let start = SystemTime::now();
 
     let well_know_res = atm.well_known_did_json().await?;
-    println!("DID: {}", well_know_res);
+    println!("did resolved: {}", well_know_res);
 
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle
