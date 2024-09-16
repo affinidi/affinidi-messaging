@@ -9,9 +9,9 @@ use affinidi_messaging_sdk::{
 };
 use clap::Parser;
 use serde_json::json;
-use tracing::{info,debug};
 use std::error::Error;
 use std::time::SystemTime;
+use tracing::{debug, info};
 use tracing_subscriber::filter;
 use uuid::Uuid;
 
