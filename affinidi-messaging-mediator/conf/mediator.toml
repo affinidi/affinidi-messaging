@@ -27,7 +27,7 @@ mediator_secrets = "${MEDIATOR_SECRETS:file://./conf/secrets.json}"
 [server]
 ### api_prefix: API prefix
 ### Default: /mediator/v1/
-api_prefix = "/"
+api_prefix = "${API_PREFIX:/mediator/v1/}"
 
 ### http_size_limit: Maximum size of a http request payload in bytes
 ### Default: 10485760 (10MB)
