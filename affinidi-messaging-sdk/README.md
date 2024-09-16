@@ -49,7 +49,7 @@ cargo run --example send_message_to_bob -- \
   --mediator-did $MEDIATOR_DID
 
 # pickup a message from another sender Alice
-cargo run --example send_message_to_bob -- \
+cargo run --example fetch_message_as_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
   --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
