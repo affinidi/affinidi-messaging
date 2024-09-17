@@ -1,7 +1,6 @@
 use affinidi_messaging_sdk::{config::Config, conversions::secret_from_str, errors::ATMError, ATM};
 use clap::{command, Parser};
 use serde_json::{json, Value};
-use std::error::Error;
 use tracing::info;
 use tracing_subscriber::filter;
 
