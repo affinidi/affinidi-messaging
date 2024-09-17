@@ -9,7 +9,6 @@ pub mod list;
 pub mod pack;
 pub mod sending;
 pub mod unpack;
-pub mod well_known_did;
 
 /// Generic response structure for all responses from the ATM API
 #[derive(Serialize, Deserialize, Debug)]

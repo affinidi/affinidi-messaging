@@ -21,6 +21,7 @@ pub mod conversions;
 pub mod errors;
 pub mod messages;
 pub mod protocols;
+pub mod public;
 mod resolvers;
 pub mod transports;
 

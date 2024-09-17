@@ -4,7 +4,7 @@ use tracing::{debug, span, Level};
 impl<'c> ATM<'c> {
     /// Returns a list of messages that are stored in the ATM
     /// - messages : List of message IDs to retrieve
-    pub async fn well_known_did_json(&mut self) -> Result<SuccessResponse<String>, ATMError> {
+    pub async fn well_known_did_json(&mut self) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did_json").entered();
 
         debug!("Sending well_known_did request");
@@ -35,6 +35,7 @@ impl<'c> ATM<'c> {
         let body = serde_json::from_str::<SuccessResponse<String>>(&body)
             .ok()
             .unwrap();
+
         if !status.is_success() {
             return Err(ATMError::TransportError(format!(
                 "Status not successful. status({}), response({:?})",
@@ -42,8 +43,14 @@ impl<'c> ATM<'c> {
             )));
         }
 
-        debug!("API response: body({:?})", body);
+        let did = if let Some(did) = body.data {
+            did
+        } else {
+            return Err(ATMError::TransportError("No did found".to_string()));
+        };
 
-        Ok(body)
+        debug!("API response: did({})", did);
+
+        Ok(did)
     }
 }
