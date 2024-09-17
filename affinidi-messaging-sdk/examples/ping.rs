@@ -82,8 +82,8 @@ async fn main() -> Result<(), ATMError> {
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();
 
-    let well_know_res = atm.well_known_did_json().await?;
-    println!("did resolved: {:?}", well_know_res.data);
+    let well_know_did = atm.well_known_did().await?;
+    println!("did resolved: {:?}", well_know_did);
 
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle

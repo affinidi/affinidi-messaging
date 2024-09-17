@@ -47,6 +47,7 @@ impl TrustPing {
             "Pinging {}, signed?({}) response_expected?({})",
             to_did, signed, expect_response
         );
+        let (my_did, _) = atm.dids()?;
 
         // If an anonymous ping is being sent, we should ensure that expect_response is false
         let expect_response = if !signed && expect_response {
@@ -72,8 +73,8 @@ impl TrustPing {
             // Can support anonymous pings
             None
         } else {
-            msg = msg.from(atm.config.my_did.clone());
-            Some(atm.config.my_did.clone())
+            msg = msg.from(my_did.clone());
+            Some(my_did.clone())
         };
         let msg = msg.created_time(now).expires_time(now + 300).finalize();
         let mut msg_info = TrustPingSent {

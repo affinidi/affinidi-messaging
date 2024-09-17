@@ -28,12 +28,14 @@ impl<'c> ATM<'c> {
         let _span = span!(Level::DEBUG, "authenticate",);
         async move {
             debug!("Retrieving authentication challenge...");
+
+            let (my_did, atm_did) = self.dids()?;
             // Step 1. Get the challenge
             let res = self
                 .client
                 .post(format!("{}/authenticate/challenge", self.config.atm_api))
                 .header("Content-Type", "application/json")
-                .body(format!("{{\"did\": \"{}\"}}", self.config.my_did).to_string())
+                .body(format!("{{\"did\": \"{}\"}}", my_did).to_string())
                 .send()
                 .await
                 .map_err(|e| {
@@ -71,15 +73,14 @@ impl<'c> ATM<'c> {
                 ));
             };
 
-            let auth_response =
-                self._create_auth_challenge_response(&self.config.atm_did, challenge);
+            let auth_response = self._create_auth_challenge_response(challenge)?;
             debug!("Auth response message:\n{:#?}", auth_response);
 
             let (auth_msg, _) = auth_response
                 .pack_encrypted(
-                    &self.config.atm_did,
-                    Some(&self.config.my_did),
-                    Some(&self.config.my_did),
+                    atm_did,
+                    Some(my_did),
+                    Some(my_did),
                     &self.did_resolver,
                     &self.secrets_resolver,
                     &PackEncryptedOptions::default(),
@@ -158,22 +159,22 @@ impl<'c> ATM<'c> {
     /// - This message will expire after 60 seconds
     fn _create_auth_challenge_response(
         &self,
-        atm_did: &str,
         body: &AuthenticationChallenge,
-    ) -> Message {
+    ) -> Result<Message, ATMError> {
+        let (my_did, atm_did) = self.dids()?;
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        Message::build(
+        Ok(Message::build(
             Uuid::new_v4().into(),
             "https://affinidi.com/atm/1.0/authenticate".to_owned(),
             json!(body),
         )
         .to(atm_did.to_owned())
-        .from(self.config.my_did.to_owned())
+        .from(my_did.to_owned())
         .created_time(now)
         .expires_time(now + 60)
-        .finalize()
+        .finalize())
     }
 }

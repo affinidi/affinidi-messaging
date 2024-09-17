@@ -4,8 +4,8 @@ use tracing::{debug, span, Level};
 impl<'c> ATM<'c> {
     /// Returns a list of messages that are stored in the ATM
     /// - messages : List of message IDs to retrieve
-    pub async fn well_known_did_json(&mut self) -> Result<String, ATMError> {
-        let _span = span!(Level::DEBUG, "well_known_did_json").entered();
+    pub async fn well_known_did(&mut self) -> Result<String, ATMError> {
+        let _span = span!(Level::DEBUG, "well_known_did").entered();
 
         debug!("Sending well_known_did request");
 

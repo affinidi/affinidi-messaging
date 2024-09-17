@@ -15,11 +15,11 @@ use tracing::error;
 /// ```
 #[derive(Clone)]
 pub struct Config<'a> {
-    pub(crate) my_did: String,
+    pub(crate) my_did: Option<String>,
     pub(crate) ssl_certificates: Vec<CertificateDer<'a>>,
     pub(crate) atm_api: String,
     pub(crate) atm_api_ws: String,
-    pub(crate) atm_did: String,
+    pub(crate) atm_did: Option<String>,
     pub(crate) ssl_only: bool,
     pub(crate) ws_enabled: bool,
     pub(crate) fetch_cache_limit_count: u32,
@@ -197,14 +197,6 @@ impl ConfigBuilder {
             ));
         }
 
-        let my_did = if let Some(my_did) = self.my_did {
-            my_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide a DID for the SDK, used for authentication!".to_owned(),
-            ));
-        };
-
         let atm_api = if let Some(atm_url) = self.atm_api {
             atm_url
         } else {
@@ -225,20 +217,12 @@ impl ConfigBuilder {
             ));
         };
 
-        let atm_did = if let Some(atm_did) = self.atm_did {
-            atm_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide the DID for the ATM service!".to_owned(),
-            ));
-        };
-
         Ok(Config {
             ssl_certificates: certs,
-            my_did,
+            my_did: self.my_did,
             atm_api,
             atm_api_ws,
-            atm_did,
+            atm_did: self.atm_did,
             ssl_only: self.ssl_only,
             ws_enabled: self.ws_enabled,
             fetch_cache_limit_count: self.fetch_cache_limit_count,
