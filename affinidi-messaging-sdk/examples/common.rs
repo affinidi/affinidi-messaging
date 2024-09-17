@@ -124,3 +124,8 @@ pub async fn configure_alice_atm() -> Result<ConfigureAtmResult, ATMError> {
 pub async fn configure_bob_atm() -> Result<ConfigureAtmResult, ATMError> {
     configure_atm(bob_configuration()).await
 }
+
+// to avoid: error[E0601]: `main` function not found in crate `common`
+fn main() {
+    info!("Please use examples for check affinidi-messaging-sdk functionality.");
+}
