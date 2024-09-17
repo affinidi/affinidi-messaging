@@ -80,7 +80,6 @@ pub async fn configure_atm(
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
     info!("Running with address: {}", &args.network_address);
-    // info!("Running with mediator_did: {}", &args.mediator_did);
     info!("Running with ssl_certificates: {}", &args.ssl_certificates);
 
     let public_config_builder = Config::builder()
