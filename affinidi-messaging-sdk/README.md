@@ -16,7 +16,7 @@ Use `<MEDIATOR_DID>` from [affinidi-messaging-mediator - Running affinidi-messag
 
 ```bash
 # enable logging for examples,
-export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug
+export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug,send_message_to_me=debug,send_message_to_bob=debug,fetch_message_as_bob=debug
 
 # no "did://" prefix for examples
 export MEDIATOR_DID=<MEDIATOR_DID>
@@ -36,13 +36,20 @@ cargo run --example message_pickup -- \
   --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
 
-# send message to another DID
+# send a message to the same recipient as sender
 cargo run --example send_message_to_me -- \
   --network-address $MEDIATOR_ENDPOINT \
   --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
 
-cargo run --example send_message -- \
+# send a message to another recipient Bob
+cargo run --example send_message_to_bob -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
+  --mediator-did $MEDIATOR_DID
+
+# pickup a message from another sender Alice
+cargo run --example fetch_message_as_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
   --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
