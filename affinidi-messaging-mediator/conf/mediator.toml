@@ -1,6 +1,6 @@
 ### log_level: trace debug info warn error
 ### default: info
-log_level = "info"
+log_level = "debug"
 
 ### listen_address: <ip_address>:<tcp_port> that this service will listen on.
 ### Default: 0.0.0.0:7037
