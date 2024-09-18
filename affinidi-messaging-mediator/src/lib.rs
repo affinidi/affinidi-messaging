@@ -79,11 +79,12 @@ pub async fn init(
                 LevelFilter::INFO
             }
         };
+        event!(Level::WARN, "Log level: {}", level);
         reload_handle
             .unwrap()
             .modify(|filter| *filter = level)
             .map_err(|e| MediatorError::InternalError("NA".into(), e.to_string()))?;
-        event!(Level::INFO, "Log level set to ({})", config.log_level);
+        event!(Level::WARN, "Log level set to ({})", config.log_level);
     }
 
     match <common::config::Config as async_convert::TryFrom<ConfigRaw>>::try_from(config).await {

@@ -25,7 +25,7 @@ pub async fn start() {
         .with(filter)
         .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
         .init();
-
+    event!(Level::WARN, "Starting mediator");
     if ansi {
         event!(
             Level::INFO,
