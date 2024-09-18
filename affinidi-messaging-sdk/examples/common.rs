@@ -17,8 +17,6 @@ struct Args {
     network_address: String,
     #[arg(short, long)]
     ssl_certificates: String,
-    #[arg(short, long)]
-    mediator_did: String,
 }
 
 pub struct ConfigureAtmResult {
@@ -82,23 +80,26 @@ pub async fn configure_atm(
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
     info!("Running with address: {}", &args.network_address);
-    info!("Running with mediator_did: {}", &args.mediator_did);
     info!("Running with ssl_certificates: {}", &args.ssl_certificates);
 
-    let atm_did = &args.mediator_did;
-
-    // TODO: in the future we likely want to pull this from the DID itself
-    let mut config = Config::builder()
-        .with_my_did(&example_configuration.did)
-        .with_atm_did(atm_did)
+    let public_config_builder = Config::builder()
+        .with_atm_api(&args.network_address)
+        .with_ssl_certificates(&mut vec![args.ssl_certificates.clone().into()])
         .with_websocket_disabled();
 
-    config = config
+    let mut public_atm = ATM::new(public_config_builder.build()?).await?;
+
+    let atm_did = public_atm.well_known_did().await?;
+
+    let config_builder = Config::builder()
         .with_atm_api(&args.network_address)
-        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()]);
+        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()])
+        .with_websocket_disabled()
+        .with_my_did(&example_configuration.did)
+        .with_atm_did(&atm_did);
 
     // Create a new ATM Client
-    let mut atm = ATM::new(config.build()?).await?;
+    let mut atm = ATM::new(config_builder.build()?).await?;
 
     // Add our secrets to ATM Client - stays local.
     atm.add_secret(secret_from_str(

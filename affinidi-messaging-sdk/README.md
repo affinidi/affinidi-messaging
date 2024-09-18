@@ -39,20 +39,17 @@ cargo run --example message_pickup -- \
 # send a message to the same recipient as sender
 cargo run --example send_message_to_me -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES 
 
 # send a message to another recipient Bob
 cargo run --example send_message_to_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
 
 # pickup a message from another sender Alice
 cargo run --example fetch_message_as_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
 ```
 
 ## WebSocket and HTTPS support
