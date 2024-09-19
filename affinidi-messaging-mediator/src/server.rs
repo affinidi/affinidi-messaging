@@ -21,10 +21,10 @@ use tracing_subscriber::{
 pub async fn start() {
     // setup logging/tracing framework
     let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
-    let (_, reload_handle) = reload::Layer::new(filter);
+    let (filter, reload_handle) = reload::Layer::new(filter);
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env())
+        .with(filter)
         .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
         .init();
 
