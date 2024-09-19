@@ -24,9 +24,6 @@ allow = [
     "Unlicense",
     "Unicode-DFS-2016",
     "Zlib",
-    "OpenSSL",
-    "MPL-2.0",
-    "W3C-20150513",
 # As stated here https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html#spdx-identifiers
 # 3.11 versions of SPDX License List was used and below licenses are not included there.
 # They are commented to avoid "[license-not-encountered]" warnings.
@@ -46,12 +43,16 @@ allow = [
 #    "UPL-1.0",
 #    "NCSA",
 #    "AFL-2.1",
-#    "ISC",
 ]
 
 exceptions = [
     { allow = ["OpenSSL"], crate = "ring" },
-    { allow = ["CC-BY-SA-3.0"], crate = "ssi-contexts" },
+    { allow = ["OpenSSL"], crate = "aws-lc-sys" },
+    { allow = ["MPL-2.0"], crate = "bitmaps" },
+    { allow = ["MPL-2.0", "W3C-20150513", "CC-BY-SA-3.0"], crate = "ssi-contexts" },
+    { allow = ["MPL-2.0"], crate = "im" },
+    { allow = ["MPL-2.0"], crate = "webpki-roots" },
+    { allow = ["CC-BY-SA-3.0", "MPL-2.0"], crate = "sized-chunks" },
 ]
 
 # Sigh
