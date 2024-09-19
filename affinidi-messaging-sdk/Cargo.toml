@@ -35,10 +35,7 @@ tokio-stream = "0.1"
 tokio-tungstenite = { version = "0.23.0", features = [
     "rustls-tls-native-roots",
 ] }
-tracing = { version = "0.1", features = [
-    "max_level_debug",
-    "release_max_level_info",
-] }
+tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
