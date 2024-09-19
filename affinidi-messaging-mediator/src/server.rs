@@ -14,9 +14,7 @@ use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{event, Level};
-use tracing_subscriber::{
-    filter, layer::SubscriberExt, reload, util::SubscriberInitExt, EnvFilter,
-};
+use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 pub async fn start() {
     // setup logging/tracing framework
@@ -25,14 +23,14 @@ pub async fn start() {
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
         .with(filter)
-        .with(EnvFilter::from_default_env())
+        // .with(EnvFilter::from_default_env())
         .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
         .init();
 
-    event!(Level::WARN, "Starting Mediator Warn");
-    event!(Level::DEBUG, "Starting Mediator Debug");
-    event!(Level::INFO, "Starting Mediator Info");
-    event!(Level::ERROR, "Starting Mediator Error");
+    event!(Level::WARN, "Starting Mediator");
+    event!(Level::DEBUG, "Starting Mediator");
+    event!(Level::INFO, "Starting Mediator");
+    event!(Level::ERROR, "Starting Mediator");
     if ansi {
         event!(
             Level::INFO,
