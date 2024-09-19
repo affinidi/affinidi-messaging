@@ -47,23 +47,22 @@ pub struct ChallengeBody {
 /// This is the first step in the authentication process
 /// Creates a new sessionID and a random challenge string to the client
 pub async fn authentication_challenge(
-    ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
+    // ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
     State(state): State<SharedData>,
     Json(body): Json<ChallengeBody>,
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
     let session = Session {
         session_id: create_random_string(12),
         challenge: create_random_string(32),
-        remote_address: connect_info.to_string(),
         state: SessionState::ChallengeSent,
         did: body.did.clone(),
     };
 
     state.database.create_session(&session).await?;
 
-    info!(
-        "{}:{}: Challenge sent to DID({})",
-        session.session_id, session.remote_address, session.did
+    debug!(
+        "{}: Challenge sent to DID({})",
+        session.session_id, session.did
     );
 
     Ok((
@@ -195,8 +194,8 @@ pub async fn authentication_response(
         debug!("Database session state is ChallengeSent - Good to go!");
     } else {
         warn!(
-            "{}:{}: Session is in an invalid state for authentication",
-            session.session_id, session.remote_address
+            "{}: Session is in an invalid state for authentication",
+            session.session_id
         );
         return Err(MediatorError::SessionError(
             session.session_id.clone(),
@@ -258,8 +257,8 @@ pub async fn authentication_response(
         .await?;
 
     info!(
-        "{}:{}: Authentication successful for DID({})",
-        session.session_id, session.remote_address, session.did
+        "{}: Authentication successful for DID({})",
+        session.session_id, session.did
     );
 
     Ok((
