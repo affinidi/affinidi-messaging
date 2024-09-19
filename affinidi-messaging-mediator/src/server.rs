@@ -21,18 +21,13 @@ use tracing_subscriber::{
 pub async fn start() {
     // setup logging/tracing framework
     let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
-    let (filter, reload_handle) = reload::Layer::new(filter);
+    let (_, reload_handle) = reload::Layer::new(filter);
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
-        // .with(filter)
         .with(EnvFilter::from_default_env())
         .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
         .init();
 
-    event!(Level::WARN, "Starting Mediator");
-    event!(Level::DEBUG, "Starting Mediator");
-    event!(Level::INFO, "Starting Mediator");
-    event!(Level::ERROR, "Starting Mediator");
     if ansi {
         event!(
             Level::INFO,
