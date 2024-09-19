@@ -56,7 +56,6 @@ pub struct Session {
     #[serde(skip)]
     pub session_id: String,
     pub challenge: String,
-    pub remote_address: String,
     pub state: SessionState,
     pub did: String,
 }
@@ -79,19 +78,6 @@ impl TryFrom<(&str, HashMap<String, String>)> for Session {
             return Err(MediatorError::SessionError(
                 sid.into(),
                 "No challenge found when retrieving session!".into(),
-            ));
-        }
-
-        if let Some(remote_address) = hash.get("remote_address") {
-            session.remote_address.clone_from(remote_address);
-        } else {
-            warn!(
-                "{}: No remote_address found when retrieving session({})!",
-                sid, sid
-            );
-            return Err(MediatorError::SessionError(
-                sid.into(),
-                "No remote_address found when retrieving session!".into(),
             ));
         }
 
@@ -133,8 +119,6 @@ impl DatabaseHandler {
             .arg(&sid)
             .arg("challenge")
             .arg(&session.challenge)
-            .arg("remote_address")
-            .arg(&session.remote_address)
             .arg("state")
             .arg(session.state.to_string())
             .arg("did")
