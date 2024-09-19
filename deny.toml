@@ -42,12 +42,16 @@ allow = [
     "AFL-2.1",
     "OpenSSL",
     "ISC",
-    "MPL-2.0",
     "W3C-20150513",
 ]
 
 exceptions = [
     { allow = ["OpenSSL"], crate = "ring" },
+    { allow = ["CC-BY-SA-3.0"], crate = "ssi-contexts" },
+    { allow = ["MPL-2.0"], crate = "bitmaps" },
+    { allow = ["MPL-2.0"], crate = "webpki-roots" },
+    { allow = ["MPL-2.0"], crate = "sized-chunks" },
+    { allow = ["MPL-2.0"], crate = "im" },
 ]
 
 # Sigh
