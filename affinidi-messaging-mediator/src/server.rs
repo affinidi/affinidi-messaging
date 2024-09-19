@@ -14,9 +14,7 @@ use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{event, Level};
-use tracing_subscriber::{
-    filter, layer::SubscriberExt, reload, util::SubscriberInitExt, EnvFilter,
-};
+use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
 
 pub async fn start() {
     // setup logging/tracing framework
