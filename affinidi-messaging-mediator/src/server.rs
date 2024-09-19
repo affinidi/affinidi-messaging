@@ -20,11 +20,11 @@ use tracing_subscriber::{
 
 pub async fn start() {
     // setup logging/tracing framework
-    let filter = filter::LevelFilter::DEBUG; // This can be changed in the config file!
+    let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
     let (filter, reload_handle) = reload::Layer::new(filter);
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
-        // .with(filter)
+        .with(filter)
         .with(EnvFilter::from_default_env())
         .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
         .init();
@@ -141,8 +141,8 @@ pub async fn start() {
         )
         .layer(
             TraceLayer::new_for_http()
-                .make_span_with(trace::DefaultMakeSpan::new().level(Level::DEBUG))
-                .on_response(trace::DefaultOnResponse::new().level(Level::DEBUG)),
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         )
         .layer(RequestBodyLimitLayer::new(config.http_size_limit as usize))
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
