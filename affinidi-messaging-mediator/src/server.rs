@@ -1,9 +1,8 @@
 use crate::{
+    common::config::init,
     database::DatabaseHandler,
     handlers::{application_routes, health_checker_handler},
-    init,
-    tasks::statistics::statistics,
-    tasks::websocket_streaming::StreamingTask,
+    tasks::{statistics::statistics, websocket_streaming::StreamingTask},
     SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;

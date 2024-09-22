@@ -388,7 +388,7 @@ impl MessagePickup {
             } else {
                 atm.config.my_did.clone()
             },
-            limit: if let Some(limit) = limit { limit } else { 10 },
+            limit: limit.unwrap_or(10),
         };
 
         let mut msg = Message::build(

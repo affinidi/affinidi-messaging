@@ -9,7 +9,7 @@ use affinidi_messaging_didcomm::{
 };
 use protocols::message_pickup;
 use protocols::routing;
-use std::{default, str::FromStr, time::SystemTime};
+use std::{str::FromStr, time::SystemTime};
 
 pub mod inbound;
 pub mod protocols;
@@ -76,7 +76,7 @@ impl MessageType {
                 session.session_id.clone(),
                 "Affinidi Authentication is only handled by the Authorization handler".into(),
             )),
-            Self::ForwardRequest => routing::process(message, session),
+            Self::ForwardRequest => routing::process(message, state, session).await,
         }
     }
 }

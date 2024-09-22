@@ -15,15 +15,16 @@ use tower_http::cors::{Any, CorsLayer};
 
 use std::{
     env, fmt,
-    fs::{self, File},
+    fs::File,
     io::{self, BufRead},
     path::Path,
 };
 use tracing::{event, info, Level};
-use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::{filter::LevelFilter, reload::Handle, Registry};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
+    pub listen_address: String,
     pub api_prefix: String,
     pub http_size_limit: String,
     pub ws_size_limit: String,
@@ -43,6 +44,7 @@ pub struct DatabaseConfig {
 /// SecurityConfig Struct contains security related configuration details
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SecurityConfig {
+    pub mediator_secrets: String,
     pub use_ssl: String,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
@@ -65,6 +67,50 @@ pub struct DIDResolverConfig {
     pub cache_ttl: String,
     pub network_timeout: String,
     pub network_limit: String,
+}
+
+/// ProcessorsConfig Struct contains configuration specific to different processors
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProcessorsConfig {
+    pub forwarding: ForwardingConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct ProcessorsConfigRaw {
+    pub forwarding: ForwardingConfigRaw,
+}
+
+/// ForwardingConfig Struct contains configuration specific to DIDComm Routing/Forwarding
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ForwardingConfig {
+    pub enabled: bool,
+    pub future_time_limit: u64,
+}
+
+impl Default for ForwardingConfig {
+    fn default() -> Self {
+        ForwardingConfig {
+            enabled: true,
+            future_time_limit: 86400,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct ForwardingConfigRaw {
+    pub enabled: String,
+    pub future_time_limit: String,
+}
+
+impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
+    type Error = MediatorError;
+
+    fn try_from(raw: ForwardingConfigRaw) -> Result<Self, Self::Error> {
+        Ok(ForwardingConfig {
+            enabled: raw.enabled.parse().unwrap_or(true),
+            future_time_limit: raw.future_time_limit.parse().unwrap_or(86400),
+        })
+    }
 }
 
 /// OtherConfig Struct contains other configuration options
@@ -94,17 +140,16 @@ impl DIDResolverConfig {
 /// ConfigRaw Struct is used to deserialize the configuration file
 /// We then convert this to the Config Struct
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConfigRaw {
+struct ConfigRaw {
     pub log_level: String,
-    pub listen_address: String,
     pub mediator_did: String,
-    pub mediator_secrets: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
     pub streaming: StreamingConfig,
     pub did_resolver: DIDResolverConfig,
     pub other: OtherConfig,
+    pub processors: ProcessorsConfigRaw,
 }
 
 #[derive(Clone)]
@@ -134,6 +179,7 @@ pub struct Config {
     pub cors_allow_origin: CorsLayer,
     pub crypto_operations_per_message_limit: usize,
     pub to_keys_per_recipient_limit: usize,
+    pub process_forwarding: ForwardingConfig,
 }
 
 impl fmt::Debug for Config {
@@ -174,6 +220,7 @@ impl fmt::Debug for Config {
                 "to_keys_per_recipient_limit",
                 &self.to_keys_per_recipient_limit,
             )
+            .field("processor Forwarding", &self.process_forwarding)
             .finish()
     }
 }
@@ -213,6 +260,7 @@ impl Default for Config {
             http_size_limit: 10485760,
             crypto_operations_per_message_limit: 1_000,
             to_keys_per_recipient_limit: 100,
+            process_forwarding: ForwardingConfig::default(),
         }
     }
 }
@@ -241,7 +289,7 @@ impl TryFrom<ConfigRaw> for Config {
                 "error" => LevelFilter::ERROR,
                 _ => LevelFilter::INFO,
             },
-            listen_address: raw.listen_address,
+            listen_address: raw.server.listen_address,
             mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
             database_url: raw.database.database_url,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
@@ -268,6 +316,7 @@ impl TryFrom<ConfigRaw> for Config {
                 .to_keys_per_recipient_limit
                 .parse()
                 .unwrap_or(100),
+            process_forwarding: raw.processors.forwarding.try_into()?,
             ..Default::default()
         };
 
@@ -277,7 +326,7 @@ impl TryFrom<ConfigRaw> for Config {
         }
 
         // Load mediator secrets
-        config.mediator_secrets = load_secrets(&raw.mediator_secrets, &aws_config).await?;
+        config.mediator_secrets = load_secrets(&raw.security.mediator_secrets, &aws_config).await?;
 
         // Create the JWT encoding and decoding keys
         let jwt_secret =
@@ -373,7 +422,7 @@ async fn load_secrets(
 /// Read the primary configuration file for the mediator
 /// Returns a ConfigRaw struct, that still needs to be processed for additional information
 /// and conversion to Config struct
-pub fn read_config_file(file_name: &str) -> Result<ConfigRaw, MediatorError> {
+fn read_config_file(file_name: &str) -> Result<ConfigRaw, MediatorError> {
     // Read configuration file parameters
     event!(Level::INFO, "Config file({})", file_name);
     let raw_config = read_file_lines(file_name)?;
@@ -612,5 +661,48 @@ fn get_hostname(host_name: &str) -> Result<String, MediatorError> {
             "NA".into(),
             "Invalid hostname format!".into(),
         ))
+    }
+}
+
+pub async fn init(
+    reload_handle: Option<Handle<LevelFilter, Registry>>,
+) -> Result<Config, MediatorError> {
+    // Read configuration file parameters
+    let config = read_config_file("conf/mediator.toml")?;
+
+    // Setup logging
+    if reload_handle.is_some() {
+        let level: LevelFilter = match config.log_level.as_str() {
+            "trace" => LevelFilter::TRACE,
+            "debug" => LevelFilter::DEBUG,
+            "info" => LevelFilter::INFO,
+            "warn" => LevelFilter::WARN,
+            "error" => LevelFilter::ERROR,
+            _ => {
+                event!(
+                    Level::WARN,
+                    "log_level({}) is unknown in config file. Defaults to INFO",
+                    config.log_level
+                );
+                LevelFilter::INFO
+            }
+        };
+        reload_handle
+            .unwrap()
+            .modify(|filter| *filter = level)
+            .map_err(|e| MediatorError::InternalError("NA".into(), e.to_string()))?;
+        event!(Level::INFO, "Log level set to ({})", config.log_level);
+    }
+
+    match <Config as async_convert::TryFrom<ConfigRaw>>::try_from(config).await {
+        Ok(config) => {
+            event!(
+                Level::INFO,
+                "Configuration settings parsed successfully.\n{:#?}",
+                config
+            );
+            Ok(config)
+        }
+        Err(err) => Err(err),
     }
 }

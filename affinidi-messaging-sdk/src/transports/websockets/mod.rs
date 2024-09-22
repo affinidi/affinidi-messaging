@@ -46,8 +46,6 @@ impl<'c> ATM<'c> {
             ws_recv_stream: None,
         };
 
-        error!("secrets: {}", atm.secrets_resolver.len());
-
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
         let (tx, mut rx) = mpsc::channel::<WSCommand>(32);
         self.ws_send_stream = Some(tx);

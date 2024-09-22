@@ -26,16 +26,13 @@ axum-extra = { version = "0.9.3", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
 chrono = "0.4"
-deadpool-redis = { version = "0.17", features = ["rt_tokio_1"] }
+deadpool-redis.workspace = true
 hostname = "0.4"
 http = "1"
 jsonwebtoken = "9.3"
 itertools = "0.13"
 rand = "0.8"
-redis = { version = "0.26", features = [
-    "tokio-rustls-comp",
-    "tls-rustls-insecure",
-] }
+redis.workspace = true
 regex = "1"
 ring = { version = "0.17", features = ["std"] }
 rustls = { version = "0.23", default-features = false, features = [
@@ -45,24 +42,18 @@ rustls = { version = "0.23", default-features = false, features = [
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha256 = "1.5"
-ssi = "0.8"
+ssi.workspace = true
 thiserror = "1.0"
-tokio = { version = "1.37.0", features = ["full"] }
-tokio-stream = "0.1"
-toml = "0.8"
-tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
-tracing = { version = "0.1", features = [
-    "max_level_debug",
-    "release_max_level_info",
-] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+tokio.workspace = true
+tokio-stream.workspace = true
+toml.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 did-peer.workspace = true
-rcgen = { version = "0.13", default-features = false, features = [
-    "aws_lc_rs",
-    "pem",
-] }
-reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
-time = "0.3"
+rcgen.workspace = true
+reqwest.workspace = true
+time.workspace = true

@@ -56,7 +56,7 @@ async fn main() -> Result<(), ATMError> {
     println!("Running with address: {}", &args.network_address);
     config = config
         .with_atm_api(&args.network_address)
-        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()]);
+        .with_ssl_certificates(&mut vec![args.ssl_certificates]);
 
     // Create a new ATM Client
     let mut atm = ATM::new(config.build()?).await?;
