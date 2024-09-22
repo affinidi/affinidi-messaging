@@ -13,35 +13,27 @@ readme = "README.md"
 [dependencies]
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
-async-trait = "0.1"
-base64 = "0.22"
-futures-util = "0.3"
-http = "1"
-jsonwebtoken = "9.3"
-reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
-rustls = { version = "0.23", default-features = false, features = [
-    "aws_lc_rs",
-    "tls12",
-] }
-rustls-native-certs = "0.8"
-rustls-pemfile = "2"
-serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = "1.0"
-sha256 = "1.5"
+async-trait.workspace = true
+base64.workspace = true
+futures-util.workspace = true
+http.workspace = true
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
+rustls-pemfile.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha256.workspace = true
 ssi.workspace = true
-thiserror = "1.0"
-tokio = { version = "1.37.0", features = ["full"] }
-tokio-stream = "0.1"
-tokio-tungstenite = { version = "0.24.0", features = [
-    "rustls-tls-native-roots",
-] }
-tracing = { version = "0.1", features = [
-    "max_level_debug",
-    "release_max_level_info",
-] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url = "2.5"
-uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 clap.workspace = true
