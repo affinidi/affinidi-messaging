@@ -56,13 +56,13 @@ async fn main() -> Result<(), ATMError> {
 
     let atm_did = public_atm.well_known_did().await?;
 
-
     let mut config = Config::builder().with_my_did(my_did).with_atm_did(&atm_did);
 
     println!("Running with address: {}", &args.network_address);
     config = config
         .with_atm_api(&args.network_address)
-        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()]);
+        .with_ssl_certificates(&mut vec![args.ssl_certificates.into()])
+        .with_websocket_disabled();
 
     // Create a new ATM Client
     let mut atm = ATM::new(config.build()?).await?;
@@ -71,19 +71,11 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
     atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
 
-    info!("Authenticate and establish websocket connection");
-    atm.start_websocket_task().await?;
-
-    info!("toggle_live_delivery");
     let protocols = Protocols::new();
-    // Enable live streaming
-    protocols
-        .message_pickup
-        .toggle_live_delivery(&mut atm, true)
-        .await?;
 
     // Send a Message Pickup 3.0 Status Request
-    info!("Testing live_stream_next()!");
+    info!("Testing status-request()!");
+    // Status Request -> Status
     let status = protocols
         .message_pickup
         .send_status_request(&mut atm, None, None, None)
@@ -91,15 +83,8 @@ async fn main() -> Result<(), ATMError> {
 
     info!("Status: {:?}", status);
 
-    if let Some((message, _)) = protocols
-        .message_pickup
-        .live_stream_next(&mut atm, Duration::from_secs(2))
-        .await?
-    {
-        info!("[live_stream_next] Message: {:?}", message);
-    }
-
     info!("Testing delivery-request()!");
+    // Delivery Request -> Message Delivery
     let response = protocols
         .message_pickup
         .send_delivery_request(&mut atm, None, None, None, None)
@@ -111,7 +96,8 @@ async fn main() -> Result<(), ATMError> {
         info!("[send_delivery_request] Message: {}", message.id);
         delete_ids.push(message.id.clone());
     }
-
+    info!("Testing messages-received()!");
+    // Message Received -> Status
     let response = protocols
         .message_pickup
         .send_messages_received(&mut atm, None, None, &delete_ids, None)
@@ -120,6 +106,19 @@ async fn main() -> Result<(), ATMError> {
     info!("Status: after send_messages_received() : {:?}", response);
 
     /* TODO: Need to complete this part of the protocol...
+        Enable live streaming
+        protocols
+            .message_pickup
+            .toggle_live_delivery(&mut atm, false)
+            .await?;
+
+            if let Some((message, _)) = protocols
+           .message_pickup
+           .live_stream_next(&mut atm, Duration::from_secs(2))
+           .await?
+       {
+           info!("[live_stream_next] Message: {:?}", message);
+       }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
     error!("Testing live_stream_get()!");
@@ -133,14 +132,14 @@ async fn main() -> Result<(), ATMError> {
     */
 
     // Disable live streaming
-    protocols
-        .message_pickup
-        .toggle_live_delivery(&mut atm, false)
-        .await?;
+    // protocols
+    //     .message_pickup
+    //     .toggle_live_delivery(&mut atm, false)
+    //     .await?;
 
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    atm.abort_websocket_task().await?;
+    // atm.abort_websocket_task().await?;
 
     Ok(())
 }
