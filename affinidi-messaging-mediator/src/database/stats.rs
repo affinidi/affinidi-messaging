@@ -233,4 +233,22 @@ impl DatabaseHandler {
         }
         Ok(stats)
     }
+
+    /// Forward Task Queue length
+    pub async fn get_forward_tasks_len(&self) -> Result<usize, MediatorError> {
+        let mut con = self.get_async_connection().await?;
+
+        let result: usize = deadpool_redis::redis::cmd("XLEN")
+            .arg("FORWARD_TASKS")
+            .query_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "INTERNAL".into(),
+                    format!("Couldn't retrieve forward_tasks length. Reason: {}", err),
+                )
+            })?;
+
+        Ok(result)
+    }
 }

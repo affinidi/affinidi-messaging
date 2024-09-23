@@ -41,7 +41,8 @@ bs58 = "0.5"
 chrono = "0.4"
 criterion = "0.5"
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
-did-peer = { version = "0.1" }
+# TODO: Change this back to crates.io when it is published
+did-peer = { version = "0.1.11", path = "../affinidi-did-resolver/affinidi-did-resolver-methods/did-peer" }
 clap = { version = "4.5", features = ["derive"] }
 futures-util = "0.3"
 getrandom = "0.2"
