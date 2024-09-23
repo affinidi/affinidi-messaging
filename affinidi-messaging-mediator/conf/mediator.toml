@@ -11,7 +11,7 @@ listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 ### Supported formats:
 ### - did://did:peer:<version>:<base58-encoded-verification-key>
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
-mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkiToqovww7vYtxm1xNM15u9JzqzUFZ1k7s7MazYJUyAxv.EzQ3shQLqRUza6AMJFbPuMdvFRFWm1wKviQRnQSC1fScovJN4s.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX19}"
+mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mkh5r9K1xpGcb76RqkfoCZWsKGTJMiGxewkAKxhGwNzdGr.EzQ3shVdocY1kyLP2mcfsMiyBW7SXY7sRCTKa4MEv4T7vUdHz8.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
 #mediator_did = "${MEDIATOR_DID:aws_parameter_store:///dev/atn/atm/global/did}"
 
 ### mediator_secrets: Secrets of the mediator
@@ -85,7 +85,7 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### Supported Formats:
 ### - string://<key> - Use the key as is
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
-jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGaI0daTTfC-ys6xGZFrR2gXWGzOPr1UdEnRldEVmS6lgSEA_f9ZL1dQ3r7cALSXRZtZUkI_5sOca-6-SgLnbuPdD3k}"
+jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEILFVQ-e4B1h3-qt-H5HO3aVFvBbiwuPSOS9daSB1DzqpgSEAR390m2jvglICKFbjfsZY_x9gTboZz2Qp6Cd53up5jwg}"
 #jwt_authorization_secret = "${AUTHORIZATION_SECRET:aws_secrets://dev/atn/atm/mediator/global/jwt_secret}"
 
 ### cors_allow_origin: Comma separated list of origins that are allowed to access this service
