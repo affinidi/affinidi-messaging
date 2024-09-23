@@ -72,8 +72,8 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                         if let Ok(msg) = msg {
                             if let Message::Text(msg) = msg {
                                 debug!("ws: Received text message: {:?}", msg);
-                                if msg.len() > state.config.ws_size_limit as usize {
-                                    warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.ws_size_limit, msg.len());
+                                if msg.len() > state.config.limits.ws_size {
+                                    warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.limits.ws_size, msg.len());
                                     break;
                                 }
 

@@ -26,8 +26,6 @@ use tracing_subscriber::{filter::LevelFilter, reload::Handle, Registry};
 pub struct ServerConfig {
     pub listen_address: String,
     pub api_prefix: String,
-    pub http_size_limit: String,
-    pub ws_size_limit: String,
 }
 
 /// Database Struct contains database and storage of messages related configuration details
@@ -36,9 +34,6 @@ pub struct DatabaseConfig {
     pub database_url: String,
     pub database_pool_size: String,
     pub database_timeout: String,
-    pub max_message_size: String,
-    pub max_queued_messages: String,
-    pub message_expiry_minutes: String,
 }
 
 /// SecurityConfig Struct contains security related configuration details
@@ -67,6 +62,74 @@ pub struct DIDResolverConfig {
     pub cache_ttl: String,
     pub network_timeout: String,
     pub network_limit: String,
+}
+
+/// LimitsConfig Struct contains limits used by Affinidi Messenger
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LimitsConfig {
+    pub attachments_max_count: usize,
+    pub crypto_operations_per_message: usize,
+    pub forward_task_queue: usize,
+    pub http_size: usize,
+    pub message_expiry_minutes: usize,
+    pub message_size: usize,
+    pub queued_messages: usize,
+    pub to_keys_per_recipient: usize,
+    pub to_recipients: usize,
+    pub ws_size: usize,
+}
+
+impl Default for LimitsConfig {
+    fn default() -> Self {
+        LimitsConfig {
+            attachments_max_count: 20,
+            crypto_operations_per_message: 1000,
+            forward_task_queue: 50_000,
+            http_size: 10_485_760,
+            message_expiry_minutes: 10_080,
+            message_size: 1_048_576,
+            queued_messages: 100,
+            to_keys_per_recipient: 100,
+            to_recipients: 100,
+            ws_size: 10_485_760,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct LimitsConfigRaw {
+    pub attachments_max_count: String,
+    pub crypto_operations_per_message: String,
+    pub forward_task_queue: String,
+    pub http_size: String,
+    pub message_expiry_minutes: String,
+    pub message_size: String,
+    pub queued_messages: String,
+    pub to_keys_per_recipient: String,
+    pub to_recipients: String,
+    pub ws_size: String,
+}
+
+impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
+    type Error = MediatorError;
+
+    fn try_from(raw: LimitsConfigRaw) -> Result<Self, Self::Error> {
+        Ok(LimitsConfig {
+            attachments_max_count: raw.attachments_max_count.parse().unwrap_or(20),
+            crypto_operations_per_message: raw
+                .crypto_operations_per_message
+                .parse()
+                .unwrap_or(1000),
+            forward_task_queue: raw.forward_task_queue.parse().unwrap_or(50_000),
+            http_size: raw.http_size.parse().unwrap_or(10_485_760),
+            message_expiry_minutes: raw.message_expiry_minutes.parse().unwrap_or(10_080),
+            message_size: raw.message_size.parse().unwrap_or(1_048_576),
+            queued_messages: raw.queued_messages.parse().unwrap_or(100),
+            to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
+            to_recipients: raw.to_recipients.parse().unwrap_or(100),
+            ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
+        })
+    }
 }
 
 /// ProcessorsConfig Struct contains configuration specific to different processors
@@ -113,14 +176,6 @@ impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
     }
 }
 
-/// OtherConfig Struct contains other configuration options
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OtherConfig {
-    pub to_recipients_limit: String,
-    pub crypto_operations_per_message_limit: String,
-    pub to_keys_per_recipient_limit: String,
-}
-
 impl DIDResolverConfig {
     pub fn convert(&self) -> ClientConfig {
         let mut config = ClientConfigBuilder::default()
@@ -148,7 +203,7 @@ struct ConfigRaw {
     pub security: SecurityConfig,
     pub streaming: StreamingConfig,
     pub did_resolver: DIDResolverConfig,
-    pub other: OtherConfig,
+    pub limits: LimitsConfigRaw,
     pub processors: ProcessorsConfigRaw,
 }
 
@@ -162,11 +217,6 @@ pub struct Config {
     pub database_pool_size: usize,
     pub database_timeout: u32,
     pub api_prefix: String,
-    pub http_size_limit: u32,
-    pub ws_size_limit: u32,
-    pub max_message_size: u32,
-    pub max_queued_messages: u32,
-    pub message_expiry_minutes: u32,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
@@ -175,11 +225,9 @@ pub struct Config {
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
     pub did_resolver_config: ClientConfig,
-    pub to_recipients_limit: usize,
     pub cors_allow_origin: CorsLayer,
-    pub crypto_operations_per_message_limit: usize,
-    pub to_keys_per_recipient_limit: usize,
     pub process_forwarding: ForwardingConfig,
+    pub limits: LimitsConfig,
 }
 
 impl fmt::Debug for Config {
@@ -198,9 +246,6 @@ impl fmt::Debug for Config {
             .field("database_url", &self.database_url)
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
-            .field("max_message_size", &self.max_message_size)
-            .field("max_queued_messages", &self.max_queued_messages)
-            .field("message_expiry_minutes", &self.message_expiry_minutes)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
@@ -208,19 +253,9 @@ impl fmt::Debug for Config {
             .field("streaming_enabled?", &self.streaming_enabled)
             .field("streaming_uuid", &self.streaming_uuid)
             .field("DID Resolver config", &self.did_resolver_config)
-            .field("to_recipients_limit", &self.to_recipients_limit)
             .field("api_prefix", &self.api_prefix)
-            .field("http_size_limit", &self.http_size_limit)
-            .field("ws_size_limit", &self.ws_size_limit)
-            .field(
-                "crypto_operations_per_message_limit",
-                &self.crypto_operations_per_message_limit,
-            )
-            .field(
-                "to_keys_per_recipient_limit",
-                &self.to_keys_per_recipient_limit,
-            )
             .field("processor Forwarding", &self.process_forwarding)
+            .field("Limits", &self.limits)
             .finish()
     }
 }
@@ -242,9 +277,6 @@ impl Default for Config {
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
             database_timeout: 2,
-            max_message_size: 1048576,
-            max_queued_messages: 100,
-            message_expiry_minutes: 10080,
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -253,14 +285,10 @@ impl Default for Config {
             streaming_enabled: true,
             streaming_uuid: "".into(),
             did_resolver_config,
-            to_recipients_limit: 100,
             cors_allow_origin: CorsLayer::new().allow_origin(Any),
-            ws_size_limit: 10485760,
             api_prefix: "/mediator/v1/".into(),
-            http_size_limit: 10485760,
-            crypto_operations_per_message_limit: 1_000,
-            to_keys_per_recipient_limit: 100,
             process_forwarding: ForwardingConfig::default(),
+            limits: LimitsConfig::default(),
         }
     }
 }
@@ -294,29 +322,14 @@ impl TryFrom<ConfigRaw> for Config {
             database_url: raw.database.database_url,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
-            max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
-            max_queued_messages: raw.database.max_queued_messages.parse().unwrap_or(100),
-            message_expiry_minutes: raw.database.message_expiry_minutes.parse().unwrap_or(10080),
             use_ssl: raw.security.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: raw.security.ssl_certificate_file,
             ssl_key_file: raw.security.ssl_key_file,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
-            to_recipients_limit: raw.other.to_recipients_limit.parse().unwrap_or(100),
             api_prefix: raw.server.api_prefix,
-            http_size_limit: raw.server.http_size_limit.parse().unwrap_or(10485760),
-            ws_size_limit: raw.server.ws_size_limit.parse().unwrap_or(10485760),
-            crypto_operations_per_message_limit: raw
-                .other
-                .crypto_operations_per_message_limit
-                .parse()
-                .unwrap_or(1_000),
-            to_keys_per_recipient_limit: raw
-                .other
-                .to_keys_per_recipient_limit
-                .parse()
-                .unwrap_or(100),
             process_forwarding: raw.processors.forwarding.try_into()?,
+            limits: raw.limits.try_into()?,
             ..Default::default()
         };
 

@@ -137,7 +137,7 @@ pub async fn start() {
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         )
-        .layer(RequestBodyLimitLayer::new(config.http_size_limit as usize))
+        .layer(RequestBodyLimitLayer::new(config.limits.http_size as usize))
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
         .route(
             "/mediator/healthchecker",

@@ -9,6 +9,9 @@ log_level = "debug"
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
 mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mkm5tu88GuKWqkZBE4Vpr8eShjtjhLaDzstheaK3rpmFun.EzQ3shwep25i8zt1T3HnpQXk16WY6kfSNX8akDRBYERwmpgHGE.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cHM6Ly8xMjcuMC4wLjE6NzAzNyIsImEiOlsiZGlkY29tbS92MiJdLCJyIjpbXX0sImlkIjpudWxsfQ}"
 
+### ****************************************************************************************************************************
+### Server configuration
+### ****************************************************************************************************************************
 [server]
 ### listen_address: <ip_address>:<tcp_port> that this service will listen on.
 ### Default: 0.0.0.0:7037
@@ -18,16 +21,9 @@ listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 ### Default: /mediator/v1/
 api_prefix = "/"
 
-### http_size_limit: Maximum size of a http request payload in bytes
-### Default: 10485760 (10MB)
-### It is recommended to use infrastructure level limitation instead of application level limitations
-http_size_limit = "${HTTP_SIZE_LIMIT:10485760}"
-
-### ws_size_limit: Maximum size of a websocket request payload in bytes
-### Default: 10485760 (10MB)
-### It is recommended to use infrastructure level limitation instead of application level limitations
-ws_size_limit = "${WS_SIZE_LIMIT:10485760}"
-
+### ****************************************************************************************************************************
+### Database configuration
+### ****************************************************************************************************************************
 [database]
 ### database_url: URL of the Redis compatable database
 ### Default: redis://127.0.0.1/
@@ -41,20 +37,9 @@ database_pool_size = "${DATABASE_POOL_SIZE:10}"
 ### Default: 2
 database_timeout = "${DATABASE_TIMEOUT:2}"
 
-### max_message_size: Maximum size of a message in bytes
-### Default: 1048576 (1MB)
-max_message_size = "${MAX_MESSAGE_SIZE:1048576}"
-
-### max_queued_messages: How many messages will we queue for a single recipient or a single sender
-### Default: 100
-### NOTE: This is a per-recipient or per-sender limit
-max_queued_messages = "${MAX_QUEUED_MESSAGES:100}"
-
-### message_expiry_minutes: Time to live in minutes for messages stored
-### Messages will expire after this limit
-### Default: 10080 (7 days)
-message_expiry_minutes = "${MESSAGE_EXPIRY_MINUTES:10080}"
-
+### ****************************************************************************************************************************
+### Security configuration
+### ****************************************************************************************************************************
 [security]
 ### mediator_secrets: Secrets of the mediator
 ### REQUIRED: Location of secrets
@@ -91,6 +76,9 @@ jwt_authorization_secret = "${AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIE
 ### Example: "https://affinidi.com,https://example2.com"
 # cors_allow_origin = "${CORS_ALLOW_ORIGIN:https://affinidi.com}"
 
+### ****************************************************************************************************************************
+### Live streaming setup
+### ****************************************************************************************************************************
 [streaming]
 ### enabled: If true, can live stream messages to subscribed recipients via WebSockets
 ### Default: true
@@ -104,6 +92,9 @@ enabled = "${STREAMING_ENABLED:true}"
 ### NOTE: Having multiple subscribers with the same UUID will cause issues
 uuid = "${STREAMING_UUID:hostname://}"
 
+### ****************************************************************************************************************************
+### DID Resolver configuration
+### ****************************************************************************************************************************
 [did_resolver]
 ### service_address: Address of the DID resolver service
 ### Default: None (Uses local DID resolver
@@ -125,26 +116,60 @@ network_timeout = "${DID_RESOLVER_NETWORK_TIMEOUT:5000}"
 ### Default: 100
 network_limit = "${DID_RESOLVER_NETWORK_LIMIT:100}"
 
-[other]
-### to_recipients_limit: Maximum number of recipients in a single message
-### Default: 100
-### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients
-to_recipients_limit = "${TO_RECIPIENTS_LIMIT:100}"
+### ****************************************************************************************************************************
+### Resource limits for the mediator
+### ****************************************************************************************************************************
+[limits]
+### attachments_max_count: Maximum number of attachments in a single message
+### Default: 20
+attachments_max_count = "${LIMIT_ATTACHMENTS_MAX_COUNT:20}"
 
 ### approximate maximum amount of crypto operations per one message
 ### it is used to protect the mediator from DoS type attacts.
 ### Default: 1000
-crypto_operations_per_message_limit = "${CRYPTO_OPERATIONS_PER_MESSAGE_LIMIT:1000}"
+crypto_operations_per_message = "${LIMIT_CRYPTO_OPERATIONS_PER_MESSAGE:1000}"
 
-### to_keys_per_recipient_limit: Maximum number of keys in a single recipient did
+### forward_task_queue: How many forward tasks can be queued up in total
+### Default: 50_000
+forward_task_queue = "${LIMIT_FORWARD_TASK_QUEUE:50000}"
+
+### http_size: Maximum size of a http request payload in bytes
+### Default: 10485760 (10MB)
+### It is recommended to use infrastructure level limitation instead of application level limitations
+http_size = "${LIMIT_HTTP_SIZE:10485760}"
+
+### message_expiry_minutes: Time to live in minutes for messages stored
+### Messages will expire after this limit
+### Default: 10080 (7 days)
+message_expiry_minutes = "${LIMIT_MESSAGE_EXPIRY_MINUTES:10080}"
+
+### message_size: Maximum size of a message in bytes
+### Default: 1048576 (1MB)
+message_size = "${LIMIT_MESSAGE_SIZE:1048576}"
+
+### queued_messages: How many messages will we queue for a single recipient or a single sender
+### Default: 100
+### NOTE: This is a per-recipient or per-sender limit
+queued_messages = "${LIMIT_QUEUED_MESSAGES:100}"
+
+### to_keys_per_recipient: Maximum number of keys in a single recipient did
 ### Default: 100
 ### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients and thousands keys of them
-to_keys_per_recipient_limit = "${TO_KEYS_PER_DID_LIMIT:100}"
+to_keys_per_recipient = "${LIMIT_TO_KEYS_PER_DID:100}"
 
-### Resource limits for the mediator
-[limits]
+### to_recipients: Maximum number of recipients in a single message
+### Default: 100
+### NOTE: Protects against a DOS attack where a single message can become a bomb with thousands of recipients
+to_recipients = "${LIMIT_TO_RECIPIENTS:100}"
 
+### ws_size_limit: Maximum size of a websocket request payload in bytes
+### Default: 10485760 (10MB)
+### It is recommended to use infrastructure level limitation instead of application level limitations
+ws_size = "${LIMIT_WS_SIZE:10485760}"
+
+### ****************************************************************************************************************************
 ### Configuration specific to the forwarding processor
+### ****************************************************************************************************************************
 [processors.forwarding]
 ### enabled: If true, the forwarding processor is enabled within the mediator locally
 ### Default: true

@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use affinidi_messaging_didcomm::Message;
 use serde::Deserialize;
-use tracing::{debug, info, span, Instrument};
+use tracing::{debug, span, Instrument};
 
 use crate::{
     common::errors::{MediatorError, Session},

@@ -39,7 +39,8 @@ pub(crate) async fn handle_inbound(
             &UnpackOptions {
                 crypto_operations_limit_per_message: state
                     .config
-                    .crypto_operations_per_message_limit,
+                    .limits
+                    .crypto_operations_per_message,
                 ..UnpackOptions::default()
             },
         )
@@ -79,7 +80,7 @@ pub(crate) async fn handle_inbound(
                     to_dids
                 );
 
-                if to_dids.len() > state.config.to_recipients_limit {
+                if to_dids.len() > state.config.limits.to_recipients {
                     return Err(MediatorError::MessagePackError(
                         session.session_id.clone(),
                         format!("Recipient count({}) exceeds limit", to_dids.len()),
@@ -97,7 +98,8 @@ pub(crate) async fn handle_inbound(
                             &PackOptions {
                                 to_keys_per_recipient_limit: state
                                     .config
-                                    .to_keys_per_recipient_limit,
+                                    .limits
+                                    .to_keys_per_recipient,
                             },
                         )
                         .await?;
@@ -157,7 +159,7 @@ pub(crate) async fn handle_inbound(
                     &state.config.mediator_secrets,
                     &state.did_resolver,
                     &PackOptions {
-                        to_keys_per_recipient_limit: state.config.to_keys_per_recipient_limit,
+                        to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,
                     },
                 )
                 .await?;
