@@ -260,17 +260,8 @@ local function get_status_reply(keys, args)
     -- Get the oldest and newest message information
     local r = redis.pcall('XINFO', 'STREAM', 'RECEIVE_Q:' .. keys[1])
     if r['err'] == nil and r.map then
-        if r.map['first-entry'] then
-            response.map.oldest_received = r.map['first-entry'][1]
-        else
-            response.map.oldest_received = 0
-        end
-
-        if r.map['last-entry'] then
-            response.map.newest_received = r.map['last-entry'][1]
-        else
-            response.map.newest_received = 0
-        end
+        response.map.oldest_received = r.map['first-entry'] and r.map['first-entry'][1] or 0
+        response.map.newest_received = r.map['last-entry'] and r.map['last-entry'][1] or 0
         response.map.queue_count = r.map['length']
     end
 
