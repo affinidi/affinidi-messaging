@@ -117,9 +117,7 @@ where
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| {
-                warn!(
-                    "No Authorization Bearer header in request!"
-                );
+                warn!("No Authorization Bearer header in request!");
                 AuthError::MissingCredentials
             })?;
 
@@ -129,11 +127,7 @@ where
             match jsonwebtoken::decode::<SessionClaims>(bearer.token(), decoding_key, &validation) {
                 Ok(token_data) => token_data,
                 Err(err) => {
-                    event!(
-                        Level::WARN,
-                        "Decoding JWT failed {:?}",
-                        err
-                    );
+                    event!(Level::WARN, "Decoding JWT failed {:?}", err);
                     return Err(AuthError::InvalidToken);
                 }
             }
