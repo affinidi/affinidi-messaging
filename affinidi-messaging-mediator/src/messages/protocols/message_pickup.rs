@@ -718,7 +718,6 @@ pub(crate) async fn messages_received(
 
                         }
                     }
-                
             }
             Err(err) => {
                 info!("Error getting message: {:?}", err);
@@ -728,9 +727,8 @@ pub(crate) async fn messages_received(
     }
 
     Ok(generate_status_reply(state, session, &session.did_hash, &thid, false, None).await.unwrap())
-    
-    }
+
+}
     .instrument(_span)
     .await
 }
-
