@@ -53,6 +53,11 @@ pub struct MessagePickupDeliveryRequest {
     pub limit: usize,
 }
 
+// Reads the body of an incoming Message Pickup 3.0 Messages Received Message
+#[derive(Default, Deserialize, Serialize)]
+pub struct MessagePickupMessagesReceived {
+    pub message_id_list: Vec<String>,
+}
 /// Handles the return from a message delivery request
 /// returns
 /// - StatusReply : No messages available
@@ -515,7 +520,12 @@ impl MessagePickup {
                         };
 
                         match atm.unpack(&decoded).await {
-                            Ok((m, u)) => response.push((m, u)),
+                            Ok((mut m, u)) => {
+                                if let Some(attachment_id) = &attachment.id {
+                                    m.id = attachment_id.to_string();
+                                }
+                                response.push((m, u))
+                            }
                             Err(e) => {
                                 warn!("Error unpacking message: ({:?})", e);
                                 continue;
@@ -562,7 +572,7 @@ impl MessagePickup {
 
         let mut msg = Message::build(
             Uuid::new_v4().into(),
-            "https://didcomm.org/messagepickup/3.0/delivery-request".to_owned(),
+            "https://didcomm.org/messagepickup/3.0/messages-received".to_owned(),
             json!({"message_id_list": list}),
         )
         .header("return_route".into(), Value::String("all".into()));
@@ -582,7 +592,7 @@ impl MessagePickup {
         let msg = msg.created_time(now).expires_time(now + 300).finalize();
         let msg_id = msg.id.clone();
 
-        debug!("Delivery-Request message: {:?}", msg);
+        debug!("messages-received message: {:?}", msg);
 
         // Pack the message
         let (msg, _) = msg
