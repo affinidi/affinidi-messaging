@@ -50,7 +50,8 @@ To build and run this project, you need to set up the following:
    cargo run --example generate_secrets
    ```
 
-   This will generate `affinidi-messaging-mediator/conf/secrets.json-generated` file containing a did:peer together with the pair of keys for verification and encryption. Use the generated did:peer as a value for `<MEDIATOR_DID>` placeholder in following commands as well as in [affinidi-messaging-sdk - Examples](../affinidi-messaging-sdk#examples).
+   This will generate `affinidi-messaging-mediator/conf/secrets.json-generated` file containing a did:peer together with the pair of keys for verification and encryption and `jwt_authorization_secret` you shall use for `jwt_authorization_secret` value in `mediator.toml`.
+   Use the generated did:peer as a value for `<MEDIATOR_DID>` placeholder in following commands as well as in [affinidi-messaging-sdk - Examples](../affinidi-messaging-sdk#examples).
 
 4. Save the generated `secrets.json-generated` file as `affinidi-messaging-mediator/conf/secrets.json`.
 

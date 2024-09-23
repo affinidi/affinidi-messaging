@@ -1,10 +1,13 @@
 use std::fs::File;
 use std::io::Write;
 
+use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
+
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
+use ring::signature::Ed25519KeyPair;
 use serde_json::json;
 use ssi::{
     dids::DIDKey,
@@ -110,7 +113,7 @@ async fn main() -> std::io::Result<()> {
     let (did_peer, _) =
         DIDPeer::create_peer_did(&keys, Some(&services)).expect("Failed to create did:peer");
 
-    println!("{}", did_peer);
+    println!("did = {}", did_peer);
 
     let secrets_json = json!([
       {
@@ -140,6 +143,13 @@ async fn main() -> std::io::Result<()> {
 
     let mut file = File::create("./conf/secrets.json-generated")?;
     file.write_all(json_string.as_bytes())?;
+
+    // Create jwt_authorization_secret
+    let doc = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    println!(
+        "jwt_authorization_secret = {}",
+        &BASE64_URL_SAFE_NO_PAD.encode(doc.as_ref())
+    );
 
     Ok(())
 }

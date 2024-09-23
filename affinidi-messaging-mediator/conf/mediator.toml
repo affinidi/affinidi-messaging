@@ -1,6 +1,6 @@
 ### log_level: trace debug info warn error
 ### default: info
-log_level = "debug"
+log_level = "info"
 
 ### mediator_did: DID of the mediator
 ### REQUIRED: DID of the mediator
@@ -19,7 +19,7 @@ listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 
 ### api_prefix: API prefix
 ### Default: /mediator/v1/
-api_prefix = "/"
+api_prefix = "${API_PREFIX:/mediator/v1/}"
 
 ### ****************************************************************************************************************************
 ### Database configuration

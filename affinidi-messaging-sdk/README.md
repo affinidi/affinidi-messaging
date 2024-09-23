@@ -16,36 +16,40 @@ Use `<MEDIATOR_DID>` from [affinidi-messaging-mediator - Running affinidi-messag
 
 ```bash
 # enable logging for examples,
-export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug
+export RUST_LOG=none,affinidi_messaging_sdk=debug,ping=debug,demo=debug,send_message_to_me=debug,send_message_to_bob=debug,fetch_message_as_bob=debug
 
 # no "did://" prefix for examples
 export MEDIATOR_DID=<MEDIATOR_DID>
 # default, local mediator endpoint
 export MEDIATOR_ENDPOINT=https://localhost:7037/mediator/v1
 # relative path to local mediator cert file
-export MEDIATOR_SSL_CERTIFICATES="../affinidi-messaging-mediator/conf/keys/client.chain"
+export MEDIATOR_TLS_CERTIFICATES="../affinidi-messaging-mediator/conf/keys/client.chain"
 
 # send a trust ping
 cargo run --example ping -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
 
 cargo run --example message_pickup -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
   --mediator-did $MEDIATOR_DID
 
-# send message to another DID
+# send a message to the same recipient as sender
 cargo run --example send_message_to_me -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES 
 
-cargo run --example send_message -- \
+# send a message to another recipient Bob
+cargo run --example send_message_to_bob -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_SSL_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
+
+# pickup a message from another sender Alice
+cargo run --example fetch_message_as_bob -- \
+  --network-address $MEDIATOR_ENDPOINT \
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
 ```
 
 ## WebSocket and HTTPS support

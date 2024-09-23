@@ -21,6 +21,7 @@ pub mod conversions;
 pub mod errors;
 pub mod messages;
 pub mod protocols;
+pub mod public;
 mod resolvers;
 pub mod transports;
 
@@ -153,9 +154,12 @@ impl<'c> ATM<'c> {
         };
 
         // Add our own DID to the DID_RESOLVER
-        atm.add_did(&config.my_did).await?;
-        // Add our ATM DID to the DID_RESOLVER
-        atm.add_did(&config.atm_did).await?;
+        if let Some(my_did) = &config.my_did {
+            atm.add_did(my_did).await?;
+        }
+        if let Some(my_did) = &config.my_did {
+            atm.add_did(my_did).await?;
+        }
 
         // Add any pre-loaded secrets
         for secret in config.secrets {
@@ -191,5 +195,25 @@ impl<'c> ATM<'c> {
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
     pub fn add_secret(&mut self, secret: Secret) {
         self.secrets_resolver.insert(secret);
+    }
+
+    pub(crate) fn dids(&self) -> Result<(&String, &String), ATMError> {
+        let my_did = if let Some(my_did) = &self.config.my_did {
+            my_did
+        } else {
+            return Err(ATMError::ConfigError(
+                "You must provide a DID for the SDK, used for authentication!".to_owned(),
+            ));
+        };
+
+        let atm_did = if let Some(atm_did) = &self.config.atm_did {
+            atm_did
+        } else {
+            return Err(ATMError::ConfigError(
+                "You must provide the DID for the ATM service!".to_owned(),
+            ));
+        };
+
+        Ok((my_did, atm_did))
     }
 }

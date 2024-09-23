@@ -83,6 +83,8 @@ impl MessagePickup {
             recipient_did, mediator_did, wait
         );
 
+        let (my_did, atm_did) = atm.dids()?;
+
         let mut msg = Message::build(
             Uuid::new_v4().into(),
             "https://didcomm.org/messagepickup/3.0/status-request".to_owned(),
@@ -97,11 +99,11 @@ impl MessagePickup {
         let to_did = if let Some(mediator_did) = mediator_did {
             mediator_did
         } else {
-            atm.config.atm_did.clone()
+            atm_did.clone()
         };
         msg = msg.to(to_did.clone());
 
-        msg = msg.from(atm.config.my_did.clone());
+        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -115,8 +117,8 @@ impl MessagePickup {
         let (msg, _) = msg
             .pack_encrypted(
                 &to_did,
-                Some(&atm.config.my_did),
-                Some(&atm.config.my_did),
+                Some(&my_did),
+                Some(&my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -181,6 +183,7 @@ impl MessagePickup {
     ) -> Result<(), ATMError> {
         let _span = span!(Level::DEBUG, "toggle_live_delivery",).entered();
         debug!("Setting live_delivery to ({})", live_delivery);
+        let (my_did, atm_did) = atm.dids()?;
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -195,17 +198,17 @@ impl MessagePickup {
         .header("return_route".into(), Value::String("all".into()))
         .created_time(now)
         .expires_time(now + 300)
-        .from(atm.config.my_did.clone())
-        .to(atm.config.atm_did.clone())
+        .from(my_did.clone())
+        .to(atm_did.clone())
         .finalize();
         let msg_id = msg.id.clone();
 
         // Pack the message
         let (msg, _) = msg
             .pack_encrypted(
-                &atm.config.atm_did,
-                Some(&atm.config.my_did),
-                Some(&atm.config.my_did),
+                &atm_did,
+                Some(&my_did),
+                Some(&my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -381,12 +384,13 @@ impl MessagePickup {
             "Delivery Request for recipient_did: {:?}, mediator_did: {:?} limit: {:?}",
             recipient_did, mediator_did, limit
         );
+        let (my_did, atm_did) = atm.dids()?;
 
         let body = MessagePickupDeliveryRequest {
             recipient_did: if let Some(recipient) = recipient_did {
                 recipient
             } else {
-                atm.config.my_did.clone()
+                my_did.clone()
             },
             limit: limit.unwrap_or(10),
         };
@@ -401,11 +405,11 @@ impl MessagePickup {
         let to_did = if let Some(mediator_did) = mediator_did {
             mediator_did
         } else {
-            atm.config.atm_did.clone()
+            atm_did.clone()
         };
         msg = msg.to(to_did.clone());
 
-        msg = msg.from(atm.config.my_did.clone());
+        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -419,8 +423,8 @@ impl MessagePickup {
         let (msg, _) = msg
             .pack_encrypted(
                 &to_did,
-                Some(&atm.config.my_did),
-                Some(&atm.config.my_did),
+                Some(&my_did),
+                Some(&my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -554,6 +558,8 @@ impl MessagePickup {
             list.len()
         );
 
+        let (my_did, atm_did) = atm.dids()?;
+
         let mut msg = Message::build(
             Uuid::new_v4().into(),
             "https://didcomm.org/messagepickup/3.0/delivery-request".to_owned(),
@@ -564,11 +570,11 @@ impl MessagePickup {
         let to_did = if let Some(mediator_did) = mediator_did {
             mediator_did
         } else {
-            atm.config.atm_did.clone()
+            atm_did.clone()
         };
         msg = msg.to(to_did.clone());
 
-        msg = msg.from(atm.config.my_did.clone());
+        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -582,8 +588,8 @@ impl MessagePickup {
         let (msg, _) = msg
             .pack_encrypted(
                 &to_did,
-                Some(&atm.config.my_did),
-                Some(&atm.config.my_did),
+                Some(my_did),
+                Some(&my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),

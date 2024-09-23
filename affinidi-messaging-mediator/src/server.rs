@@ -115,7 +115,7 @@ pub async fn start() {
     };
 
     // build our application routes
-    let app: Router = application_routes(config.api_prefix, &shared_state);
+    let app: Router = application_routes(&config.api_prefix, &shared_state);
 
     // Add middleware to all routes
     let app = Router::new()
@@ -140,7 +140,7 @@ pub async fn start() {
         .layer(RequestBodyLimitLayer::new(config.limits.http_size as usize))
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
         .route(
-            "/mediator/healthchecker",
+            format!("{}healthchecker", &config.api_prefix).as_str(),
             get(health_checker_handler).with_state(shared_state),
         );
 
