@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = '0.7.5'
+version = "0.7.5"
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Trusted Messaging"
@@ -22,7 +22,62 @@ license = "Apache-2.0"
 affinidi-messaging-sdk = { version = "0.7", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.7", path = "./affinidi-messaging-didcomm" }
 affinidi-did-resolver-cache-sdk = { version = "0.1.12" }
-did-peer = { version = "0.1.7" }
+did-peer = { version = "0.1.12" }
 clap = { version = "4.5", features = ["derive"] }
 ssi = "0.9"
 tracing = "0.1"
+reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
+
+anyhow = "1.0"
+base64 = "0.22"
+async-trait = "0.1"
+thiserror = "1.0"
+serde_json = "1.0"
+serde-enum-str = "0.4"
+sha2 = "0.10"
+bs58 = "0.5"
+varint = "0.9.0"
+askar-crypto = "0.3.1"
+
+async-convert = "1"
+aws-config = "1.5"
+aws-sdk-dynamodb = "1.29"
+aws-sdk-memorydb = "1.26.0"
+aws-sdk-secretsmanager = "1.26.0"
+aws-sdk-ssm = "1.26.0"
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9.3", features = ["typed-header"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+chrono = "0.4"
+deadpool-redis = { version = "0.17", features = ["rt_tokio_1"] }
+hostname = "0.4"
+http = "1"
+jsonwebtoken = "9.3"
+itertools = "0.13"
+rand = "0.8"
+redis = { version = "0.26", features = [
+    "tokio-rustls-comp",
+    "tls-rustls-insecure",
+] }
+regex = "1"
+ring = { version = "0.17", features = ["std"] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws_lc_rs",
+    "tls12",
+] }
+serde = { version = "1.0", features = ["derive", "rc"] }
+sha256 = "1.5"
+tokio = { version = "1.37.0", features = ["full"] }
+tokio-stream = "0.1"
+toml = "0.8"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+
+futures-util = "0.3"
+rustls-native-certs = "0.8"
+rustls-pemfile = "2"
+tokio-tungstenite = { version = "0.23.0", features = [
+    "rustls-tls-native-roots",
+] }
+url = "2.5"
