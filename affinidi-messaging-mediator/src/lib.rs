@@ -14,8 +14,8 @@ use common::{
 use database::DatabaseHandler;
 use http::request::Parts;
 use tasks::websocket_streaming::StreamingTask;
-use tracing::{event, level_filters::LevelFilter, Level};
-use tracing_subscriber::{reload::Handle, Registry};
+use tracing::{event, Level};
+use tracing_subscriber::{reload::Handle, EnvFilter, Registry};
 
 pub mod common;
 pub mod database;
@@ -57,33 +57,20 @@ where
 }
 
 pub async fn init(
-    reload_handle: Option<Handle<LevelFilter, Registry>>,
+    reload_handle: Option<Handle<EnvFilter, Registry>>,
 ) -> Result<Config, MediatorError> {
     // Read configuration file parameters
     let config = read_config_file("conf/mediator.toml")?;
 
     // Setup logging
     if reload_handle.is_some() {
-        let level: LevelFilter = match config.log_level.as_str() {
-            "trace" => LevelFilter::TRACE,
-            "debug" => LevelFilter::DEBUG,
-            "info" => LevelFilter::INFO,
-            "warn" => LevelFilter::WARN,
-            "error" => LevelFilter::ERROR,
-            _ => {
-                event!(
-                    Level::WARN,
-                    "log_level({}) is unknown in config file. Defaults to INFO",
-                    config.log_level
-                );
-                LevelFilter::INFO
-            }
-        };
+        let level: EnvFilter = EnvFilter::new(config.log_level.as_str());
         reload_handle
             .unwrap()
             .modify(|filter| *filter = level)
             .map_err(|e| MediatorError::InternalError("NA".into(), e.to_string()))?;
         event!(Level::INFO, "Log level set to ({})", config.log_level);
+        event!(Level::DEBUG, "Log level set to ({})", config.log_level);
     }
 
     match <common::config::Config as async_convert::TryFrom<ConfigRaw>>::try_from(config).await {

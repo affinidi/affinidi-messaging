@@ -1,6 +1,6 @@
 ### log_level: trace debug info warn error
 ### default: info
-log_level = "info"
+log_level = "info,affinidi_messaging_mediator=info,affinidi_did_resolver_cache_sdk=debug,affinidi_messaging_sdk=debug,tower_http=trace"
 
 ### listen_address: <ip_address>:<tcp_port> that this service will listen on.
 ### Default: 0.0.0.0:7037

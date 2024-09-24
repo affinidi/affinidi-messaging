@@ -22,7 +22,7 @@ pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> 
             interval.tick().await;
             let stats = database.get_db_metadata().await?;
             info!("Statistics: {}", stats);
-            info!("Delta: {}", stats.delta(&previous_stats));
+            info!("Delta: {:?}", stats.delta(&previous_stats));
 
             previous_stats = stats;
         }
