@@ -309,12 +309,7 @@ pub(crate) async fn delivery_request(
 ) -> Result<ProcessMessageResponse, MediatorError> {
     let _span = span!(tracing::Level::DEBUG, "delivery_request",);
     async move {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
         _validate_msg(msg, state, session).unwrap();
-
         // Get or create the thread id for the response
         let thid = if let Some(thid) = &msg.thid {
             thid.to_owned()
@@ -381,6 +376,10 @@ pub(crate) async fn delivery_request(
                     attachments.push(attachment.finalize())
                 }
             }
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
 
             let response_msg = response_msg
                 .attachments(attachments)
@@ -498,9 +497,9 @@ fn _validate_msg(
     }
 
     // Ensure to: exists and is valid
-    let to: Result<String, MediatorError> = if let Some(to) = &msg.to {
+    let to: String = if let Some(to) = &msg.to {
         if let Some(first) = to.first() {
-            Ok(first.to_owned())
+            first.to_owned()
         } else {
             return Err(MediatorError::RequestDataError(
                 session.session_id.clone(),
@@ -513,7 +512,6 @@ fn _validate_msg(
             "Message missing 'to' field".into(),
         ));
     };
-    let to = to.unwrap();
 
     // Must be addressed to ATM
     if to != state.config.mediator_did {
