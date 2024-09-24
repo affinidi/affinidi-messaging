@@ -98,7 +98,7 @@ where
                 ))
             })?;
 
-        let remote_addr = if let Some(address) = parts
+        if let Some(address) = parts
             .extensions
             .get::<axum::extract::ConnectInfo<SocketAddr>>()
             .map(|ci| ci.0)
@@ -117,10 +117,7 @@ where
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| {
-                warn!(
-                    "{}: No Authorization Bearer header in request!",
-                    remote_addr
-                );
+                warn!("No Authorization Bearer header in request!");
                 AuthError::MissingCredentials
             })?;
 
@@ -130,12 +127,7 @@ where
             match jsonwebtoken::decode::<SessionClaims>(bearer.token(), decoding_key, &validation) {
                 Ok(token_data) => token_data,
                 Err(err) => {
-                    event!(
-                        Level::WARN,
-                        "{}: decoding JWT failed {:?}",
-                        remote_addr,
-                        err
-                    );
+                    event!(Level::WARN, "Decoding JWT failed {:?}", err);
                     return Err(AuthError::InvalidToken);
                 }
             }
@@ -148,13 +140,12 @@ where
         let did_hash = digest(&did);
 
         info!(
-            "{}: Protected connection accepted from address({}) did_hash({})",
-            &session_id, &remote_addr, &did_hash
+            "{}: Protected connection accepted from did_hash({})",
+            &session_id, &did_hash
         );
 
         let session = Session {
             session_id,
-            remote_addr,
             authenticated: true,
             challenge_sent: None,
             did,

@@ -172,7 +172,6 @@ pub(crate) async fn process(
         }
 
         // Forward is good, lets process the attachments and add to the queues
-        // test
 
         Ok(ProcessMessageResponse {
             store_message: true,
