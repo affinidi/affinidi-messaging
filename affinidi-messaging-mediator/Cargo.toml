@@ -14,6 +14,8 @@ readme = "README.md"
 affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
+ssi.workspace = true
+tracing.workspace = true
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
@@ -45,13 +47,11 @@ rustls = { version = "0.23", default-features = false, features = [
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha256 = "1.5"
-ssi = "0.8"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-stream = "0.1"
 toml = "0.8"
 tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
-tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
 

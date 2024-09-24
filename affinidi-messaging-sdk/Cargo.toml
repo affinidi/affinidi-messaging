@@ -13,6 +13,8 @@ readme = "README.md"
 [dependencies]
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
+ssi.workspace = true
+tracing.workspace = true
 async-trait = "0.1"
 base64 = "0.22"
 futures-util = "0.3"
@@ -28,14 +30,12 @@ rustls-pemfile = "2"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha256 = "1.5"
-ssi = "0.8"
 thiserror = "1.0"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-stream = "0.1"
 tokio-tungstenite = { version = "0.23.0", features = [
     "rustls-tls-native-roots",
 ] }
-tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
