@@ -16,50 +16,44 @@ affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 ssi.workspace = true
 tracing.workspace = true
-async-convert = "1"
-async-trait = "0.1"
-aws-config = "1.5"
-aws-sdk-dynamodb = "1.29"
-aws-sdk-memorydb = "1.26.0"
-aws-sdk-secretsmanager = "1.26.0"
-aws-sdk-ssm = "1.26.0"
-axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9.3", features = ["typed-header"] }
-axum-server = { version = "0.7", features = ["tls-rustls"] }
-base64 = "0.22"
-chrono = "0.4"
-deadpool-redis = { version = "0.17", features = ["rt_tokio_1"] }
-hostname = "0.4"
-http = "1"
-jsonwebtoken = "9.3"
-itertools = "0.13"
-rand = "0.8"
-redis = { version = "0.26", features = [
-    "tokio-rustls-comp",
-    "tls-rustls-insecure",
-] }
-regex = "1"
-ring = { version = "0.17", features = ["std"] }
-rustls = { version = "0.23", default-features = false, features = [
-    "aws_lc_rs",
-    "tls12",
-] }
-serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = "1.0"
-sha256 = "1.5"
-thiserror = "1.0"
-tokio = { version = "1.37.0", features = ["full"] }
-tokio-stream = "0.1"
-toml = "0.8"
-tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+async-convert.workspace = true
+async-trait.workspace = true
+aws-config.workspace = true
+aws-sdk-dynamodb.workspace = true
+aws-sdk-memorydb.workspace = true
+aws-sdk-secretsmanager.workspace = true
+aws-sdk-ssm.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+axum-server.workspace = true
+base64.workspace = true
+chrono.workspace = true
+deadpool-redis.workspace = true
+hostname.workspace = true
+http.workspace = true
+jsonwebtoken.workspace = true
+itertools.workspace = true
+rand.workspace = true
+redis.workspace = true
+regex.workspace = true
+ring.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha256.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+toml.workspace = true
+tower-http.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 did-peer.workspace = true
+reqwest.workspace = true
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
 ] }
-reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 time = "0.3"
