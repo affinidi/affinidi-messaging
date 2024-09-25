@@ -13,11 +13,11 @@ use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{event, Level};
-use tracing_subscriber::{filter, layer::SubscriberExt, reload, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, reload, util::SubscriberInitExt, EnvFilter};
 
 pub async fn start() {
     // setup logging/tracing framework
-    let filter = filter::LevelFilter::INFO; // This can be changed in the config file!
+    let filter = EnvFilter::from_default_env(); // This can be changed in the config file!
     let (filter, reload_handle) = reload::Layer::new(filter);
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
