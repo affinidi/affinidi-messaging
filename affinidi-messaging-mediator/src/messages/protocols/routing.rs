@@ -1,7 +1,8 @@
-use std::time::SystemTime;
-
 use affinidi_messaging_didcomm::Message;
 use serde::Deserialize;
+use serde_json::Value;
+use ssi::dids::{document::service::Endpoint, Document, DIDURL};
+use std::time::SystemTime;
 use tracing::{debug, span, warn, Instrument};
 
 use crate::{
@@ -67,6 +68,16 @@ pub(crate) async fn process(
                 ));
             };
         let next_did_hash = sha256::digest(next.as_bytes());
+
+        // resolve the next DID to a DIDDoc
+        let next_did = state.did_resolver.resolve(&next).await.map_err(|e| {
+            MediatorError::DIDError(
+                session.session_id.clone(),
+                next,
+                format!("Couldn't resolve DID: Reason: {}", e),
+            )
+        })?;
+        let next_did_doc = next_did.doc;
 
         let attachments = if let Some(attachments) = &msg.attachments {
             attachments.to_owned()
@@ -172,6 +183,8 @@ pub(crate) async fn process(
         }
 
         // Forward is good, lets process the attachments and add to the queues
+        // First step is to determine if the next hop is local to the mediator or remote?
+        //if next_did_doc.service
 
         Ok(ProcessMessageResponse {
             store_message: true,
@@ -181,4 +194,75 @@ pub(crate) async fn process(
     }
     .instrument(_span)
     .await
+}
+
+/// Determines if the next hop is local to the mediator or remote
+/// The next field of a routing message is a DID
+/// https://identity.foundation/didcomm-messaging/spec/#routing-protocol-20
+/// - next: DID (may include key ID) of the next hop
+/// - next_doc: Resolved DID Document of the next hop
+///
+/*
+{
+    "id": "did:example:123456789abcdefghi#didcomm-1",
+    "type": "DIDCommMessaging",
+    "serviceEndpoint": [{
+        "uri": "https://example.com/path",
+        "accept": [
+            "didcomm/v2",
+            "didcomm/aip2;env=rfc587"
+        ],
+        "routingKeys": ["did:example:somemediator#somekey"]
+    }]
+}
+*/
+fn service_local(
+    session: &Session,
+    state: &SharedData,
+    next: &str,
+    next_doc: &Document,
+) -> Result<bool, MediatorError> {
+    let mut _error = None;
+
+    // If the next hop is the mediator itself, then this is a recursive forward
+    if next == state.config.mediator_did {
+        warn!("next hop is the mediator itself, but this should have been unpacked. not accepting this message");
+        return Err(MediatorError::ForwardMessageError(
+            session.session_id.clone(),
+            "next hop is the mediator, recursive forward found".into(),
+        ));
+    }
+
+    let local = next_doc
+        .service
+        .iter()
+        .filter(|s| s.type_.contains(&"DIDCommMessaging".to_string()))
+        .any(|s| {
+            // Service Type is DIDCommMessaging
+            if let Some(service_endpoint) = &s.service_endpoint {
+                service_endpoint.into_iter().any(|endpoint| {
+                    match endpoint {
+                        Endpoint::Uri(uri) => {
+                            if uri.as_str().eq(&state.config.mediator_did) {
+                                warn!("next hop is the mediator itself, but this should have been unpacked. not accepting this message");
+                                _error = Some(MediatorError::ForwardMessageError(session.session_id.clone(), "next hop is the mediator, recursive forward found".into()));
+                                false
+                            } else {
+                                // Next hop is remote to the mediator
+                                false
+                            }
+                        }
+                        Endpoint::Map(map) => {true}
+                    }
+                })
+            } else {
+                false
+            }
+        });
+
+    if let Some(e) = _error {
+        Err(e)
+    } else {
+        Ok(local)
+    }
 }
