@@ -20,7 +20,7 @@ use std::{
     path::Path,
 };
 use tracing::{event, info, Level};
-use tracing_subscriber::{filter::LevelFilter, reload::Handle, Registry};
+use tracing_subscriber::{filter::LevelFilter, reload::Handle, EnvFilter, Registry};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -678,28 +678,14 @@ fn get_hostname(host_name: &str) -> Result<String, MediatorError> {
 }
 
 pub async fn init(
-    reload_handle: Option<Handle<LevelFilter, Registry>>,
+    reload_handle: Option<Handle<EnvFilter, Registry>>,
 ) -> Result<Config, MediatorError> {
     // Read configuration file parameters
     let config = read_config_file("conf/mediator.toml")?;
 
     // Setup logging
     if reload_handle.is_some() {
-        let level: LevelFilter = match config.log_level.as_str() {
-            "trace" => LevelFilter::TRACE,
-            "debug" => LevelFilter::DEBUG,
-            "info" => LevelFilter::INFO,
-            "warn" => LevelFilter::WARN,
-            "error" => LevelFilter::ERROR,
-            _ => {
-                event!(
-                    Level::WARN,
-                    "log_level({}) is unknown in config file. Defaults to INFO",
-                    config.log_level
-                );
-                LevelFilter::INFO
-            }
-        };
+        let level: EnvFilter = EnvFilter::new(config.log_level.as_str());
         reload_handle
             .unwrap()
             .modify(|filter| *filter = level)
