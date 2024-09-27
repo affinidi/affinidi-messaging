@@ -138,6 +138,10 @@ forward_task_queue = "${LIMIT_FORWARD_TASK_QUEUE:50000}"
 ### It is recommended to use infrastructure level limitation instead of application level limitations
 http_size = "${LIMIT_HTTP_SIZE:10485760}"
 
+### local_max_acl: Maximum number of ACL entries that each DID can have
+### Default: 1_000
+local_max_acl = "${LIMIT_LOCAL_MAX_ACL:1000}"
+
 ### message_expiry_minutes: Time to live in minutes for messages stored
 ### Messages will expire after this limit
 ### Default: 10080 (7 days)
