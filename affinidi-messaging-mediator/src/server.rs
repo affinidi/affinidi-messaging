@@ -26,6 +26,7 @@ pub async fn start() {
         .init();
 
     if ansi {
+        event!(Level::INFO, "");
         event!(
             Level::INFO,
             r#"        db          ad88     ad88  88               88           88  88     88b           d88                       88  88"#
@@ -79,6 +80,12 @@ pub async fn start() {
             std::process::exit(1);
         }
     };
+
+    // Set up the administration account if it doesn't exist
+    database
+        .setup_admin_account(&config.admin_did)
+        .await
+        .expect("Could not setup admin account! exiting...");
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread

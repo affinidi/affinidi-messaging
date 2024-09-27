@@ -26,6 +26,7 @@ use tracing_subscriber::{filter::LevelFilter, reload::Handle, EnvFilter, Registr
 pub struct ServerConfig {
     pub listen_address: String,
     pub api_prefix: String,
+    pub admin_did: String,
 }
 
 /// Database Struct contains database and storage of messages related configuration details
@@ -216,6 +217,7 @@ pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
+    pub admin_did: String,
     pub mediator_secrets: AffinidiSecrets,
     pub database_url: String,
     pub database_pool_size: usize,
@@ -240,6 +242,7 @@ impl fmt::Debug for Config {
             .field("log_level", &self.log_level)
             .field("listen_address", &self.listen_address)
             .field("mediator_did", &self.mediator_did)
+            .field("admin_did", &self.admin_did)
             .field("mediator_did_doc", &"Hidden")
             .field(
                 "mediator_secrets",
@@ -277,6 +280,7 @@ impl Default for Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
             mediator_did: "".into(),
+            admin_did: "".into(),
             mediator_secrets: AffinidiSecrets::new(vec![]),
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
@@ -323,6 +327,7 @@ impl TryFrom<ConfigRaw> for Config {
             },
             listen_address: raw.server.listen_address,
             mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
+            admin_did: read_did_config(&raw.server.admin_did, &aws_config).await?,
             database_url: raw.database.database_url,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),

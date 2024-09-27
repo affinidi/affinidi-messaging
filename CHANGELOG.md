@@ -11,7 +11,10 @@
 
 ### Affinidi Mediator
 
+* ACL support added
 * DIDComm routing protocol (forwarding) implemented
+* Mediator ADMIN accounts added
+  * Allows for managing ACL's
 * Mediator configuration modified to break config into clearer blocks
   * Breaking change. i.e. config items have changed names and blocks
 * Ability to run the `forwarding` processor locally or remotely
