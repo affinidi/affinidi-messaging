@@ -1,6 +1,6 @@
 /target
 dump.rdb
 .DS_Store
-/**/secrets.json-generated
 /**/secrets.json
 .vscode
+**/*.gif

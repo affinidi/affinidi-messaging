@@ -50,6 +50,7 @@ fn init_local_mediator(theme: &ColorfulTheme) -> Result<Option<MediatorConfig>, 
         );
     }
 
+    println!();
     if Confirm::with_theme(theme)
         .with_prompt("Do you want to create a new administration DID and secrets?")
         .interact()?
@@ -64,6 +65,7 @@ fn init_local_mediator(theme: &ColorfulTheme) -> Result<Option<MediatorConfig>, 
         );
     }
 
+    println!();
     if Confirm::with_theme(theme)
         .with_prompt("Save mediator configuration?")
         .interact()?
@@ -115,6 +117,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             style(")").blue()
         );
     }
+
+    println!();
+    println!(
+        "{}",
+        style("You can now run the mediator locally using the following command:").blue()
+    );
+    println!(
+        "  {}",
+        style("cd affinidi-messaging-mediator && cargo run").color256(231)
+    );
 
     println!();
     Ok(())

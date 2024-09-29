@@ -28,38 +28,23 @@ To build and run this project, you need to set up the following:
    docker run --name=redis-local --publish=6379:6379 --hostname=redis --restart=on-failure --detach redis:latest
    ```
 
-2. Navigate to the `affinidi-messaging-mediator` subfolder and create certificates for `affinidi-messaging-mediator` service:
+2. Run `setup_environment` to configure the mediator with all the required information to run locally.
+
+   You must run the following from the top-level directory of `affinidi-messaging`
+
+   ```bash
+   cargo run --example setup_environment
+   ```
+
+   This will generate:
+      - Mediator DID and secrets
+      - Administration DID and secrets
+      - SSL Certificates for local development/testing
+
+3. Start `affinidi-messaging-mediator` service via:
 
    ```bash
    cd affinidi-messaging-mediator
-   cargo run --example create_local_certs
-   ```
-
-   This will generate certificate files in the `affinidi-messaging-mediator/conf/keys` folder. You should use `client.chain` file to override the default SSL certificates in `affinidi-messaging-sdk`, like:
-
-   ```rust
-   let mut config = Config::builder()
-       .with_ssl_certificates(&mut vec![
-           "../affinidi-messaging-mediator/conf/keys/client.chain".into()
-       ])
-   ```
-
-3. In the same `affinidi-messaging-mediator` subfolder run the following command to generate DID and the corresponding keys:
-
-   ```bash
-   cargo run --example generate_secrets
-   ```
-
-   This will generate `affinidi-messaging-mediator/conf/secrets.json-generated` file containing a did:peer together with the pair of keys for verification and encryption and `jwt_authorization_secret` you shall use for `jwt_authorization_secret` value in `mediator.toml`.
-   Use the generated did:peer as a value for `<MEDIATOR_DID>` placeholder in following commands as well as in [affinidi-messaging-sdk - Examples](../affinidi-messaging-sdk#examples).
-
-4. Save the generated `secrets.json-generated` file as `affinidi-messaging-mediator/conf/secrets.json`.
-
-5. Start `affinidi-messaging-mediator` service via:
-
-   ```bash
-   cd affinidi-messaging-mediator
-   export MEDIATOR_DID=did://<MEDIATOR_DID>
    export REDIS_URL=redis://@localhost:6379
    cargo run
    ```

@@ -600,7 +600,7 @@ async fn read_did_config(
         _ => {
             return Err(MediatorError::ConfigError(
                 "NA".into(),
-                "Invalid MEDIATOR_SECRETS format! Expecting file:// or aws_secrets:// ...".into(),
+                "Invalid mediator_did format! Expecting file:// or aws_secrets:// ...".into(),
             ))
         }
     };

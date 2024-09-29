@@ -170,8 +170,10 @@ impl MediatorConfig {
         config.lines().for_each(|line| {
             if mediator_did_re.is_match(line) {
                 if let Some(mediator_did) = &self.mediator_did {
-                    let new_str =
-                        format!("mediator_did = \"{{MEDIATOR_DID:did://{}}}\"", mediator_did);
+                    let new_str = format!(
+                        "mediator_did = \"${{MEDIATOR_DID:did://{}}}\"",
+                        mediator_did
+                    );
                     new_config.push_str(&new_str);
                     new_config.push('\n');
                     println!(
@@ -186,7 +188,7 @@ impl MediatorConfig {
                 }
             } else if admin_did_re.is_match(line) {
                 if let Some(admin_did) = &self.admin_did {
-                    let new_str = format!("admin_did = \"{{ADMIN_DID:did://{}}}\"", admin_did);
+                    let new_str = format!("admin_did = \"${{ADMIN_DID:did://{}}}\"", admin_did);
                     new_config.push_str(&new_str);
                     new_config.push('\n');
                     println!(
