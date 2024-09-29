@@ -7,16 +7,19 @@ use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
     secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
-use protocols::message_pickup;
-use protocols::routing;
+use protocols::{mediator_administration, mediator_local_acls, routing};
+use protocols::{mediator_global_acls, message_pickup};
 use std::{str::FromStr, time::SystemTime};
 
 pub mod inbound;
 pub mod protocols;
 
 pub enum MessageType {
-    AffinidiAuthenticate,            // Affinidi Authentication Response
+    AffinidiAuthenticate,            // Affinidi Messaging Authentication Response
     ForwardRequest,                  // DidComm Routing 2.0 Forward Request
+    MediatorAdministration,          // Mediator Administration Protocol
+    MediatorGlobalACLManagement,     // Mediator Global ACL Management Protocol
+    MediatorLocalACLManagement,      // Mediator Global ACL Management Protocol
     MessagePickupStatusRequest,      // Message Pickup 3.0 Status Request
     MessagePickupDeliveryRequest,    // Message Pickup 3.0 Delivery Request
     MessagePickupMessagesReceived,   // Message Pickup 3.0 Messages Received (ok to delete)
@@ -31,6 +34,13 @@ impl FromStr for MessageType {
         match s {
             "https://didcomm.org/trust-ping/2.0/ping" => Ok(Self::TrustPing),
             "https://affinidi.com/atm/1.0/authenticate" => Ok(Self::AffinidiAuthenticate),
+            "https://didcomm.org/mediator/1.0/admin-management" => Ok(Self::MediatorAdministration),
+            "https://didcomm.org/mediator/1.0/global-acl-management" => {
+                Ok(Self::MediatorGlobalACLManagement)
+            }
+            "https://didcomm.org/mediator/1.0/local-acl-management" => {
+                Ok(Self::MediatorLocalACLManagement)
+            }
             "https://didcomm.org/messagepickup/3.0/status-request" => {
                 Ok(Self::MessagePickupStatusRequest)
             }
@@ -61,6 +71,15 @@ impl MessageType {
         session: &Session,
     ) -> Result<ProcessMessageResponse, MediatorError> {
         match self {
+            Self::MediatorAdministration => {
+                mediator_administration::process(message, state, session).await
+            }
+            Self::MediatorGlobalACLManagement => {
+                mediator_global_acls::process(message, state, session).await
+            }
+            Self::MediatorLocalACLManagement => {
+                mediator_local_acls::process(message, state, session).await
+            }
             Self::TrustPing => ping::process(message, session),
             Self::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await

@@ -1,7 +1,6 @@
 use affinidi_messaging_didcomm::Message;
 use serde::Deserialize;
-use serde_json::Value;
-use ssi::dids::{document::service::Endpoint, Document, DIDURL};
+use ssi::dids::{document::service::Endpoint, Document};
 use std::time::SystemTime;
 use tracing::{debug, span, warn, Instrument};
 

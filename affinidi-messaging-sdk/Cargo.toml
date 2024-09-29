@@ -37,4 +37,11 @@ uuid.workspace = true
 
 [dev-dependencies]
 clap.workspace = true
+console.workspace = true
+dialoguer.workspace = true
 did-peer.workspace = true
+rand.workspace = true
+rcgen.workspace = true
+regex.workspace = true
+ring.workspace = true
+time.workspace = true

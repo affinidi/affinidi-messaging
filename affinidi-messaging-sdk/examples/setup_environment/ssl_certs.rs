@@ -1,3 +1,4 @@
+//! Create a local SSL Certificate Authority (CA) for use in testing and local development
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File};
@@ -20,7 +21,7 @@ use time::OffsetDateTime;
  * This code was "borrowed" from the rustls examples
  * https://github.com/rustls/rustls/blob/main/rustls/examples/internal/test_ca.rs
  */
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_ssl_certs() -> Result<(), Box<dyn std::error::Error>> {
     let mut certified_keys = HashMap::with_capacity(ROLES.len() * SIG_ALGS.len());
     for role in ROLES {
         for alg in SIG_ALGS {
@@ -235,7 +236,8 @@ struct SigAlgContext {
 
 impl SigAlgContext {
     fn output_directory(&self) -> PathBuf {
-        let output_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("conf/keys");
+        let output_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("../affinidi-messaging-mediator/conf/keys");
         //.join(self.issuer_cn.to_lowercase().replace(' ', "-"));
         fs::create_dir_all(&output_dir).unwrap();
         output_dir

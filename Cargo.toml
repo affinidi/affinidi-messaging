@@ -28,10 +28,10 @@ askar-crypto = "0.3.1"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.29"
-aws-sdk-memorydb = "1.26.0"
-aws-sdk-secretsmanager = "1.26.0"
-aws-sdk-ssm = "1.26.0"
+aws-sdk-dynamodb = "1.48"
+aws-sdk-memorydb = "1.44"
+aws-sdk-secretsmanager = "1.48"
+aws-sdk-ssm = "1.49"
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
@@ -40,8 +40,10 @@ bs58 = "0.5"
 chrono = "0.4"
 criterion = "0.5"
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
+dialoguer = "0.11"
 did-peer = { version = "0.1.12" }
 clap = { version = "4.5", features = ["derive"] }
+console = "0.15"
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"

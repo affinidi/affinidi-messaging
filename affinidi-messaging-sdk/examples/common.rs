@@ -128,5 +128,5 @@ pub async fn configure_bob_atm() -> Result<ConfigureAtmResult, ATMError> {
 
 // to avoid: error[E0601]: `main` function not found in crate `common`
 fn main() {
-    info!("Please use examples for check affinidi-messaging-sdk functionality.");
+    info!("Please use examples to check affinidi-messaging-sdk functionality.");
 }

@@ -7,7 +7,7 @@ log_level = "debug"
 ### Supported formats:
 ### - did://did:peer:<version>:<base58-encoded-verification-key>
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
-mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkrG9UvqihbUBmZjPp3D3GpfGP6eDUhWGhFhPZvJBoscp2.EzQ3shdh72DgvrjWE6vA6Jsqz2wQKr6AZbyJFownKcyVQhXiRj.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
+mediator_did = "{MEDIATOR_DID:did://did:peer:2.Vz6MkmcCNZhRYR8b99qAxvCedui1t4GpUZ5VeFg1sQFd633Px.EzQ3shQjCQW7gkiBLnCYduu3RPj7iKJDm8RqZ5iYZsPadCifUQ.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
 
 ### ****************************************************************************************************************************
 ### Server configuration
@@ -29,7 +29,7 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
 ###       This causes more use cases where the secrets of the mediator itself can be exposed in adminstration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
-admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkiCNo4V15L14eegJ3c7UHszzwftZm7m6S789WSSWiNt65.EzQ3shTo5k6wyZmZ7EWQfqFzXQxAPxiFAZTog1vsEoZxFbjHar}"
+admin_did = "{ADMIN_DID:did://did:peer:2.Vz6MksaydRpcxek9xosYVt2MfFQiJ7WrR9LqnweoCyDcgVnXa.EzQ3shnk84iRrJ2Lf22ACLuBMDAWy9cYzz6SyzMU6W12Y3AbhD}"
 
 ### ****************************************************************************************************************************
 ### Database configuration
