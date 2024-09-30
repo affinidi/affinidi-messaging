@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
 use std::{
-    env, fmt,
+    env,
+    fmt::{self, Debug},
     fs::File,
     io::{self, BufRead},
     path::Path,
@@ -37,15 +38,131 @@ pub struct DatabaseConfig {
     pub database_timeout: String,
 }
 
+/// What ACL logic mode is the mediator running in?
+/// - ExplicitAllow - no one can connect, unless explicitly allowed
+/// - ExplicitDeny - everyone can connect, unless explicitly denied
+#[derive(Clone)]
+pub enum ACLMode {
+    ExplicitAllow,
+    ExplicitDeny,
+}
+
+impl Debug for ACLMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
+            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
+        }
+    }
+}
+
 /// SecurityConfig Struct contains security related configuration details
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SecurityConfig {
+pub struct SecurityConfigRaw {
+    pub acl_mode: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
     pub jwt_authorization_secret: String,
     pub cors_allow_origin: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct SecurityConfig {
+    pub acl_mode: ACLMode,
+    pub mediator_secrets: AffinidiSecrets,
+    pub use_ssl: bool,
+    pub ssl_certificate_file: String,
+    pub ssl_key_file: String,
+    pub jwt_encoding_key: EncodingKey,
+    pub jwt_decoding_key: DecodingKey,
+    pub cors_allow_origin: CorsLayer,
+}
+
+impl Debug for SecurityConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecurityConfig")
+            .field("acl_mode", &self.acl_mode)
+            .field(
+                "mediator_secrets",
+                &format!("({}) secrets loaded", self.mediator_secrets.len()),
+            )
+            .field("use_ssl", &self.use_ssl)
+            .field("ssl_certificate_file", &self.ssl_certificate_file)
+            .field("ssl_key_file", &self.ssl_key_file)
+            .field("jwt_encoding_key?", &"<hidden>".to_string())
+            .field("jwt_decoding_key?", &"<hidden>".to_string())
+            .field("cors_allow_origin", &self.cors_allow_origin)
+            .finish()
+    }
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        SecurityConfig {
+            acl_mode: ACLMode::ExplicitDeny,
+            mediator_secrets: AffinidiSecrets::new(vec![]),
+            use_ssl: true,
+            ssl_certificate_file: "".into(),
+            ssl_key_file: "".into(),
+            jwt_encoding_key: EncodingKey::from_ed_der(&[0; 32]),
+            jwt_decoding_key: DecodingKey::from_ed_der(&[0; 32]),
+            cors_allow_origin: CorsLayer::new().allow_origin(Any),
+        }
+    }
+}
+
+impl SecurityConfigRaw {
+    fn parse_cors_allow_origin(
+        &self,
+        cors_allow_origin: &str,
+    ) -> Result<Vec<HeaderValue>, MediatorError> {
+        let origins: Vec<HeaderValue> = cors_allow_origin
+            .split(',')
+            .map(|o| o.parse::<HeaderValue>().unwrap())
+            .collect();
+
+        Ok(origins)
+    }
+
+    async fn convert(&self, aws_config: &SdkConfig) -> Result<SecurityConfig, MediatorError> {
+        let mut config = SecurityConfig {
+            acl_mode: match self.acl_mode.as_str() {
+                "explicit_allow" => ACLMode::ExplicitAllow,
+                "explicit_deny" => ACLMode::ExplicitDeny,
+                _ => ACLMode::ExplicitDeny,
+            },
+            use_ssl: self.use_ssl.parse().unwrap_or(true),
+            ssl_certificate_file: self.ssl_certificate_file.clone(),
+            ssl_key_file: self.ssl_key_file.clone(),
+            ..Default::default()
+        };
+
+        if let Some(cors_allow_origin) = &self.cors_allow_origin {
+            config.cors_allow_origin =
+                CorsLayer::new().allow_origin(self.parse_cors_allow_origin(cors_allow_origin)?);
+        }
+
+        // Load mediator secrets
+        config.mediator_secrets = load_secrets(&self.mediator_secrets, aws_config).await?;
+
+        // Create the JWT encoding and decoding keys
+        let jwt_secret = config_jwt_secret(&self.jwt_authorization_secret, aws_config).await?;
+
+        config.jwt_encoding_key = EncodingKey::from_ed_der(&jwt_secret);
+
+        let pair = Ed25519KeyPair::from_pkcs8(&jwt_secret).map_err(|err| {
+            event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not create JWT key pair. {}", err),
+            )
+        })?;
+        config.jwt_decoding_key = DecodingKey::from_ed_der(pair.public_key().as_ref());
+
+        Ok(config)
+    }
 }
 
 /// StreamingConfig Struct contains live streaming related configuration details
@@ -205,7 +322,7 @@ struct ConfigRaw {
     pub mediator_did: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
-    pub security: SecurityConfig,
+    pub security: SecurityConfigRaw,
     pub streaming: StreamingConfig,
     pub did_resolver: DIDResolverConfig,
     pub limits: LimitsConfigRaw,
@@ -218,20 +335,14 @@ pub struct Config {
     pub listen_address: String,
     pub mediator_did: String,
     pub admin_did: String,
-    pub mediator_secrets: AffinidiSecrets,
     pub database_url: String,
     pub database_pool_size: usize,
     pub database_timeout: u32,
     pub api_prefix: String,
-    pub use_ssl: bool,
-    pub ssl_certificate_file: String,
-    pub ssl_key_file: String,
-    pub jwt_encoding_key: Option<EncodingKey>,
-    pub jwt_decoding_key: Option<DecodingKey>,
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
+    pub security: SecurityConfig,
     pub did_resolver_config: ClientConfig,
-    pub cors_allow_origin: CorsLayer,
     pub process_forwarding: ForwardingConfig,
     pub limits: LimitsConfig,
 }
@@ -244,23 +355,14 @@ impl fmt::Debug for Config {
             .field("mediator_did", &self.mediator_did)
             .field("admin_did", &self.admin_did)
             .field("mediator_did_doc", &"Hidden")
-            .field(
-                "mediator_secrets",
-                &format!("({}) secrets loaded", self.mediator_secrets.len()),
-            )
-            .field("use_ssl", &self.use_ssl)
-            .field("cors_allow_origin", &self.cors_allow_origin)
             .field("database_url", &self.database_url)
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
-            .field("ssl_certificate_file", &self.ssl_certificate_file)
-            .field("ssl_key_file", &self.ssl_key_file)
-            .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
-            .field("jwt_decoding_key?", &self.jwt_decoding_key.is_some())
             .field("streaming_enabled?", &self.streaming_enabled)
             .field("streaming_uuid", &self.streaming_uuid)
             .field("DID Resolver config", &self.did_resolver_config)
             .field("api_prefix", &self.api_prefix)
+            .field("security", &self.security)
             .field("processor Forwarding", &self.process_forwarding)
             .field("Limits", &self.limits)
             .finish()
@@ -281,20 +383,14 @@ impl Default for Config {
             listen_address: "".into(),
             mediator_did: "".into(),
             admin_did: "".into(),
-            mediator_secrets: AffinidiSecrets::new(vec![]),
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
             database_timeout: 2,
-            use_ssl: true,
-            ssl_certificate_file: "".into(),
-            ssl_key_file: "".into(),
-            jwt_encoding_key: None,
-            jwt_decoding_key: None,
             streaming_enabled: true,
             streaming_uuid: "".into(),
             did_resolver_config,
-            cors_allow_origin: CorsLayer::new().allow_origin(Any),
             api_prefix: "/mediator/v1/".into(),
+            security: SecurityConfig::default(),
             process_forwarding: ForwardingConfig::default(),
             limits: LimitsConfig::default(),
         }
@@ -331,39 +427,14 @@ impl TryFrom<ConfigRaw> for Config {
             database_url: raw.database.database_url,
             database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
-            use_ssl: raw.security.use_ssl.parse().unwrap_or(true),
-            ssl_certificate_file: raw.security.ssl_certificate_file,
-            ssl_key_file: raw.security.ssl_key_file,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
             api_prefix: raw.server.api_prefix,
+            security: raw.security.convert(&aws_config).await?,
             process_forwarding: raw.processors.forwarding.try_into()?,
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
-
-        if let Some(cors_allow_origin) = &raw.security.cors_allow_origin {
-            config.cors_allow_origin =
-                CorsLayer::new().allow_origin(parse_cors_allow_origin(cors_allow_origin)?);
-        }
-
-        // Load mediator secrets
-        config.mediator_secrets = load_secrets(&raw.security.mediator_secrets, &aws_config).await?;
-
-        // Create the JWT encoding and decoding keys
-        let jwt_secret =
-            config_jwt_secret(&raw.security.jwt_authorization_secret, &aws_config).await?;
-
-        config.jwt_encoding_key = Some(EncodingKey::from_ed_der(&jwt_secret));
-
-        let pair = Ed25519KeyPair::from_pkcs8(&jwt_secret).map_err(|err| {
-            event!(Level::ERROR, "Could not create JWT key pair. {}", err);
-            MediatorError::ConfigError(
-                "NA".into(),
-                format!("Could not create JWT key pair. {}", err),
-            )
-        })?;
-        config.jwt_decoding_key = Some(DecodingKey::from_ed_der(pair.public_key().as_ref()));
 
         // Get Subscriber unique hostname
         if config.streaming_enabled {
@@ -372,15 +443,6 @@ impl TryFrom<ConfigRaw> for Config {
 
         Ok(config)
     }
-}
-
-fn parse_cors_allow_origin(cors_allow_origin: &str) -> Result<Vec<HeaderValue>, MediatorError> {
-    let origins: Vec<HeaderValue> = cors_allow_origin
-        .split(',')
-        .map(|o| o.parse::<HeaderValue>().unwrap())
-        .collect();
-
-    Ok(origins)
 }
 
 /// Loads the secret data into the Config file.

@@ -1,11 +1,8 @@
-use std::{net::SocketAddr, time::SystemTime};
+use std::time::SystemTime;
 
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use affinidi_messaging_sdk::messages::GenericDataStruct;
-use axum::{
-    extract::{ConnectInfo, State},
-    Json,
-};
+use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
 use rand::{distributions::Alphanumeric, Rng};
@@ -99,24 +96,29 @@ pub async fn authentication_response(
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthorizationResponse>>), AppError> {
     let s = serde_json::to_string(&body).unwrap();
 
-    let mut envelope =
-        match MetaEnvelope::new(&s, &state.did_resolver, &state.config.mediator_secrets).await {
-            Ok(envelope) => envelope,
-            Err(e) => {
-                return Err(MediatorError::ParseError(
-                    "UNKNOWN".to_string(),
-                    "Raw inbound DIDComm message".into(),
-                    e.to_string(),
-                )
-                .into());
-            }
-        };
+    let mut envelope = match MetaEnvelope::new(
+        &s,
+        &state.did_resolver,
+        &state.config.security.mediator_secrets,
+    )
+    .await
+    {
+        Ok(envelope) => envelope,
+        Err(e) => {
+            return Err(MediatorError::ParseError(
+                "UNKNOWN".to_string(),
+                "Raw inbound DIDComm message".into(),
+                e.to_string(),
+            )
+            .into());
+        }
+    };
 
     // Unpack the message
     let (msg, _) = match Message::unpack(
         &mut envelope,
         &state.did_resolver,
-        &state.config.mediator_secrets,
+        &state.config.security.mediator_secrets,
         &UnpackOptions::default(),
     )
     .await
@@ -219,35 +221,29 @@ pub async fn authentication_response(
     let mut refresh_claims = access_claims.clone();
     refresh_claims.exp += 85500;
 
-    let response = if let Some(encoding_key) = state.config.jwt_encoding_key.as_ref() {
-        AuthorizationResponse {
-            access_token: encode(
-                &Header::new(jsonwebtoken::Algorithm::EdDSA),
-                &access_claims,
-                encoding_key,
+    let response = AuthorizationResponse {
+        access_token: encode(
+            &Header::new(jsonwebtoken::Algorithm::EdDSA),
+            &access_claims,
+            &state.config.security.jwt_encoding_key,
+        )
+        .map_err(|err| {
+            MediatorError::InternalError(
+                "UNKNOWN".into(),
+                format!("Couldn't encode access token. Reason: {}", err),
             )
-            .map_err(|err| {
-                MediatorError::InternalError(
-                    "UNKNOWN".into(),
-                    format!("Couldn't encode access token. Reason: {}", err),
-                )
-            })?,
-            refresh_token: encode(
-                &Header::new(jsonwebtoken::Algorithm::EdDSA),
-                &refresh_claims,
-                encoding_key,
+        })?,
+        refresh_token: encode(
+            &Header::new(jsonwebtoken::Algorithm::EdDSA),
+            &refresh_claims,
+            &state.config.security.jwt_encoding_key,
+        )
+        .map_err(|err| {
+            MediatorError::InternalError(
+                "UNKNOWN".into(),
+                format!("Couldn't encode refresh token. Reason: {}", err),
             )
-            .map_err(|err| {
-                MediatorError::InternalError(
-                    "UNKNOWN".into(),
-                    format!("Couldn't encode refresh token. Reason: {}", err),
-                )
-            })?,
-        }
-    } else {
-        return Err(
-            MediatorError::InternalError("NA".into(), "JWT Encoding Key not found".into()).into(),
-        );
+        })?,
     };
 
     // Set the session state to Authorized

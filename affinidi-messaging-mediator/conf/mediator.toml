@@ -51,6 +51,13 @@ database_timeout = "${DATABASE_TIMEOUT:2}"
 ### Security configuration
 ### ****************************************************************************************************************************
 [security]
+### acl_mode: What ACL logic mode is the mediator running in?
+### Default: explicit_deny
+### Options:
+###    - explicit_deny: Mediator will allow any DID to connect and forward/deliver messages unless explicitly denied
+###    - explicit_allow: Mediator will deny all DIDs except for what has been explicitly allowed
+acl_mode = "${ACL_MODE:explicit_deny}"
+
 ### mediator_secrets: Secrets of the mediator
 ### REQUIRED: Location of secrets
 ### Supported formats:

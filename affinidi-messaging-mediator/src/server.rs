@@ -129,6 +129,7 @@ pub async fn start() {
         .merge(app)
         .layer(
             config
+                .security
                 .cors_allow_origin
                 .allow_headers([http::header::CONTENT_TYPE])
                 .allow_methods([
@@ -151,7 +152,7 @@ pub async fn start() {
             get(health_checker_handler).with_state(shared_state),
         );
 
-    if config.use_ssl {
+    if config.security.use_ssl {
         event!(
             Level::INFO,
             "This mediator is using SSL/TLS for secure communication."
@@ -159,10 +160,12 @@ pub async fn start() {
         // configure certificate and private key used by https
         // TODO: Build a proper TLS Config
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-        let ssl_config =
-            RustlsConfig::from_pem_file(config.ssl_certificate_file, config.ssl_key_file)
-                .await
-                .expect("bad certificate/key");
+        let ssl_config = RustlsConfig::from_pem_file(
+            config.security.ssl_certificate_file,
+            config.security.ssl_key_file,
+        )
+        .await
+        .expect("bad certificate/key");
 
         axum_server::bind_rustls(config.listen_address.parse().unwrap(), ssl_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())

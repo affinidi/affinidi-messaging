@@ -16,26 +16,29 @@ pub(crate) async fn handle_inbound(
     let _span = span!(tracing::Level::DEBUG, "handle_inbound",);
 
     async move {
-        let mut envelope =
-            match MetaEnvelope::new(message, &state.did_resolver, &state.config.mediator_secrets)
-                .await
-            {
-                Ok(envelope) => envelope,
-                Err(e) => {
-                    return Err(MediatorError::ParseError(
-                        session.session_id.clone(),
-                        "Raw inbound DIDComm message".into(),
-                        e.to_string(),
-                    ));
-                }
-            };
+        let mut envelope = match MetaEnvelope::new(
+            message,
+            &state.did_resolver,
+            &state.config.security.mediator_secrets,
+        )
+        .await
+        {
+            Ok(envelope) => envelope,
+            Err(e) => {
+                return Err(MediatorError::ParseError(
+                    session.session_id.clone(),
+                    "Raw inbound DIDComm message".into(),
+                    e.to_string(),
+                ));
+            }
+        };
         debug!("message converted to MetaEnvelope");
 
         // Unpack the message
         let (msg, metadata) = match Message::unpack(
             &mut envelope,
             &state.did_resolver,
-            &state.config.mediator_secrets,
+            &state.config.security.mediator_secrets,
             &UnpackOptions {
                 crypto_operations_limit_per_message: state
                     .config
@@ -93,7 +96,7 @@ pub(crate) async fn handle_inbound(
                             recipient,
                             &state.config.mediator_did,
                             &metadata,
-                            &state.config.mediator_secrets,
+                            &state.config.security.mediator_secrets,
                             &state.did_resolver,
                             &PackOptions {
                                 to_keys_per_recipient_limit: state
@@ -156,7 +159,7 @@ pub(crate) async fn handle_inbound(
                     &session.did,
                     &state.config.mediator_did,
                     &metadata,
-                    &state.config.mediator_secrets,
+                    &state.config.security.mediator_secrets,
                     &state.did_resolver,
                     &PackOptions {
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,

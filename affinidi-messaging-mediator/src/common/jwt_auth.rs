@@ -121,18 +121,16 @@ where
                 AuthError::MissingCredentials
             })?;
 
-        let token_data: TokenData<SessionClaims> = if let Some(decoding_key) =
-            state.config.jwt_decoding_key.as_ref()
-        {
-            match jsonwebtoken::decode::<SessionClaims>(bearer.token(), decoding_key, &validation) {
-                Ok(token_data) => token_data,
-                Err(err) => {
-                    event!(Level::WARN, "Decoding JWT failed {:?}", err);
-                    return Err(AuthError::InvalidToken);
-                }
+        let token_data: TokenData<SessionClaims> = match jsonwebtoken::decode::<SessionClaims>(
+            bearer.token(),
+            &state.config.security.jwt_decoding_key,
+            &validation,
+        ) {
+            Ok(token_data) => token_data,
+            Err(err) => {
+                event!(Level::WARN, "Decoding JWT failed {:?}", err);
+                return Err(AuthError::InvalidToken);
             }
-        } else {
-            return Err(AuthError::MissingCredentials);
         };
 
         let session_id = token_data.claims.session_id.clone();

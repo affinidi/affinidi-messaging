@@ -15,7 +15,7 @@ pub mod message_outbound;
 pub mod websocket;
 pub mod well_known_did_fetch;
 
-pub fn application_routes(api_prefix: &String, shared_data: &SharedData) -> Router {
+pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router {
     let app = Router::new()
         // Inbound message handling from ATM clients
         .route("/inbound", post(message_inbound::message_inbound_handler))
@@ -47,7 +47,7 @@ pub fn application_routes(api_prefix: &String, shared_data: &SharedData) -> Rout
         );
 
     Router::new()
-        .nest(api_prefix.as_str(), app)
+        .nest(api_prefix, app)
         .with_state(shared_data.to_owned())
 }
 
