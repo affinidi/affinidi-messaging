@@ -33,6 +33,10 @@ Sleep 2s
 Type "y"
 Sleep 2s
 
+# Create JWT Token Secrets
+Type "y"
+Sleep 2s
+
 # Save Mediator Configuration
 Type "y"
 Sleep 2s

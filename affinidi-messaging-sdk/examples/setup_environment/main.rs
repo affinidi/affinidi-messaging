@@ -67,6 +67,14 @@ fn init_local_mediator(theme: &ColorfulTheme) -> Result<Option<MediatorConfig>, 
 
     println!();
     if Confirm::with_theme(theme)
+        .with_prompt("Create new JWT authorization secrets?")
+        .interact()?
+    {
+        mediator_config.create_jwt_secrets()?;
+    }
+
+    println!();
+    if Confirm::with_theme(theme)
         .with_prompt("Save mediator configuration?")
         .interact()?
     {

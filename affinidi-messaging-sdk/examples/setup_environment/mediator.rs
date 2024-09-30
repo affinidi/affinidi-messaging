@@ -1,10 +1,12 @@
 //! Helper functions to do with the Mediator
+use base64::prelude::*;
 use console::style;
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
 use regex::Regex;
+use ring::signature::Ed25519KeyPair;
 use serde_json::json;
 use ssi::{dids::DIDKey, jwk::Params, JWK};
 use std::{error::Error, fs::File, io::Write};
@@ -15,6 +17,7 @@ pub(crate) struct MediatorConfig {
     pub mediator_secrets: Option<String>,
     pub admin_did: Option<String>,
     pub admin_secrets: Option<String>,
+    pub jwt_authorization_secret: Option<String>,
 }
 
 struct LocalDidPeerKeys {
@@ -118,18 +121,23 @@ impl MediatorConfig {
 
         let mediator_secrets = serde_json::to_string_pretty(&secrets_json)?;
 
-        /*
-
-
-        // Create jwt_authorization_secret
-        let doc = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
-        println!(
-            "jwt_authorization_secret = {}",
-            &BASE64_URL_SAFE_NO_PAD.encode(doc.as_ref())
-        );
-        */
-
         Ok((did_peer, mediator_secrets))
+    }
+
+    pub fn create_jwt_secrets(&mut self) -> Result<(), Box<dyn Error>> {
+        // Create jwt_authorization_secret
+        self.jwt_authorization_secret = Some(
+            BASE64_URL_SAFE_NO_PAD
+                .encode(Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap()),
+        );
+
+        println!(
+            "  {} {}",
+            style(" JWT Authorization Secret created: ").blue().bold(),
+            style(&self.jwt_authorization_secret.as_ref().unwrap()).color256(208)
+        );
+
+        Ok(())
     }
 
     /// Saves a mediator configuration to a file
@@ -167,6 +175,7 @@ impl MediatorConfig {
 
         let mediator_did_re = Regex::new(r"^mediator_did\s*=").unwrap();
         let admin_did_re = Regex::new(r"^admin_did\s*=").unwrap();
+        let jwt_authorization_re = Regex::new(r"^jwt_authorization_secret\s*=").unwrap();
         config.lines().for_each(|line| {
             if mediator_did_re.is_match(line) {
                 if let Some(mediator_did) = &self.mediator_did {
@@ -189,6 +198,24 @@ impl MediatorConfig {
             } else if admin_did_re.is_match(line) {
                 if let Some(admin_did) = &self.admin_did {
                     let new_str = format!("admin_did = \"${{ADMIN_DID:did://{}}}\"", admin_did);
+                    new_config.push_str(&new_str);
+                    new_config.push('\n');
+                    println!(
+                        "  {} {}",
+                        style("Line modified:").blue(),
+                        style(&new_str).color256(208),
+                    );
+                    change_flag = true;
+                } else {
+                    new_config.push_str(line);
+                    new_config.push('\n');
+                }
+            } else if jwt_authorization_re.is_match(line) {
+                if let Some(jwt_auth) = &self.jwt_authorization_secret {
+                    let new_str = format!(
+                        "jwt_authorization_secret = \"${{JWT_AUTHORIZATION_SECRET:string://{}}}\"",
+                        jwt_auth
+                    );
                     new_config.push_str(&new_str);
                     new_config.push('\n');
                     println!(
