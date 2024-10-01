@@ -7,7 +7,7 @@ log_level = "debug"
 ### Supported formats:
 ### - did://did:peer:<version>:<base58-encoded-verification-key>
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
-mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkhW6k48jVqie9vKiSXjCczfWAsWZGuuDwV8XcvVb6wPeW.EzQ3shn8XjZjfcaSNLR9h2jnDsHRzCUQKbnM4Qsbb74gb6W23J.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
+mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6MkhhYoXNy54jBHe4fruB7TvsYk3KAnbHKe64xxFMqjBANn.EzQ3shTpGVwRp2pNM6oX7U9y2k5qm94FvfirHDuHtLoBHF9eZD.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
 
 ### ****************************************************************************************************************************
 ### Server configuration
@@ -29,7 +29,7 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
 ###       This causes more use cases where the secrets of the mediator itself can be exposed in adminstration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
-admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkhpRboLt5LhVyQUBVF6ujKHuVUAgTmoZwWjScAga8DphX.EzQ3shwVATTm1zUrGeHz53uaVQ2KT5d8bpnfaaHSuMPRV4NLyN}"
+admin_did = "${ADMIN_DID:did://did:peer:2.Vz6Mkgskpd6CEHwpLKX68sQU49B6nB7GKKEhDKppt9VfCm9CS.EzQ3shVtvDYuMNuqmFcEWMJzYxrn4bgRWF7ETMKbScrwcph3ox}"
 
 ### ****************************************************************************************************************************
 ### Database configuration
@@ -85,7 +85,7 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### Supported Formats:
 ### - string://<key> - Use the key as is
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
-jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGrfLparVWTnK4dBohzY2vx_kaDlhTwDyzk4xlUl5dbEgSEAkMTUKYQCv-OOAgOp8xjgqizq1V0ZDY1ZRtgTbRpf6gA}"
+jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIHxa6f91uhcaN68RTMA2loIrw3muOGydPTuYhzKqbu0lgSEA-q_CU_WLoIujxUy0iPRrQPpC_qNa0pOdhM9magPxS3s}"
 
 ### cors_allow_origin: Comma separated list of origins that are allowed to access this service
 ### Default: *

@@ -32,3 +32,4 @@
 
 * Added forwarding/routing support
 * Added routing example
+* Added add_secrets() method to add more than one secret at a time

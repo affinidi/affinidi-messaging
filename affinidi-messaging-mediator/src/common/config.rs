@@ -749,10 +749,11 @@ fn get_hostname(host_name: &str) -> Result<String, MediatorError> {
 }
 
 pub async fn init(
+    config_file: &str,
     reload_handle: Option<Handle<EnvFilter, Registry>>,
 ) -> Result<Config, MediatorError> {
     // Read configuration file parameters
-    let config = read_config_file("conf/mediator.toml")?;
+    let config = read_config_file(config_file)?;
 
     // Setup logging
     if reload_handle.is_some() {

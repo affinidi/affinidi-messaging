@@ -191,10 +191,17 @@ impl<'c> ATM<'c> {
         }
     }
 
-    /// Adds required secrets to the secrets resolver
+    /// Adds secret to the secrets resolver
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
     pub fn add_secret(&mut self, secret: Secret) {
         self.secrets_resolver.insert(secret);
+    }
+
+    /// Adds a Vec of secrets to the secrets resolver
+    pub fn add_secrets(&mut self, secrets: Vec<Secret>) {
+        for secret in secrets {
+            self.secrets_resolver.insert(secret);
+        }
     }
 
     pub(crate) fn dids(&self) -> Result<(&String, &String), ATMError> {

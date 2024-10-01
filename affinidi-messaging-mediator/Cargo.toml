@@ -50,5 +50,5 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-did-peer.workspace = true
-reqwest.workspace = true
+console.workspace = true
+dialoguer.workspace = true

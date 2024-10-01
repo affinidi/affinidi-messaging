@@ -1,14 +1,21 @@
 //! This module contains the implementation of the DIDComm protocols supported by the SDK.
+
+use crate::messages::GenericDataStruct;
 #[derive(Default)]
 pub struct Protocols {
     pub message_pickup: message_pickup::MessagePickup,
     pub trust_ping: trust_ping::TrustPing,
     pub routing: routing::Routing,
+    pub mediator: mediator::Mediator,
 }
 
+pub mod mediator;
 pub mod message_pickup;
 pub mod routing;
 pub mod trust_ping;
+
+type MessageString = String;
+impl GenericDataStruct for MessageString {}
 
 impl Protocols {
     pub fn new() -> Protocols {
@@ -16,6 +23,7 @@ impl Protocols {
             message_pickup: message_pickup::MessagePickup::default(),
             trust_ping: trust_ping::TrustPing::default(),
             routing: routing::Routing::default(),
+            mediator: mediator::Mediator::default(),
         }
     }
 }

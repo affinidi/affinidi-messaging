@@ -122,8 +122,8 @@ impl MessagePickup {
         let (msg, _) = msg
             .pack_encrypted(
                 &to_did,
-                Some(&my_did),
-                Some(&my_did),
+                Some(my_did),
+                Some(my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -148,9 +148,6 @@ impl MessagePickup {
                 Err(ATMError::MsgSendError("No response from API".into()))
             }
         } else {
-            type MessageString = String;
-            impl GenericDataStruct for MessageString {}
-
             let a = atm
                 .send_didcomm_message::<InboundMessageResponse>(&msg, true)
                 .await?;
@@ -211,9 +208,9 @@ impl MessagePickup {
         // Pack the message
         let (msg, _) = msg
             .pack_encrypted(
-                &atm_did,
-                Some(&my_did),
-                Some(&my_did),
+                atm_did,
+                Some(my_did),
+                Some(my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -428,8 +425,8 @@ impl MessagePickup {
         let (msg, _) = msg
             .pack_encrypted(
                 &to_did,
-                Some(&my_did),
-                Some(&my_did),
+                Some(my_did),
+                Some(my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),
@@ -599,7 +596,7 @@ impl MessagePickup {
             .pack_encrypted(
                 &to_did,
                 Some(my_did),
-                Some(&my_did),
+                Some(my_did),
                 &atm.did_resolver,
                 &atm.secrets_resolver,
                 &PackEncryptedOptions::default(),

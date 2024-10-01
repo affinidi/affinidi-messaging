@@ -67,7 +67,7 @@ pub async fn start() {
         "[Loading Affinidi Secure Messaging Mediator configuration]"
     );
 
-    let config = init(Some(reload_handle))
+    let config = init("conf/mediator.toml", Some(reload_handle))
         .await
         .expect("Couldn't initialize mediator!");
 

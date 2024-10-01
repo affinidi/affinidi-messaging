@@ -18,7 +18,7 @@ To run the mediator, it requires these packages that is also part of the Affinid
 To build and run this project, you need to set up the following:
 
 1. Install Rust on your machine if you haven't installed it yet using [this guide](https://www.rust-lang.org/tools/install).
-2. Install the Docker on your machine if you haven't installed it yet using [this guide](https://docs.docker.com/desktop/). We will need this to run Redis instance for the mediator.
+2. Install Docker on your machine if you haven't installed it yet using [this guide](https://docs.docker.com/desktop/). We will need this to run Redis instance for the mediator.
 
 ## Running affinidi-messaging-mediator service
 
@@ -50,5 +50,19 @@ To build and run this project, you need to set up the following:
    ```
 
 ## Examples
+
+_**NOTE:**_ _Ensure Mediator is configured and running before using the following examples._
+
+### Mediator Specific Examples
+
+1. Mediator Administration
+
+  You can add/remove/list administration accounts easily using the mediator_administration example
+  
+  ```bash
+  cargo run --example mediator_administration
+  ```
+
+### Affinidi Messaging Examples
 
 Refer to [affinidi-messaging-sdk - Examples](../affinidi-messaging-sdk#examples).

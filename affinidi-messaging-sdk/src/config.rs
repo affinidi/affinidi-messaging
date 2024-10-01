@@ -146,6 +146,15 @@ impl ConfigBuilder {
         self
     }
 
+    /// Add secrets to the SDK
+    /// This is required to auto-start the websocket connection
+    pub fn with_secrets(mut self, secrets: Vec<Secret>) -> Self {
+        for secret in secrets {
+            self.secrets.push(secret);
+        }
+        self
+    }
+
     /// Set the maximum number of messages to cache in the fetch task
     /// Default: 100
     pub fn with_fetch_cache_limit_count(mut self, count: u32) -> Self {
