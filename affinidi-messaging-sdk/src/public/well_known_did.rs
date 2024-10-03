@@ -2,8 +2,7 @@ use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 use tracing::{debug, span, Level};
 
 impl<'c> ATM<'c> {
-    /// Returns a list of messages that are stored in the ATM
-    /// - messages : List of message IDs to retrieve
+    /// Helper method to get the Mediators well-known DID
     pub async fn well_known_did(&mut self) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did").entered();
 

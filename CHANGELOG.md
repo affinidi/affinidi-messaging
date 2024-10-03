@@ -17,6 +17,9 @@
   * Allows for managing ACL's
 * Mediator configuration modified to break config into clearer blocks
   * Breaking change. i.e. config items have changed names and blocks
+* send_error_response() method added so that DIDComm error messages can be generated
+  * Helps with sending error responses to WebSocket requests
+* send_empty_ack_response() method added so that you can ack messages that have no response
 * Ability to run the `forwarding` processor locally or remotely
 * Redis updated from 0.26 to 0.27 and deadpool-redis from 0.17 to 0.18
 * tower-http updated from 0.5 to 0.6

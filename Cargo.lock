@@ -73,9 +73,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d3001c59b4b4cce151d055ca41fc823d9551bf11d570d58848ba4882340f8c"
+checksum = "a21e50e05c4be5df254f0ed0b6d677afd5d5ffd1563d6c0b53ddb1da98e13e96"
 dependencies = [
  "blake2",
  "did-peer",
@@ -2222,9 +2222,9 @@ dependencies = [
 
 [[package]]
 name = "did-peer"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd9d57923f2e42f8d5896a00cb598b9b86e627a8f52047d3750863ac7f079d87"
+checksum = "b2f74327326cbf144cd8d86f135d3d83472f76da81cfa8ef9386fe51d7f2eafc"
 dependencies = [
  "base64 0.22.1",
  "iref",
@@ -5869,6 +5869,7 @@ dependencies = [
  "k256",
  "keccak-hash",
  "p256",
+ "p384",
  "pin-project",
  "rand",
  "ripemd160",
@@ -5967,6 +5968,7 @@ dependencies = [
  "locspan",
  "multibase 0.9.1",
  "p256",
+ "p384",
  "pin-project",
  "rand",
  "rdf-types",
@@ -6124,6 +6126,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "p256",
+ "p384",
  "rand",
  "rsa",
  "serde",
@@ -6152,6 +6155,7 @@ dependencies = [
  "k256",
  "linked-data",
  "p256",
+ "p384",
  "rand",
  "rsa",
  "serde",
@@ -6388,6 +6392,7 @@ dependencies = [
  "linked-data",
  "multibase 0.9.1",
  "p256",
+ "p384",
  "pin-project",
  "rand_core",
  "rdf-types",

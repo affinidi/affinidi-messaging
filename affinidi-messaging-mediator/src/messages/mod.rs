@@ -11,6 +11,7 @@ use protocols::{mediator_administration, mediator_local_acls, routing};
 use protocols::{mediator_global_acls, message_pickup};
 use std::{str::FromStr, time::SystemTime};
 
+pub mod error_response;
 pub mod inbound;
 pub mod protocols;
 

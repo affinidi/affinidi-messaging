@@ -20,6 +20,15 @@ use crate::{
 #[derive(Default)]
 pub struct Mediator {}
 
+pub struct MediatorRequest {
+    pub admins: Vec<MediatorAdminRequest>,
+}
+pub struct MediatorAdminRequest {
+    pub action: String,
+    pub did: Option<String>,
+    pub offset: Option<i32>,
+}
+
 /// A list of admins in the mediator
 /// - `admins` - The list of admins (SHA256 Hashed DIDs)
 /// - `next` - The offset to use for the next request

@@ -42,7 +42,7 @@ impl DatabaseHandler {
     pub(crate) async fn check_admin_account(&self, did_hash: &str) -> Result<bool, MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let result: Vec<String> = deadpool_redis::redis::pipe()
+        let result: Vec<i32> = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SISMEMBER")
             .arg("ADMINS")
@@ -62,8 +62,10 @@ impl DatabaseHandler {
                 )
             })?;
 
-        debug!("Admin account check result: {:?}", result);
-
-        Ok(false)
+        if result.iter().sum::<i32>() == 2 {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }

@@ -68,7 +68,7 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
             select! {
                 value = socket.recv() => {
                     if let Some(msg) = value {
-                        info!("ws: Received message: {:?}", msg);
+                        debug!("ws: Received message: {:?}", msg);
                         if let Ok(msg) = msg {
                             if let Message::Text(msg) = msg {
                                 debug!("ws: Received text message: {:?}", msg);
@@ -88,6 +88,9 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                                         continue;
                                     }
                                 };
+                            } else if let Message::Close(_) = msg {
+                                debug!("Received close message, closing connection");
+                                break;
                             } else {
                                 warn!("Received non-text message, ignoring");
                                 continue;

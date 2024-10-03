@@ -46,8 +46,12 @@ impl MessageCache {
         {
             self.cache_full = true;
         }
+
         if let Some(thid) = message.thid {
             self.thid_lookup.insert(thid, message.id.clone());
+        } else if let Some(pthid) = message.pthid {
+            // DIDComm problem reports use pthid only
+            self.thid_lookup.insert(pthid, message.id.clone());
         }
         debug!(
             "Message inserted into cache: id({}) cached_count({})",
@@ -113,6 +117,8 @@ impl MessageCache {
             // Remove this from thid_lookup if it exists
             if let Some(thid) = &message.thid {
                 self.thid_lookup.remove(thid);
+            } else if let Some(pthid) = &message.pthid {
+                self.thid_lookup.remove(pthid);
             }
 
             (message, meta)
@@ -241,6 +247,13 @@ impl<'c> ATM<'c> {
                                         if let Some(thid) = &message.thid {
                                             if cache.search_list.contains(thid) {
                                                 cache.remove(thid);
+                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
+                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                                })?;
+                                            }
+                                        } else if let Some(pthid) = &message.pthid {
+                                            if cache.search_list.contains(pthid) {
+                                                cache.remove(pthid);
                                                 to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
                                                     ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                                 })?;
