@@ -81,7 +81,7 @@ async fn main() -> Result<(), ATMError> {
         .send_status_request(&mut atm, None, None, None)
         .await?;
 
-    info!("Status: {:?}", status);
+    info!("Status: {:#?}", status);
 
     info!("Testing delivery-request()!");
     // Delivery Request -> Message Delivery
@@ -93,7 +93,7 @@ async fn main() -> Result<(), ATMError> {
     let mut delete_ids: Vec<String> = Vec::new();
 
     for (message, _) in response {
-        info!("[send_delivery_request] Message: {}", message.id);
+        // info!("[send_delivery_request] Message: {}", message.id);
         delete_ids.push(message.id.clone());
     }
     info!("Testing messages-received()!");
@@ -103,7 +103,7 @@ async fn main() -> Result<(), ATMError> {
         .send_messages_received(&mut atm, None, None, &delete_ids, None)
         .await?;
 
-    info!("Status: after send_messages_received() : {:?}", response);
+    info!("Status: after send_messages_received() : {:#?}", response);
 
     /* TODO: Need to complete this part of the protocol...
         Enable live streaming

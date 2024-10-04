@@ -29,16 +29,16 @@ export MEDIATOR_TLS_CERTIFICATES="../affinidi-messaging-mediator/conf/keys/clien
 cargo run --example ping -- \
   --network-address $MEDIATOR_ENDPOINT \
   --ssl-certificates $MEDIATOR_TLS_CERTIFICATES \
-  --mediator-did $MEDIATOR_DID
+
 
 cargo run --example message_pickup -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES 
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
 
 # send a message to the same recipient as sender
 cargo run --example send_message_to_me -- \
   --network-address $MEDIATOR_ENDPOINT \
-  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES 
+  --ssl-certificates $MEDIATOR_TLS_CERTIFICATES
 
 # send a message to another recipient Bob
 cargo run --example send_message_to_bob -- \
