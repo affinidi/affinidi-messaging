@@ -1,6 +1,6 @@
 use crate::{config::Config, errors::ATMError, ATM};
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use ws_handler::WSCommand;
 
 pub mod sending;

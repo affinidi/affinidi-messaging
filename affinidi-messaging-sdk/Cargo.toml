@@ -18,6 +18,7 @@ base64.workspace = true
 futures-util.workspace = true
 http.workspace = true
 jsonwebtoken.workspace = true
+regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true

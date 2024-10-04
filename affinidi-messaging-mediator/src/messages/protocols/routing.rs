@@ -28,27 +28,6 @@ pub(crate) async fn process(
         session_id = session.session_id.as_str()
     );
     async move {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        if let Some(expires) = msg.expires_time {
-            if expires <= now {
-                debug!(
-                    "Message expired at ({}) now({}) seconds_ago({})",
-                    expires,
-                    now,
-                    now - expires
-                );
-                return Err(MediatorError::MessageExpired(
-                    session.session_id.clone(),
-                    expires.to_string(),
-                    now.to_string(),
-                ));
-            }
-        }
-
         let next: String =
             if let Ok(body) = serde_json::from_value::<ForwardRequest>(msg.body.to_owned()) {
                 match body.next {

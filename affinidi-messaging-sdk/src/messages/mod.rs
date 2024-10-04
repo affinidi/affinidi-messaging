@@ -5,6 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub mod delete;
 pub mod fetch;
 pub mod get;
+pub mod known;
 pub mod list;
 pub mod pack;
 pub mod problem_report;

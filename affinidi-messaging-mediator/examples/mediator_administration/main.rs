@@ -156,11 +156,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .interact()
             .unwrap();
 
+        println!();
         match selection {
-            0 => {
-                println!("Listing Administration DIDs");
-                protocols.mediator.list_admins(&mut atm, None).await?;
-            }
+            0 => match protocols.mediator.list_admins(&mut atm, None).await {
+                Ok(admins) => {
+                    println!("Listing Administration DIDs");
+                    for admin in admins.admins {
+                        println!("  {}", admin);
+                    }
+                }
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
             1 => {
                 println!("Adding new Administration DID");
             }
@@ -175,6 +183,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Invalid selection");
             }
         }
+
+        println!();
     }
 
     Ok(())

@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
-use affinidi_messaging_sdk::messages::GenericDataStruct;
+use affinidi_messaging_sdk::messages::{known::MessageType, GenericDataStruct};
 use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
@@ -12,7 +12,6 @@ use tracing::{debug, info, warn};
 use crate::{
     common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::{Session, SessionClaims, SessionState},
-    messages::MessageType,
     SharedData,
 };
 
@@ -134,7 +133,9 @@ pub async fn authentication_response(
     };
 
     // Only accepts AffinidiAuthenticate messages
-    match msg.type_.as_str().parse::<MessageType>()? {
+    match msg.type_.as_str().parse::<MessageType>().map_err(|err| {
+        MediatorError::ParseError("UNKNOWN".to_string(), "msg.type".into(), err.to_string())
+    })? {
         MessageType::AffinidiAuthenticate => (),
         _ => {
             return Err(MediatorError::SessionError(

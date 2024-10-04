@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::ATMError,
-    messages::{sending::InboundMessageResponse, EmptyResponse},
+    messages::{known::MessageType, sending::InboundMessageResponse, EmptyResponse},
     protocols::message_pickup::MessagePickup,
     transports::SendMessageResponse,
     ATM,
@@ -117,7 +117,7 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
             let pickup = MessagePickup::default();
-            if atm.ws_send_stream.is_some() {
+            let message = if atm.ws_send_stream.is_some() {
                 atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
                     .await?;
                 let response = pickup
@@ -125,9 +125,9 @@ impl Mediator {
                     .await?;
 
                 if let Some((message, _)) = response {
-                    self._parse_list_admins_response(&message)
+                    message
                 } else {
-                    Err(ATMError::MsgSendError("No response from API".into()))
+                    return Err(ATMError::MsgSendError("No response from API".into()));
                 }
             } else {
                 let a = atm
@@ -142,10 +142,17 @@ impl Mediator {
                 ))) = a
                 {
                     let (message, _) = atm.unpack(&message).await?;
-                    self._parse_list_admins_response(&message)
+                    message
                 } else {
-                    Err(ATMError::MsgSendError("No response from API".into()))
+                    return Err(ATMError::MsgSendError("No response from API".into()));
                 }
+            };
+
+            let type_ = message.type_.parse::<MessageType>()?;
+            if let MessageType::ProblemReport = type_ {
+                Err(ATMError::from_problem_report(&message))
+            } else {
+                self._parse_list_admins_response(&message)
             }
         }
         .instrument(_span)

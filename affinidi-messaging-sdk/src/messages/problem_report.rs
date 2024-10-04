@@ -2,6 +2,7 @@
 //! [https://identity.foundation/didcomm-messaging/spec/#problem-reports]
 //!
 use core::fmt;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -11,6 +12,18 @@ pub struct ProblemReport {
     pub args: Vec<String>,
     #[serde(rename = "escalate_to")]
     pub escalate_to: Option<String>,
+}
+
+impl fmt::Display for ProblemReport {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Problem Report: code: {}, comment: {}, escalate_to: {:?}",
+            self.code,
+            self.interpolation(),
+            self.escalate_to
+        )
+    }
 }
 
 /// DIDComm Problem Report Sorter Code
@@ -74,10 +87,36 @@ impl ProblemReport {
             escalate_to,
         }
     }
+
+    pub fn interpolation(&self) -> String {
+        let mut output: Vec<String> = Vec::new();
+        let re = Regex::new(r"^\{(\d*)\}$").unwrap();
+        for part in self.comment.split(" ") {
+            if let Some(cap) = re.captures(part) {
+                if let Some(num) = cap.get(1) {
+                    if let Ok(idx) = num.as_str().parse::<usize>() {
+                        if let Some(arg) = self.args.get(idx - 1) {
+                            output.push(arg.to_string());
+                        } else {
+                            output.push("?".to_string());
+                        }
+                    } else {
+                        output.push("?".to_string());
+                    }
+                } else {
+                    output.push("?".to_string())
+                }
+            } else {
+                output.push(part.to_string());
+            }
+        }
+
+        output.join(" ")
+    }
 }
 
+#[cfg(test)]
 mod tests {
-    #[cfg(test)]
     use crate::messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter};
 
     #[test]
@@ -96,5 +135,19 @@ mod tests {
         assert_eq!(problem_report.code, "e.test.authentication");
         assert_eq!(problem_report.comment, comment);
         assert_eq!(problem_report.args, args);
+    }
+
+    #[test]
+    fn test_problem_report_interpolation_works() {
+        let problem_report = ProblemReport {
+            code: "e.test.authentication".to_string(),
+            comment: "authentication for {1} failed due to {2} {3}".to_string(),
+            args: vec!["Alice".to_string(), "invalid signature".to_string()],
+            escalate_to: None,
+        };
+        assert_eq!(
+            problem_report.interpolation(),
+            "authentication for Alice failed due to invalid signature ?".to_string()
+        );
     }
 }

@@ -44,8 +44,8 @@ pub(crate) async fn process(
         ProblemReportSorter::Error,
         ProblemReportScope::Protocol,
         "not-implemented".into(),
-        "Not Implemented".into(),
-        vec![], None
+        "Test one {1} two {2} three {3}".into(),
+        vec!["1".into(), "2".into(), "3".into()], None
     ), false)
 }.instrument(_span).await
 }

@@ -1,4 +1,7 @@
+use affinidi_messaging_didcomm::Message;
 use thiserror::Error;
+
+use crate::messages::{known::MessageType, problem_report::ProblemReport};
 
 /// ATMError
 #[derive(Error, Debug)]
@@ -21,4 +24,106 @@ pub enum ATMError {
     AuthenticationError(String),
     #[error("DIDComm message error: {0}. Reason: {1}")]
     DidcommError(String, String),
+    #[error("SDK Error: {0}")]
+    SDKError(String),
+    #[error("DIDComm Problem Report: code: ({0}), comment: ({1}), escalate?: ({2})")]
+    ProblemReport(String, String, String),
+}
+
+impl ATMError {
+    /// Creates an ATM Error from a DIDComm Problem Report Error Message
+    pub fn from_problem_report(message: &Message) -> Self {
+        if let Ok(MessageType::ProblemReport) = message.type_.parse::<MessageType>() {
+            let body: ProblemReport = match serde_json::from_value(message.body.clone()) {
+                Ok(body) => body,
+                Err(err) => {
+                    return ATMError::SDKError(format!(
+                        "Internal error handling error. Could not parse Problem Report message. Reason: {}",
+                        err
+                    ))
+                }
+            };
+
+            let comment = body.interpolation();
+
+            ATMError::ProblemReport(
+                body.code,
+                comment,
+                body.escalate_to.unwrap_or("NONE".into()),
+            )
+        } else {
+            // Handling for non-Problem Report messages
+            ATMError::SDKError(format!("Internal error handling error. Expecting a DIDComm Problem Report message. Received instead ({})", message.type_))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_problem_report_works() {
+        let message = Message::build(
+            "example-1".into(),
+            "https://didcomm.org/report-problem/2.0/problem-report".into(),
+            serde_json::json!({
+                "code": "test-code",
+                "comment": "Test one {1} two {2} three {3}",
+                "escalate_to": "test-escalate",
+                "args": ["1", "2", "3"]
+            }),
+        )
+        .finalize();
+
+        let error = ATMError::from_problem_report(&message);
+
+        match error {
+            ATMError::ProblemReport(code, comment, escalate) => {
+                assert_eq!(code, "test-code");
+                assert_eq!(comment, "Test one 1 two 2 three 3");
+                assert_eq!(escalate, "test-escalate");
+            }
+            _ => panic!("Expected ProblemReport error"),
+        }
+    }
+
+    #[test]
+    fn test_from_problem_report_wrong_type() {
+        let message = Message::build(
+            "example-1".into(),
+            "https://didcomm.org/NOT-A-PROBLEM/2.0/problem-report".into(),
+            serde_json::json!({
+                "code": "test-code",
+                "comment": "Test one {1} two {2} three {3}",
+                "escalate_to": "test-escalate",
+                "args": ["1", "2", "3"]
+            }),
+        )
+        .finalize();
+
+        let error = ATMError::from_problem_report(&message);
+
+        match error {
+            ATMError::SDKError(_) => {}
+            _ => panic!("Expected SDKError error"),
+        }
+    }
+
+    #[test]
+    fn test_from_problem_report_wrong_body() {
+        let message = Message::build(
+            "example-1".into(),
+            "https://didcomm.org/NOT-A-PROBLEM/2.0/problem-report".into(),
+            serde_json::json!({}),
+        )
+        .finalize();
+
+        let error = ATMError::from_problem_report(&message);
+
+        match error {
+            ATMError::SDKError(_) => {}
+            _ => panic!("Expected SDKError error"),
+        }
+    }
 }
