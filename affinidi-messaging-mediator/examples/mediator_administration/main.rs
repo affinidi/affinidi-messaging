@@ -4,6 +4,7 @@ use affinidi_messaging_mediator::common;
 use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
 use console::{style, Style, Term};
 use dialoguer::{theme::ColorfulTheme, Select};
+use sha256::digest;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -99,6 +100,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         style("Successfully read mediator configuration...").yellow()
     );
 
+    let root_admin_hash = digest(&mediator_config.admin_did);
+
     // read secrets from file
     let secrets = read_secrets_from_file("conf/secrets-admin.json")?;
 
@@ -158,15 +161,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         println!();
         match selection {
-            0 => match protocols.mediator.list_admins(&mut atm, None).await {
+            0 => match protocols.mediator.list_admins(&mut atm, None, None).await {
                 Ok(admins) => {
-                    println!("Listing Administration DIDs");
-                    for admin in admins.admins {
-                        println!("  {}", admin);
+                    println!(
+                        "{}",
+                        style("Listing Administration DIDs (SHA256 Hashed DID's)").green()
+                    );
+
+                    for (idx, admin) in admins.admins.iter().enumerate() {
+                        print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
+                        if admin == &root_admin_hash {
+                            println!(" {}", style(" mediator_root").red());
+                        } else {
+                            println!();
+                        }
                     }
                 }
                 Err(e) => {
-                    println!("Error: {}", e);
+                    println!("{}", style(format!("Error: {}", e)).red());
                 }
             },
             1 => {

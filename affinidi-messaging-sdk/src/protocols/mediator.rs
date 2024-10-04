@@ -20,22 +20,19 @@ use crate::{
 #[derive(Default)]
 pub struct Mediator {}
 
-pub struct MediatorRequest {
-    pub admins: Vec<MediatorAdminRequest>,
+#[derive(Serialize, Deserialize)]
+pub enum MediatorAdminRequest {
+    AdminAdd(Vec<String>),
+    AdminRemove(Vec<String>),
+    AdminList { cursor: u32, limit: u32 },
 }
-pub struct MediatorAdminRequest {
-    pub action: String,
-    pub did: Option<String>,
-    pub offset: Option<i32>,
-}
-
 /// A list of admins in the mediator
 /// - `admins` - The list of admins (SHA256 Hashed DIDs)
 /// - `next` - The offset to use for the next request
 #[derive(Serialize, Deserialize)]
 pub struct MediatorAdminList {
     pub admins: Vec<String>,
-    pub next: u32,
+    pub cursor: u32,
 }
 
 impl Mediator {
@@ -53,20 +50,23 @@ impl Mediator {
     }
     /// Lists all the admins in the mediator
     /// - `atm` - The ATM client to use
-    /// - `offset` - The offset to start from (Defaults to 0 if not provided)
+    /// - `cursor` - The cursor to start from (Defaults to 0 if not provided)
+    /// - `limit` - The maximum number of admins to return (Defaults to 100 if not provided)
     /// # Returns
     /// A list of admins in the mediator
     pub async fn list_admins(
         &self,
         atm: &mut ATM<'_>,
-        offset: Option<u32>,
+        cursor: Option<u32>,
+        limit: Option<u32>,
     ) -> Result<MediatorAdminList, ATMError> {
         let _span = span!(Level::DEBUG, "list_admins");
 
         async move {
             debug!(
-                "Requesting list of Admin accounts from mediator. Offset: {:?}",
-                offset.unwrap_or(0)
+                "Requesting list of Admin accounts from mediator. Cursor: {} Limit: {}",
+                cursor.unwrap_or(0),
+                limit.unwrap_or(100)
             );
 
             let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
@@ -93,7 +93,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
-                json!({"admins": {"action": "list", "offset": offset.unwrap_or(0)}}),
+                json!({"AdminList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
             .to(mediator_did.clone())
             .from(my_did.clone())
