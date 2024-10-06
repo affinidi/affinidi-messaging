@@ -182,7 +182,8 @@ async fn generate_status_reply(
             .as_secs();
 
         if let Some(t) = status.oldest_received_time {
-            status.longest_waited_seconds = Some(now - t);
+            // Using wrapping sub because result could overflow u64
+            status.longest_waited_seconds = Some(now.wrapping_sub(t));
         }
 
         // Build the message
