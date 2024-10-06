@@ -3,7 +3,9 @@ use affinidi_messaging_didcomm::secrets::Secret;
 use affinidi_messaging_mediator::common;
 use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
 use console::{style, Style, Term};
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::Confirm;
+use dialoguer::{theme::ColorfulTheme, Input, Select};
+use regex::Regex;
 use sha256::digest;
 use std::env;
 use std::error::Error;
@@ -182,7 +184,53 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             1 => {
-                println!("Adding new Administration DID");
+                println!("Adding new Administration DID (type exit to quit this dialog)");
+
+                let input: String = Input::with_theme(&theme)
+                    .with_prompt("DID to add")
+                    .validate_with(|input: &String| -> Result<(), &str> {
+                        let re = Regex::new(r"did:\w*:\w*").unwrap();
+                        if re.is_match(input) || input == "exit" {
+                            Ok(())
+                        } else {
+                            Err("Invalid DID format")
+                        }
+                    })
+                    .interact_text()
+                    .unwrap();
+
+                if input == "exit" {
+                    continue;
+                }
+
+                if Confirm::with_theme(&theme)
+                    .with_prompt(format!("Do you want to add DID ({})?", &input))
+                    .interact()
+                    .unwrap()
+                {
+                    match protocols
+                        .mediator
+                        .add_admins(&mut atm, &[input.clone()])
+                        .await
+                    {
+                        Ok(result) => {
+                            if result == 1 {
+                                println!(
+                                    "{}",
+                                    style(format!("Successfully added DID ({})", &input)).green()
+                                );
+                            } else {
+                                println!(
+                                    "{}",
+                                    style(format!("DID ({}) already exists", &input)).color256(208)
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            println!("{}", style(format!("Error: {}", e)).red());
+                        }
+                    }
+                }
             }
             2 => {
                 println!("Removing Administration DID");

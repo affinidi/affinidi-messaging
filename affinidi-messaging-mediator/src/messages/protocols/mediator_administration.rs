@@ -70,20 +70,28 @@ pub(crate) async fn process(
                             ProblemReportSorter::Error,
                             ProblemReportScope::Protocol,
                             "database_error".into(),
-                            "Error listing admin accounts".into(),
+                            "Error listing admin accounts {1}".into(),
                             vec![err.to_string()], None
                         ), false)
                     }
                 }
             }
             MediatorAdminRequest::AdminAdd(attr) => {
-                generate_error_response(state, session, &msg.id, ProblemReport::new(
-                    ProblemReportSorter::Error,
-                    ProblemReportScope::Protocol,
-                    "not_implemented".into(),
-                    "method not implemented yet".into(),
-                    vec![], None
-                ), false)
+                match  state.database.add_admin_accounts(attr).await {
+                    Ok(response) => {
+                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
+                    }
+                    Err(err) => {
+                        warn!("Error adding admin accounts. Reason: {}", err);
+                        generate_error_response(state, session, &msg.id, ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "database_error".into(),
+                            "Error adding admin accounts {1}".into(),
+                            vec![err.to_string()], None
+                        ), false)
+                    }
+                }
             }
             MediatorAdminRequest::AdminRemove(attr) => {
                 generate_error_response(state, session, &msg.id, ProblemReport::new(

@@ -76,6 +76,52 @@ impl DatabaseHandler {
     /// Retrieves up to 100 admin accounts from the mediator
     /// - `cursor` - The offset to start from (0 is the start)
     /// - `limit` - The maximum number of accounts to return
+    pub(crate) async fn add_admin_accounts(
+        &self,
+        accounts: Vec<String>,
+    ) -> Result<i32, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "add_admin_accounts",
+            "#_accounts" = accounts.len(),
+        );
+
+        async move {
+            debug!("Adding Admin accounts to the mediator");
+            if accounts.len() > 100 {
+                return Err(MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    "Number of admin accounts being added exceeds 100".to_string(),
+                ));
+            }
+
+            let mut con = self.get_async_connection().await?;
+
+            let mut tx = deadpool_redis::redis::pipe();
+            let mut tx = tx.atomic().cmd("SADD").arg("ADMINS");
+
+            for account in accounts {
+                debug!("Adding Admin account: {}", account);
+                tx = tx.arg(account);
+            }
+
+            let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("SADD failed. Reason: {}", err),
+                )
+            })?;
+            debug!("Admin accounts added successfully: {:?}", result);
+
+            Ok(result.first().unwrap_or(&0).to_owned())
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Retrieves up to 100 admin accounts from the mediator
+    /// - `cursor` - The offset to start from (0 is the start)
+    /// - `limit` - The maximum number of accounts to return
     pub(crate) async fn list_admin_accounts(
         &self,
         cursor: u32,
