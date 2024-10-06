@@ -1,11 +1,11 @@
 //! Example of how to manage administration accounts for the mediator
 use affinidi_messaging_didcomm::secrets::Secret;
 use affinidi_messaging_mediator::common;
+use affinidi_messaging_mediator::common::config::Config as MediatorConfig;
 use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
 use console::{style, Style, Term};
-use dialoguer::{theme::ColorfulTheme, Input, Select};
-use dialoguer::{Confirm, MultiSelect};
-use regex::Regex;
+use dialoguer::theme::ColorfulTheme;
+use global_acls::global_acls_menu;
 use sha256::digest;
 use std::env;
 use std::error::Error;
@@ -13,32 +13,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use tracing_subscriber::filter;
+use ui::{add_admin, check_path, list_admins, main_menu, remove_admins};
 
 mod affinidi_logo;
-
-/// Returns the path to the mediator directory depending on where you are
-fn check_path() -> Result<String, Box<dyn Error>> {
-    let cwd = std::env::current_dir()?;
-    let mut path = String::new();
-    let mut found = false;
-    cwd.components().rev().for_each(|dir| {
-        if dir.as_os_str() == "affinidi-messaging" && !found {
-            found = true;
-            path.push_str("affinidi-messaging-mediator/");
-        } else if dir.as_os_str() == "affinidi-messaging-mediator" && !found {
-            found = true;
-            path.push_str("./");
-        } else if !found {
-            path.push_str("../");
-        }
-    });
-
-    if !found {
-        return Err("You are not in the affinidi-messaging repository".into());
-    }
-
-    Ok(path)
-}
+mod global_acls;
+mod ui;
 
 fn read_secrets_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<Secret>, Box<dyn Error>> {
     // Open the file in read-only mode with buffer.
@@ -61,8 +40,8 @@ fn fix_ssl_path(path: &str) -> String {
     components.join("/")
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn init() -> Result<(ColorfulTheme, MediatorConfig, String, Config<'static>), Box<dyn Error>>
+{
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
@@ -80,14 +59,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ..ColorfulTheme::default()
     };
 
+    // determine the right path to config files
+    let path = check_path()?;
+    env::set_current_dir(&path)?;
+
     println!(
         "{}",
         style("Welcome to the Affinidi Messaging Mediator Administration wizard").green(),
     );
-
-    // determine the right path to config files
-    let path = check_path()?;
-    env::set_current_dir(&path)?;
 
     println!(
         "{} {}",
@@ -106,7 +85,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // read secrets from file
     let secrets = read_secrets_from_file("conf/secrets-admin.json")?;
-
     println!(
         "{} {}",
         style("Admin secrets loaded successfully... admin DID:").yellow(),
@@ -129,10 +107,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_atm_did(&mediator_config.mediator_did)
         .with_atm_api(&["https://", "127.0.0.1:7037", api_prefix].concat())
         .with_secrets(secrets)
-        .with_ssl_certificates(&mut vec![client_cert_chain]);
+        .with_ssl_certificates(&mut vec![client_cert_chain])
+        .build()?;
 
+    Ok((theme, mediator_config, root_admin_hash, config))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let (theme, mediator_config, root_admin_hash, config) = init().await?;
     // Create a new ATM Client
-    let mut atm = ATM::new(config.build()?).await?;
+    let mut atm = ATM::new(config).await?;
     let protocols = Protocols::new();
 
     protocols
@@ -145,149 +130,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .green()
     );
 
-    let selections = &[
-        "List Administration DIDs",
-        "Add new Administration DID",
-        "Remove Administration DID",
-        "Quit",
-    ];
-
-    println!();
     loop {
-        let selection = Select::with_theme(&theme)
-            .with_prompt("Select an action?")
-            .default(0)
-            .items(&selections[..])
-            .interact()
-            .unwrap();
+        println!();
+        let selection = main_menu(&theme);
 
         println!();
         match selection {
-            0 => match protocols.mediator.list_admins(&mut atm, None, None).await {
-                Ok(admins) => {
-                    println!(
-                        "{}",
-                        style("Listing Administration DIDs (SHA256 Hashed DID's)").green()
-                    );
-
-                    for (idx, admin) in admins.admins.iter().enumerate() {
-                        print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
-                        if admin == &root_admin_hash {
-                            println!(" {}", style(" mediator_root").red());
-                        } else {
-                            println!();
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("{}", style(format!("Error: {}", e)).red());
-                }
-            },
-            1 => {
-                println!("Adding new Administration DID (type exit to quit this dialog)");
-
-                let input: String = Input::with_theme(&theme)
-                    .with_prompt("DID to add")
-                    .validate_with(|input: &String| -> Result<(), &str> {
-                        let re = Regex::new(r"did:\w*:\w*").unwrap();
-                        if re.is_match(input) || input == "exit" {
-                            Ok(())
-                        } else {
-                            Err("Invalid DID format")
-                        }
-                    })
-                    .interact_text()
-                    .unwrap();
-
-                if input == "exit" {
-                    continue;
-                }
-
-                if Confirm::with_theme(&theme)
-                    .with_prompt(format!("Do you want to add DID ({})?", &input))
-                    .interact()
-                    .unwrap()
-                {
-                    match protocols
-                        .mediator
-                        .add_admins(&mut atm, &[input.clone()])
-                        .await
-                    {
-                        Ok(result) => {
-                            if result == 1 {
-                                println!(
-                                    "{}",
-                                    style(format!("Successfully added DID ({})", &input)).green()
-                                );
-                                println!(
-                                    "  {}{}",
-                                    style("DID Hash: ").green(),
-                                    style(digest(&input)).yellow()
-                                );
-                            } else {
-                                println!(
-                                    "{}",
-                                    style(format!("DID ({}) already exists", &input)).color256(208)
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}", style(format!("Error: {}", e)).red());
-                        }
-                    }
-                }
-            }
-            2 => match protocols.mediator.list_admins(&mut atm, None, None).await {
-                Ok(admins) => {
-                    // remove the mediator administrator account from the list
-                    let admins: Vec<&String> = admins
-                        .admins
-                        .iter()
-                        .filter(|&x| x != &root_admin_hash)
-                        .collect();
-
-                    if admins.is_empty() {
-                        println!("{}", style("No Admin DIDs can be removed").red());
-                        println!();
-                        continue;
-                    }
-                    let dids = MultiSelect::with_theme(&theme)
-                        .with_prompt("Select DIDs to remove (space to select, enter to continue)?")
-                        .items(&admins)
-                        .report(false)
-                        .interact()
-                        .unwrap();
-
-                    println!();
-                    println!("{}", style("Removing the following DIDs:").green());
-                    for did in &dids {
-                        println!("  {}", style(admins[did.to_owned()]).yellow());
-                    }
-
-                    if Confirm::with_theme(&theme)
-                        .with_prompt("Do you want to remove the selected DIDs?")
-                        .interact()
-                        .unwrap()
-                    {
-                        let admins = dids
-                            .iter()
-                            .map(|&idx| admins[idx].clone())
-                            .collect::<Vec<_>>();
-                        match protocols.mediator.remove_admins(&mut atm, &admins).await {
-                            Ok(result) => {
-                                println!("{}", style(format!("Removed {} DIDs", result)).green());
-                            }
-                            Err(e) => {
-                                println!("{}", style(format!("Error: {}", e)).red());
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("{}", style(format!("Error: {}", e)).red());
-                }
-            },
-            3 => {
+            0 => list_admins(&mut atm, &protocols, &root_admin_hash).await,
+            1 => add_admin(&mut atm, &protocols, &theme).await,
+            2 => remove_admins(&mut atm, &protocols, &root_admin_hash, &theme).await,
+            3 => global_acls_menu(&mut atm, &protocols, &theme, &mediator_config).await,
+            4 => {
                 println!("Quitting");
                 break;
             }
@@ -295,8 +148,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Invalid selection");
             }
         }
-
-        println!();
     }
 
     Ok(())

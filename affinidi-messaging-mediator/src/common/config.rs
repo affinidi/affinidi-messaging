@@ -47,7 +47,16 @@ pub enum ACLMode {
     ExplicitDeny,
 }
 
-impl Debug for ACLMode {
+impl fmt::Debug for ACLMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
+            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
+        }
+    }
+}
+
+impl fmt::Display for ACLMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
