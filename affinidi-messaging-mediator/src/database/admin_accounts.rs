@@ -73,9 +73,8 @@ impl DatabaseHandler {
         }
     }
 
-    /// Retrieves up to 100 admin accounts from the mediator
-    /// - `cursor` - The offset to start from (0 is the start)
-    /// - `limit` - The maximum number of accounts to return
+    /// Adds up to 100 admin accounts to the mediator
+    /// - `accounts` - The list of accounts to add
     pub(crate) async fn add_admin_accounts(
         &self,
         accounts: Vec<String>,
@@ -100,18 +99,75 @@ impl DatabaseHandler {
             let mut tx = deadpool_redis::redis::pipe();
             let mut tx = tx.atomic().cmd("SADD").arg("ADMINS");
 
-            for account in accounts {
+            // Add to the ADMINS Set
+            for account in &accounts {
                 debug!("Adding Admin account: {}", account);
                 tx = tx.arg(account);
+            }
+
+            // Set the role type for each DID
+            for account in &accounts {
+                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg(1);
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
                 MediatorError::DatabaseError(
                     "NA".to_string(),
-                    format!("SADD failed. Reason: {}", err),
+                    format!("Add failed. Reason: {}", err),
                 )
             })?;
             debug!("Admin accounts added successfully: {:?}", result);
+
+            Ok(result.first().unwrap_or(&0).to_owned())
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Removes up to 100 admin accounts from the mediator
+    /// - `accounts` - The list of accounts to remove
+    pub(crate) async fn remove_admin_accounts(
+        &self,
+        accounts: Vec<String>,
+    ) -> Result<i32, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "remove_admin_accounts",
+            "#_accounts" = accounts.len(),
+        );
+
+        async move {
+            debug!("Removing Admin accounts from the mediator");
+            if accounts.len() > 100 {
+                return Err(MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    "Number of admin accounts being removed exceeds 100".to_string(),
+                ));
+            }
+
+            let mut con = self.get_async_connection().await?;
+
+            let mut tx = deadpool_redis::redis::pipe();
+            let mut tx = tx.atomic().cmd("SREM").arg("ADMINS");
+
+            // Remove from the ADMINS Set
+            for account in &accounts {
+                debug!("Removing Admin account: {}", account);
+                tx = tx.arg(account);
+            }
+
+            // Remove admin field on each DID
+            for account in &accounts {
+                tx = tx.cmd("HDEL").arg(account).arg("ROLE_TYPE");
+            }
+
+            let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("Remove failed. Reason: {}", err),
+                )
+            })?;
+            debug!("Admin accounts removed successfully: {:?}", result);
 
             Ok(result.first().unwrap_or(&0).to_owned())
         }

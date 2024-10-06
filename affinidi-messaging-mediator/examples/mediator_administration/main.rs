@@ -3,8 +3,8 @@ use affinidi_messaging_didcomm::secrets::Secret;
 use affinidi_messaging_mediator::common;
 use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
 use console::{style, Style, Term};
-use dialoguer::Confirm;
 use dialoguer::{theme::ColorfulTheme, Input, Select};
+use dialoguer::{Confirm, MultiSelect};
 use regex::Regex;
 use sha256::digest;
 use std::env;
@@ -219,6 +219,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     "{}",
                                     style(format!("Successfully added DID ({})", &input)).green()
                                 );
+                                println!(
+                                    "  {}{}",
+                                    style("DID Hash: ").green(),
+                                    style(digest(&input)).yellow()
+                                );
                             } else {
                                 println!(
                                     "{}",
@@ -232,9 +237,56 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            2 => {
-                println!("Removing Administration DID");
-            }
+            2 => match protocols.mediator.list_admins(&mut atm, None, None).await {
+                Ok(admins) => {
+                    // remove the mediator administrator account from the list
+                    let admins: Vec<&String> = admins
+                        .admins
+                        .iter()
+                        .filter(|&x| x != &root_admin_hash)
+                        .collect();
+
+                    if admins.is_empty() {
+                        println!("{}", style("No Admin DIDs can be removed").red());
+                        println!();
+                        continue;
+                    }
+                    let dids = MultiSelect::with_theme(&theme)
+                        .with_prompt("Select DIDs to remove (space to select, enter to continue)?")
+                        .items(&admins)
+                        .report(false)
+                        .interact()
+                        .unwrap();
+
+                    println!();
+                    println!("{}", style("Removing the following DIDs:").green());
+                    for did in &dids {
+                        println!("  {}", style(admins[did.to_owned()]).yellow());
+                    }
+
+                    if Confirm::with_theme(&theme)
+                        .with_prompt("Do you want to remove the selected DIDs?")
+                        .interact()
+                        .unwrap()
+                    {
+                        let admins = dids
+                            .iter()
+                            .map(|&idx| admins[idx].clone())
+                            .collect::<Vec<_>>();
+                        match protocols.mediator.remove_admins(&mut atm, &admins).await {
+                            Ok(result) => {
+                                println!("{}", style(format!("Removed {} DIDs", result)).green());
+                            }
+                            Err(e) => {
+                                println!("{}", style(format!("Error: {}", e)).red());
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("{}", style(format!("Error: {}", e)).red());
+                }
+            },
             3 => {
                 println!("Quitting");
                 break;

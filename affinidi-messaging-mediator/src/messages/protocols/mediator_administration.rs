@@ -8,6 +8,7 @@ use affinidi_messaging_sdk::{
     protocols::mediator::MediatorAdminRequest,
 };
 use serde_json::{json, Value};
+use sha256::digest;
 use tracing::{span, warn, Instrument};
 use uuid::Uuid;
 
@@ -94,13 +95,25 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AdminRemove(attr) => {
-                generate_error_response(state, session, &msg.id, ProblemReport::new(
-                    ProblemReportSorter::Error,
-                    ProblemReportScope::Protocol,
-                    "not_implemented".into(),
-                    "method not implemented yet".into(),
-                    vec![], None
-                ), false)
+                // Remove root admin DID in case it is in the list
+                // Protects accidentally deleting the only admin account
+                let root_admin = digest(&state.config.admin_did);
+                let attr = attr.iter().filter_map(|a| if a == &root_admin { None } else { Some(a.to_owned()) }).collect();
+                match  state.database.remove_admin_accounts(attr).await {
+                    Ok(response) => {
+                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
+                    }
+                    Err(err) => {
+                        warn!("Error removing admin accounts. Reason: {}", err);
+                        generate_error_response(state, session, &msg.id, ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "database_error".into(),
+                            "Error removing admin accounts {1}".into(),
+                            vec![err.to_string()], None
+                        ), false)
+                    }
+                }
             }
         }
     }.instrument(_span).await
