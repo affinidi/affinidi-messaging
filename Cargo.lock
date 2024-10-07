@@ -143,6 +143,7 @@ dependencies = [
  "http 1.1.0",
  "itertools 0.13.0",
  "jsonwebtoken",
+ "lazy_static",
  "rand",
  "rcgen",
  "redis",

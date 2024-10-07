@@ -56,4 +56,5 @@ rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
 ] }
+lazy_static = "1.4.0"
 time = "0.3"
