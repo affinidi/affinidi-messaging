@@ -1,8 +1,5 @@
 use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::{
-    envelope::MetaEnvelope, secrets::SecretsResolver, AttachmentData, Message,
-    PackEncryptedOptions, UnpackMetadata, UnpackOptions,
-};
+use affinidi_messaging_didcomm::{secrets::SecretsResolver, Message, PackEncryptedOptions};
 use affinidi_messaging_mediator::{resolvers::affinidi_secrets::AffinidiSecrets, server::start};
 use affinidi_messaging_sdk::{
     config::Config,
@@ -14,10 +11,8 @@ use affinidi_messaging_sdk::{
         GenericDataStruct, GetMessagesRequest, GetMessagesResponse, MessageList,
         MessageListElement, SuccessResponse,
     },
-    protocols::message_pickup::MessagePickupStatusReply,
     transports::SendMessageResponse,
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use common::{BOB_DID, BOB_E1, BOB_V1, MEDIATOR_API, MY_DID, MY_E1, MY_V1};
 use core::panic;
 use message_builders::{
@@ -25,13 +20,17 @@ use message_builders::{
     build_ping_message, build_status_request_message, create_auth_challenge_response,
 };
 use reqwest::{Certificate, Client, ClientBuilder};
-use serde_json::json;
+use response_validations::{
+    validate_forward_request_response, validate_get_message_response, validate_list_messages,
+    validate_message_delivery, validate_message_received_status_reply, validate_status_reply,
+};
 use sha256::digest;
 use std::time::Duration;
 use tokio::time::sleep;
 
 mod common;
 mod message_builders;
+mod response_validations;
 
 #[tokio::test]
 async fn test_mediator_server() {
@@ -173,7 +172,13 @@ async fn test_mediator_server() {
         200,
     )
     .await;
-    _validate_status_reply(status_reply, &did_resolver, &my_secrets_resolver).await;
+    validate_status_reply(
+        status_reply,
+        MY_DID.into(),
+        &did_resolver,
+        &my_secrets_resolver,
+    )
+    .await;
 
     // MessageType=MessagePickupDeliveryRequest
     let delivery_request_msg = build_delivery_request_message(
@@ -191,7 +196,7 @@ async fn test_mediator_server() {
         200,
     )
     .await;
-    let message_received_ids = _validate_message_delivery(
+    let message_received_ids = validate_message_delivery(
         message_delivery,
         &did_resolver,
         &my_secrets_resolver,
@@ -217,8 +222,10 @@ async fn test_mediator_server() {
             200,
         )
         .await;
-    _validate_message_received_status_reply(
+
+    validate_message_received_status_reply(
         message_received_status_reply,
+        MY_DID.into(),
         &did_resolver,
         &my_secrets_resolver,
     )
@@ -244,7 +251,7 @@ async fn test_mediator_server() {
         )
         .await;
 
-    let forwarded_msg_id = _validate_forward_request_response(forward_request_response).await;
+    let forwarded_msg_id = validate_forward_request_response(forward_request_response).await;
 
     // /outbound
     // delete messages: FALSE
@@ -261,7 +268,7 @@ async fn test_mediator_server() {
     )
     .await;
 
-    _validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
+    validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
 
     // delete messages: TRUE
     let get_message_delete_request = GetMessagesRequest {
@@ -277,7 +284,7 @@ async fn test_mediator_server() {
     )
     .await;
 
-    _validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
+    validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
 
     // get message should return not found
     let _msg_list = _outbound_message(
@@ -321,7 +328,7 @@ async fn test_mediator_server() {
         Folder::Inbox,
     )
     .await;
-    _validate_list_messages(msgs_list, &mediator_did);
+    validate_list_messages(msgs_list, &mediator_did);
 
     // /list/:did_hash/Outbox
     let msgs_list = list_messages(
@@ -335,7 +342,7 @@ async fn test_mediator_server() {
     assert_eq!(msgs_list.len(), 0);
 
     // /fetch
-    let messages = fetch_messages(
+    let messages = _fetch_messages(
         client.clone(),
         my_authentication_response.clone(),
         200,
@@ -515,207 +522,6 @@ async fn _authenticate<'sr>(
     }
 }
 
-async fn _validate_status_reply<S>(
-    status_reply: SendMessageResponse<InboundMessageResponse>,
-    did_resolver: &DIDCacheClient,
-    secrets_resolver: &S,
-) where
-    S: SecretsResolver + Send,
-{
-    if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-        status_reply
-    {
-        let (message, _) = Message::unpack_string(
-            &message,
-            &did_resolver,
-            secrets_resolver,
-            &UnpackOptions::default(),
-        )
-        .await
-        .unwrap();
-        let status: MessagePickupStatusReply =
-            serde_json::from_value(message.body.clone()).unwrap();
-        assert!(!status.live_delivery);
-        assert!(status.longest_waited_seconds.unwrap() > 0);
-        assert!(status.message_count == 1);
-        assert!(status.recipient_did == MY_DID);
-        assert!(status.total_bytes > 0);
-    }
-}
-
-async fn _handle_delivery<S>(
-    message: &Message,
-    did_resolver: &DIDCacheClient,
-    secrets_resolver: &S,
-) -> Vec<(Message, UnpackMetadata)>
-where
-    S: SecretsResolver + Send,
-{
-    let mut response: Vec<(Message, UnpackMetadata)> = Vec::new();
-
-    if let Some(attachments) = &message.attachments {
-        for attachment in attachments {
-            match &attachment.data {
-                AttachmentData::Base64 { value } => {
-                    let decoded = match BASE64_URL_SAFE_NO_PAD.decode(value.base64.clone()) {
-                        Ok(decoded) => match String::from_utf8(decoded) {
-                            Ok(decoded) => decoded,
-                            Err(e) => {
-                                assert!(false, "{:?}", e);
-                                "".into()
-                            }
-                        },
-                        Err(e) => {
-                            assert!(false, "{:?}", e);
-                            continue;
-                        }
-                    };
-                    let mut envelope =
-                        match MetaEnvelope::new(&decoded, &did_resolver, secrets_resolver).await {
-                            Ok(envelope) => envelope,
-                            Err(e) => {
-                                assert!(false, "{:?}", e);
-                                continue;
-                            }
-                        };
-
-                    match Message::unpack(
-                        &mut envelope,
-                        did_resolver,
-                        secrets_resolver,
-                        &UnpackOptions::default(),
-                    )
-                    .await
-                    {
-                        Ok((mut m, u)) => {
-                            if let Some(attachment_id) = &attachment.id {
-                                m.id = attachment_id.to_string();
-                            }
-                            response.push((m, u))
-                        }
-                        Err(e) => {
-                            assert!(false, "{:?}", e);
-                            continue;
-                        }
-                    };
-                }
-                _ => {
-                    assert!(false);
-                    continue;
-                }
-            };
-        }
-    }
-
-    response
-}
-
-async fn _validate_message_delivery<S>(
-    message_delivery: SendMessageResponse<InboundMessageResponse>,
-    did_resolver: &DIDCacheClient,
-    secrets_resolver: &S,
-    pong_msg_id: &str,
-) -> Vec<String>
-where
-    S: SecretsResolver + Send,
-{
-    if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-        message_delivery
-    {
-        let (message, _) = Message::unpack_string(
-            &message,
-            &did_resolver,
-            secrets_resolver,
-            &UnpackOptions::default(),
-        )
-        .await
-        .unwrap();
-
-        let messages = _handle_delivery(&message, did_resolver, secrets_resolver).await;
-        let mut to_delete_ids: Vec<String> = Vec::new();
-
-        assert_eq!(messages.first().unwrap().0.id, pong_msg_id);
-
-        for (message, _) in messages {
-            to_delete_ids.push(message.id.clone());
-        }
-        to_delete_ids
-    } else {
-        vec![]
-    }
-}
-
-async fn _validate_message_received_status_reply<S>(
-    status_reply: SendMessageResponse<InboundMessageResponse>,
-    did_resolver: &DIDCacheClient,
-    secrets_resolver: &S,
-) where
-    S: SecretsResolver + Send,
-{
-    if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-        status_reply
-    {
-        let (message, _) = Message::unpack_string(
-            &message,
-            &did_resolver,
-            secrets_resolver,
-            &UnpackOptions::default(),
-        )
-        .await
-        .unwrap();
-        let status: MessagePickupStatusReply =
-            serde_json::from_value(message.body.clone()).unwrap();
-
-        assert!(!status.live_delivery);
-        assert!(status.longest_waited_seconds.is_none());
-        assert!(status.message_count == 0);
-        assert!(status.recipient_did == MY_DID);
-        assert!(status.total_bytes == 0);
-    }
-}
-
-async fn _validate_forward_request_response(
-    forward_request_response: SendMessageResponse<InboundMessageResponse>,
-) -> String {
-    let msg_id = if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Stored(m))) =
-        forward_request_response
-    {
-        if let Some((_, msg_id)) = m.messages.first() {
-            Some(msg_id.to_owned())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    assert!(!msg_id.is_none());
-
-    msg_id.unwrap()
-}
-
-async fn _validate_get_message_response<S>(
-    list: GetMessagesResponse,
-    my_did: &str,
-    did_resolver: &DIDCacheClient,
-    secrets_resolver: &S,
-) where
-    S: SecretsResolver + Send,
-{
-    for msg in list.success {
-        assert_eq!(msg.to_address.unwrap(), digest(my_did));
-        let _ = Message::unpack_string(
-            &msg.msg.unwrap(),
-            did_resolver,
-            secrets_resolver,
-            &UnpackOptions::default(),
-        )
-        .await
-        .unwrap();
-        println!("Msg id: {}", msg.msg_id);
-    }
-}
-
 async fn _send_inbound_message<T>(
     client: Client,
     tokens: AuthorizationResponse,
@@ -816,14 +622,6 @@ async fn _outbound_message(
     list
 }
 
-fn _validate_list_messages(list: Vec<MessageListElement>, mediator_did: &str) {
-    assert_eq!(list.len(), 3);
-
-    for msg in list {
-        assert_eq!(msg.from_address.unwrap(), mediator_did);
-    }
-}
-
 async fn list_messages(
     client: Client,
     tokens: AuthorizationResponse,
@@ -870,7 +668,7 @@ async fn list_messages(
     list
 }
 
-async fn fetch_messages(
+async fn _fetch_messages(
     client: Client,
     tokens: AuthorizationResponse,
     expected_status_code: u16,
