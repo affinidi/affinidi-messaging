@@ -9,8 +9,10 @@ use affinidi_messaging_sdk::{
     conversions::secret_from_str,
     errors::ATMError,
     messages::{
-        sending::InboundMessageResponse, AuthenticationChallenge, AuthorizationResponse,
-        GenericDataStruct, GetMessagesRequest, GetMessagesResponse, SuccessResponse,
+        fetch::FetchOptions, sending::InboundMessageResponse, AuthenticationChallenge,
+        AuthorizationResponse, DeleteMessageRequest, DeleteMessageResponse, Folder,
+        GenericDataStruct, GetMessagesRequest, GetMessagesResponse, MessageList,
+        MessageListElement, SuccessResponse,
     },
     protocols::{
         message_pickup::{MessagePickupDeliveryRequest, MessagePickupStatusReply},
@@ -307,7 +309,7 @@ async fn test_mediator_server() {
     _validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
 
     // get message should return not found
-    let msg_list = _outbound_message(
+    let _msg_list = _outbound_message(
         client.clone(),
         &get_message_delete_request,
         my_authentication_response.clone(),
@@ -315,6 +317,82 @@ async fn test_mediator_server() {
         true,
     )
     .await;
+
+    // Sending messages to list/fetch
+    for _ in 0..3 {
+        let (signed_ping_msg, _) = _build_ping_message(
+            &mediator_did,
+            MY_DID.into(),
+            true,
+            true,
+            &did_resolver,
+            &my_secrets_resolver,
+        )
+        .await;
+
+        let _: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
+            client.clone(),
+            my_authentication_response.clone(),
+            &signed_ping_msg,
+            true,
+            200,
+        )
+        .await;
+    }
+
+    // /list/:did_hash/:folder
+    // /list/:did_hash/Inbox
+    let msgs_list = list_messages(
+        client.clone(),
+        my_authentication_response.clone(),
+        200,
+        MY_DID,
+        Folder::Inbox,
+    )
+    .await;
+    _validate_list_messages(msgs_list, &mediator_did);
+
+    // /list/:did_hash/Outbox
+    let msgs_list = list_messages(
+        client.clone(),
+        my_authentication_response.clone(),
+        200,
+        MY_DID,
+        Folder::Outbox,
+    )
+    .await;
+    assert_eq!(msgs_list.len(), 0);
+
+    // /fetch
+    let messages = fetch_messages(
+        client.clone(),
+        my_authentication_response.clone(),
+        200,
+        &FetchOptions {
+            limit: 10,
+            start_id: None,
+            delete_policy: affinidi_messaging_sdk::messages::FetchDeletePolicy::DoNotDelete,
+        },
+    )
+    .await;
+    assert_eq!(messages.success.len(), 3);
+
+    let msg_ids: Vec<String> = messages
+        .success
+        .iter()
+        .map(|msg| msg.msg_id.clone())
+        .collect();
+
+    let deleted_msgs = _delete_messages(
+        client.clone(),
+        my_authentication_response.clone(),
+        200,
+        &DeleteMessageRequest {
+            message_ids: msg_ids,
+        },
+    )
+    .await;
+    assert_eq!(deleted_msgs.success.len(), 3);
 }
 
 async fn _start_mediator_server() {
@@ -997,6 +1075,165 @@ async fn _outbound_message(
     list
 }
 
+fn _validate_list_messages(list: Vec<MessageListElement>, mediator_did: &str) {
+    assert_eq!(list.len(), 3);
+
+    for msg in list {
+        assert_eq!(msg.from_address.unwrap(), mediator_did);
+    }
+}
+
+async fn list_messages(
+    client: Client,
+    tokens: AuthorizationResponse,
+    expected_status_code: u16,
+    my_did: &str,
+    folder: Folder,
+) -> Vec<MessageListElement> {
+    let res = client
+        .get(format!(
+            "{}/list/{}/{}",
+            MEDIATOR_API,
+            digest(my_did),
+            folder,
+        ))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", tokens.access_token))
+        .send()
+        .await
+        .map_err(|e| {
+            ATMError::TransportError(format!("Could not send list_messages request: {:?}", e))
+        })
+        .unwrap();
+
+    let status = res.status();
+    println!("API response: status({})", status);
+    assert_eq!(status, expected_status_code);
+
+    let body = res
+        .text()
+        .await
+        .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))
+        .unwrap();
+
+    let body = serde_json::from_str::<SuccessResponse<MessageList>>(&body)
+        .ok()
+        .unwrap();
+
+    let list = if let Some(list) = body.data {
+        list
+    } else {
+        panic!("No messages found");
+    };
+
+    list
+}
+
+async fn fetch_messages(
+    client: Client,
+    tokens: AuthorizationResponse,
+    expected_status_code: u16,
+    options: &FetchOptions,
+) -> GetMessagesResponse {
+    let body = serde_json::to_string(options)
+        .map_err(|e| {
+            ATMError::TransportError(format!(
+                "Could not serialize fetch_message() options: {:?}",
+                e
+            ))
+        })
+        .unwrap();
+
+    let res = client
+        .post(format!("{}/fetch", MEDIATOR_API))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", tokens.access_token))
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| {
+            ATMError::TransportError(format!("Could not send list_messages request: {:?}", e))
+        })
+        .unwrap();
+
+    let status = res.status();
+    println!("API response: status({})", status);
+    assert_eq!(status, expected_status_code);
+
+    let body = res
+        .text()
+        .await
+        .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))
+        .unwrap();
+
+    let body = serde_json::from_str::<SuccessResponse<GetMessagesResponse>>(&body)
+        .ok()
+        .unwrap();
+
+    let list = if let Some(list) = body.data {
+        list
+    } else {
+        panic!("No messages found");
+    };
+    list
+}
+
+async fn _delete_messages(
+    client: Client,
+    tokens: AuthorizationResponse,
+    expected_status_code: u16,
+    messages: &DeleteMessageRequest,
+) -> DeleteMessageResponse {
+    let msg = serde_json::to_string(messages)
+        .map_err(|e| {
+            ATMError::TransportError(format!(
+                "Could not serialize delete message request: {:?}",
+                e
+            ))
+        })
+        .unwrap();
+
+    let res = client
+        .delete(format!("{}/delete", MEDIATOR_API))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", tokens.access_token))
+        .body(msg)
+        .send()
+        .await
+        .map_err(|e| {
+            ATMError::TransportError(format!("Could not send delete_messages request: {:?}", e))
+        })
+        .unwrap();
+
+    let status = res.status();
+    println!("API response: status({})", status);
+    assert_eq!(status, expected_status_code);
+
+    let body = res
+        .text()
+        .await
+        .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))
+        .unwrap();
+
+    let body = serde_json::from_str::<SuccessResponse<DeleteMessageResponse>>(&body)
+        .ok()
+        .unwrap();
+
+    let list = if let Some(list) = body.data {
+        list
+    } else {
+        panic!("No messages found");
+    };
+
+    if !list.errors.is_empty() {
+        for (msg, err) in &list.errors {
+            println!("failed: msg({}) error({})", msg, err);
+        }
+        panic!("Failed to delete above messages")
+    }
+
+    list
+}
 fn _get_time_now() -> u64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
