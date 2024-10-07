@@ -162,9 +162,11 @@ impl DatabaseHandler {
 
     /// Updates a session in the database to become authenticated
     /// Updates the state, and the expiry time
+    /// Also ensures that the DID is recorded in the KNOWN_DIDS Set
     pub async fn update_session_authenticated(
         &self,
         session_id: &str,
+        did_hash: &str,
     ) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
@@ -180,13 +182,16 @@ impl DatabaseHandler {
             .arg("GLOBAL")
             .arg("SESSIONS_SUCCESS")
             .arg(1)
+            .cmd("SADD")
+            .arg("KNOWN_DIDS")
+            .arg(did_hash)
             .expire(&sid, 86400)
             .query_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::SessionError(
                     session_id.into(),
-                    format!("tried to retrieve session({}). Error: {}", session_id, err),
+                    format!("tried to set session({}). Error: {}", session_id, err),
                 )
             })?;
 

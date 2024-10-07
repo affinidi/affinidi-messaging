@@ -1,5 +1,17 @@
-use std::time::SystemTime;
+//! Authorization Process
+//! 1. Client gets a random challenge from the server
+//! 2. Client encrypts the random challenge in a message and sends it back to the server POST /authenticate
+//! 3. Server decrypts the message and verifies the challenge
+//! 4. If the challenge is correct, the server sends two JWT tokens to the client (access and refresh tokens)
+//! 5. Client uses the access token to access protected services
+//! 6. If the access token expires, the client uses the refresh token to get a new access token
 
+use super::message_inbound::InboundMessage;
+use crate::{
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::{Session, SessionClaims, SessionState},
+    SharedData,
+};
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use affinidi_messaging_sdk::messages::{known::MessageType, GenericDataStruct};
 use axum::{extract::State, Json};
@@ -7,15 +19,9 @@ use http::StatusCode;
 use jsonwebtoken::{encode, Header};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
+use std::time::SystemTime;
 use tracing::{debug, info, warn};
-
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::{Session, SessionClaims, SessionState},
-    SharedData,
-};
-
-use super::message_inbound::InboundMessage;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct AuthenticationChallenge {
@@ -29,14 +35,6 @@ impl GenericDataStruct for AuthenticationChallenge {}
 pub struct ChallengeBody {
     pub did: String,
 }
-
-// Authorization Process
-// 1. Client gets a random challenge from the server
-// 2. Client encrypts the random challenge in a message and sends it back to the server POST /authenticate
-// 3. Server decrypts the message and verifies the challenge
-// 4. If the challenge is correct, the server sends two JWT tokens to the client (access and refresh tokens)
-// 5. Client uses the access token to access protected services
-// 6. If the access token expires, the client uses the refresh token to get a new access token
 
 /// POST /authenticate/challenge
 /// Request from client to get the challenge
@@ -250,7 +248,7 @@ pub async fn authentication_response(
     // Set the session state to Authorized
     state
         .database
-        .update_session_authenticated(&session.session_id)
+        .update_session_authenticated(&session.session_id, &digest(&session.did))
         .await?;
 
     info!(

@@ -36,7 +36,20 @@ pub(crate) async fn global_acls_menu(
 
         match selection {
             0 => {
-                println!("Select DID");
+                selected_did = match select_did(theme).await {
+                    Ok(did) => {
+                        if let Some(did) = did {
+                            Some(did)
+                        } else {
+                            // No DID was selected
+                            selected_did
+                        }
+                    }
+                    Err(e) => {
+                        println!("{}", style(format!("Error: {}", e)).red());
+                        None
+                    }
+                }
             }
             1 => {
                 println!("Set ACLs");
@@ -49,4 +62,37 @@ pub(crate) async fn global_acls_menu(
             }
         }
     }
+}
+
+/// Picks the target DID
+/// returns the selected DID Hash
+/// returns None if the user cancels the selection
+async fn select_did(theme: &ColorfulTheme) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let selection = Select::with_theme(theme)
+        .with_prompt("Select an action?")
+        .default(0)
+        .items(&[
+            "Scan existing DIDs on Mediator?",
+            "Manually enter DID or DID Hash?",
+            "Back",
+        ])
+        .interact()
+        .unwrap();
+
+    match selection {
+        0 => {
+            println!("Scan existing DIDs on Mediator");
+        }
+        1 => {
+            println!("Manually enter DID or DID Hash");
+        }
+        2 => {
+            return Ok(None);
+        }
+        _ => {
+            println!("Invalid selection");
+        }
+    }
+
+    Ok(None)
 }
