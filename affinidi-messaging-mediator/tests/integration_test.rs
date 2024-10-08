@@ -1,5 +1,8 @@
 use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::{secrets::SecretsResolver, Message, PackEncryptedOptions};
+use affinidi_messaging_didcomm::{
+    secrets::{Secret, SecretsResolver},
+    Message, PackEncryptedOptions,
+};
 use affinidi_messaging_mediator::{resolvers::affinidi_secrets::AffinidiSecrets, server::start};
 use affinidi_messaging_sdk::{
     config::Config,
@@ -13,7 +16,9 @@ use affinidi_messaging_sdk::{
     },
     transports::SendMessageResponse,
 };
-use common::{BOB_DID, BOB_E1, BOB_V1, MEDIATOR_API, MY_DID, MY_E1, MY_V1};
+use common::{
+    BOB_DID, BOB_E1, BOB_V1, CONFIG_PATH, MEDIATOR_API, MY_DID, MY_E1, MY_V1, SECRETS_PATH,
+};
 use core::panic;
 use message_builders::{
     build_delivery_request_message, build_forward_request_message, build_message_received_message,
@@ -25,7 +30,14 @@ use response_validations::{
     validate_message_delivery, validate_message_received_status_reply, validate_status_reply,
 };
 use sha256::digest;
-use std::time::Duration;
+use std::{
+    fs::{self, File},
+    io::{self, BufRead, BufReader},
+    path::Path,
+    process::Command,
+    str,
+    time::Duration,
+};
 use tokio::time::sleep;
 
 mod common;
@@ -34,6 +46,15 @@ mod response_validations;
 
 #[tokio::test]
 async fn test_mediator_server() {
+    // Generate secrets and did for mediator if not existing
+    if !fs::metadata(SECRETS_PATH).is_ok() {
+        println!("Generating secrets");
+        _generate_secrets();
+        let mediator_did = _get_did_from_secrets(SECRETS_PATH.into());
+        _inject_did_into_config(CONFIG_PATH, &mediator_did);
+        println!("Secrets generated and did injected to mediator.toml");
+    }
+
     _start_mediator_server().await;
 
     // Allow some time for the server to start
@@ -41,7 +62,7 @@ async fn test_mediator_server() {
 
     let config = Config::builder()
         .with_ssl_certificates(&mut vec![
-            "../affinidi-messaging-mediator/conf/keys/client.chain".into(),
+            "../affinidi-messaging-mediator/tests/keys/client.chain".into(),
         ])
         .build()
         .unwrap();
@@ -65,8 +86,7 @@ async fn test_mediator_server() {
     // Start Authentication
     let my_authentication_challenge = _authenticate_challenge(client.clone(), MY_DID).await;
     let bob_authentication_challenge = _authenticate_challenge(client.clone(), BOB_DID).await;
-    println!("Auth ch: {:#?}", my_authentication_challenge);
-    println!("Auth ch: {:#?}", bob_authentication_challenge);
+
     // /authenticate/challenge
     let my_auth_response_msg =
         create_auth_challenge_response(&my_authentication_challenge, MY_DID, &mediator_did);
@@ -507,7 +527,7 @@ async fn _authenticate<'sr>(
 
     let body = res.text().await.unwrap();
 
-    assert!(status.is_success());
+    assert!(status.is_success(), "Received status code: {}", status);
 
     if !status.is_success() {
         println!("Failed to get authentication response. Body: {:?}", body);
@@ -772,4 +792,60 @@ async fn _delete_messages(
     }
 
     list
+}
+
+fn _generate_secrets() {
+    let output = Command::new("cargo")
+        .args(&["run", "--example", "generate_secrets"])
+        .output()
+        .expect("Failed to run example");
+    assert!(output.status.success());
+    let source_path = "../affinidi-messaging-mediator/conf/secrets.json-generated";
+
+    let _ = match fs::copy(source_path, SECRETS_PATH) {
+        Ok(_) => println!("Copied {} to {}", source_path, SECRETS_PATH),
+        Err(e) => panic!("Failed with error: {e:?}"),
+    };
+}
+
+fn _get_did_from_secrets(path: String) -> String {
+    let file = File::open(path).unwrap();
+    let reader = BufReader::new(file);
+
+    // Parse the JSON file
+    let config: Vec<Secret> = serde_json::from_reader(reader).unwrap();
+    let id_split: Vec<&str> = config.first().unwrap().id.split("#").collect();
+    let did = *id_split.first().unwrap();
+    did.into()
+}
+
+fn _inject_did_into_config<P>(file_name: P, did: &str)
+where
+    P: AsRef<Path>,
+{
+    let file = File::open(file_name.as_ref())
+        .map_err(|err| {
+            panic!(
+                "{}",
+                format!(
+                    "Could not open file({}). {}",
+                    file_name.as_ref().display(),
+                    err
+                )
+            );
+        })
+        .unwrap();
+
+    let mut lines: Vec<String> = Vec::new();
+    for mut line in io::BufReader::new(file).lines().map_while(Result::ok) {
+        // Strip comments out
+        if line.starts_with("mediator_did =") {
+            let line_split: Vec<&str> = line.split("//").collect();
+            let line_beginning = *line_split.first().unwrap();
+            line = format!("{}{}{}{}", line_beginning, "//", did, "}\"");
+        }
+        lines.push(line);
+    }
+    let config_file = lines.join("\n");
+    fs::write(file_name, config_file).expect("Failed to write to file");
 }

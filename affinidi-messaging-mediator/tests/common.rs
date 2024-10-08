@@ -4,6 +4,9 @@ use serde_json::{json, Value};
 pub const MY_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
 pub const MEDIATOR_API: &str = "https://localhost:7037/mediator/v1";
 pub const BOB_DID: &str = "did:peer:2.Vz6Mkihn2R3M8nY62EFJ7MAVXu7YxsTnuS5iAhmn3qKJbkdFf.EzQ3shpZRBUtewwzYiueXgDqs1bvGNkSyGoRgsbZJXt3TTb9jD.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ";
+pub const SECRETS_PATH: &str = "../affinidi-messaging-mediator/conf/secrets.json";
+pub const CONFIG_PATH: &str = "../affinidi-messaging-mediator/conf/mediator.toml";
+
 lazy_static! {
 // Signing and verification key
 pub static ref MY_V1: Value = json!({
