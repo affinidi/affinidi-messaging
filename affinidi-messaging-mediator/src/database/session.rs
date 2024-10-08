@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use redis::Value;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -113,7 +114,7 @@ impl DatabaseHandler {
 
         let sid = format!("SESSION:{}", session.session_id);
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HSET")
             .arg(&sid)
@@ -172,7 +173,7 @@ impl DatabaseHandler {
 
         let sid = format!("SESSION:{}", session_id);
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HSET")
             .arg(&sid)

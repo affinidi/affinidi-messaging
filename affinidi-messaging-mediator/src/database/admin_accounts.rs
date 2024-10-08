@@ -1,3 +1,4 @@
+//! Database routines to add/remove/list admin accounts
 use affinidi_messaging_sdk::protocols::mediator::MediatorAdminList;
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
@@ -16,7 +17,7 @@ impl DatabaseHandler {
         let did_hash = sha256::digest(admin_did);
         debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SADD")
             .arg("ADMINS")
@@ -245,7 +246,7 @@ impl DatabaseHandler {
                 })?;
             }
             Ok(MediatorAdminList {
-                admins,
+                accounts: admins,
                 cursor: new_cursor,
             })
         }

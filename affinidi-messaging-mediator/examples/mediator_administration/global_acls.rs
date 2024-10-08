@@ -36,7 +36,7 @@ pub(crate) async fn global_acls_menu(
 
         match selection {
             0 => {
-                selected_did = match select_did(theme).await {
+                selected_did = match select_did(atm, protocols, theme).await {
                     Ok(did) => {
                         if let Some(did) = did {
                             Some(did)
@@ -67,7 +67,11 @@ pub(crate) async fn global_acls_menu(
 /// Picks the target DID
 /// returns the selected DID Hash
 /// returns None if the user cancels the selection
-async fn select_did(theme: &ColorfulTheme) -> Result<Option<String>, Box<dyn std::error::Error>> {
+async fn select_did(
+    atm: &mut ATM<'static>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
     let selection = Select::with_theme(theme)
         .with_prompt("Select an action?")
         .default(0)
@@ -82,6 +86,7 @@ async fn select_did(theme: &ColorfulTheme) -> Result<Option<String>, Box<dyn std
     match selection {
         0 => {
             println!("Scan existing DIDs on Mediator");
+            protocols.mediator.list_accounts(atm, None, None).await?;
         }
         1 => {
             println!("Manually enter DID or DID Hash");

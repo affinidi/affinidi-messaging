@@ -61,7 +61,7 @@ pub(crate) async fn list_admins(
                 style("Listing Administration DIDs (SHA256 Hashed DID's). NOTE: Will only list first 100 admin accounts!").green()
             );
 
-            for (idx, admin) in admins.admins.iter().enumerate() {
+            for (idx, admin) in admins.accounts.iter().enumerate() {
                 print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
                 if admin == root_admin_hash {
                     println!(" {}", style(" mediator_root").red());
@@ -142,7 +142,7 @@ pub(crate) async fn remove_admins(
         Ok(admins) => {
             // remove the mediator administrator account from the list
             let admins: Vec<&String> = admins
-                .admins
+                .accounts
                 .iter()
                 .filter(|&x| x != root_admin_hash)
                 .collect();

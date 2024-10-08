@@ -115,6 +115,69 @@ pub(crate) async fn process(
                     }
                 }
             }
+            MediatorAdminRequest::AccountList{cursor, limit} => {
+                match  state.database.list_accounts(cursor, limit).await {
+                    Ok(response) => {
+                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
+                    }
+                    Err(err) => {
+                        warn!("Error listing accounts. Reason: {}", err);
+                        generate_error_response(state, session, &msg.id, ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "database_error".into(),
+                            "Error listing accounts {1}".into(),
+                            vec![err.to_string()], None
+                        ), false)
+                    }
+                }
+            }
+            MediatorAdminRequest::AccountAdd(attr) => {
+                match  state.database.add_account(&attr).await {
+                    Ok(response) => {
+                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
+                    }
+                    Err(err) => {
+                        warn!("Error adding account. Reason: {}", err);
+                        generate_error_response(state, session, &msg.id, ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "database_error".into(),
+                            "Error adding account {1}".into(),
+                            vec![err.to_string()], None
+                        ), false)
+                    }
+                }
+            }
+            MediatorAdminRequest::AccountRemove(attr) => {
+                // Remove root admin DID in case it is in the list
+                // Protects accidentally deleting the only admin account
+                let root_admin = digest(&state.config.admin_did);
+                if root_admin == attr {
+                    return generate_error_response(state, session, &msg.id, ProblemReport::new(
+                        ProblemReportSorter::Error,
+                        ProblemReportScope::Protocol,
+                        "invalid_request".into(),
+                        "Error removing account. Cannot remove root admin account".into(),
+                        vec![], None
+                    ), false);
+                }
+                match  state.database.remove_account(&attr).await {
+                    Ok(response) => {
+                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
+                    }
+                    Err(err) => {
+                        warn!("Error removing account. Reason: {}", err);
+                        generate_error_response(state, session, &msg.id, ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "database_error".into(),
+                            "Error removing account {1}".into(),
+                            vec![err.to_string()], None
+                        ), false)
+                    }
+                }
+            }
         }
     }.instrument(_span).await
 }
