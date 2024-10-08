@@ -17,8 +17,6 @@ struct Args {
     network_address: String,
     #[arg(short, long)]
     ssl_certificates: String,
-    #[arg(short, long)]
-    mediator_did: String,
 }
 
 #[tokio::main]
@@ -32,8 +30,16 @@ async fn main() -> Result<(), ATMError> {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
+    let public_config_builder = Config::builder()
+        .with_atm_api(&args.network_address)
+        .with_ssl_certificates(&mut vec![args.ssl_certificates.clone().into()])
+        .with_websocket_disabled();
+
+    let mut public_atm = ATM::new(public_config_builder.build()?).await?;
+
+    let atm_did = public_atm.well_known_did().await?;
     info!("Running with address: {}", &args.network_address);
-    info!("Running with mediator_did: {}", &args.mediator_did);
+    info!("Running with mediator_did: {}", &atm_did);
     info!("Running with ssl_certificates: {}", &args.ssl_certificates);
 
     let my_did = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
@@ -54,8 +60,6 @@ async fn main() -> Result<(), ATMError> {
       "y": "PpYqybOwMsm64vftt-7gBCQPIUbglMmyy_6rloSSAPk"
     });
 
-    let atm_did = &args.mediator_did;
-
     // ATM SDK supports an externally created DID Cache Resolver
     let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
         .await
@@ -63,7 +67,7 @@ async fn main() -> Result<(), ATMError> {
 
     let mut config = Config::builder()
         .with_my_did(my_did)
-        .with_atm_did(atm_did)
+        .with_atm_did(&atm_did)
         .with_websocket_disabled()
         .with_external_did_resolver(&did_resolver);
 
@@ -82,9 +86,6 @@ async fn main() -> Result<(), ATMError> {
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();
 
-    let well_know_did = atm.well_known_did().await?;
-    println!("did resolved: {:?}", well_know_did);
-
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle
     atm.authenticate().await?;
@@ -94,7 +95,7 @@ async fn main() -> Result<(), ATMError> {
     // Send a trust-ping message to ATM, will generate a PONG response
     let response = protocols
         .trust_ping
-        .send_ping(&mut atm, atm_did, true, true)
+        .send_ping(&mut atm, &atm_did, true, true)
         .await?;
     let after_ping = SystemTime::now();
 
