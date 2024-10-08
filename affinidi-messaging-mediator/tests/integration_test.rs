@@ -58,7 +58,7 @@ async fn test_mediator_server() {
     _start_mediator_server().await;
 
     // Allow some time for the server to start
-    sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(2000)).await;
 
     let config = Config::builder()
         .with_ssl_certificates(&mut vec![
