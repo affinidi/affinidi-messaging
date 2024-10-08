@@ -49,6 +49,7 @@ async fn test_mediator_server() {
     // Generate secrets and did for mediator if not existing
     if !fs::metadata(SECRETS_PATH).is_ok() {
         println!("Generating secrets");
+        _generate_keys();
         _generate_secrets();
         let mediator_did = _get_did_from_secrets(SECRETS_PATH.into());
         _inject_did_into_config(CONFIG_PATH, &mediator_did);
@@ -62,7 +63,7 @@ async fn test_mediator_server() {
 
     let config = Config::builder()
         .with_ssl_certificates(&mut vec![
-            "../affinidi-messaging-mediator/tests/keys/client.chain".into(),
+            "../affinidi-messaging-mediator/conf/keys/client.chain".into(),
         ])
         .build()
         .unwrap();
@@ -798,7 +799,7 @@ fn _generate_secrets() {
     let output = Command::new("cargo")
         .args(&["run", "--example", "generate_secrets"])
         .output()
-        .expect("Failed to run example");
+        .expect("Failed to generate secrets");
     assert!(output.status.success());
     let source_path = "../affinidi-messaging-mediator/conf/secrets.json-generated";
 
@@ -806,6 +807,14 @@ fn _generate_secrets() {
         Ok(_) => println!("Copied {} to {}", source_path, SECRETS_PATH),
         Err(e) => panic!("Failed with error: {e:?}"),
     };
+}
+
+fn _generate_keys() {
+    let output = Command::new("cargo")
+        .args(&["run", "--example", "create_local_certs"])
+        .output()
+        .expect("Failed to create local certs");
+    assert!(output.status.success());
 }
 
 fn _get_did_from_secrets(path: String) -> String {
