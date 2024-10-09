@@ -22,6 +22,9 @@ use crate::{
     SharedData,
 };
 
+const MAX_RETRIEVED_MSGS: usize = 100;
+const MIN_RETRIEVED_MSGS: usize = 1;
+
 /// Process a Status Request message and generates a response
 pub(crate) async fn status_request(
     msg: &Message,
@@ -491,7 +494,7 @@ fn _parse_and_validate_delivery_request_body(
         ));
     }
 
-    if limit < 1 || limit > 100 {
+    if limit < MIN_RETRIEVED_MSGS || limit > MAX_RETRIEVED_MSGS {
         return Err(MediatorError::RequestDataError(
             session.session_id.clone(),
             format!(
