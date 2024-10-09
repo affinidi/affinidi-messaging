@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 pub fn create_auth_challenge_response(
     body: &AuthenticationChallenge,
-    my_did: &str,
+    actor_did: &str,
     atm_did: &str,
 ) -> Message {
     let now = _get_time_now();
@@ -25,7 +25,7 @@ pub fn create_auth_challenge_response(
         json!(body),
     )
     .to(atm_did.to_owned())
-    .from(my_did.to_owned())
+    .from(actor_did.to_owned())
     .created_time(now)
     .expires_time(now + 60)
     .finalize()
@@ -33,7 +33,7 @@ pub fn create_auth_challenge_response(
 
 pub async fn build_ping_message<'sr>(
     to_did: &str,
-    my_did: String,
+    actor_did: String,
     signed: bool,
     expect_response: bool,
     did_resolver: &DIDCacheClient,
@@ -52,8 +52,8 @@ pub async fn build_ping_message<'sr>(
         // Can support anonymous pings
         None
     } else {
-        msg = msg.from(my_did.clone());
-        Some(my_did.clone())
+        msg = msg.from(actor_did.clone());
+        Some(actor_did.clone())
     };
     let msg = msg.created_time(now).expires_time(now + 300).finalize();
     let mut msg_info = TrustPingSent {

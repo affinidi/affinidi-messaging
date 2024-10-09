@@ -194,14 +194,14 @@ pub async fn validate_forward_request_response(
 
 pub async fn validate_get_message_response<S>(
     list: GetMessagesResponse,
-    my_did: &str,
+    actor_did: &str,
     did_resolver: &DIDCacheClient,
     secrets_resolver: &S,
 ) where
     S: SecretsResolver + Send,
 {
     for msg in list.success {
-        assert_eq!(msg.to_address.unwrap(), digest(my_did));
+        assert_eq!(msg.to_address.unwrap(), digest(actor_did));
         let _ = Message::unpack_string(
             &msg.msg.unwrap(),
             did_resolver,
