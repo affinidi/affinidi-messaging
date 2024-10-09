@@ -176,10 +176,7 @@ async fn generate_status_reply(
             status.live_delivery = live_delivery;
         }
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = _get_time_now();
 
         if let Some(t) = status.oldest_received_time {
             // Using wrapping sub because result could overflow u64
@@ -321,36 +318,8 @@ pub(crate) async fn delivery_request(
 
         // Pull recipient_did and limit from message body
         let (recipient_did, limit): (String, usize) =
-            match serde_json::from_value::<MessagePickupDeliveryRequest>(msg.body.to_owned()) {
-                Ok(body) => (body.recipient_did, body.limit),
-                Err(e) => {
-                    return Err(MediatorError::RequestDataError(
-                        session.session_id.clone(),
-                        format!("delivery-request body isn't valid. Reason: {}", e),
-                    ))
-                }
-            };
+            _parse_and_validate_delivery_request_body(&session, msg)?;
 
-        if session.did != recipient_did {
-            return Err(MediatorError::Unauthorized(
-                session.session_id.clone(),
-                format!(
-                    "Session DID \"{}\" doesn't match recipient DID \"{}\"",
-                    session.did, recipient_did
-                ),
-            ));
-        }
-
-        if limit < 1 || limit > 100 {
-            return Err(MediatorError::RequestDataError(
-                session.session_id.clone(),
-                format!(
-                    "limit must be between 1 and 100 inclusive. Received limit({})",
-                    limit
-                ),
-            )
-            .into());
-        }
         let recipient_did_hash = digest(recipient_did.clone());
 
         debug!(
@@ -397,10 +366,7 @@ pub(crate) async fn delivery_request(
                     attachments.push(attachment.finalize())
                 }
             }
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = _get_time_now();
 
             let response_msg = response_msg
                 .attachments(attachments)
@@ -442,17 +408,8 @@ pub(crate) async fn messages_received(
         };
         debug!("thid = ({})", thid);
 
-        // Pull recipient_did and limit from message body
-        let message_id_list: Vec<String> =
-            match serde_json::from_value::<MessagePickupMessagesReceived>(msg.body.to_owned()) {
-                Ok(body) => body.message_id_list,
-                Err(e) => {
-                    return Err(MediatorError::RequestDataError(
-                        session.session_id.clone(),
-                        format!("messages-received body isn't valid. Reason: {}", e),
-                    ))
-                }
-            };
+        // Pull messages ids list from message body
+        let message_id_list: Vec<String> = _parse_message_received_body(session, msg)?;
 
         debug!("Messages Id list: {:?}", message_id_list);
 
@@ -491,15 +448,76 @@ pub(crate) async fn messages_received(
     .await
 }
 
+fn _parse_message_received_body(
+    session: &Session,
+    msg: &Message,
+) -> Result<Vec<String>, MediatorError> {
+    let message_id_list: Vec<String> =
+        match serde_json::from_value::<MessagePickupMessagesReceived>(msg.body.to_owned()) {
+            Ok(body) => body.message_id_list,
+            Err(e) => {
+                return Err(MediatorError::RequestDataError(
+                    session.session_id.clone(),
+                    format!("messages-received body isn't valid. Reason: {}", e),
+                ))
+            }
+        };
+
+    Ok(message_id_list)
+}
+
+fn _parse_and_validate_delivery_request_body(
+    session: &Session,
+    msg: &Message,
+) -> Result<(String, usize), MediatorError> {
+    let (recipient_did, limit): (String, usize) =
+        match serde_json::from_value::<MessagePickupDeliveryRequest>(msg.body.to_owned()) {
+            Ok(body) => (body.recipient_did, body.limit),
+            Err(e) => {
+                return Err(MediatorError::RequestDataError(
+                    session.session_id.clone(),
+                    format!("delivery-request body isn't valid. Reason: {}", e),
+                ))
+            }
+        };
+
+    if session.did != recipient_did {
+        return Err(MediatorError::Unauthorized(
+            session.session_id.clone(),
+            format!(
+                "Session DID \"{}\" doesn't match recipient DID \"{}\"",
+                session.did, recipient_did
+            ),
+        ));
+    }
+
+    if limit < 1 || limit > 100 {
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            format!(
+                "limit must be between 1 and 100 inclusive. Received limit({})",
+                limit
+            ),
+        )
+        .into());
+    }
+
+    Ok((recipient_did, limit))
+}
+
+fn _get_time_now() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
 fn _validate_msg(
     msg: &Message,
     state: &SharedData,
     session: &Session,
 ) -> Result<(), MediatorError> {
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = _get_time_now();
 
     if let Some(expires) = msg.expires_time {
         if expires <= now {
