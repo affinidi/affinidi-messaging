@@ -1,15 +1,11 @@
-use std::{net::SocketAddr, time::SystemTime};
-
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use affinidi_messaging_sdk::messages::GenericDataStruct;
-use axum::{
-    extract::{ConnectInfo, State},
-    Json,
-};
+use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use tracing::{debug, info, warn};
 
 use crate::{
