@@ -331,6 +331,26 @@ pub(crate) async fn delivery_request(
                 }
             };
 
+        if session.did != recipient_did {
+            return Err(MediatorError::Unauthorized(
+                session.session_id.clone(),
+                format!(
+                    "Session DID \"{}\" doesn't match recipient DID \"{}\"",
+                    session.did, recipient_did
+                ),
+            ));
+        }
+
+        if limit < 1 || limit > 100 {
+            return Err(MediatorError::ConfigError(
+                session.session_id.clone(),
+                format!(
+                    "limit must be between 1 and 100 inclusive. Received limit({})",
+                    limit
+                ),
+            )
+            .into());
+        }
         let recipient_did_hash = digest(recipient_did.clone());
 
         debug!(
