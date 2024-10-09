@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde_json::{json, Value};
 
-pub const MY_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
+pub const ALICE_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
 pub const MEDIATOR_API: &str = "https://localhost:7037/mediator/v1";
 pub const BOB_DID: &str = "did:peer:2.Vz6Mkihn2R3M8nY62EFJ7MAVXu7YxsTnuS5iAhmn3qKJbkdFf.EzQ3shpZRBUtewwzYiueXgDqs1bvGNkSyGoRgsbZJXt3TTb9jD.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ";
 pub const SECRETS_PATH: &str = "../affinidi-messaging-mediator/conf/secrets.json";
@@ -9,7 +9,7 @@ pub const CONFIG_PATH: &str = "../affinidi-messaging-mediator/conf/mediator.toml
 
 lazy_static! {
 // Signing and verification key
-pub static ref MY_V1: Value = json!({
+pub static ref ALICE_V1: Value = json!({
     "crv": "Ed25519",
     "d": "LLWCf83n8VsUYq31zlZRe0NNMCcn1N4Dh85dGpIqSFw",
     "kty": "OKP",
@@ -17,7 +17,7 @@ pub static ref MY_V1: Value = json!({
 });
 
 // Encryption key
-pub static ref MY_E1: Value = json!({
+pub static ref ALICE_E1: Value = json!({
   "crv": "secp256k1",
   "d": "oi-dXG4EqfNODFPjv2vkieoLdbQZH9k6dwPDV8HDoms",
   "kty": "EC",

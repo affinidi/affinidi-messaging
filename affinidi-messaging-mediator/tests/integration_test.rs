@@ -17,7 +17,7 @@ use affinidi_messaging_sdk::{
     transports::SendMessageResponse,
 };
 use common::{
-    BOB_DID, BOB_E1, BOB_V1, CONFIG_PATH, MEDIATOR_API, MY_DID, MY_E1, MY_V1, SECRETS_PATH,
+    ALICE_DID, ALICE_E1, ALICE_V1, BOB_DID, BOB_E1, BOB_V1, CONFIG_PATH, MEDIATOR_API, SECRETS_PATH,
 };
 use core::panic;
 use message_builders::{
@@ -71,9 +71,9 @@ async fn test_mediator_server() {
     let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
         .await
         .unwrap();
-    let my_secrets_resolver = AffinidiSecrets::new(vec![
-        secret_from_str(&format!("{}#key-1", MY_DID), &MY_V1),
-        secret_from_str(&format!("{}#key-2", MY_DID), &MY_E1),
+    let alice_secrets_resolver = AffinidiSecrets::new(vec![
+        secret_from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
+        secret_from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
     ]);
     let bob_secrets_resolver = AffinidiSecrets::new(vec![
         secret_from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
@@ -85,24 +85,24 @@ async fn test_mediator_server() {
     let mediator_did = _well_known(client.clone()).await;
 
     // Start Authentication
-    let my_authentication_challenge = _authenticate_challenge(client.clone(), MY_DID).await;
+    let alice_authentication_challenge = _authenticate_challenge(client.clone(), ALICE_DID).await;
     let bob_authentication_challenge = _authenticate_challenge(client.clone(), BOB_DID).await;
 
     // /authenticate/challenge
-    let my_auth_response_msg =
-        create_auth_challenge_response(&my_authentication_challenge, MY_DID, &mediator_did);
+    let alice_auth_response_msg =
+        create_auth_challenge_response(&alice_authentication_challenge, ALICE_DID, &mediator_did);
 
     let bob_auth_response_msg =
         create_auth_challenge_response(&bob_authentication_challenge, BOB_DID, &mediator_did);
 
     // /authenticate
-    let my_authentication_response = _authenticate(
+    let alice_authentication_response = _authenticate(
         client.clone(),
-        my_auth_response_msg,
-        MY_DID,
+        alice_auth_response_msg,
+        ALICE_DID,
         &mediator_did,
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
     let bob_authentication_response = _authenticate(
@@ -115,8 +115,8 @@ async fn test_mediator_server() {
     )
     .await;
 
-    assert!(!my_authentication_response.access_token.is_empty());
-    assert!(!my_authentication_response.refresh_token.is_empty());
+    assert!(!alice_authentication_response.access_token.is_empty());
+    assert!(!alice_authentication_response.refresh_token.is_empty());
     assert!(!bob_authentication_response.access_token.is_empty());
     assert!(!bob_authentication_response.refresh_token.is_empty());
 
@@ -125,17 +125,17 @@ async fn test_mediator_server() {
     // Send signed ping and expecting response
     let (signed_ping_msg, mut signed_ping_msg_info) = build_ping_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         true,
         true,
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
 
     let signed_ping_res: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         &signed_ping_msg,
         true,
         200,
@@ -161,16 +161,16 @@ async fn test_mediator_server() {
     // Send anonymous ping
     let (anon_ping_msg, _) = build_ping_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         false,
         false,
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
     let _anon_ping_res: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         &anon_ping_msg,
         false,
         500,
@@ -180,14 +180,14 @@ async fn test_mediator_server() {
     // MessageType=MessagePickupStatusRequest
     let status_request_msg = build_status_request_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
     let status_reply: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         &status_request_msg,
         false,
         200,
@@ -195,23 +195,23 @@ async fn test_mediator_server() {
     .await;
     validate_status_reply(
         status_reply,
-        MY_DID.into(),
+        ALICE_DID.into(),
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
 
     // MessageType=MessagePickupDeliveryRequest
     let delivery_request_msg = build_delivery_request_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
     let message_delivery: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         &delivery_request_msg,
         true,
         200,
@@ -220,7 +220,7 @@ async fn test_mediator_server() {
     let message_received_ids = validate_message_delivery(
         message_delivery,
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
         &pong_msg_id,
     )
     .await;
@@ -228,16 +228,16 @@ async fn test_mediator_server() {
     // MessageType=MessagePickupMessagesReceived
     let message_received_msg = build_message_received_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
         message_received_ids.clone(),
     )
     .await;
     let message_received_status_reply: SendMessageResponse<InboundMessageResponse> =
         _send_inbound_message(
             client.clone(),
-            my_authentication_response.clone(),
+            alice_authentication_response.clone(),
             &message_received_msg,
             true,
             200,
@@ -246,16 +246,16 @@ async fn test_mediator_server() {
 
     validate_message_received_status_reply(
         message_received_status_reply,
-        MY_DID.into(),
+        ALICE_DID.into(),
         &did_resolver,
-        &my_secrets_resolver,
+        &alice_secrets_resolver,
     )
     .await;
 
     // MessageType=ForwardRequest
     let forward_request_msg = build_forward_request_message(
         &mediator_did,
-        MY_DID.into(),
+        ALICE_DID.into(),
         BOB_DID.into(),
         &did_resolver,
         &bob_secrets_resolver,
@@ -265,7 +265,7 @@ async fn test_mediator_server() {
     let forward_request_response: SendMessageResponse<InboundMessageResponse> =
         _send_inbound_message(
             client.clone(),
-            my_authentication_response.clone(),
+            alice_authentication_response.clone(),
             &forward_request_msg,
             true,
             200,
@@ -283,13 +283,14 @@ async fn test_mediator_server() {
     let msg_list = _outbound_message(
         client.clone(),
         &get_message_no_delete_request,
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
         false,
     )
     .await;
 
-    validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
+    validate_get_message_response(msg_list, ALICE_DID, &did_resolver, &alice_secrets_resolver)
+        .await;
 
     // delete messages: TRUE
     let get_message_delete_request = GetMessagesRequest {
@@ -299,19 +300,20 @@ async fn test_mediator_server() {
     let msg_list = _outbound_message(
         client.clone(),
         &get_message_delete_request,
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
         false,
     )
     .await;
 
-    validate_get_message_response(msg_list, MY_DID, &did_resolver, &my_secrets_resolver).await;
+    validate_get_message_response(msg_list, ALICE_DID, &did_resolver, &alice_secrets_resolver)
+        .await;
 
     // get message should return not found
     let _msg_list = _outbound_message(
         client.clone(),
         &get_message_delete_request,
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
         true,
     )
@@ -321,17 +323,17 @@ async fn test_mediator_server() {
     for _ in 0..3 {
         let (signed_ping_msg, _) = build_ping_message(
             &mediator_did,
-            MY_DID.into(),
+            ALICE_DID.into(),
             true,
             true,
             &did_resolver,
-            &my_secrets_resolver,
+            &alice_secrets_resolver,
         )
         .await;
 
         let _: SendMessageResponse<InboundMessageResponse> = _send_inbound_message(
             client.clone(),
-            my_authentication_response.clone(),
+            alice_authentication_response.clone(),
             &signed_ping_msg,
             true,
             200,
@@ -343,9 +345,9 @@ async fn test_mediator_server() {
     // /list/:did_hash/Inbox
     let msgs_list = list_messages(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
-        MY_DID,
+        ALICE_DID,
         Folder::Inbox,
     )
     .await;
@@ -354,9 +356,9 @@ async fn test_mediator_server() {
     // /list/:did_hash/Outbox
     let msgs_list = list_messages(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
-        MY_DID,
+        ALICE_DID,
         Folder::Outbox,
     )
     .await;
@@ -365,7 +367,7 @@ async fn test_mediator_server() {
     // /fetch
     let messages = _fetch_messages(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
         &FetchOptions {
             limit: 10,
@@ -384,7 +386,7 @@ async fn test_mediator_server() {
 
     let deleted_msgs = _delete_messages(
         client.clone(),
-        my_authentication_response.clone(),
+        alice_authentication_response.clone(),
         200,
         &DeleteMessageRequest {
             message_ids: msg_ids,
@@ -489,7 +491,7 @@ async fn _authenticate_challenge(client: Client, did: &str) -> AuthenticationCha
 async fn _authenticate<'sr>(
     client: Client,
     auth_response: Message,
-    my_did: &str,
+    actor_did: &str,
     atm_did: &str,
     did_resolver: &DIDCacheClient,
     secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
@@ -497,8 +499,8 @@ async fn _authenticate<'sr>(
     let (auth_msg, _) = auth_response
         .pack_encrypted(
             atm_did,
-            Some(my_did),
-            Some(my_did),
+            Some(actor_did),
+            Some(actor_did),
             did_resolver,
             secrets_resolver,
             &PackEncryptedOptions::default(),
@@ -647,14 +649,14 @@ async fn list_messages(
     client: Client,
     tokens: AuthorizationResponse,
     expected_status_code: u16,
-    my_did: &str,
+    actor_did: &str,
     folder: Folder,
 ) -> Vec<MessageListElement> {
     let res = client
         .get(format!(
             "{}/list/{}/{}",
             MEDIATOR_API,
-            digest(my_did),
+            digest(actor_did),
             folder,
         ))
         .header("Content-Type", "application/json")
