@@ -342,7 +342,7 @@ pub(crate) async fn delivery_request(
         }
 
         if limit < 1 || limit > 100 {
-            return Err(MediatorError::ConfigError(
+            return Err(MediatorError::RequestDataError(
                 session.session_id.clone(),
                 format!(
                     "limit must be between 1 and 100 inclusive. Received limit({})",
