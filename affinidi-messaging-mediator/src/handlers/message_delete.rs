@@ -34,7 +34,7 @@ pub async fn message_delete_handler(
     );
     async move {
         debug!("Deleting ({}) messages", body.message_ids.len());
-        if body.message_ids.len() > state.config.max_messages_to_delete.try_into().unwrap() {
+        if body.message_ids.len() > state.config.max_deleted_messages.try_into().unwrap() {
             return Err(MediatorError::RequestDataError(
                 session.session_id.clone(),
                 format!(

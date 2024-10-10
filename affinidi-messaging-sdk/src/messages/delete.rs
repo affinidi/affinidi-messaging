@@ -4,7 +4,7 @@ use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
 
-const MAX_MESSAGES_TO_DELETE_LIMIT: usize = 100;
+const MAX_DELETED_MESSAGES: usize = 100;
 
 impl<'c> ATM<'c> {
     /// Delete messages from ATM
@@ -17,7 +17,7 @@ impl<'c> ATM<'c> {
 
         // Check if authenticated
         let tokens = self.authenticate().await?;
-        if messages.message_ids.len() > MAX_MESSAGES_TO_DELETE_LIMIT {
+        if messages.message_ids.len() > MAX_DELETED_MESSAGES {
             return  Err(ATMError::MsgSendError(format!(
                 "Operation exceeds the allowed limit. You may delete a maximum of 100 messages per request. Received {} ids.",
                 messages.message_ids.len()
