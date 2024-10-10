@@ -4,6 +4,8 @@ use crate::{errors::ATMError, messages::SuccessResponse, ATM};
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
 
+const MAX_MESSAGES_TO_DELETE_LIMIT: usize = 100;
+
 impl<'c> ATM<'c> {
     /// Delete messages from ATM
     /// - messages: List of message_ids to delete
@@ -15,7 +17,12 @@ impl<'c> ATM<'c> {
 
         // Check if authenticated
         let tokens = self.authenticate().await?;
-
+        if messages.message_ids.len() > MAX_MESSAGES_TO_DELETE_LIMIT {
+            return  Err(ATMError::MsgSendError(format!(
+                "Operation exceeds the allowed limit. You may delete a maximum of 100 messages per request. Received {} ids.",
+                messages.message_ids.len()
+            )));
+        }
         let msg = serde_json::to_string(messages).map_err(|e| {
             ATMError::TransportError(format!(
                 "Could not serialize delete message request: {:?}",
