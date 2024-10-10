@@ -7,8 +7,6 @@ use crate::common::errors::MediatorError;
 
 use super::DatabaseHandler;
 
-const MAX_MESSAGES_LIMIT: usize = 100;
-
 impl DatabaseHandler {
     /// Retrieves list of messages for the specified DID and folder
     /// The folder can be either Inbox or Outbox
@@ -19,6 +17,7 @@ impl DatabaseHandler {
         did_hash: &str,
         folder: Folder,
         range: Option<(&str, &str)>,
+        limit: u32,
     ) -> Result<MessageList, MediatorError> {
         let _span = span!(
             Level::DEBUG,
@@ -46,7 +45,7 @@ impl DatabaseHandler {
                 .arg(start)
                 .arg(end)
                 .arg("COUNT")
-                .arg(MAX_MESSAGES_LIMIT)
+                .arg(limit)
                 .query_async(&mut conn)
                 .await
                 .map_err(|err| {

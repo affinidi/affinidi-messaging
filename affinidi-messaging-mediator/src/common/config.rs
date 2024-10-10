@@ -38,6 +38,8 @@ pub struct DatabaseConfig {
     pub max_message_size: String,
     pub max_queued_messages: String,
     pub message_expiry_minutes: String,
+    pub max_messages_list: String,
+    pub max_messages_to_delete: String,
 }
 
 /// SecurityConfig Struct contains security related configuration details
@@ -122,6 +124,8 @@ pub struct Config {
     pub max_message_size: u32,
     pub max_queued_messages: u32,
     pub message_expiry_minutes: u32,
+    pub max_messages_list: u32,
+    pub max_messages_to_delete: u32,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
@@ -153,8 +157,10 @@ impl fmt::Debug for Config {
             .field("database_pool_size", &self.database_pool_size)
             .field("database_timeout", &self.database_timeout)
             .field("max_message_size", &self.max_message_size)
-            .field("max_queued_messages", &self.max_queued_messages)
+            .field("max_messages_list", &self.max_messages_list)
             .field("message_expiry_minutes", &self.message_expiry_minutes)
+            .field("max_queued_messages", &self.max_queued_messages)
+            .field("max_messages_to_delete", &self.max_messages_to_delete)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &self.jwt_encoding_key.is_some())
@@ -198,6 +204,8 @@ impl Default for Config {
             max_message_size: 1048576,
             max_queued_messages: 100,
             message_expiry_minutes: 10080,
+            max_messages_list: 100,
+            max_messages_to_delete: 100,
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -248,6 +256,8 @@ impl TryFrom<ConfigRaw> for Config {
             database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
             max_message_size: raw.database.max_message_size.parse().unwrap_or(1048576),
             max_queued_messages: raw.database.max_queued_messages.parse().unwrap_or(100),
+            max_messages_list: raw.database.max_messages_list.parse().unwrap_or(100),
+            max_messages_to_delete: raw.database.max_messages_to_delete.parse().unwrap_or(100),
             message_expiry_minutes: raw.database.message_expiry_minutes.parse().unwrap_or(10080),
             use_ssl: raw.security.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: raw.security.ssl_certificate_file,
