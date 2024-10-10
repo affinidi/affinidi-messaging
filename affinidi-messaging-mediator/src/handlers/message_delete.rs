@@ -11,7 +11,7 @@ use crate::{
     common::errors::{AppError, MediatorError, Session, SuccessResponse},
     SharedData,
 };
-const MAX_MESSAGES_TO_DELETE_LIMIT: usize = 100;
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ResponseData {
     pub body: String,
@@ -34,7 +34,7 @@ pub async fn message_delete_handler(
     );
     async move {
         debug!("Deleting ({}) messages", body.message_ids.len());
-        if body.message_ids.len() > MAX_MESSAGES_TO_DELETE_LIMIT {
+        if body.message_ids.len() > state.config.max_deleted_messages.try_into().unwrap() {
             return Err(MediatorError::RequestDataError(
                 session.session_id.clone(),
                 format!(

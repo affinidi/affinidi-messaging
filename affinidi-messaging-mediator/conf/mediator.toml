@@ -66,6 +66,15 @@ max_queued_messages = "${MAX_QUEUED_MESSAGES:100}"
 ### Default: 10080 (7 days)
 message_expiry_minutes = "${MESSAGE_EXPIRY_MINUTES:10080}"
 
+### max_listed_messages: Max messages retrieved 
+### when listing messages from db per request
+### Default: 100
+max_listed_messages = "${MAX_LISTED_MESSAGES:100}"
+
+### max_deleted_messages: Max number of messages to be deleted per request
+### Default: 100
+max_deleted_messages = "{MAX_DELETED_MESSAGES:100}"
+
 [security]
 ### If true (default) SSL is enabled.
 ### default: true
