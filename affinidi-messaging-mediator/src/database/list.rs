@@ -43,6 +43,8 @@ impl DatabaseHandler {
                 .arg(&key)
                 .arg(start)
                 .arg(end)
+                .arg("COUNT")
+                .arg(100)
                 .query_async(&mut conn)
                 .await
                 .map_err(|err| {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, span, warn, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, Session, SuccessResponse},
     SharedData,
 };
 
@@ -34,6 +34,16 @@ pub async fn message_delete_handler(
     );
     async move {
         debug!("Deleting ({}) messages", body.message_ids.len());
+        if body.message_ids.len() > 100 {
+            return Err(MediatorError::RequestDataError(
+                session.session_id.clone(),
+                format!(
+                    "Operation exceeds the allowed limit. You may delete a maximum of 100 messages per request. Received {} ids.",
+                    body.message_ids.len()
+                ),
+            )
+            .into());
+        }
         let mut deleted: DeleteMessageResponse = DeleteMessageResponse::default();
 
         for message in &body.message_ids {
