@@ -3,7 +3,7 @@
 use affinidi_messaging_helpers::common::{affinidi_logo, friends::Friend, profiles::Profiles};
 use console::{style, Style, Term};
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use std::{ascii::AsciiExt, env, error::Error};
+use std::{env, error::Error};
 use ui::{init_local_mediator, init_remote_mediator, local_remote_mediator, MediatorType};
 
 mod mediator;
