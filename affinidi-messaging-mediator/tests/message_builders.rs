@@ -207,8 +207,6 @@ pub async fn build_forward_request_message<'sr>(
 ) -> String {
     let now = _get_time_now();
 
-    let recipient_did = recipient_did;
-
     let msg = Message::build(
         Uuid::new_v4().into(),
         "https://didcomm.org/routing/2.0/forward".to_owned(),

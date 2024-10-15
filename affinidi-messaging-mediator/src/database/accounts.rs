@@ -1,9 +1,9 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
-use affinidi_messaging_sdk::protocols::mediator::{MediatorAccountList, MediatorAdminList};
+use affinidi_messaging_sdk::protocols::mediator::MediatorAccountList;
 use redis::{from_redis_value, Value};
 use tracing::{debug, span, Instrument, Level};
 
-use crate::{common::errors::MediatorError, database::accounts};
+use crate::common::errors::MediatorError;
 
 use super::DatabaseHandler;
 

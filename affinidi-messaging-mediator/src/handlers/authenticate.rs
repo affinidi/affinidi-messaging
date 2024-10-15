@@ -13,7 +13,7 @@ use crate::{
     SharedData,
 };
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
-use affinidi_messaging_sdk::messages::GenericDataStruct;
+use affinidi_messaging_sdk::messages::{known::MessageType, GenericDataStruct};
 use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
@@ -250,7 +250,7 @@ pub async fn authentication_response(
     // Set the session state to Authorized
     state
         .database
-        .update_session_authenticated(&old_sid, &session.session_id, &digest(session.did))
+        .update_session_authenticated(&old_sid, &session.session_id, &digest(&session.did))
         .await?;
 
     info!(

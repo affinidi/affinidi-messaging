@@ -52,3 +52,5 @@ uuid.workspace = true
 [dev-dependencies]
 console.workspace = true
 dialoguer.workspace = true
+lazy_static.workspace = true
+reqwest.workspace = true

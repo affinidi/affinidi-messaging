@@ -196,8 +196,10 @@ pub struct DIDResolverConfig {
 pub struct LimitsConfig {
     pub attachments_max_count: usize,
     pub crypto_operations_per_message: usize,
+    pub deleted_messages: usize,
     pub forward_task_queue: usize,
     pub http_size: usize,
+    pub listed_messages: usize,
     pub local_max_acl: usize,
     pub message_expiry_minutes: usize,
     pub message_size: usize,
@@ -212,8 +214,10 @@ impl Default for LimitsConfig {
         LimitsConfig {
             attachments_max_count: 20,
             crypto_operations_per_message: 1000,
+            deleted_messages: 100,
             forward_task_queue: 50_000,
             http_size: 10_485_760,
+            listed_messages: 100,
             local_max_acl: 1_000,
             message_expiry_minutes: 10_080,
             message_size: 1_048_576,
@@ -229,8 +233,10 @@ impl Default for LimitsConfig {
 struct LimitsConfigRaw {
     pub attachments_max_count: String,
     pub crypto_operations_per_message: String,
+    pub deleted_messages: String,
     pub forward_task_queue: String,
     pub http_size: String,
+    pub listed_messages: String,
     pub local_max_acl: String,
     pub message_expiry_minutes: String,
     pub message_size: String,
@@ -250,8 +256,10 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
                 .crypto_operations_per_message
                 .parse()
                 .unwrap_or(1000),
+            deleted_messages: raw.deleted_messages.parse().unwrap_or(100),
             forward_task_queue: raw.forward_task_queue.parse().unwrap_or(50_000),
             http_size: raw.http_size.parse().unwrap_or(10_485_760),
+            listed_messages: raw.listed_messages.parse().unwrap_or(100),
             local_max_acl: raw.local_max_acl.parse().unwrap_or(1_000),
             message_expiry_minutes: raw.message_expiry_minutes.parse().unwrap_or(10_080),
             message_size: raw.message_size.parse().unwrap_or(1_048_576),

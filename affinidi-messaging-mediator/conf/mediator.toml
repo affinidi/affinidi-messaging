@@ -146,6 +146,10 @@ attachments_max_count = "${LIMIT_ATTACHMENTS_MAX_COUNT:20}"
 ### Default: 1000
 crypto_operations_per_message = "${LIMIT_CRYPTO_OPERATIONS_PER_MESSAGE:1000}"
 
+### deleted_messages: Maxx number of messages that can be deleted at once
+### Default: 100
+deleted_messages = "${LIMIT_DELETED_MESSAGES:100}"
+
 ### forward_task_queue: How many forward tasks can be queued up in total
 ### Default: 50_000
 forward_task_queue = "${LIMIT_FORWARD_TASK_QUEUE:50000}"
@@ -154,6 +158,10 @@ forward_task_queue = "${LIMIT_FORWARD_TASK_QUEUE:50000}"
 ### Default: 10485760 (10MB)
 ### It is recommended to use infrastructure level limitation instead of application level limitations
 http_size = "${LIMIT_HTTP_SIZE:10485760}"
+
+### listed_messages: Maxx number of messages that can be listed at a time
+### Default: 100
+listed_messages = "${LIMIT_LISTED_MESSAGES:100}"
 
 ### local_max_acl: Maximum number of ACL entries that each DID can have
 ### Default: 1_000
