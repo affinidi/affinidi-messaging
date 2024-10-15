@@ -23,4 +23,17 @@ impl Friend {
             keys: did.1,
         })
     }
+
+    /// Searches for a key by its key ID
+    /// kid: Key ID (E.g. "#key-1")
+    /// Returns: Secret if found, None otherwise
+    pub fn get_key(&self, kid: &str) -> Option<Secret> {
+        let kid = if kid.starts_with("#") {
+            kid.to_string()
+        } else {
+            format!("#{}", kid)
+        };
+
+        self.keys.iter().find(|k| k.id.ends_with(&kid)).cloned()
+    }
 }

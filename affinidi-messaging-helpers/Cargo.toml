@@ -15,7 +15,10 @@ name = "setup_environment"
 path = "src/setup_environment/main.rs"
 
 [dependencies]
+affinidi-did-resolver-cache-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
+affinidi-messaging-sdk.workspace = true
+clap.workspace = true
 did-peer.workspace = true
 base64.workspace = true
 console.workspace = true
@@ -30,3 +33,5 @@ ssi.workspace = true
 time.workspace = true
 tokio.workspace = true
 toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

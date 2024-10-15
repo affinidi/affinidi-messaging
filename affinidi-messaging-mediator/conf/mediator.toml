@@ -7,7 +7,7 @@ log_level = "debug"
 ### Supported formats:
 ### - did://did:peer:<version>:<base58-encoded-verification-key>
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
-mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mko8UkR8jGrdxLXVccreHnTLtsngYYNVu6tdEJYaMLHfN5.EzQ3shbLpwiso4Eb6W1PF3nixmBgRvjsMvtX6BBu5t4ZZfXoPy.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
+mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mktrp3LCFD5G7yik7dpyUskkUYqusbJo6GTD4FwHQMyFqA.EzQ3shNzbkWpkugTk3C8bwqiU66ALbDSEESo2ccPkXmwYyjFft.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
 
 ### ****************************************************************************************************************************
 ### Server configuration
@@ -85,7 +85,7 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### Supported Formats:
 ### - string://<key> - Use the key as is
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
-jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIIWC7aAMpjr5u1tbwAr3Rs9KW_Vj1-vikuJM3ACnM4HFgSEAUXjYpN_fEe5j7-AVUAjFxp-dR_C9L2Hf58rDciF1ws0}"
+jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGHgDA0UoKvqSIx5fFiNNDrVyAW3zR2URl9o-5tKmOMJgSEAqkYjPFDw326B5ZDeRgJnila0oFGNeUwSGYyDbwpRBXc}"
 
 ### cors_allow_origin: Comma separated list of origins that are allowed to access this service
 ### Default: *

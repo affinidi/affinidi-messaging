@@ -1,3 +1,4 @@
+use super::check_path;
 use super::friends::Friend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -23,9 +24,44 @@ pub struct Profile {
     pub friends: HashMap<String, Friend>,
 }
 
+pub const PROFILES_PATH: &str = "affinidi-messaging-helpers/conf/profiles.json";
+
 impl Profiles {
+    /// Loads profile config using Environment or command line argument
+    /// priority is given in the following order
+    /// 1. Command Line Argument
+    /// 2. Environment Variable
+    /// 3. First Profile in the file
+    /// 4. Return Error if nothing found
+    pub fn smart_load(
+        args_profile: Option<String>,
+        env_profile: Option<String>,
+    ) -> Result<(String, Profile), Box<dyn Error>> {
+        check_path()?;
+        let profiles = Profiles::load_file(PROFILES_PATH)?;
+        if let Some(args) = args_profile {
+            if let Some(profile) = profiles.profiles.get(&args) {
+                Ok((args, profile.clone()))
+            } else {
+                Err(format!("Couldn't find profile ({})!", args).into())
+            }
+        } else if let Some(env) = env_profile {
+            if let Some(profile) = profiles.profiles.get(&env) {
+                Ok((env, profile.clone()))
+            } else {
+                Err(format!("Couldn't find profile ({})!", env).into())
+            }
+        } else if profiles.profiles.is_empty() {
+            Err("No profiles found!".into())
+        } else if let Some((name, profile)) = profiles.profiles.iter().next() {
+            Ok((name.to_string(), profile.clone()))
+        } else {
+            Err("No profiles found!".into())
+        }
+    }
+
     // Load saved profiles from file
-    pub fn load(path: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn load_file(path: &str) -> Result<Self, Box<dyn Error>> {
         match Path::new(path).try_exists() {
             Ok(exists) => {
                 if exists {

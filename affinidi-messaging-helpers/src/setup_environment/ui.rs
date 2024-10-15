@@ -24,7 +24,7 @@ pub enum MediatorType {
 pub(crate) fn local_remote_mediator(
     theme: &ColorfulTheme,
     profiles: &Profiles,
-) -> Result<MediatorType, Box<dyn Error>> {
+) -> Result<Option<MediatorType>, Box<dyn Error>> {
     println!();
 
     let mut selections = vec![
@@ -35,6 +35,8 @@ pub(crate) fn local_remote_mediator(
         selections.push("Select Existing Profile?".to_string());
     }
 
+    selections.push("Exit".to_string());
+
     loop {
         let type_ = Select::with_theme(theme)
             .with_prompt("Configure local or remote mediator?")
@@ -42,14 +44,18 @@ pub(crate) fn local_remote_mediator(
             .items(&selections[..])
             .interact()?;
 
+        if type_ == selections.len() - 1 {
+            return Ok(None);
+        }
+
         match type_ {
-            0 => return Ok(MediatorType::Local),
-            1 => return Ok(MediatorType::Remote),
+            0 => return Ok(Some(MediatorType::Local)),
+            1 => return Ok(Some(MediatorType::Remote)),
             2 => {
                 if profiles.profiles.is_empty() {
                     unreachable!("No profiles to manage");
                 } else if let Some(profile) = select_profile(theme, profiles)? {
-                    return Ok(profile);
+                    return Ok(Some(profile));
                 }
             }
             _ => unreachable!(),
@@ -269,7 +275,11 @@ pub(crate) async fn init_local_mediator(
             if groups.len() == 2 {
                 if let Some(api_prefix) = server_block.get("api_prefix") {
                     if let Some(api_prefix) = api_prefix.as_str() {
-                        return Ok(format!("https://localhost:{}{}", &groups[1], api_prefix));
+                        return Ok(format!(
+                            "https://localhost:{}{}",
+                            &groups[1],
+                            api_prefix.trim_end_matches("/")
+                        ));
                     }
                 }
             }
@@ -365,7 +375,7 @@ pub(crate) async fn init_local_mediator(
     let profile = Profile {
         mediator_did: new_mediator_config.mediator_did.clone().unwrap(),
         network_address: _rewrite_network_address(&mediator_config)?,
-        ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.cert".to_string()),
+        ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.chain".to_string()),
         friends: HashMap::new(),
     };
     Ok((

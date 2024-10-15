@@ -1,12 +1,13 @@
-use std::time::SystemTime;
+//! Example Trust Ping using the Affinidi Trust Messaging SDK
+//! Pings the mediator from Alice
+//! Will use HTTPS and then WebSocket
 
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
-    config::Config, conversions::secret_from_str, errors::ATMError, messages::GetMessagesRequest,
-    protocols::Protocols, ATM,
+    config::Config, errors::ATMError, messages::GetMessagesRequest, protocols::Protocols, ATM,
 };
 use clap::Parser;
-use serde_json::json;
+use std::{env, time::SystemTime};
 use tracing::info;
 use tracing_subscriber::filter;
 
@@ -14,14 +15,17 @@ use tracing_subscriber::filter;
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    network_address: String,
-    #[arg(short, long)]
-    ssl_certificates: String,
+    profile: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
     let args = Args::parse();
+
+    let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())
+        .map_err(|err| ATMError::ConfigError(err.to_string()))?;
+    println!("Using Profile: {}", profile_name);
+
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
@@ -30,58 +34,32 @@ async fn main() -> Result<(), ATMError> {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
-    let public_config_builder = Config::builder()
-        .with_atm_api(&args.network_address)
-        .with_ssl_certificates(&mut vec![args.ssl_certificates.clone().into()])
-        .with_websocket_disabled();
-
-    let mut public_atm = ATM::new(public_config_builder.build()?).await?;
-
-    let atm_did = public_atm.well_known_did().await?;
-    info!("Running with address: {}", &args.network_address);
-    info!("Running with mediator_did: {}", &atm_did);
-    info!("Running with ssl_certificates: {}", &args.ssl_certificates);
-
-    let my_did = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";
-    // Signing and verification key
-    let v1 = json!({
-        "crv": "Ed25519",
-        "d": "LLWCf83n8VsUYq31zlZRe0NNMCcn1N4Dh85dGpIqSFw",
-        "kty": "OKP",
-        "x": "Hn8T4ZjjT0oJ6rjhqox8AykwC3GDFsJF6KkaYZExwQo"
-    });
-
-    // Encryption key
-    let e1 = json!({
-      "crv": "secp256k1",
-      "d": "oi-dXG4EqfNODFPjv2vkieoLdbQZH9k6dwPDV8HDoms",
-      "kty": "EC",
-      "x": "DhfaXbhwo0KkOiyA5V1K1RZx6Ikr86h_lX5GOwxjmjE",
-      "y": "PpYqybOwMsm64vftt-7gBCQPIUbglMmyy_6rloSSAPk"
-    });
-
-    // ATM SDK supports an externally created DID Cache Resolver
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
-        .await
-        .expect("Couldn't create DID Resolver!");
+    let alice = if let Some(alice) = profile.friends.get("Alice") {
+        alice
+    } else {
+        return Err(ATMError::ConfigError(
+            format!("Alice not found in Profile: {}", profile_name).to_string(),
+        ));
+    };
 
     let mut config = Config::builder()
-        .with_my_did(my_did)
-        .with_atm_did(&atm_did)
+        .with_my_did(&alice.did)
+        .with_atm_did(&profile.mediator_did)
         .with_websocket_disabled()
-        .with_external_did_resolver(&did_resolver);
+        .with_atm_api(&profile.network_address);
 
-    config = config
-        .with_atm_api(&args.network_address)
-        .with_ssl_certificates(&mut vec![args.ssl_certificates]);
+    if let Some(ssl_cert) = &profile.ssl_certificate {
+        config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
+        println!("Using SSL Certificate: {}", ssl_cert);
+    }
 
     // Create a new ATM Client
     let mut atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
     // Add our secrets to ATM Client - stays local.
-    atm.add_secret(secret_from_str(&format!("{}#key-1", my_did), &v1));
-    atm.add_secret(secret_from_str(&format!("{}#key-2", my_did), &e1));
+    atm.add_secret(alice.get_key("#key-1").unwrap());
+    atm.add_secret(alice.get_key("#key-2").unwrap());
 
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();
@@ -95,7 +73,7 @@ async fn main() -> Result<(), ATMError> {
     // Send a trust-ping message to ATM, will generate a PONG response
     let response = protocols
         .trust_ping
-        .send_ping(&mut atm, &atm_did, true, true)
+        .send_ping(&mut atm, &profile.mediator_did, true, true)
         .await?;
     let after_ping = SystemTime::now();
 
@@ -143,7 +121,6 @@ async fn main() -> Result<(), ATMError> {
         after_unpack.duration_since(start).unwrap().as_millis()
     );
 
-    /*
     // Send a WebSocket message
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
@@ -152,7 +129,7 @@ async fn main() -> Result<(), ATMError> {
 
     let response = protocols
         .trust_ping
-        .send_ping(&mut atm, atm_did, true, true)
+        .send_ping(&mut atm, &profile.mediator_did, true, true)
         .await?;
     let after_ping = SystemTime::now();
 
@@ -172,7 +149,7 @@ async fn main() -> Result<(), ATMError> {
             .unwrap()
             .as_millis(),
         after_ping.duration_since(start).unwrap().as_millis()
-    );*/
+    );
 
     Ok(())
 }

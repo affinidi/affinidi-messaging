@@ -122,8 +122,11 @@ dependencies = [
 name = "affinidi-messaging-helpers"
 version = "0.8.0"
 dependencies = [
+ "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
+ "affinidi-messaging-sdk",
  "base64 0.22.1",
+ "clap",
  "console",
  "dialoguer",
  "did-peer",
@@ -137,6 +140,8 @@ dependencies = [
  "time",
  "tokio",
  "toml 0.8.19",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -1,39 +1,20 @@
 //! Helps configure the various configuration options, DIDs and keys for the actors in the examples.
 //! This helps to create consistency in the examples and also to avoid code duplication.
-use affinidi_messaging_helpers::common::{affinidi_logo, friends::Friend, profiles::Profiles};
+use affinidi_messaging_helpers::common::{
+    affinidi_logo, check_path,
+    friends::Friend,
+    profiles::{Profiles, PROFILES_PATH},
+};
 use console::{style, Style, Term};
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use std::{env, error::Error};
+use serde::de;
+use std::error::Error;
 use ui::{init_local_mediator, init_remote_mediator, local_remote_mediator, MediatorType};
 
 mod mediator;
 mod network;
 mod ssl_certs;
 mod ui;
-
-/// Returns the path to the top level directory depending on where you are
-/// Will change path as required
-pub fn check_path() -> Result<bool, Box<dyn Error>> {
-    let cwd = std::env::current_dir()?;
-    let mut path = String::new();
-    let mut found = false;
-    cwd.components().rev().for_each(|dir| {
-        if dir.as_os_str() == "affinidi-messaging" && !found {
-            found = true;
-            path.push_str("./");
-        } else if !found {
-            path.push_str("../");
-        }
-    });
-
-    if !found {
-        return Err("You are not in the affinidi-messaging repository".into());
-    }
-
-    env::set_current_dir(&path)?;
-
-    Ok(true)
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -54,18 +35,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Load profiles if they already exist
-    let mut profiles = Profiles::load("affinidi-messaging-helpers/conf/profiles.json")?;
+    let mut profiles = Profiles::load_file(PROFILES_PATH)?;
 
     // ************ Local or Remote? ************
     let profile_name;
     let type_;
     loop {
-        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? {
-            MediatorType::Local => init_local_mediator(&theme, &mut profiles).await?,
-            MediatorType::Remote => init_remote_mediator(&theme, &mut profiles).await?,
-            MediatorType::Existing(profile) => {
-                (MediatorType::Existing(profile.clone()), Some(profile))
+        let (t_, profile) = if let Some(m_t) = local_remote_mediator(&theme, &profiles)? {
+            match m_t {
+                MediatorType::Local => init_local_mediator(&theme, &mut profiles).await?,
+                MediatorType::Remote => init_remote_mediator(&theme, &mut profiles).await?,
+                MediatorType::Existing(profile) => {
+                    (MediatorType::Existing(profile.clone()), Some(profile))
+                }
             }
+        } else {
+            println!("{}", style("Exiting...").color256(208));
+            return Ok(());
         };
 
         if let Some(profile) = profile {
@@ -91,6 +77,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if Confirm::with_theme(&theme)
         .with_prompt("You need some friends to run the examples! Would you like to auto-create some friends?")
+        .default(true)
         .interact()?
     {
         profile.friends.insert("Alice".into(),  Friend::new("Alice", None)?);
@@ -105,6 +92,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if Confirm::with_theme(&theme)
         .with_prompt(format!("Save friends to profile: {}?", profile_name))
+        .default(true)
         .interact()?
     {
         profiles.add(&profile_name, profile);
@@ -123,6 +111,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    println!();
+    println!(
+        "{}",
+        style(
+            "You can set the environment variable AM_PROFILE to use this profile in the examples."
+        )
+        .blue()
+    );
+    println!(
+        "  {}",
+        style(format!("export AM_PROFILE={}", profile_name)).color256(208)
+    );
     println!();
     Ok(())
 }
