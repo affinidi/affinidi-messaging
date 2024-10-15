@@ -17,6 +17,7 @@ impl DatabaseHandler {
         did_hash: &str,
         folder: Folder,
         range: Option<(&str, &str)>,
+        limit: u32,
     ) -> Result<MessageList, MediatorError> {
         let _span = span!(
             Level::DEBUG,
@@ -43,6 +44,8 @@ impl DatabaseHandler {
                 .arg(&key)
                 .arg(start)
                 .arg(end)
+                .arg("COUNT")
+                .arg(limit)
                 .query_async(&mut conn)
                 .await
                 .map_err(|err| {

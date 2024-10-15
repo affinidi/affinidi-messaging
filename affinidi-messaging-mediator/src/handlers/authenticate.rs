@@ -13,7 +13,7 @@ use crate::{
     SharedData,
 };
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
-use affinidi_messaging_sdk::messages::{known::MessageType, GenericDataStruct};
+use affinidi_messaging_sdk::messages::GenericDataStruct;
 use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, Header};
@@ -170,7 +170,7 @@ pub async fn authentication_response(
     })?;
 
     // Retrieve the session info from the database
-    let session = state.database.get_session(&challenge.session_id).await?;
+    let mut session = state.database.get_session(&challenge.session_id).await?;
 
     // check that the DID matches from what was given for the initial challenge request to what was used for the message response
     if let Some(from_did) = msg.from {
@@ -204,6 +204,8 @@ pub async fn authentication_response(
         )
         .into());
     }
+    let old_sid = session.session_id;
+    session.session_id = create_random_string(12);
 
     // Passed all the checks, now create the JWT tokens
     let access_claims = SessionClaims {
@@ -248,7 +250,7 @@ pub async fn authentication_response(
     // Set the session state to Authorized
     state
         .database
-        .update_session_authenticated(&session.session_id, &digest(&session.did))
+        .update_session_authenticated(&old_sid, &session.session_id, &digest(session.did))
         .await?;
 
     info!(

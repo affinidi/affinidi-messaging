@@ -166,17 +166,22 @@ impl DatabaseHandler {
     /// Also ensures that the DID is recorded in the KNOWN_DIDS Set
     pub async fn update_session_authenticated(
         &self,
-        session_id: &str,
+        old_session_id: &str,
+        new_session_id: &str,
         did_hash: &str,
     ) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let sid = format!("SESSION:{}", session_id);
+        let old_sid = format!("SESSION:{}", old_session_id);
+        let new_sid = format!("SESSION:{}", new_session_id);
 
         let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
+            .cmd("RENAME")
+            .arg(&old_sid)
+            .arg(&new_sid)
             .cmd("HSET")
-            .arg(&sid)
+            .arg(&new_sid)
             .arg("state")
             .arg(SessionState::Authenticated.to_string())
             .cmd("HINCRBY")
@@ -186,13 +191,16 @@ impl DatabaseHandler {
             .cmd("SADD")
             .arg("KNOWN_DIDS")
             .arg(did_hash)
-            .expire(&sid, 86400)
+            .expire(&new_sid, 86400)
             .query_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::SessionError(
-                    session_id.into(),
-                    format!("tried to set session({}). Error: {}", session_id, err),
+                    old_session_id.into(),
+                    format!(
+                        "tried to retrieve session({}). Error: {}",
+                        old_session_id, err
+                    ),
                 )
             })?;
 
