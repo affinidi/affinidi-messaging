@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     {
         profile.friends.insert("Alice".into(),  Friend::new("Alice", None)?);
         println!("  {}{}", style("Friend Alice created with DID: ").blue(), style(&profile.friends.get("Alice").unwrap().did).color256(208));
-        profile.friends.insert("Bob".into(),  Friend::new("Bob", None)?);
+        profile.friends.insert("Bob".into(),  Friend::new("Bob", Some(profile.mediator_did.clone()))?);
         println!("  {}{}", style("Friend Bob created with DID: ").blue(), style(&profile.friends.get("Bob").unwrap().did).color256(208));
         profile.friends.insert("Charlie".into(),  Friend::new("Charlie", None)?);
         println!("  {}{}", style("Friend Charlie created with DID: ").blue(), style(&profile.friends.get("Charlie").unwrap().did).color256(208));

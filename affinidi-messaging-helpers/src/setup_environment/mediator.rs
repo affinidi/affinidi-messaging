@@ -58,7 +58,7 @@ impl MediatorConfig {
         // 2. Write out the admin secrets file
         if let Some(secrets) = &self.admin_secrets {
             let mut file = File::create("./affinidi-messaging-mediator/conf/secrets-admin.json")?;
-            file.write_all(serde_json::to_string(secrets)?.as_bytes())?;
+            file.write_all(serde_json::to_string_pretty(secrets)?.as_bytes())?;
             file.flush()?;
             println!(
                 "  {}{}{}",
