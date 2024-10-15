@@ -1,129 +1,29 @@
 //! Helper functions to do with the Mediator
+use affinidi_messaging_didcomm::secrets::Secret;
 use base64::prelude::*;
 use console::style;
-use did_peer::{
-    DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
-    PeerServiceEndPointLong,
-};
-use regex::Regex;
+use regex::{Captures, Regex};
 use ring::signature::Ed25519KeyPair;
-use serde_json::json;
-use ssi::{dids::DIDKey, jwk::Params, JWK};
-use std::{error::Error, fs::File, io::Write};
+use serde::Serialize;
+use std::{
+    env,
+    error::Error,
+    fs::File,
+    io::{self, BufRead, Write},
+    path::Path,
+};
+use toml::Value;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 pub(crate) struct MediatorConfig {
     pub mediator_did: Option<String>,
-    pub mediator_secrets: Option<String>,
+    pub mediator_secrets: Option<Vec<Secret>>,
     pub admin_did: Option<String>,
-    pub admin_secrets: Option<String>,
+    pub admin_secrets: Option<Vec<Secret>>,
     pub jwt_authorization_secret: Option<String>,
 }
 
-struct LocalDidPeerKeys {
-    v_d: Option<String>,
-    v_x: Option<String>,
-    e_d: Option<String>,
-    e_x: Option<String>,
-    e_y: Option<String>,
-}
-
 impl MediatorConfig {
-    /// Creates a fully formed DID, with corresponding secrets
-    /// - service: if true, a service definition is created
-    pub(crate) fn create_did(&mut self, service: bool) -> Result<(String, String), Box<dyn Error>> {
-        // Generate keys for encryption and verification
-        let v_ed25519_key = JWK::generate_ed25519().unwrap();
-
-        let e_secp256k1_key = JWK::generate_secp256k1();
-
-        let mut local_did_peer_keys = LocalDidPeerKeys {
-            v_d: None,
-            v_x: None,
-            e_d: None,
-            e_x: None,
-            e_y: None,
-        };
-
-        if let Params::OKP(map) = v_ed25519_key.clone().params {
-            local_did_peer_keys.v_d = Some(String::from(map.private_key.clone().unwrap()));
-            local_did_peer_keys.v_x = Some(String::from(map.public_key.clone()));
-        }
-
-        if let Params::EC(map) = e_secp256k1_key.clone().params {
-            local_did_peer_keys.e_d = Some(String::from(map.ecc_private_key.clone().unwrap()));
-            local_did_peer_keys.e_x = Some(String::from(map.x_coordinate.clone().unwrap()));
-            local_did_peer_keys.e_y = Some(String::from(map.y_coordinate.clone().unwrap()));
-        }
-
-        // Create the did:key DID's for each key above
-        let v_did_key = DIDKey::generate(&v_ed25519_key).unwrap();
-        let e_did_key = DIDKey::generate(&e_secp256k1_key).unwrap();
-
-        // Put these keys in order and specify the type of each key (we strip the did:key: from the front)
-        let keys = vec![
-            DIDPeerCreateKeys {
-                purpose: DIDPeerKeys::Verification,
-                type_: None,
-                public_key_multibase: Some(v_did_key[8..].to_string()),
-            },
-            DIDPeerCreateKeys {
-                purpose: DIDPeerKeys::Encryption,
-                type_: None,
-                public_key_multibase: Some(e_did_key[8..].to_string()),
-            },
-        ];
-
-        // Create a service definition
-        let services = if service {
-            Some(vec![DIDPeerService {
-                id: None,
-                _type: "dm".into(),
-                service_end_point: PeerServiceEndPoint::Long(PeerServiceEndPointLong {
-                    uri: "https://localhost:7037/".into(),
-                    accept: vec!["didcomm/v2".into()],
-                    routing_keys: vec![],
-                }),
-            }])
-        } else {
-            None
-        };
-
-        let services = services.as_ref();
-
-        // Create the did:peer DID
-        let (did_peer, _) =
-            DIDPeer::create_peer_did(&keys, services).expect("Failed to create did:peer");
-
-        let secrets_json = json!([
-          {
-              "id": format!("{}#key-1", did_peer),
-              "type": "JsonWebKey2020",
-              "privateKeyJwk": {
-                  "crv": "Ed25519",
-                  "d":  local_did_peer_keys.v_d,
-                  "kty": "OKP",
-                  "x": local_did_peer_keys.v_x
-              }
-          },
-          {
-              "id": format!("{}#key-2", did_peer),
-              "type": "JsonWebKey2020",
-              "privateKeyJwk": {
-                  "crv": "secp256k1",
-                  "d": local_did_peer_keys.e_d,
-                  "kty": "EC",
-                  "x": local_did_peer_keys.e_x,
-                  "y": local_did_peer_keys.e_y,
-              }
-          }
-        ]);
-
-        let mediator_secrets = serde_json::to_string_pretty(&secrets_json)?;
-
-        Ok((did_peer, mediator_secrets))
-    }
-
     pub fn create_jwt_secrets(&mut self) -> Result<(), Box<dyn Error>> {
         // Create jwt_authorization_secret
         self.jwt_authorization_secret = Some(
@@ -145,7 +45,7 @@ impl MediatorConfig {
         // 1. Write out the mediator secrets file
         if let Some(secrets) = &self.mediator_secrets {
             let mut file = File::create("./affinidi-messaging-mediator/conf/secrets.json")?;
-            file.write_all(secrets.as_bytes())?;
+            file.write_all(serde_json::to_string(secrets)?.as_bytes())?;
             file.flush()?;
             println!(
                 "  {}{}{}",
@@ -158,7 +58,7 @@ impl MediatorConfig {
         // 2. Write out the admin secrets file
         if let Some(secrets) = &self.admin_secrets {
             let mut file = File::create("./affinidi-messaging-mediator/conf/secrets-admin.json")?;
-            file.write_all(secrets.as_bytes())?;
+            file.write_all(serde_json::to_string(secrets)?.as_bytes())?;
             file.flush()?;
             println!(
                 "  {}{}{}",
@@ -255,4 +155,57 @@ impl MediatorConfig {
 
         Ok(())
     }
+}
+
+/// Replaces all strings ${VAR_NAME:default_value}
+/// with the corresponding environment variables (e.g. value of ${VAR_NAME})
+/// or with `default_value` if the variable is not defined.
+fn expand_env_vars(raw_config: &Vec<String>) -> Result<Vec<String>, Box<dyn Error>> {
+    let re = Regex::new(r"\$\{(?P<env_var>[A-Z_]{1,}[0-9A-Z_]*):(?P<default_value>.*)\}")?;
+    let mut result: Vec<String> = Vec::new();
+    for line in raw_config {
+        result.push(
+            re.replace_all(line, |caps: &Captures| match env::var(&caps["env_var"]) {
+                Ok(val) => val,
+                Err(_) => (caps["default_value"]).into(),
+            })
+            .into_owned(),
+        );
+    }
+    Ok(result)
+}
+
+/// Read the primary configuration file for the mediator
+/// Returns a ConfigRaw struct, that still needs to be processed for additional information
+/// and conversion to Config struct
+pub fn read_config_file(file_name: &str) -> Result<Value, Box<dyn Error>> {
+    // Read configuration file parameters
+    let raw_config = read_file_lines(file_name)?;
+
+    let config_with_vars = expand_env_vars(&raw_config)?;
+    Ok(toml::from_str(&config_with_vars.join("\n"))?)
+}
+
+/// Reads a file and returns a vector of strings, one for each line in the file.
+/// It also strips any lines starting with a # (comments)
+/// You can join the Vec back into a single string with `.join("\n")`
+/// ```ignore
+/// let lines = read_file_lines("file.txt")?;
+/// let file_contents = lines.join("\n");
+/// ```
+fn read_file_lines<P>(file_name: P) -> Result<Vec<String>, Box<dyn Error>>
+where
+    P: AsRef<Path>,
+{
+    let file = File::open(file_name.as_ref())?;
+
+    let mut lines = Vec::new();
+    for line in io::BufReader::new(file).lines().map_while(Result::ok) {
+        // Strip comments out
+        if !line.starts_with('#') {
+            lines.push(line);
+        }
+    }
+
+    Ok(lines)
 }

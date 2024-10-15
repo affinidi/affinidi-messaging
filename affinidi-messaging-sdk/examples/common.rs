@@ -1,9 +1,30 @@
+use affinidi_messaging_didcomm::secrets::Secret;
 use affinidi_messaging_sdk::{config::Config, conversions::secret_from_str, errors::ATMError, ATM};
 use clap::{command, Parser};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::info;
 use tracing_subscriber::filter;
 
+/// ExamplesConfiguration contains all the required information to run the various examples
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExamplesConfiguration {
+    pub mediator_did: String,
+    pub ssl_certificate: String,
+    pub network_address: String,
+    pub friends: Vec<Friend>,
+}
+
+/// Friends are actors in examples that help showcase functionality
+/// They have a name, a DID, and a set of keys
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Friend {
+    pub name: String,
+    pub did: String,
+    pub keys: Vec<Secret>,
+}
+
+// ******************* OLD COMMON BELOW *******************
 pub struct ExampleActorConfiguration {
     pub verification_key: Value,
     pub encryption_key: Value,

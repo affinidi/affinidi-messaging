@@ -1,0 +1,32 @@
+[package]
+name = "affinidi-messaging-helpers"
+version.workspace = true
+description = "Affinidi Messaging Helpers"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[[bin]]
+name = "setup_environment"
+path = "src/setup_environment/main.rs"
+
+[dependencies]
+affinidi-messaging-didcomm.workspace = true
+did-peer.workspace = true
+base64.workspace = true
+console.workspace = true
+dialoguer.workspace = true
+rcgen.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+ring.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ssi.workspace = true
+time.workspace = true
+tokio.workspace = true
+toml.workspace = true

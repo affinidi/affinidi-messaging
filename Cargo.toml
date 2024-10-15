@@ -4,6 +4,7 @@ members = [
     "affinidi-messaging-sdk",
     "affinidi-messaging-mediator",
     "affinidi-messaging-processor",
+    "affinidi-messaging-helpers",
 ]
 resolver = "2"
 
@@ -22,6 +23,7 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 [workspace.dependencies]
 affinidi-messaging-sdk = { version = "0.8", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.8", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.8", path = "./affinidi-messaging-mediator" }
 affinidi-did-resolver-cache-sdk = { version = "0.1.13" }
 anyhow = '1.0'
 askar-crypto = "0.3.1"
@@ -29,7 +31,7 @@ async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.49"
-aws-sdk-memorydb = "1.45"
+aws-sdk-memorydb = "1.46"
 aws-sdk-secretsmanager = "1.49"
 aws-sdk-ssm = "1.50"
 axum = { version = "0.7", features = ["ws"] }
