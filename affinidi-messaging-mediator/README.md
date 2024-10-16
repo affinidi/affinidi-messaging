@@ -60,7 +60,7 @@ _**NOTE:**_ _Ensure Mediator is configured and running before using the followin
   You can add/remove/list administration accounts easily using the mediator_administration example
   
   ```bash
-  cargo run --example mediator_administration
+  cargo run --bin mediator_administration
   ```
 
 ### Affinidi Messaging Examples

@@ -5,6 +5,7 @@ use crate::{
 };
 use affinidi_messaging_helpers::common::{
     did::{create_did, get_service_address},
+    friends::Friend,
     profiles::{Profile, Profiles},
 };
 use console::style;
@@ -170,6 +171,51 @@ pub(crate) async fn init_remote_mediator(
         }
     }
 
+    fn _admin_did(theme: &ColorfulTheme) -> Option<Friend> {
+        if Confirm::with_theme(theme)
+            .with_prompt("Do you want to create an Admin account?")
+            .default(true)
+            .interact()
+            .unwrap()
+        {
+            let admin_did = Friend::new("Admin", None).unwrap();
+            println!(
+                "  {}{}",
+                style("Admin DID: ").blue(),
+                style(&admin_did.did).color256(208)
+            );
+            Some(admin_did)
+        } else if Confirm::with_theme(theme)
+            .with_prompt("Do you have an Admin DID?")
+            .interact()
+            .unwrap()
+        {
+            let admin_did = Input::with_theme(theme)
+                .with_prompt("Admin DID")
+                .interact_text()
+                .unwrap();
+
+            println!(
+                "  {}{}",
+                style("Admin DID provided: ").blue(),
+                style(&admin_did).color256(208)
+            );
+            println!(
+                "  {}",
+                style("You MUST edit the profile to add the Admin keys!")
+                    .blink()
+                    .red()
+            );
+            Some(Friend {
+                name: "Admin".into(),
+                did: admin_did,
+                keys: vec![],
+            })
+        } else {
+            None
+        }
+    }
+
     let mediator_did;
     let mut network_address;
 
@@ -231,11 +277,16 @@ pub(crate) async fn init_remote_mediator(
 
     // We need to know where the SSL Certificate is if needed?
     let ssl_certificate = _ssl_cert(theme)?;
+
+    // Get admin account info
+    let admin_did = _admin_did(theme);
+
     let profile = Profile {
         mediator_did,
         network_address,
         ssl_certificate,
         friends: HashMap::new(),
+        admin_did,
     };
 
     Ok((
@@ -348,6 +399,10 @@ pub(crate) async fn init_local_mediator(
         new_mediator_config.create_jwt_secrets()?;
     }
 
+    // Creating new Admin account
+    let admin_did = Friend::new("Admin", None)?;
+    new_mediator_config.admin_did = Some(admin_did.did.clone());
+
     println!();
     if Confirm::with_theme(theme)
         .with_prompt("Save mediator configuration?")
@@ -377,6 +432,7 @@ pub(crate) async fn init_local_mediator(
         network_address: _rewrite_network_address(&mediator_config)?,
         ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.chain".to_string()),
         friends: HashMap::new(),
+        admin_did: Some(admin_did),
     };
     Ok((
         MediatorType::Local,

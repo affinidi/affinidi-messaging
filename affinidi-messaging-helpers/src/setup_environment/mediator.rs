@@ -55,19 +55,6 @@ impl MediatorConfig {
             );
         }
 
-        // 2. Write out the admin secrets file
-        if let Some(secrets) = &self.admin_secrets {
-            let mut file = File::create("./affinidi-messaging-mediator/conf/secrets-admin.json")?;
-            file.write_all(serde_json::to_string_pretty(secrets)?.as_bytes())?;
-            file.flush()?;
-            println!(
-                "  {}{}{}",
-                style("Administration secrets file (").blue(),
-                style("./affinidi-messaging-mediator/conf/secrets-admin.json").color256(201),
-                style(") written...").blue()
-            );
-        }
-
         // 3. Write out changes ot the mediator configuration file
         let config = std::fs::read_to_string("./affinidi-messaging-mediator/conf/mediator.toml")?;
         let mut new_config = String::new();

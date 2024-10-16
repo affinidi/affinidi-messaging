@@ -7,7 +7,6 @@ use affinidi_messaging_helpers::common::{
 };
 use console::{style, Style, Term};
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use serde::de;
 use std::error::Error;
 use ui::{init_local_mediator, init_remote_mediator, local_remote_mediator, MediatorType};
 
@@ -74,6 +73,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         style(&profile_name).color256(208)
     );
     println!();
+
+    // ************ Administration Account ************
+
+    // ************ Friends ************
 
     if Confirm::with_theme(&theme)
         .with_prompt("You need some friends to run the examples! Would you like to auto-create some friends?")

@@ -124,6 +124,7 @@ version = "0.8.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
+ "affinidi-messaging-mediator",
  "affinidi-messaging-sdk",
  "base64 0.22.1",
  "clap",
@@ -136,6 +137,7 @@ dependencies = [
  "ring",
  "serde",
  "serde_json",
+ "sha256",
  "ssi",
  "time",
  "tokio",

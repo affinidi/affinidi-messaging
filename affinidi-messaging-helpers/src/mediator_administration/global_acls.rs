@@ -1,14 +1,15 @@
-use affinidi_messaging_mediator::common::config::Config;
 use affinidi_messaging_sdk::{protocols::Protocols, ATM};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Select};
+
+use crate::BasicMediatorConfig;
 
 pub(crate) async fn global_acls_menu(
     atm: &mut ATM<'static>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
-    mediator_config: &Config,
-) {
+    mediator_config: &BasicMediatorConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
     let selections = &["Select and Set Active DID", "Set ACLs", "Back"];
 
     let mut selected_did: Option<String> = None;
@@ -20,10 +21,11 @@ pub(crate) async fn global_acls_menu(
         } else {
             println!("{}", style("None").red());
         }
+
         println!(
             "{}{}",
             style("Mediator ACL Mode: ").yellow(),
-            style(&mediator_config.security.acl_mode).blue()
+            style(&mediator_config.acl_mode).blue()
         );
 
         println!();
@@ -55,7 +57,7 @@ pub(crate) async fn global_acls_menu(
                 println!("Set ACLs");
             }
             2 => {
-                return;
+                return Ok(());
             }
             _ => {
                 println!("Invalid selection");

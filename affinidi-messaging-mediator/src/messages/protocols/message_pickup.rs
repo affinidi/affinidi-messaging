@@ -321,7 +321,7 @@ pub(crate) async fn delivery_request(
 
         // Pull recipient_did and limit from message body
         let (recipient_did, limit): (String, usize) =
-            _parse_and_validate_delivery_request_body(&session, msg)?;
+            _parse_and_validate_delivery_request_body(session, msg)?;
 
         let recipient_did_hash = digest(recipient_did.clone());
 
@@ -494,15 +494,14 @@ fn _parse_and_validate_delivery_request_body(
         ));
     }
 
-    if limit < MIN_RETRIEVED_MSGS || limit > MAX_RETRIEVED_MSGS {
+    if !(MIN_RETRIEVED_MSGS..=MAX_RETRIEVED_MSGS).contains(&limit) {
         return Err(MediatorError::RequestDataError(
             session.session_id.clone(),
             format!(
                 "limit must be between 1 and 100 inclusive. Received limit({})",
                 limit
             ),
-        )
-        .into());
+        ));
     }
 
     Ok((recipient_did, limit))

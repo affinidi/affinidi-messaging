@@ -41,7 +41,7 @@ pub struct DatabaseConfig {
 /// What ACL logic mode is the mediator running in?
 /// - ExplicitAllow - no one can connect, unless explicitly allowed
 /// - ExplicitDeny - everyone can connect, unless explicitly denied
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum ACLMode {
     ExplicitAllow,
     ExplicitDeny,
@@ -77,15 +77,20 @@ pub struct SecurityConfigRaw {
     pub cors_allow_origin: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct SecurityConfig {
     pub acl_mode: ACLMode,
+    #[serde(skip_serializing)]
     pub mediator_secrets: AffinidiSecrets,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
+    #[serde(skip_serializing)]
     pub ssl_key_file: String,
+    #[serde(skip_serializing)]
     pub jwt_encoding_key: EncodingKey,
+    #[serde(skip_serializing)]
     pub jwt_decoding_key: DecodingKey,
+    #[serde(skip_serializing)]
     pub cors_allow_origin: CorsLayer,
 }
 
@@ -346,8 +351,9 @@ struct ConfigRaw {
     pub processors: ProcessorsConfigRaw,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Config {
+    #[serde(skip_serializing)]
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
@@ -359,6 +365,7 @@ pub struct Config {
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
     pub security: SecurityConfig,
+    #[serde(skip_serializing)]
     pub did_resolver_config: ClientConfig,
     pub process_forwarding: ForwardingConfig,
     pub limits: LimitsConfig,

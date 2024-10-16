@@ -1,35 +1,9 @@
 //! UI Related functions
-use std::error::Error;
-
 use affinidi_messaging_sdk::{protocols::Protocols, ATM};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use regex::Regex;
 use sha256::digest;
-
-/// Returns the path to the mediator directory depending on where you are
-pub fn check_path() -> Result<String, Box<dyn Error>> {
-    let cwd = std::env::current_dir()?;
-    let mut path = String::new();
-    let mut found = false;
-    cwd.components().rev().for_each(|dir| {
-        if dir.as_os_str() == "affinidi-messaging" && !found {
-            found = true;
-            path.push_str("affinidi-messaging-mediator/");
-        } else if dir.as_os_str() == "affinidi-messaging-mediator" && !found {
-            found = true;
-            path.push_str("./");
-        } else if !found {
-            path.push_str("../");
-        }
-    });
-
-    if !found {
-        return Err("You are not in the affinidi-messaging repository".into());
-    }
-
-    Ok(path)
-}
 
 pub(crate) fn main_menu(theme: &ColorfulTheme) -> usize {
     let selections = &[
@@ -52,6 +26,7 @@ pub(crate) fn main_menu(theme: &ColorfulTheme) -> usize {
 pub(crate) async fn list_admins(
     atm: &mut ATM<'static>,
     protocols: &Protocols,
+    admin_hash: &str,
     root_admin_hash: &str,
 ) {
     match protocols.mediator.list_admins(atm, None, None).await {
@@ -64,10 +39,12 @@ pub(crate) async fn list_admins(
             for (idx, admin) in admins.accounts.iter().enumerate() {
                 print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
                 if admin == root_admin_hash {
-                    println!(" {}", style(" mediator_root").red());
-                } else {
-                    println!();
+                    print!("  {}", style("(ROOT Admin)").red())
                 }
+                if admin == admin_hash {
+                    print!("  {}", style("(our Admin account)").color256(208));
+                }
+                println!();
             }
         }
         Err(e) => {
@@ -135,7 +112,7 @@ pub(crate) async fn add_admin(
 pub(crate) async fn remove_admins(
     atm: &mut ATM<'static>,
     protocols: &Protocols,
-    root_admin_hash: &String,
+    admin_hash: &String,
     theme: &ColorfulTheme,
 ) {
     match protocols.mediator.list_admins(atm, None, None).await {
@@ -144,7 +121,7 @@ pub(crate) async fn remove_admins(
             let admins: Vec<&String> = admins
                 .accounts
                 .iter()
-                .filter(|&x| x != root_admin_hash)
+                .filter(|&x| x != admin_hash)
                 .collect();
 
             if admins.is_empty() {

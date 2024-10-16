@@ -7,8 +7,11 @@ use affinidi_messaging_sdk::{
     config::Config, errors::ATMError, messages::GetMessagesRequest, protocols::Protocols, ATM,
 };
 use clap::Parser;
-use std::{env, time::SystemTime};
-use tracing::info;
+use std::{
+    env,
+    time::{Duration, SystemTime},
+};
+use tracing::{error, info};
 use tracing_subscriber::filter;
 
 #[derive(Parser, Debug)]
@@ -20,7 +23,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
-    let args = Args::parse();
+    let args: Args = Args::parse();
 
     let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())
         .map_err(|err| ATMError::ConfigError(err.to_string()))?;
@@ -122,18 +125,36 @@ async fn main() -> Result<(), ATMError> {
     );
 
     // Send a WebSocket message
+    info!("  *****************************************************  ");
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
     atm.start_websocket_task().await?;
     let after_websocket = SystemTime::now();
 
+    protocols
+        .message_pickup
+        .toggle_live_delivery(&mut atm, true)
+        .await?;
+    let after_live_delivery = SystemTime::now();
+
     let response = protocols
         .trust_ping
         .send_ping(&mut atm, &profile.mediator_did, true, true)
         .await?;
-    let after_ping = SystemTime::now();
+    let after_ping_send = SystemTime::now();
+    info!("PING sent: {}", response.message_id);
 
-    info!("PING sent: {}", response.message_hash);
+    let response = protocols
+        .message_pickup
+        .live_stream_get(&mut atm, &response.message_id, Duration::from_secs(10))
+        .await?;
+    let after_pong_receive = SystemTime::now();
+
+    if let Some((msg, _)) = response {
+        info!("PONG received: {}", msg.id);
+    } else {
+        error!("No response from live stream");
+    }
 
     // Print out timing information
     info!(
@@ -143,12 +164,43 @@ async fn main() -> Result<(), ATMError> {
     );
 
     info!(
-        "Sending Ping took {}ms :: total {}ms to complete",
-        after_ping
+        "Enabling Live Delivery took {}ms :: total {}ms to complete",
+        after_live_delivery
             .duration_since(after_websocket)
             .unwrap()
             .as_millis(),
-        after_ping.duration_since(start).unwrap().as_millis()
+        after_live_delivery
+            .duration_since(start)
+            .unwrap()
+            .as_millis()
+    );
+
+    info!(
+        "Sending Ping took {}ms :: total {}ms to complete",
+        after_ping_send
+            .duration_since(after_live_delivery)
+            .unwrap()
+            .as_millis(),
+        after_ping_send.duration_since(start).unwrap().as_millis()
+    );
+
+    info!(
+        "Receiving unpacked Pong took {}ms :: total {}ms to complete",
+        after_pong_receive
+            .duration_since(after_ping_send)
+            .unwrap()
+            .as_millis(),
+        after_pong_receive
+            .duration_since(start)
+            .unwrap()
+            .as_millis()
+    );
+    info!(
+        "Total WebSocket trust-ping took {}ms to complete",
+        after_pong_receive
+            .duration_since(start)
+            .unwrap()
+            .as_millis()
     );
 
     Ok(())

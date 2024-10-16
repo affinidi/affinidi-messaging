@@ -178,6 +178,11 @@ pub(crate) async fn process(
                     }
                 }
             }
+            MediatorAdminRequest::Configuration(_) => {
+                // Return the current configuration
+                let config = json!({"version": env!("CARGO_PKG_VERSION"), "config": state.config});
+                 _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &config)
+            }
         }
     }.instrument(_span).await
 }

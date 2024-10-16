@@ -22,6 +22,7 @@ pub struct Profile {
     pub ssl_certificate: Option<String>,
     pub network_address: String,
     pub friends: HashMap<String, Friend>,
+    pub admin_did: Option<Friend>, // Administration account for this profile
 }
 
 pub const PROFILES_PATH: &str = "affinidi-messaging-helpers/conf/profiles.json";

@@ -14,9 +14,14 @@ readme = "README.md"
 name = "setup_environment"
 path = "src/setup_environment/main.rs"
 
+[[bin]]
+name = "mediator_administration"
+path = "src/mediator_administration/main.rs"
+
 [dependencies]
 affinidi-did-resolver-cache-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
+affinidi-messaging-mediator.workspace = true
 affinidi-messaging-sdk.workspace = true
 clap.workspace = true
 did-peer.workspace = true
@@ -29,6 +34,7 @@ reqwest.workspace = true
 ring.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha256.workspace = true
 ssi.workspace = true
 time.workspace = true
 tokio.workspace = true

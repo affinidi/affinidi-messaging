@@ -5,7 +5,7 @@ use affinidi_messaging_didcomm::{
     secrets::{Secret, SecretsResolver},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct AffinidiSecrets {
     known_secrets: Vec<Secret>,
 }
@@ -24,8 +24,7 @@ impl AffinidiSecrets {
     }
 }
 
-#[cfg_attr(feature = "uniffi", async_trait)]
-#[cfg_attr(not(feature = "uniffi"), async_trait)]
+#[async_trait]
 impl SecretsResolver for AffinidiSecrets {
     async fn get_secret(&self, secret_id: &str) -> Result<Option<Secret>> {
         Ok(self
