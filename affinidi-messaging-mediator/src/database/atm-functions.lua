@@ -23,7 +23,7 @@ local function store_message(keys, args)
     -- Get current time on server
     local time = redis.call('TIME')
     redis.log(redis.LOG_WARNING, 'TIME:   ' .. time[1] .. ':' .. time[2])
-    local time = string.format("%d%04d", time[1], time[2] / 1000)
+    local time = string.format("%d%03d", time[1], time[2] / 1000)
     redis.log(redis.LOG_WARNING, 'TIME-2: ' .. time)
     local bytes = tonumber(args[2])
     if bytes == nil then
