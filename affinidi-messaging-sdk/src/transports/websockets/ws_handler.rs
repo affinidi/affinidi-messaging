@@ -193,10 +193,11 @@ impl<'c> ATM<'c> {
         );
 
         // Connect to the websocket
-        let (ws_stream, _) =
+        let ws_stream =
             connect_async_tls_with_config(request, None, false, Some(self.ws_connector.clone()))
                 .await
-                .expect("Failed to connect");
+                .expect("Failed to connect")
+                .0;
 
         debug!("Completed websocket connection");
 
