@@ -11,6 +11,7 @@ use std::{
     env,
     time::{Duration, SystemTime},
 };
+use tracing::{error, info};
 use tracing_subscriber::filter;
 use uuid::Uuid;
 
@@ -68,7 +69,11 @@ async fn main() -> Result<(), ATMError> {
     if let Some(ssl_cert) = &profile.ssl_certificate {
         alice_config = alice_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
         bob_config = bob_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        println!("Using SSL Certificate: {}", ssl_cert);
+        info!("Using SSL Certificate: {}", ssl_cert);
+    } else {
+        alice_config = alice_config.with_non_ssl();
+        bob_config = bob_config.with_non_ssl();
+        error!("  **** Not using SSL/TLS ****");
     }
 
     // Create a new ATM Client
