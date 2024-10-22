@@ -54,5 +54,6 @@ pub(crate) fn generate_error_response(
         store_message,
         force_live_delivery: false,
         message: Some(error_msg),
+        forward_message: false,
     })
 }

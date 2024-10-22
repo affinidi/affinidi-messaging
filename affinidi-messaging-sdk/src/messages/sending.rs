@@ -12,6 +12,7 @@ use super::GenericDataStruct;
 pub enum InboundMessageResponse {
     Stored(InboundMessageList),
     Ephemeral(String),
+    Forwarded,
     Empty,
 }
 impl GenericDataStruct for InboundMessageResponse {}

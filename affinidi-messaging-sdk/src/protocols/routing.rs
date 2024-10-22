@@ -4,12 +4,12 @@
 //! The DIDComm Routing Protocol is used to route messages between agents. It is used to ensure that messages are delivered to the correct agent.
 //!
 
-use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
+use crate::{errors::ATMError, ATM};
+use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
+use base64::prelude::*;
 use serde_json::json;
 use tracing::{span, Instrument, Level};
 use uuid::Uuid;
-
-use crate::{errors::ATMError, ATM};
 #[derive(Default)]
 pub struct Routing {}
 
@@ -19,6 +19,7 @@ impl Routing {
     /// - atm: The Affinidi Messaging instance
     /// - message: The message to be forwarded
     /// - target_did: The DID of the target agent (typically a mediator)
+    /// - next_did: The DID of the next agent to forward the message to
     /// - expires_time: The time at which the message expires if not delivered
     /// - delay_milli: The time to wait before delivering the message
     ///                NOTE: If negative, picks a random delay between 0 and the absolute value
@@ -27,6 +28,7 @@ impl Routing {
         atm: &'c mut ATM<'_>,
         message: &str,
         target_did: &str,
+        next_did: &str,
         expires_time: Option<u64>,
         delay_milli: Option<i64>,
     ) -> Result<String, ATMError> {
@@ -35,12 +37,16 @@ impl Routing {
         async move {
             let id = Uuid::new_v4();
 
-            let mut forwarded = Message::build(
+            let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(message)).finalize();
+
+            let forwarded = Message::build(
                 id.into(),
                 "https://didcomm.org/routing/2.0/forward".to_owned(),
-                json!({"next": target_did}),
+                json!({"next": next_did}),
             )
-            .to(target_did.to_owned());
+            .to(target_did.to_owned())
+            .from(atm.config.my_did.as_deref().unwrap_or("").to_string())
+            .attachment(attachment);
 
             let forwarded = forwarded.finalize();
 
@@ -48,8 +54,8 @@ impl Routing {
             let (msg, _) = forwarded
                 .pack_encrypted(
                     target_did,
-                    Some(target_did),
-                    Some(target_did),
+                    atm.config.my_did.as_deref(),
+                    atm.config.my_did.as_deref(),
                     &atm.did_resolver,
                     &atm.secrets_resolver,
                     &PackEncryptedOptions::default(),

@@ -220,5 +220,6 @@ fn _generate_response_message(
         store_message: true,
         force_live_delivery: false,
         message: Some(response),
+        forward_message: false,
     })
 }

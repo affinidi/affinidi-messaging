@@ -205,6 +205,7 @@ async fn generate_status_reply(
             store_message: false,
             force_live_delivery,
             message: Some(status_msg),
+            forward_message: false,
         })
     }
     .instrument(_span)
@@ -385,6 +386,7 @@ pub(crate) async fn delivery_request(
                 store_message: false,
                 force_live_delivery: false,
                 message: Some(response_msg),
+                forward_message: false,
             })
         } else {
             generate_status_reply(state, session, &recipient_did_hash, &thid, false, None).await

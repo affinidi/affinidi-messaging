@@ -84,7 +84,7 @@ impl TrustPing {
             response: None,
         };
 
-        debug!("Ping message: {:?}", msg);
+        debug!("Ping message: {:#?}", msg);
 
         // Pack the message
         let (msg, _) = msg
@@ -98,6 +98,8 @@ impl TrustPing {
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+        debug!("Packed message: {:#?}", msg);
 
         msg_info.message_hash = digest(&msg).to_string();
         msg_info.bytes = msg.len() as u32;

@@ -11,9 +11,11 @@ use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
 use protocols::{mediator_administration, mediator_local_acls, routing};
 use protocols::{mediator_global_acls, message_pickup};
 use std::time::SystemTime;
+
 pub mod error_response;
 pub mod inbound;
 pub mod protocols;
+pub(crate) mod store;
 
 struct MessageType(SDKMessageType);
 
@@ -71,6 +73,7 @@ impl MessageType {
 pub(crate) struct ProcessMessageResponse {
     pub store_message: bool,
     pub force_live_delivery: bool, // Will force a live delivery attempt.
+    pub forward_message: bool, // Set to true if the message was forwarded. Means we don't need to store it.
     pub message: Option<Message>,
 }
 

@@ -1,14 +1,13 @@
-use affinidi_messaging_didcomm::Message;
-use serde::Deserialize;
-use ssi::dids::{document::service::Endpoint, Document};
-use std::time::SystemTime;
-use tracing::{debug, span, warn, Instrument};
-
 use crate::{
     common::errors::{MediatorError, Session},
-    messages::ProcessMessageResponse,
+    messages::{store::store_forwarded_message, ProcessMessageResponse},
     SharedData,
 };
+use affinidi_messaging_didcomm::{AttachmentData, Message};
+use base64::prelude::*;
+use serde::Deserialize;
+use ssi::dids::{document::service::Endpoint, Document};
+use tracing::{debug, error, span, warn, Instrument};
 
 // Reads the body of an incoming forward message
 #[derive(Default, Deserialize)]
@@ -46,16 +45,6 @@ pub(crate) async fn process(
                 ));
             };
         let next_did_hash = sha256::digest(next.as_bytes());
-
-        // resolve the next DID to a DIDDoc
-        let next_did = state.did_resolver.resolve(&next).await.map_err(|e| {
-            MediatorError::DIDError(
-                session.session_id.clone(),
-                next,
-                format!("Couldn't resolve DID: Reason: {}", e),
-            )
-        })?;
-        let next_did_doc = next_did.doc;
 
         let attachments = if let Some(attachments) = &msg.attachments {
             attachments.to_owned()
@@ -164,9 +153,37 @@ pub(crate) async fn process(
         // First step is to determine if the next hop is local to the mediator or remote?
         //if next_did_doc.service
 
+        let attachment = attachments.first().unwrap();
+        let data = match attachment.data {
+            AttachmentData::Base64 { ref value } => {
+                String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(&value.base64).unwrap()).unwrap()
+            }
+            _ => {
+                return Err(MediatorError::RequestDataError(
+                    session.session_id.clone(),
+                    "Attachment is wrong format".into(),
+                ))
+            }
+        };
+        debug!(" *************************************** ");
+        debug!(" TO: {}", next);
+        debug!(" FROM: {:?}", msg.from);
+        debug!(" Forwarded message:\n{}", data);
+        debug!(" *************************************** ");
+        if let Some(from) = &msg.from {
+            store_forwarded_message(state, session, &data, from, &next).await?;
+        } else {
+            error!("Forwarded message is missing 'from' field");
+            return Err(MediatorError::ForwardMessageError(
+                session.session_id.clone(),
+                "Forwarded message is missing 'from' field".into(),
+            ));
+        }
+
         Ok(ProcessMessageResponse {
-            store_message: true,
+            store_message: false,
             force_live_delivery: false,
+            forward_message: true,
             message: None,
         })
     }
@@ -230,7 +247,7 @@ fn service_local(
                                 false
                             }
                         }
-                        Endpoint::Map(map) => {true}
+                        Endpoint::Map(_) => {true}
                     }
                 })
             } else {
