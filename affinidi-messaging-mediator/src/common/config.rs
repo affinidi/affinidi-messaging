@@ -6,7 +6,10 @@ use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
-use http::HeaderValue;
+use http::{
+    header::{AUTHORIZATION, CONTENT_TYPE},
+    HeaderValue, Method,
+};
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -74,6 +77,7 @@ pub struct SecurityConfigRaw {
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
     pub jwt_authorization_secret: String,
+    pub jwt_expiry: String,
     pub cors_allow_origin: Option<String>,
 }
 
@@ -90,6 +94,7 @@ pub struct SecurityConfig {
     pub jwt_encoding_key: EncodingKey,
     #[serde(skip_serializing)]
     pub jwt_decoding_key: DecodingKey,
+    pub jwt_expiry: u64,
     #[serde(skip_serializing)]
     pub cors_allow_origin: CorsLayer,
 }
@@ -107,6 +112,7 @@ impl Debug for SecurityConfig {
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &"<hidden>".to_string())
             .field("jwt_decoding_key?", &"<hidden>".to_string())
+            .field("jwt_expiry", &self.jwt_expiry)
             .field("cors_allow_origin", &self.cors_allow_origin)
             .finish()
     }
@@ -122,7 +128,19 @@ impl Default for SecurityConfig {
             ssl_key_file: "".into(),
             jwt_encoding_key: EncodingKey::from_ed_der(&[0; 32]),
             jwt_decoding_key: DecodingKey::from_ed_der(&[0; 32]),
-            cors_allow_origin: CorsLayer::new().allow_origin(Any),
+            jwt_expiry: 900,
+            cors_allow_origin: CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+                //.allow_credentials(true)
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::OPTIONS,
+                    Method::DELETE,
+                    Method::PATCH,
+                    Method::PUT,
+                ]),
         }
     }
 }

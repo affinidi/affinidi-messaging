@@ -127,19 +127,7 @@ pub async fn start() {
     // Add middleware to all routes
     let app = Router::new()
         .merge(app)
-        .layer(
-            config
-                .security
-                .cors_allow_origin
-                .allow_headers([http::header::CONTENT_TYPE])
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::DELETE,
-                    Method::PATCH,
-                ]),
-        )
+        .layer(config.security.cors_allow_origin)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
