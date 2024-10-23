@@ -1,14 +1,12 @@
-use std::{thread::sleep, time::Duration};
-
+use super::DatabaseHandler;
+use crate::common::{config::Config, errors::MediatorError};
 use deadpool_redis::Connection;
 use redis::aio::PubSub;
-use tracing::{event, Level};
+use std::{thread::sleep, time::Duration};
+use tracing::{error, event, info, Level};
 
-use crate::common::{config::Config, errors::MediatorError};
-
-use super::DatabaseHandler;
-
-static LUA_SCRIPTS: &[u8] = include_bytes!("atm-functions.lua");
+const LUA_SCRIPTS: &str = "atm-functions.lua";
+const REDIS_VERSION: &str = "7.4"; // Minimum Redis version required
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
@@ -82,6 +80,9 @@ impl DatabaseHandler {
             }
         }
 
+        // Check the version of Redis Server
+        _check_server_version(&database).await?;
+
         // Check and load LUA scripts as required
         {
             let mut conn = database.get_async_connection().await?;
@@ -142,5 +143,64 @@ impl DatabaseHandler {
                 format!("Couldn't get redis pubsub connection. Reason: {}", err),
             )
         })
+    }
+}
+
+/// Helper function to check the version of the Redis Server
+async fn _check_server_version(database: &DatabaseHandler) -> Result<String, MediatorError> {
+    let mut conn = database.get_async_connection().await?;
+    let server_info: String = match deadpool_redis::redis::cmd("INFO")
+        .arg("SERVER")
+        .query_async(&mut conn)
+        .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            return Err(MediatorError::DatabaseError(
+                "NA".into(),
+                format!("Couldn't get server info. Reason: {}", err),
+            ));
+        }
+    };
+
+    let server_version = server_info
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split(":").collect();
+            if parts.len() == 2 {
+                if parts[0] == "redis_version" {
+                    Some(parts[1].to_owned())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .next();
+
+    if let Some(version) = server_version {
+        if version.starts_with(REDIS_VERSION) {
+            info!("Redis version is compatible: {}", version);
+            Ok(version.to_owned())
+        } else {
+            error!(
+                "Redis version ({}) must be equal or higher than minimum ({})",
+                version, REDIS_VERSION
+            );
+            Err(MediatorError::DatabaseError(
+                "NA".into(),
+                format!(
+                    "Redis version ({}) must be equal or higher than minimum ({})",
+                    version, REDIS_VERSION
+                ),
+            ))
+        }
+    } else {
+        error!("Couldn't find redis_version in server info",);
+        Err(MediatorError::DatabaseError(
+            "NA".into(),
+            "Couldn't find redis_version in server info".into(),
+        ))
     }
 }
