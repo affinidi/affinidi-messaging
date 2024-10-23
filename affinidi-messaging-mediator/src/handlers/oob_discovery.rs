@@ -54,7 +54,7 @@ pub async fn oob_invite_handler(
             errorCode: 0,
             errorCodeStr: "NA".to_string(),
             message: "Success".to_string(),
-            data: Some(OOBInviteResponse { oob_id }),
+            data: Some(OOBInviteResponse { _oobid: oob_id }),
         }),
     ))
 }

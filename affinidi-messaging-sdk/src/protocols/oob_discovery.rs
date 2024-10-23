@@ -22,7 +22,7 @@ pub struct OOBDiscovery {}
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct OOBInviteResponse {
-    pub oob_id: String,
+    pub _oobid: String,
 }
 impl GenericDataStruct for OOBInviteResponse {}
 
@@ -97,11 +97,11 @@ impl OOBDiscovery {
             .unwrap();
 
         if let Some(data) = body.data {
-            Ok(data.oob_id)
+            Ok(data._oobid)
         } else {
             Err(ATMError::MediatorError(
                 "EMPTY".into(),
-                "Expected to get oob_id, but it was empty...".into(),
+                "Expected to get _oobid, but it was empty...".into(),
             ))
         }
     }
