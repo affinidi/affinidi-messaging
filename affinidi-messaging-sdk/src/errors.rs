@@ -28,6 +28,8 @@ pub enum ATMError {
     SDKError(String),
     #[error("DIDComm Problem Report: code: ({0}), comment: ({1}), escalate?: ({2})")]
     ProblemReport(String, String, String),
+    #[error("DIDComm Mediator error: code({0}), message: ({1})")]
+    MediatorError(String, String),
 }
 
 impl ATMError {

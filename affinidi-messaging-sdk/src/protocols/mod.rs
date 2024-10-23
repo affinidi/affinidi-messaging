@@ -7,10 +7,12 @@ pub struct Protocols {
     pub trust_ping: trust_ping::TrustPing,
     pub routing: routing::Routing,
     pub mediator: mediator::Mediator,
+    pub oob_discovery: oob_discovery::OOBDiscovery,
 }
 
 pub mod mediator;
 pub mod message_pickup;
+pub mod oob_discovery;
 pub mod routing;
 pub mod trust_ping;
 
@@ -24,6 +26,7 @@ impl Protocols {
             trust_ping: trust_ping::TrustPing::default(),
             routing: routing::Routing::default(),
             mediator: mediator::Mediator::default(),
+            oob_discovery: oob_discovery::OOBDiscovery::default(),
         }
     }
 }

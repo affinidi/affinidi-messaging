@@ -8,7 +8,6 @@ use crate::{
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use http::Method;
 use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
