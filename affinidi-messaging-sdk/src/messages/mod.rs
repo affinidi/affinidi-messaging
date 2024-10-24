@@ -36,7 +36,9 @@ impl GenericDataStruct for AuthenticationChallenge {}
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct AuthorizationResponse {
     pub access_token: String,
+    pub access_expires_at: u64,
     pub refresh_token: String,
+    pub refresh_expires_at: u64,
 }
 impl GenericDataStruct for AuthorizationResponse {}
 

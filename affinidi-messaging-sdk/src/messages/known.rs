@@ -6,6 +6,7 @@ use crate::errors::ATMError;
 
 pub enum MessageType {
     AffinidiAuthenticate,            // Affinidi Messaging Authentication Response
+    AffinidiAuthenticateRefresh,     // Affinidi Messaging Authentication Refresh
     ForwardRequest,                  // DidComm Routing 2.0 Forward Request
     MediatorAdministration,          // Mediator Administration Protocol
     MediatorGlobalACLManagement,     // Mediator Global ACL Management Protocol
@@ -26,6 +27,9 @@ impl FromStr for MessageType {
         match s {
             "https://didcomm.org/trust-ping/2.0/ping" => Ok(Self::TrustPing),
             "https://affinidi.com/atm/1.0/authenticate" => Ok(Self::AffinidiAuthenticate),
+            "https://affinidi.com/atm/1.0/authenticate/refresh" => {
+                Ok(Self::AffinidiAuthenticateRefresh)
+            }
             "https://didcomm.org/mediator/1.0/admin-management" => Ok(Self::MediatorAdministration),
             "https://didcomm.org/mediator/1.0/global-acl-management" => {
                 Ok(Self::MediatorGlobalACLManagement)

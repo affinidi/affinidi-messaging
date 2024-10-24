@@ -19,7 +19,7 @@ pub struct SessionClaims {
     pub exp: u64,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum SessionState {
     #[default]
     Unknown,

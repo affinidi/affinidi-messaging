@@ -14,8 +14,6 @@ use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
-use tower_http::cors::{Any, CorsLayer};
-
 use std::{
     env,
     fmt::{self, Debug},
@@ -23,7 +21,8 @@ use std::{
     io::{self, BufRead},
     path::Path,
 };
-use tracing::{event, info, Level};
+use tower_http::cors::{Any, CorsLayer};
+use tracing::{error, event, info, Level};
 use tracing_subscriber::{filter::LevelFilter, reload::Handle, EnvFilter, Registry};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,10 +34,43 @@ pub struct ServerConfig {
 
 /// Database Struct contains database and storage of messages related configuration details
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DatabaseConfig {
+pub struct DatabaseConfigRaw {
+    pub functions_file: String,
     pub database_url: String,
     pub database_pool_size: String,
     pub database_timeout: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DatabaseConfig {
+    pub functions_file: String,
+    pub database_url: String,
+    pub database_pool_size: usize,
+    pub database_timeout: u32,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        DatabaseConfig {
+            functions_file: "./conf/atm-functions.lua".into(),
+            database_url: "redis://127.0.0.1/".into(),
+            database_pool_size: 10,
+            database_timeout: 2,
+        }
+    }
+}
+
+impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
+    type Error = MediatorError;
+
+    fn try_from(raw: DatabaseConfigRaw) -> Result<Self, Self::Error> {
+        Ok(DatabaseConfig {
+            functions_file: raw.functions_file,
+            database_url: raw.database_url,
+            database_pool_size: raw.database_pool_size.parse().unwrap_or(10),
+            database_timeout: raw.database_timeout.parse().unwrap_or(2),
+        })
+    }
 }
 
 /// What ACL logic mode is the mediator running in?
@@ -77,7 +109,8 @@ pub struct SecurityConfigRaw {
     pub ssl_certificate_file: String,
     pub ssl_key_file: String,
     pub jwt_authorization_secret: String,
-    pub jwt_expiry: String,
+    pub jwt_access_expiry: String,
+    pub jwt_refresh_expiry: String,
     pub cors_allow_origin: Option<String>,
 }
 
@@ -94,7 +127,8 @@ pub struct SecurityConfig {
     pub jwt_encoding_key: EncodingKey,
     #[serde(skip_serializing)]
     pub jwt_decoding_key: DecodingKey,
-    pub jwt_expiry: u64,
+    pub jwt_access_expiry: u64,
+    pub jwt_refresh_expiry: u64,
     #[serde(skip_serializing)]
     pub cors_allow_origin: CorsLayer,
 }
@@ -112,7 +146,8 @@ impl Debug for SecurityConfig {
             .field("ssl_key_file", &self.ssl_key_file)
             .field("jwt_encoding_key?", &"<hidden>".to_string())
             .field("jwt_decoding_key?", &"<hidden>".to_string())
-            .field("jwt_expiry", &self.jwt_expiry)
+            .field("jwt_access_expiry", &self.jwt_access_expiry)
+            .field("jwt_refresh_expiry", &self.jwt_refresh_expiry)
             .field("cors_allow_origin", &self.cors_allow_origin)
             .finish()
     }
@@ -128,7 +163,8 @@ impl Default for SecurityConfig {
             ssl_key_file: "".into(),
             jwt_encoding_key: EncodingKey::from_ed_der(&[0; 32]),
             jwt_decoding_key: DecodingKey::from_ed_der(&[0; 32]),
-            jwt_expiry: 900,
+            jwt_access_expiry: 900,
+            jwt_refresh_expiry: 86_400,
             cors_allow_origin: CorsLayer::new()
                 .allow_origin(Any)
                 .allow_headers([AUTHORIZATION, CONTENT_TYPE])
@@ -168,6 +204,8 @@ impl SecurityConfigRaw {
             use_ssl: self.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: self.ssl_certificate_file.clone(),
             ssl_key_file: self.ssl_key_file.clone(),
+            jwt_access_expiry: self.jwt_access_expiry.parse().unwrap_or(900),
+            jwt_refresh_expiry: self.jwt_refresh_expiry.parse().unwrap_or(86_400),
             ..Default::default()
         };
 
@@ -361,7 +399,7 @@ struct ConfigRaw {
     pub log_level: String,
     pub mediator_did: String,
     pub server: ServerConfig,
-    pub database: DatabaseConfig,
+    pub database: DatabaseConfigRaw,
     pub security: SecurityConfigRaw,
     pub streaming: StreamingConfig,
     pub did_resolver: DIDResolverConfig,
@@ -376,12 +414,10 @@ pub struct Config {
     pub listen_address: String,
     pub mediator_did: String,
     pub admin_did: String,
-    pub database_url: String,
-    pub database_pool_size: usize,
-    pub database_timeout: u32,
     pub api_prefix: String,
     pub streaming_enabled: bool,
     pub streaming_uuid: String,
+    pub database: DatabaseConfig,
     pub security: SecurityConfig,
     #[serde(skip_serializing)]
     pub did_resolver_config: ClientConfig,
@@ -397,9 +433,7 @@ impl fmt::Debug for Config {
             .field("mediator_did", &self.mediator_did)
             .field("admin_did", &self.admin_did)
             .field("mediator_did_doc", &"Hidden")
-            .field("database_url", &self.database_url)
-            .field("database_pool_size", &self.database_pool_size)
-            .field("database_timeout", &self.database_timeout)
+            .field("database", &self.database)
             .field("streaming_enabled?", &self.streaming_enabled)
             .field("streaming_uuid", &self.streaming_uuid)
             .field("DID Resolver config", &self.did_resolver_config)
@@ -425,9 +459,7 @@ impl Default for Config {
             listen_address: "".into(),
             mediator_did: "".into(),
             admin_did: "".into(),
-            database_url: "redis://127.0.0.1/".into(),
-            database_pool_size: 10,
-            database_timeout: 2,
+            database: DatabaseConfig::default(),
             streaming_enabled: true,
             streaming_uuid: "".into(),
             did_resolver_config,
@@ -466,9 +498,7 @@ impl TryFrom<ConfigRaw> for Config {
             listen_address: raw.server.listen_address,
             mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
             admin_did: read_did_config(&raw.server.admin_did, &aws_config).await?,
-            database_url: raw.database.database_url,
-            database_pool_size: raw.database.database_pool_size.parse().unwrap_or(10),
-            database_timeout: raw.database.database_timeout.parse().unwrap_or(2),
+            database: raw.database.try_into()?,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
             api_prefix: raw.server.api_prefix,
@@ -477,6 +507,18 @@ impl TryFrom<ConfigRaw> for Config {
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
+
+        // Ensure that the security JWT expiry times are valid
+        if config.security.jwt_access_expiry >= config.security.jwt_refresh_expiry {
+            error!(
+                "JWT Access expiry ({}) must be less than JWT Refresh expiry ({})",
+                config.security.jwt_access_expiry, config.security.jwt_refresh_expiry
+            );
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "JWT Access expiry must be less than JWT Refresh expiry".into(),
+            ));
+        }
 
         // Get Subscriber unique hostname
         if config.streaming_enabled {

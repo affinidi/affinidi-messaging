@@ -1,6 +1,6 @@
 ### log_level: trace debug info warn error
 ### default: info
-log_level = "debug"
+log_level = "info"
 
 ### mediator_did: DID of the mediator
 ### REQUIRED: DID of the mediator
@@ -35,9 +35,13 @@ admin_did = "${ADMIN_DID:did://did:peer:2.Vz6Mkk5UdjCVt8ihfEBXU8cEVWp7wGZvo1SfWm
 ### Database configuration
 ### ****************************************************************************************************************************
 [database]
+### functions_file: Path to the database functions file
+### Default: ./conf/atm-functions.lua
+functions_file = "${DATABASE_FUNCTIONS_FILE:./conf/atm-functions.lua}"
+
 ### database_url: URL of the Redis compatable database
 ### Default: redis://127.0.0.1/
-database_url = "${REDIS_URL:redis://127.0.0.1/}"
+database_url = "${DATABASE_URL:redis://127.0.0.1/}"
 
 ### database_pool_size: Number of connections to the database
 ### Default: 10
@@ -87,9 +91,13 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
 jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGARAda-NDucNM2L6x2dmkO8wJSPQvrWaryjyigcgspsgSEAReoGHKXiehaZARzl3koMw2osM6Bsy_MceZoIf9tR4kc}"
 
-### jwt_expiry: Expiry time in seconds for JWT tokens
+### jwt_access_expiry: Expiry time in seconds for JWT access tokens
 ### Default: 900 (15 Minutes)
-jwt_expiry = "${JWT_EXPIRY:900}"
+jwt_access_expiry = "${JWT_ACCESS_EXPIRY:900}"
+
+### jwt_refresh_expiry: Expiry time in seconds for JWT refresh tokens
+### Default: 86400 (24 hours)
+jwt_refresh_expiry = "${JWT_REFRESH_EXPIRY:86_400}"
 
 ### cors_allow_origin: Comma separated list of origins that are allowed to access this service
 ### Default: *

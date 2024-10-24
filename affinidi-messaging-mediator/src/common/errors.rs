@@ -60,6 +60,8 @@ pub enum MediatorError {
     AnonymousMessageError(SessId, String),
     #[error("Forwarding/Routing message error: {1}")]
     ForwardMessageError(SessId, String),
+    #[error("Authentication error: {0}")]
+    AuthenticationError(String),
 }
 
 impl IntoResponse for AppError {
@@ -247,6 +249,17 @@ impl IntoResponse for AppError {
                     sessionId: session_id.to_string(),
                     errorCode: 17,
                     errorCodeStr: "ForwardMessageError".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::AuthenticationError(message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::UNAUTHORIZED.as_u16(),
+                    sessionId: "NO-SESSION".to_string(),
+                    errorCode: 18,
+                    errorCodeStr: "AuthenticationError".to_string(),
                     message,
                 };
                 event!(Level::WARN, "{}", response.to_string());

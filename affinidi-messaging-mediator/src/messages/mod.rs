@@ -56,6 +56,10 @@ impl MessageType {
                 session.session_id.clone(),
                 "Affinidi Authentication is only handled by the Authorization handler".into(),
             )),
+            SDKMessageType::AffinidiAuthenticateRefresh => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Affinidi Authentication is only handled by the Authorization handler".into(),
+            )),
             SDKMessageType::ForwardRequest => routing::process(message, state, session).await,
             SDKMessageType::ProblemReport => Err(MediatorError::NotImplemented(
                 session.session_id.clone(),

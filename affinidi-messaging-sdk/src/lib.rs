@@ -15,7 +15,7 @@ use tokio_tungstenite::Connector;
 use tracing::{debug, span, warn};
 use websockets::ws_handler::WSCommand;
 
-mod authentication;
+pub mod authentication;
 pub mod config;
 pub mod conversions;
 pub mod errors;

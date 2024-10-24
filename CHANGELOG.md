@@ -22,8 +22,17 @@
 * send_empty_ack_response() method added so that you can ack messages that have no response
 * Ability to run the `forwarding` processor locally or remotely
 * Redis updated from 0.26 to 0.27 and deadpool-redis from 0.17 to 0.18
-* tower-http updated from 0.5 to 0.6
-* ssi updated from 0.8 to 0.9
+* JWT Expiry configuration added
+  * access tokens
+  * refresh tokens
+* Authentication refresh added
+  * /authentication/refresh
+* OOB Discovery Protocol Added
+  * /oob
+* Redis Database changes
+  * Version check added
+  * Redis 7.4 minimum version required
+  * LUA scripts shifted
 
 ### Affinidi Processors
 
