@@ -7,7 +7,7 @@ log_level = "debug"
 ### Supported formats:
 ### - did://did:peer:<version>:<base58-encoded-verification-key>
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
-mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mkvw3cBJpxm7475pXPHDr7tMbRsDurUji715cx97A8V1vq.EzQ3shQXXrEc3SBFeHhvemiZkeuePQ2KmJUro2otxNiz6E784q.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMzcvIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXSwicm91dGluZ19rZXlzIjpbXX0sImlkIjpudWxsfQ}"
+mediator_did = "${MEDIATOR_DID:did://did:peer:2.Vz6Mkvw3cBJpxm7475pXPHDr7tMbRsDurUji715cx97A8V1vq.VzDnaeiF8YrdnpKuxgaWLmLaj5TfqyX2AVMnAhrS1sVmAmyMtt.EzQ3shQXXrEc3SBFeHhvemiZkeuePQ2KmJUro2otxNiz6E784q.EzDnaerZYqiX32LPjbKS8Ewn11AGwpmJHwhGduamisG3WWz3LM.SeyJ0IjoiRElEQ29tbU1lc3NhZ2luZyIsInMiOnsidXJpIjoiaHR0cDovLzQ3LjEyOS4xMDguMjIzOjcwMzcvIiwiYSI6WyJkaWRjb21tL3YyIl0sInIiOltdfSwiaWQiOm51bGx9}"
 
 ### ****************************************************************************************************************************
 ### Server configuration
@@ -86,6 +86,10 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### - string://<key> - Use the key as is
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
 jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGARAda-NDucNM2L6x2dmkO8wJSPQvrWaryjyigcgspsgSEAReoGHKXiehaZARzl3koMw2osM6Bsy_MceZoIf9tR4kc}"
+
+### jwt_expiry: Expiry time in seconds for JWT tokens
+### Default: 900 (15 Minutes)
+jwt_expiry = "${JWT_EXPIRY:900}"
 
 ### cors_allow_origin: Comma separated list of origins that are allowed to access this service
 ### Default: *
