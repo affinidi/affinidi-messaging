@@ -24,7 +24,7 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.8", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.8", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.8", path = "./affinidi-messaging-mediator" }
-affinidi-did-resolver-cache-sdk = { version = "0.1.13" }
+affinidi-did-resolver-cache-sdk = { version = "0.1.13", path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk" }
 anyhow = '1.0'
 askar-crypto = "0.3.1"
 async-convert = "1"
@@ -43,7 +43,7 @@ chrono = "0.4"
 criterion = "0.5"
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
-did-peer = { version = "0.1.13" }
+did-peer = { version = "0.1.13", path = "../affinidi-did-resolver/affinidi-did-resolver-methods/did-peer" }
 clap = { version = "4.5", features = ["derive"] }
 console = "0.15"
 futures-util = "0.3"
@@ -76,10 +76,10 @@ serde-enum-str = '0.4'
 serde_json = "1.0"
 sha2 = "0.10"
 sha256 = "1.5"
-ssi = "0.9"
+ssi = { version = "0.9", path = "../ssi" }
 thiserror = "1.0"
 time = "0.3"
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.41", features = ["full"] }
 tokio-stream = "0.1"
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
 toml = "0.8"
@@ -91,5 +91,5 @@ tracing = { version = "0.1", features = [
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-test = "0.2"
 url = "2.5"
-uuid = { version = "1.10", features = ["v4", "fast-rng"] }
+uuid = { version = "1.11", features = ["v4", "fast-rng"] }
 varint = "0.9"
