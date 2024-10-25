@@ -1,3 +1,15 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::{
+    common::errors::{MediatorError, Session},
+    messages::inbound::handle_inbound,
+    tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
+    SharedData,
+};
+use affinidi_messaging_didcomm::{Message as DidcommMessage, PackEncryptedOptions};
+use affinidi_messaging_sdk::messages::problem_report::{
+    ProblemReport, ProblemReportScope, ProblemReportSorter,
+};
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -5,18 +17,13 @@ use axum::{
     },
     response::IntoResponse,
 };
+use serde_json::json;
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
 use tracing::{debug, info, span, warn, Instrument};
-
-use crate::{
-    common::errors::Session,
-    messages::inbound::handle_inbound,
-    tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
-    SharedData,
-};
+use uuid::Uuid;
 
 // Handles the switching of the protocol to a websocket connection
 pub async fn websocket_handler(
@@ -109,12 +116,14 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                 value = rx.recv() => {
                     if let Some(msg) = value {
                         match msg {
-                            WebSocketCommands::Message(msg) => {                        
+                            WebSocketCommands::Message(msg) => {
                                 debug!("ws: Received message from streaming task: {:?}", msg);
                                 let _ = socket.send(Message::Text(msg)).await;
                             },
                             WebSocketCommands::Close => {
-                                let _ = socket.send(Message::Text("New Duplicate Connection Detected. Closing this connection.".to_string())).await;
+                                if let Ok(msg) =  _generate_duplicate_connection_problem_report(&state, &session).await {
+                                   let _ = socket.send(Message::Text(msg)).await;
+                            }
                                 debug!("Received close message from streaming task, closing websocket connection");
                                 already_deregistered_flag = true;
                                 break;
@@ -149,4 +158,56 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
     }
     .instrument(_span)
     .await
+}
+
+async fn _generate_duplicate_connection_problem_report(
+    state: &SharedData,
+    session: &Session,
+) -> Result<String, MediatorError> {
+    let problem_report = ProblemReport::new(
+        ProblemReportSorter::Warning,
+        ProblemReportScope::Other("websocket".to_string()),
+        "duplicate-channel".to_string(),
+        "A new duplicate websocket connection for this DID has caused this websocket to terminate"
+            .to_string(),
+        vec![],
+        None,
+    );
+
+    let pr_msg = DidcommMessage::build(
+        Uuid::new_v4().to_string(),
+        "https://didcomm.org/report-problem/2.0/problem-report".to_string(),
+        json!(problem_report),
+    )
+    .from(state.config.mediator_did.clone())
+    .to(session.did.to_string())
+    .created_time(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    )
+    .finalize();
+
+    let (packed, _) = pr_msg
+        .pack_encrypted(
+            &session.did,
+            Some(&state.config.mediator_did),
+            Some(&state.config.mediator_did),
+            &state.did_resolver,
+            &state.config.security.mediator_secrets,
+            &PackEncryptedOptions {
+                to_kids_limit: state.config.limits.to_keys_per_recipient,
+                ..PackEncryptedOptions::default()
+            },
+        )
+        .await
+        .map_err(|err| {
+            MediatorError::MessagePackError(
+                session.session_id.clone(),
+                format!("Couldn't pack DIDComm message. Reason: {}", err),
+            )
+        })?;
+
+    Ok(packed)
 }
