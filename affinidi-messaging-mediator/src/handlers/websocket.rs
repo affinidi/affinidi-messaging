@@ -14,7 +14,7 @@ use tracing::{debug, info, span, warn, Instrument};
 use crate::{
     common::errors::Session,
     messages::inbound::handle_inbound,
-    tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
+    tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
     SharedData,
 };
 
@@ -25,7 +25,7 @@ pub async fn websocket_handler(
     State(state): State<SharedData>,
 ) -> impl IntoResponse {
     let _span = span!(
-        tracing::Level::DEBUG,
+        tracing::Level::INFO,
         "websocket_handler",
         session = session.session_id
     );
@@ -37,13 +37,13 @@ pub async fn websocket_handler(
 /// WebSocket state machine. This is spawned per connection.
 async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Session) {
     let _span = span!(
-        tracing::Level::DEBUG,
+        tracing::Level::INFO,
         "handle_socket",
         session = session.session_id
     );
     async move {
         // Register the transmission channel between websocket_streaming task and this websocket.
-        let (tx, mut rx): (Sender<String>, Receiver<String>) = mpsc::channel(5);
+        let (tx, mut rx): (Sender<WebSocketCommands>, Receiver<WebSocketCommands>) = mpsc::channel(5);
         if let Some(streaming) = &state.streaming_task {
 
             let start = StreamingUpdate {
@@ -64,6 +64,11 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         let _ = state.database.global_stats_increment_websocket_open().await;
         info!("Websocket connection established");
 
+        // Flag to prevent double deregistration
+        // This can occur because in some situations the streaming-task will send a close message
+        // due to duplicate channels. If we were to deregister on close in this scenario, we would
+        // also deregister the new channel that is still in use.
+        let mut already_deregistered_flag = false;
         loop {
             select! {
                 value = socket.recv() => {
@@ -103,8 +108,18 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                 }
                 value = rx.recv() => {
                     if let Some(msg) = value {
-                        debug!("ws: Received message from streaming task: {:?}", msg);
-                        let _ = socket.send(Message::Text(msg)).await;
+                        match msg {
+                            WebSocketCommands::Message(msg) => {                        
+                                debug!("ws: Received message from streaming task: {:?}", msg);
+                                let _ = socket.send(Message::Text(msg)).await;
+                            },
+                            WebSocketCommands::Close => {
+                                let _ = socket.send(Message::Text("New Duplicate Connection Detected. Closing this connection.".to_string())).await;
+                                debug!("Received close message from streaming task, closing websocket connection");
+                                already_deregistered_flag = true;
+                                break;
+                            }
+                        }
                     } else {
                         debug!("Received None from streaming task, closing connection");
                         break;
@@ -114,12 +129,14 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         }
 
         // Remove this websocket and associated info from the streaming task
-        if let Some(streaming) = &state.streaming_task {
-            let stop = StreamingUpdate {
-                did_hash: session.did_hash.clone(),
-                state: StreamingUpdateState::Deregister,
-            };
-            let _ = streaming.channel.send(stop).await;
+        if !already_deregistered_flag { // Skip if close initiated by the streaming task
+            if let Some(streaming) = &state.streaming_task  {
+                let stop = StreamingUpdate {
+                    did_hash: session.did_hash.clone(),
+                    state: StreamingUpdateState::Deregister,
+                };
+                let _ = streaming.channel.send(stop).await;
+            }
         }
 
         // We're done, close the connection

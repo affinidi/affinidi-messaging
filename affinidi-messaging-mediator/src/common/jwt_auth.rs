@@ -63,8 +63,8 @@ impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let status = match self {
             AuthError::WrongCredentials => StatusCode::UNAUTHORIZED,
-            AuthError::MissingCredentials => StatusCode::BAD_REQUEST,
-            AuthError::InvalidToken => StatusCode::BAD_REQUEST,
+            AuthError::MissingCredentials => StatusCode::UNAUTHORIZED,
+            AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
             AuthError::ExpiredToken => StatusCode::UNAUTHORIZED,
             AuthError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };

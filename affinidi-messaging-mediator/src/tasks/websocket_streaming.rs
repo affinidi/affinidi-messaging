@@ -1,12 +1,20 @@
-use std::{collections::HashMap, time::Duration};
+/*!
+ A task that listens for messages on a Redis pub/sub channel and sends them to clients over a websocket.
 
+ It will maintain a HashSet of channels based on the DID hash. As a result, if duplicate websockets
+ are created for the same DID, only the most recent one will receive messages as the older websocket
+ channel will be forcibly closed.
+
+ Any status on the existing websocket channel for a DID will need to be reset on the new channel.
+
+*/
+use crate::{common::errors::MediatorError, database::DatabaseHandler};
 use redis::aio::PubSub;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, time::Duration};
 use tokio::{select, sync::mpsc, task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
 use tracing::{debug, error, info, span, warn, Instrument, Level};
-
-use crate::{common::errors::MediatorError, database::DatabaseHandler};
 
 // Useful links on redis pub/sub in Rust:
 // https://github.com/redis-rs/redis-rs/issues/509
@@ -17,10 +25,16 @@ use crate::{common::errors::MediatorError, database::DatabaseHandler};
 /// Stop: Stop streaming messages to clients.
 /// Deregister: Remove the hash map entry for the DID hash.
 pub enum StreamingUpdateState {
-    Register(mpsc::Sender<String>),
+    Register(mpsc::Sender<WebSocketCommands>),
     Start,
     Stop,
     Deregister,
+}
+
+/// Used to send commands from the streaming task to the websocket handler
+pub enum WebSocketCommands {
+    Message(String), // Send a message to the client
+    Close,           // Close the websocket connection
 }
 
 /// Used to update the streaming state.
@@ -33,6 +47,7 @@ pub struct StreamingUpdate {
 
 #[derive(Clone)]
 pub struct StreamingTask {
+    pub uuid: String,
     pub channel: mpsc::Sender<StreamingUpdate>,
 }
 
@@ -62,16 +77,16 @@ impl StreamingTask {
             let (tx, mut rx) = mpsc::channel(10);
             let task = StreamingTask {
                 channel: tx.clone(),
+                uuid: mediator_uuid.to_string(),
             };
 
             // Start the streaming task
             // With it's own clone of required data
             let handle = {
-                let _mediator_uuid = mediator_uuid.to_string();
                 let _task = task.clone();
                 tokio::spawn(async move {
                     _task
-                        .ws_streaming_task(database, &mut rx, _mediator_uuid)
+                        .ws_streaming_task(database, &mut rx)
                         .await
                         .expect("Error starting websocket_streaming thread");
                 })
@@ -114,24 +129,23 @@ impl StreamingTask {
     /// Streams messages to subscribed clients over websocket.
     /// Is spawned as a task
     async fn ws_streaming_task(
-        &self,
+        self,
         database: DatabaseHandler,
         channel: &mut mpsc::Receiver<StreamingUpdate>,
-        uuid: String,
     ) -> Result<(), MediatorError> {
-        let _span = span!(Level::INFO, "ws_streaming_task", uuid = uuid);
+        let _span = span!(Level::INFO, "ws_streaming_task", uuid = &self.uuid);
 
         async move {
             debug!("Starting...");
 
             // Clean up any existing sessions left over from previous runs
-            database.streaming_clean_start(&uuid).await?;
+            database.streaming_clean_start(&self.uuid).await?;
 
             // Create a hashmap to store the clients and if they are active (true = yes)
-            let mut clients: HashMap<String, (mpsc::Sender<String>, bool)> = HashMap::new();
+            let mut clients: HashMap<String, (mpsc::Sender<WebSocketCommands>, bool)> = HashMap::new();
 
             // Start streaming messages to clients
-            let mut pubsub = self._start_pubsub(database.clone(), &uuid).await?;
+            let mut pubsub = self._start_pubsub(database.clone(), &self.uuid).await?;
             loop {
                 let mut stream = pubsub.on_message();
 
@@ -139,7 +153,7 @@ impl StreamingTask {
                 // stream: redis pubsub of incoming messages destined for a client
                 // channel: command channel to start/stop streaming for a client
                 select! {
-                    value = stream.next() => {
+                    value = stream.next() => { // redis pubsub
                         if let Some(msg) = value {
                             if let Ok(payload) = msg.get_payload::<String>() {
                                 let payload: PubSubRecord = serde_json::from_str(&payload).unwrap();
@@ -148,14 +162,14 @@ impl StreamingTask {
                                 if let Some((tx, active)) = clients.get(&payload.did_hash) {
                                     if payload.force_delivery ||  *active {
                                         // Send the message to the client
-                                        if let Err(err) = tx.send(payload.message.clone()).await {
+                                        if let Err(err) = tx.send(WebSocketCommands::Message(payload.message.clone())).await {
                                             error!("Error sending message to client ({}): {}", payload.did_hash, err);
                                         } else {
                                             info!("Sent message to client ({})", payload.did_hash);
                                         }
                                     } else {
                                         warn!("pub/sub msg received for did_hash({}) but it is not active", payload.did_hash);
-                                        if let Err(err) = database.streaming_stop_live(&payload.did_hash, &uuid).await {
+                                        if let Err(err) = database.streaming_stop_live(&payload.did_hash, &self.uuid).await {
                                             error!("Error stopping streaming for client ({}): {}", payload.did_hash, err);
                                         }
                                     }
@@ -174,7 +188,7 @@ impl StreamingTask {
 
                             pubsub = loop {
                                 sleep(Duration::from_secs(1)).await;
-                                match self._start_pubsub(database.clone(), &uuid).await {
+                                match self._start_pubsub(database.clone(), &self.uuid).await {
                                     Ok(pubsub) => break pubsub,
                                     Err(err) => {
                                         error!("Error starting pubsub: {}", err);
@@ -184,16 +198,11 @@ impl StreamingTask {
                             }
                         }
                     }
-                    value = channel.recv() => {
-                        if let Some(value) = value {
-                            match value.state {
+                    value = channel.recv() => { // mpsc command channel
+                        if let Some(value) = &value {
+                            match &value.state {
                                 StreamingUpdateState::Register(client_tx) => {
-                                    info!("Registered streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()+1);
-                                    clients.insert(value.did_hash.clone(), (client_tx, false));
-
-                                    if let Err(err) = database.streaming_register_client(&value.did_hash, &uuid).await {
-                                        error!("Error starting streaming to client ({}) streaming: {}",value.did_hash, err);
-                                    }
+                                    self._handle_registration(&database, &mut clients, value, client_tx).await;
                                 },
                                 StreamingUpdateState::Start => {
                                     if let Some((_, active)) = clients.get_mut(&value.did_hash) {
@@ -201,7 +210,7 @@ impl StreamingTask {
                                         *active = true;
                                     };
 
-                                    if let Err(err) = database.streaming_start_live(&value.did_hash, &uuid).await {
+                                    if let Err(err) = database.streaming_start_live(&value.did_hash, &self.uuid).await {
                                         error!("Error starting streaming to client ({}) streaming: {}",value.did_hash, err);
                                     }
                                 },
@@ -212,13 +221,19 @@ impl StreamingTask {
                                         *active = false;
                                     };
 
-                                    if let Err(err) = database.streaming_stop_live(&value.did_hash, &uuid).await {
+                                    if let Err(err) = database.streaming_stop_live(&value.did_hash, &self.uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
                                 },
                                 StreamingUpdateState::Deregister => {
-                                    info!("Deregistering streaming for DID: ({}) registered_clients({})", value.did_hash, clients.len()-1);
-                                    if let Err(err) = database.streaming_deregister_client(&value.did_hash, &uuid).await {
+                                    let count = if !clients.is_empty() {
+                                        clients.len() - 1
+                                    } else {
+                                        warn!("Duplicate websocket channels has us off by one");
+                                        0
+                                    };
+                                    info!("Deregistered streaming for DID: ({}) registered_clients({})", value.did_hash, count);
+                                    if let Err(err) = database.streaming_deregister_client(&value.did_hash, &self.uuid).await {
                                         error!("Error stopping streaming for client ({}): {}",value.did_hash, err);
                                     }
                                     clients.remove(value.did_hash.as_str());
@@ -231,5 +246,39 @@ impl StreamingTask {
         }
         .instrument(_span)
         .await
+    }
+
+    /// Helper function to handle the registration of a new client.
+    /// Handles if this is a duplicate channel for a DID
+    async fn _handle_registration(
+        &self,
+        database: &DatabaseHandler,
+        clients: &mut HashMap<String, (mpsc::Sender<WebSocketCommands>, bool)>,
+        value: &StreamingUpdate,
+        client_tx: &mpsc::Sender<WebSocketCommands>,
+    ) {
+        if let Some((channel, _)) = clients.get(&value.did_hash) {
+            debug!("Duplicate WebSocket channel detected");
+            // Channel already exists, close the old one
+            let _ = channel.send(WebSocketCommands::Close).await;
+            debug!("Sent close WebSocket command to old channel");
+        }
+
+        info!(
+            "Registered streaming for DID: ({}) registered_clients({})",
+            value.did_hash,
+            clients.len() + 1
+        );
+        clients.insert(value.did_hash.clone(), (client_tx.clone(), false));
+
+        if let Err(err) = database
+            .streaming_register_client(&value.did_hash, &self.uuid)
+            .await
+        {
+            error!(
+                "Error starting streaming to client ({}) streaming: {}",
+                value.did_hash, err
+            );
+        }
     }
 }
