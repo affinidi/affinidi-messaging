@@ -11,6 +11,7 @@ use std::{
     env,
     time::{Duration, SystemTime},
 };
+use tokio::time::sleep;
 use tracing::{error, info};
 use tracing_subscriber::filter;
 
@@ -49,6 +50,7 @@ async fn main() -> Result<(), ATMError> {
         .with_my_did(&alice.did)
         .with_atm_did(&profile.mediator_did)
         .with_websocket_disabled()
+        .with_non_ssl()
         .with_atm_api(&profile.network_address);
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
@@ -64,144 +66,154 @@ async fn main() -> Result<(), ATMError> {
     atm.add_secret(alice.get_key("#key-1").unwrap());
     atm.add_secret(alice.get_key("#key-2").unwrap());
 
-    // Ready to send a trust-ping to ATM
-    let start = SystemTime::now();
-
     // You normally don't need to call authenticate() as it is called automatically
     // We do this here so we can time the auth cycle
     atm.authenticate().await?;
 
-    let after_auth = SystemTime::now();
+    let mut error_count = 0;
+    let mut success_count = 0;
+    loop {
+        // Ready to send a trust-ping to ATM
+        let start = SystemTime::now();
 
-    // Send a trust-ping message to ATM, will generate a PONG response
-    let response = protocols
-        .trust_ping
-        .send_ping(&mut atm, &profile.mediator_did, true, true)
-        .await?;
-    let after_ping = SystemTime::now();
+        // Send a trust-ping message to ATM, will generate a PONG response
+        let response = protocols
+            .trust_ping
+            .send_ping(&mut atm, &profile.mediator_did, true, true)
+            .await?;
+        let after_ping = SystemTime::now();
 
-    info!("PING sent: {}", response.message_hash);
+        info!("PING sent: {}", response.message_hash);
 
-    // Get the PONG message from ATM
-    let msgs = atm
-        .get_messages(&GetMessagesRequest {
-            delete: false,
-            message_ids: vec![response.response.unwrap()],
-        })
-        .await?;
-    let after_get = SystemTime::now();
+        if let Some(response) = response.response {
+            // Get the PONG message from ATM
+            let msgs = atm
+                .get_messages(&GetMessagesRequest {
+                    delete: false,
+                    message_ids: vec![response],
+                })
+                .await?;
+            let after_get = SystemTime::now();
 
-    // Unpack the messages retrieved
-    for msg in msgs.success {
-        atm.unpack(&msg.msg.unwrap()).await?;
-        info!("PONG received: {}", msg.msg_id);
+            // Unpack the messages retrieved
+            for msg in msgs.success {
+                atm.unpack(&msg.msg.unwrap()).await?;
+                info!("PONG received: {}", msg.msg_id);
+            }
+            let after_unpack = SystemTime::now();
+
+            // Print out timing information
+            info!(
+                "Sending Ping took {}ms :: total {}ms to complete",
+                after_ping.duration_since(start).unwrap().as_millis(),
+                after_ping.duration_since(start).unwrap().as_millis()
+            );
+            info!(
+                "Get response took {}ms :: total {}ms to complete",
+                after_get.duration_since(after_ping).unwrap().as_millis(),
+                after_get.duration_since(start).unwrap().as_millis()
+            );
+            info!(
+                "Unpack took {}ms :: total {}ms to complete",
+                after_unpack.duration_since(after_get).unwrap().as_millis(),
+                after_unpack.duration_since(start).unwrap().as_millis()
+            );
+            info!(
+                "Total trust-ping took {}ms to complete",
+                after_unpack.duration_since(start).unwrap().as_millis()
+            );
+            success_count += 1;
+            info!(
+                " counters: success: {}, error: {}",
+                success_count, error_count
+            );
+        } else {
+            error_count += 1;
+            error!("No response from trust-ping");
+        }
+        sleep(Duration::from_millis(2000)).await;
+        info!(" ***************************************************** ");
     }
-    let after_unpack = SystemTime::now();
+    /*
+        // Send a WebSocket message
+        info!("  *****************************************************  ");
+        info!("Starting WebSocket test...");
+        let start = SystemTime::now();
+        atm.start_websocket_task().await?;
+        let after_websocket = SystemTime::now();
 
-    // Print out timing information
-    info!(
-        "Authenticating took {}ms :: total {}ms to complete",
-        after_auth.duration_since(start).unwrap().as_millis(),
-        after_auth.duration_since(start).unwrap().as_millis()
-    );
-    info!(
-        "Sending Ping took {}ms :: total {}ms to complete",
-        after_ping.duration_since(after_auth).unwrap().as_millis(),
-        after_ping.duration_since(start).unwrap().as_millis()
-    );
-    info!(
-        "Get response took {}ms :: total {}ms to complete",
-        after_get.duration_since(after_ping).unwrap().as_millis(),
-        after_get.duration_since(start).unwrap().as_millis()
-    );
-    info!(
-        "Unpack took {}ms :: total {}ms to complete",
-        after_unpack.duration_since(after_get).unwrap().as_millis(),
-        after_unpack.duration_since(start).unwrap().as_millis()
-    );
-    info!(
-        "Total trust-ping took {}ms to complete",
-        after_unpack.duration_since(start).unwrap().as_millis()
-    );
+        protocols
+            .message_pickup
+            .toggle_live_delivery(&mut atm, true)
+            .await?;
+        let after_live_delivery = SystemTime::now();
 
-    // Send a WebSocket message
-    info!("  *****************************************************  ");
-    info!("Starting WebSocket test...");
-    let start = SystemTime::now();
-    atm.start_websocket_task().await?;
-    let after_websocket = SystemTime::now();
+        let response = protocols
+            .trust_ping
+            .send_ping(&mut atm, &profile.mediator_did, true, true)
+            .await?;
+        let after_ping_send = SystemTime::now();
+        info!("PING sent: {}", response.message_id);
 
-    protocols
-        .message_pickup
-        .toggle_live_delivery(&mut atm, true)
-        .await?;
-    let after_live_delivery = SystemTime::now();
+        let response = protocols
+            .message_pickup
+            .live_stream_get(&mut atm, &response.message_id, Duration::from_secs(10))
+            .await?;
+        let after_pong_receive = SystemTime::now();
 
-    let response = protocols
-        .trust_ping
-        .send_ping(&mut atm, &profile.mediator_did, true, true)
-        .await?;
-    let after_ping_send = SystemTime::now();
-    info!("PING sent: {}", response.message_id);
+        if let Some((msg, _)) = response {
+            info!("PONG received: {}", msg.id);
+        } else {
+            error!("No response from live stream");
+        }
 
-    let response = protocols
-        .message_pickup
-        .live_stream_get(&mut atm, &response.message_id, Duration::from_secs(10))
-        .await?;
-    let after_pong_receive = SystemTime::now();
+        // Print out timing information
+        info!(
+            "Creating WebSocket took {}ms :: total {}ms to complete",
+            after_websocket.duration_since(start).unwrap().as_millis(),
+            after_websocket.duration_since(start).unwrap().as_millis()
+        );
 
-    if let Some((msg, _)) = response {
-        info!("PONG received: {}", msg.id);
-    } else {
-        error!("No response from live stream");
-    }
+        info!(
+            "Enabling Live Delivery took {}ms :: total {}ms to complete",
+            after_live_delivery
+                .duration_since(after_websocket)
+                .unwrap()
+                .as_millis(),
+            after_live_delivery
+                .duration_since(start)
+                .unwrap()
+                .as_millis()
+        );
 
-    // Print out timing information
-    info!(
-        "Creating WebSocket took {}ms :: total {}ms to complete",
-        after_websocket.duration_since(start).unwrap().as_millis(),
-        after_websocket.duration_since(start).unwrap().as_millis()
-    );
+        info!(
+            "Sending Ping took {}ms :: total {}ms to complete",
+            after_ping_send
+                .duration_since(after_live_delivery)
+                .unwrap()
+                .as_millis(),
+            after_ping_send.duration_since(start).unwrap().as_millis()
+        );
 
-    info!(
-        "Enabling Live Delivery took {}ms :: total {}ms to complete",
-        after_live_delivery
-            .duration_since(after_websocket)
-            .unwrap()
-            .as_millis(),
-        after_live_delivery
-            .duration_since(start)
-            .unwrap()
-            .as_millis()
-    );
+        info!(
+            "Receiving unpacked Pong took {}ms :: total {}ms to complete",
+            after_pong_receive
+                .duration_since(after_ping_send)
+                .unwrap()
+                .as_millis(),
+            after_pong_receive
+                .duration_since(start)
+                .unwrap()
+                .as_millis()
+        );
+        info!(
+            "Total WebSocket trust-ping took {}ms to complete",
+            after_pong_receive
+                .duration_since(start)
+                .unwrap()
+                .as_millis()
+        );
+    */
 
-    info!(
-        "Sending Ping took {}ms :: total {}ms to complete",
-        after_ping_send
-            .duration_since(after_live_delivery)
-            .unwrap()
-            .as_millis(),
-        after_ping_send.duration_since(start).unwrap().as_millis()
-    );
-
-    info!(
-        "Receiving unpacked Pong took {}ms :: total {}ms to complete",
-        after_pong_receive
-            .duration_since(after_ping_send)
-            .unwrap()
-            .as_millis(),
-        after_pong_receive
-            .duration_since(start)
-            .unwrap()
-            .as_millis()
-    );
-    info!(
-        "Total WebSocket trust-ping took {}ms to complete",
-        after_pong_receive
-            .duration_since(start)
-            .unwrap()
-            .as_millis()
-    );
-
-    Ok(())
+    // Ok(())
 }

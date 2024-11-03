@@ -5,6 +5,7 @@ members = [
     "affinidi-messaging-mediator",
     "affinidi-messaging-processor",
     "affinidi-messaging-helpers",
+    "affinidi-messaging-text-client",
 ]
 resolver = "2"
 
@@ -24,36 +25,42 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.8", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.8", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.8", path = "./affinidi-messaging-mediator" }
-affinidi-did-resolver-cache-sdk = { version = "0.1.13", path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk" }
+affinidi-did-resolver-cache-sdk = { version = "0.1.13", path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk", features = [
+    "network",
+] }
 anyhow = '1.0'
 askar-crypto = "0.3.1"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.50"
-aws-sdk-memorydb = "1.47"
-aws-sdk-secretsmanager = "1.50"
-aws-sdk-ssm = "1.51"
+aws-sdk-dynamodb = "1.52"
+aws-sdk-memorydb = "1.49"
+aws-sdk-secretsmanager = "1.52"
+aws-sdk-ssm = "1.53"
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
 bs58 = "0.5"
 chrono = "0.4"
+color-eyre = "0.6"
 criterion = "0.5"
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
 did-peer = { version = "0.1.13", path = "../affinidi-did-resolver/affinidi-did-resolver-methods/did-peer" }
 clap = { version = "4.5", features = ["derive"] }
 console = "0.15"
+crossterm = "0.28.1"
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"
 http = "1"
+image = "0.25.4"
 itertools = "0.13"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
 rand = "0.8"
+ratatui = "0.29"
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
@@ -62,7 +69,7 @@ redis = { version = "0.27", features = [
     "tokio-rustls-comp",
     "tls-rustls-insecure",
 ] }
-regex = "1"
+regex = "1.11"
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 ring = { version = "0.17", features = ["std"] }
 rustls = { version = "0.23", default-features = false, features = [
@@ -76,7 +83,7 @@ serde-enum-str = '0.4'
 serde_json = "1.0"
 sha2 = "0.10"
 sha256 = "1.5"
-ssi = { version = "0.9", path = "../ssi" }
+ssi = { version = "0.10" }
 thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1.41", features = ["full"] }

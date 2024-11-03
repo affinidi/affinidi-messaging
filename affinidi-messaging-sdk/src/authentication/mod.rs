@@ -96,7 +96,10 @@ impl<'c> ATM<'c> {
             };
 
             let auth_response = self._create_auth_challenge_response(challenge)?;
-            debug!("Auth response message:\n{:#?}", auth_response);
+            debug!(
+                "Auth response message:\n{}",
+                serde_json::to_string_pretty(&auth_response).unwrap()
+            );
 
             let (auth_msg, _) = auth_response
                 .pack_encrypted(
@@ -272,6 +275,7 @@ async fn _http_post<T: GenericDataStruct>(
     body: &str,
 ) -> Result<SuccessResponse<T>, ATMError> {
     debug!("POSTing to {}", url);
+    debug!("Body: {}", body);
     let response = client
         .post(url)
         .header("Content-Type", "application/json")
@@ -292,6 +296,8 @@ async fn _http_post<T: GenericDataStruct>(
             url, response_status
         )));
     }
+
+    debug!("response body: {}", response_body);
     serde_json::from_str::<SuccessResponse<T>>(&response_body).map_err(|e| {
         ATMError::AuthenticationError(format!("Couldn't deserialize AuthorizationResponse: {}", e))
     })

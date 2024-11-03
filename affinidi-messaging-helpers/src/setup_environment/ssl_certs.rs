@@ -168,9 +168,15 @@ impl Role {
                 params.is_ca = IsCa::NoCa;
                 params.key_usages = EE_KEY_USAGES.to_vec();
                 params.subject_alt_names = vec![
-                    SanType::DnsName(Ia5String::try_from("localhost".to_string()).unwrap()),
-                    SanType::IpAddress(IpAddr::from_str("127.0.0.1").unwrap()),
-                    SanType::IpAddress(IpAddr::from_str("::1").unwrap()),
+                    SanType::DnsName(
+                        Ia5String::try_from(
+                            "ec2-13-212-148-180.ap-southeast-1.compute.amazonaws.com".to_string(),
+                        )
+                        .unwrap(),
+                    ),
+                    SanType::IpAddress(IpAddr::from_str("13.212.148.180").unwrap()),
+                    SanType::IpAddress(IpAddr::from_str("10.42.0.37").unwrap()),
+                    SanType::IpAddress(IpAddr::from_str("fe80::887:27ff:fe5c:e709").unwrap()),
                 ];
             }
         }
@@ -189,7 +195,9 @@ impl Role {
             DnType::CommonName,
             match self {
                 Self::Client => "Affinidi Secure Messaging Client".to_owned(),
-                Self::EndEntity => "localhost".to_owned(),
+                Self::EndEntity => {
+                    "ec2-13-212-148-180.ap-southeast-1.compute.amazonaws.com".to_owned()
+                }
                 Self::Intermediate => {
                     format!("Affinidi {} level 2 intermediate", alg.issuer_cn)
                 }

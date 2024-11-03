@@ -11,6 +11,7 @@ use std::{
     env,
     time::{Duration, SystemTime},
 };
+use tokio::time::sleep;
 use tracing::{error, info};
 use tracing_subscriber::filter;
 use uuid::Uuid;
@@ -76,38 +77,12 @@ async fn main() -> Result<(), ATMError> {
         error!("  **** Not using SSL/TLS ****");
     }
 
+    let built = alice_config.build()?;
     // Create a new ATM Client
-    let mut alice_atm = ATM::new(alice_config.build()?).await?;
-    let mut bob_atm = ATM::new(bob_config.build()?).await?;
-    let protocols = Protocols::new();
+    let mut alice_atm = ATM::new(built.clone()).await?;
+    let mut alice2_atm = ATM::new(built.clone()).await?;
 
-    let oob_id = protocols
-        .oob_discovery
-        .create_invite(&mut alice_atm, None)
-        .await?;
-
-    println!("oob_id = {}", oob_id);
-    println!();
-
-    let url = [&profile.network_address, "/oob?_oobid=", &oob_id].concat();
-    println!("Attempting to retrieve an invitation: {}", url);
-    let invitation = protocols
-        .oob_discovery
-        .retrieve_invite(&mut alice_atm, &url)
-        .await?;
-
-    println!(
-        "Received invitation:\n{}",
-        serde_json::to_string_pretty(&invitation).unwrap()
-    );
-
-    println!();
-    let del_response = protocols
-        .oob_discovery
-        .delete_invite(&mut alice_atm, &oob_id)
-        .await?;
-
-    println!("Delete response: deleted? {}", del_response);
+    sleep(Duration::from_secs(30)).await;
 
     Ok(())
 }

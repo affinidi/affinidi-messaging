@@ -7,7 +7,7 @@
 use crate::{errors::ATMError, ATM};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
-use serde_json::json;
+use serde_json::{json, Number, Value};
 use tracing::{span, Instrument, Level};
 use uuid::Uuid;
 #[derive(Default)]
@@ -39,7 +39,7 @@ impl Routing {
 
             let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(message)).finalize();
 
-            let forwarded = Message::build(
+            let mut forwarded = Message::build(
                 id.into(),
                 "https://didcomm.org/routing/2.0/forward".to_owned(),
                 json!({"next": next_did}),
@@ -48,6 +48,15 @@ impl Routing {
             .from(atm.config.my_did.as_deref().unwrap_or("").to_string())
             .attachment(attachment);
 
+            if let Some(expires_time) = expires_time {
+                forwarded = forwarded.expires_time(expires_time);
+            }
+            if let Some(delay_milli) = delay_milli {
+                forwarded = forwarded.header(
+                    "delay_milli".to_string(),
+                    Value::Number(Number::from(delay_milli)),
+                );
+            }
             let forwarded = forwarded.finalize();
 
             // Pack the message

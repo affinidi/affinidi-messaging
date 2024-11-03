@@ -45,3 +45,6 @@
 * Added forwarding/routing support
 * Added routing example
 * Added add_secrets() method to add more than one secret at a time
+* Added ability to support multiple DID Profiles per SDK ATM Instance
+  * Ensures that each DID is authenticated separately, and has their own WebSocket connection
+  * Can turn on live-delivery on a per DID basis, or all together

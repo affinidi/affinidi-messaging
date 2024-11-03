@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 pub struct ProblemReport {
     pub code: String,
     pub comment: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
-    #[serde(rename = "escalate_to")]
+    #[serde(rename = "escalate_to", skip_serializing_if = "Option::is_none")]
     pub escalate_to: Option<String>,
 }
 

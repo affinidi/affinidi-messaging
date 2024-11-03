@@ -1,10 +1,15 @@
-use crate::SharedData;
+use crate::{
+    common::errors::{AppError, Session},
+    SharedData,
+};
+use affinidi_messaging_sdk::messages::SuccessResponse;
 use axum::{
     extract::State,
     response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
 };
+use http::StatusCode;
 
 pub mod authenticate;
 pub mod inbox_fetch;
@@ -53,6 +58,8 @@ pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router 
         .route("/oob", post(oob_discovery::oob_invite_handler))
         .route("/oob", get(oob_discovery::oobid_handler))
         .route("/oob", delete(oob_discovery::delete_oobid_handler))
+        // Helps to test if you are who you think you are
+        .route("/whoami", get(whoami_handler))
         .route(
             "/.well-known/did",
             get(well_known_did_fetch::well_known_did_fetch_handler),
@@ -75,4 +82,21 @@ pub async fn health_checker_handler(State(state): State<SharedData>) -> impl Int
         "message": message,
     });
     Json(response_json)
+}
+
+/// Handler that returns the DID registered for this session
+pub async fn whoami_handler(
+    session: Session,
+) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
+    Ok((
+        StatusCode::OK,
+        Json(SuccessResponse {
+            sessionId: "".to_string(),
+            data: Some(session.did.clone()),
+            httpCode: StatusCode::OK.as_u16(),
+            errorCode: 0,
+            errorCodeStr: "NA".to_string(),
+            message: "Success".to_string(),
+        }),
+    ))
 }

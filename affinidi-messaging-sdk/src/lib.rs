@@ -23,6 +23,7 @@ pub mod messages;
 pub mod protocols;
 pub mod public;
 mod resolvers;
+pub mod secrets;
 pub mod transports;
 
 pub mod websockets {
