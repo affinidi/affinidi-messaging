@@ -2,47 +2,48 @@ use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::secrets::Secret;
 use config::Config;
 use errors::ATMError;
-use messages::AuthorizationResponse;
+use profiles::Profiles;
 use reqwest::{Certificate, Client};
 use resolvers::secrets_resolver::AffinidiSecrets;
 use rustls::{ClientConfig, RootCertStore};
 use ssi::dids::Document;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
 use tracing::{debug, span, warn};
-use websockets::ws_handler::WSCommand;
+use transports::websockets::ws_handler::WsHandlerCommands;
 
 pub mod authentication;
 pub mod config;
 pub mod conversions;
 pub mod errors;
 pub mod messages;
+pub mod profiles;
 pub mod protocols;
 pub mod public;
 mod resolvers;
 pub mod secrets;
 pub mod transports;
 
-pub mod websockets {
-    #[doc(inline)]
-    pub use crate::transports::websockets::*;
+pub struct ATM {
+    pub(crate) inner: Arc<RwLock<SharedState>>,
 }
 
-pub struct ATM<'c> {
-    pub(crate) config: Config<'c>,
-    did_resolver: DIDCacheClient,
-    secrets_resolver: AffinidiSecrets,
+/// Private SharedState struct for the ATM to be used across tasks
+pub(crate) struct SharedState {
+    pub(crate) config: Config,
+    pub(crate) did_resolver: DIDCacheClient,
+    pub(crate) secrets_resolver: AffinidiSecrets,
     pub(crate) client: Client,
-    authenticated: bool,
-    jwt_tokens: Option<AuthorizationResponse>,
-    ws_connector: Connector,
-    pub(crate) ws_enabled: bool,
-    ws_handler: Option<JoinHandle<()>>,
-    ws_send_stream: Option<Sender<WSCommand>>,
-    ws_recv_stream: Option<Receiver<WSCommand>>,
+    pub(crate) ws_connector: Connector,
+    pub(crate) ws_handler: Option<JoinHandle<()>>,
+    pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>,
+    pub(crate) ws_handler_recv_stream: Receiver<WsHandlerCommands>,
+    pub(crate) profiles: Profiles,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -61,10 +62,10 @@ pub struct ATM<'c> {
 ///
 /// let response = atm.ping("did:example:123", true);
 /// ```
-impl<'c> ATM<'c> {
+impl ATM {
     /// Creates a new instance of the SDK with a given configuration
     /// You need to add at least the DID Method for the SDK DID to work
-    pub async fn new(config: Config<'c>) -> Result<ATM<'c>, ATMError> {
+    pub async fn new(config: Config) -> Result<ATM, ATMError> {
         // Set a process wide default crypto provider.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
@@ -140,37 +141,36 @@ impl<'c> ATM<'c> {
             }
         };
 
-        let mut atm = ATM {
+        // Set up the channels for the WebSocket handler
+        // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
+        let (sdk_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
+
+        // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
+        let (ws_handler_tx, ws_handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
+
+        let shared_state = SharedState {
             config: config.clone(),
             did_resolver,
             secrets_resolver: AffinidiSecrets::new(vec![]),
             client,
-            authenticated: false,
-            jwt_tokens: None,
             ws_connector,
-            ws_enabled: config.ws_enabled,
             ws_handler: None,
-            ws_send_stream: None,
-            ws_recv_stream: None,
+            ws_handler_send_stream: sdk_tx,
+            ws_handler_recv_stream: ws_handler_rx,
+            profiles: Profiles::default(),
         };
 
-        // Add our own DID to the DID_RESOLVER
-        if let Some(my_did) = &config.my_did {
-            atm.add_did(my_did).await?;
-        }
-        if let Some(my_did) = &config.my_did {
-            atm.add_did(my_did).await?;
-        }
+        let atm = ATM {
+            inner: Arc::new(RwLock::new(shared_state)),
+        };
 
         // Add any pre-loaded secrets
-        for secret in config.secrets {
-            atm.add_secret(secret);
+        for secret in &config.secrets {
+            atm.add_secret(secret).await;
         }
 
-        // Start the websocket connection if enabled
-        if atm.ws_enabled {
-            atm.start_websocket_task().await?;
-        }
+        // Start the websocket handler
+        atm.start_websocket_handler(sdk_rx, ws_handler_tx).await?;
         debug!("ATM SDK initialized");
 
         Ok(atm)
@@ -179,11 +179,11 @@ impl<'c> ATM<'c> {
     /// Adds a DID to the resolver
     /// This resolves the DID to the DID Document, and adds it to the list of known DIDs
     /// Returns the DIDDoc itself if successful, or an SDK Error
-    pub async fn add_did(&mut self, did: &str) -> Result<Document, ATMError> {
+    pub async fn add_did(&self, did: &str) -> Result<Document, ATMError> {
         let _span = span!(tracing::Level::DEBUG, "add_did", did = did).entered();
         debug!("Adding DID to resolver");
 
-        match self.did_resolver.resolve(did).await {
+        match self.inner.write().await.did_resolver.resolve(did).await {
             Ok(results) => Ok(results.doc),
             Err(err) => Err(ATMError::DIDError(format!(
                 "Couldn't resolve did ({}). Reason: {}",
@@ -194,34 +194,19 @@ impl<'c> ATM<'c> {
 
     /// Adds secret to the secrets resolver
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
-    pub fn add_secret(&mut self, secret: Secret) {
-        self.secrets_resolver.insert(secret);
+    pub async fn add_secret(&self, secret: &Secret) {
+        self.inner
+            .write()
+            .await
+            .secrets_resolver
+            .insert(secret.to_owned());
     }
 
     /// Adds a Vec of secrets to the secrets resolver
-    pub fn add_secrets(&mut self, secrets: Vec<Secret>) {
+    pub async fn add_secrets(&mut self, secrets: Vec<Secret>) {
+        let mut lock = self.inner.write().await;
         for secret in secrets {
-            self.secrets_resolver.insert(secret);
+            lock.secrets_resolver.insert(secret);
         }
-    }
-
-    pub(crate) fn dids(&self) -> Result<(&String, &String), ATMError> {
-        let my_did = if let Some(my_did) = &self.config.my_did {
-            my_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide a DID for the SDK, used for authentication!".to_owned(),
-            ));
-        };
-
-        let atm_did = if let Some(atm_did) = &self.config.atm_did {
-            atm_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide the DID for the ATM service!".to_owned(),
-            ));
-        };
-
-        Ok((my_did, atm_did))
     }
 }

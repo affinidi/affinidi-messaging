@@ -1,10 +1,20 @@
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
 use tracing::{debug, span, Instrument, Level};
 
-use crate::{errors::ATMError, ATM};
+use crate::{errors::ATMError, SharedState, ATM};
 
-impl<'c> ATM<'c> {
-    pub async fn unpack(&mut self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {
+impl ATM {
+    pub async fn unpack(&self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {
+        let _span = span!(Level::DEBUG, "unpack",);
+
+        async move { self.inner.read().await.unpack(message).await }
+            .instrument(_span)
+            .await
+    }
+}
+
+impl SharedState {
+    pub async fn unpack(&self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {
         let _span = span!(Level::DEBUG, "unpack",);
 
         async move {

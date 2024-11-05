@@ -1,17 +1,13 @@
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
 
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde_json::json;
 use sha256::digest;
+use tokio::sync::RwLock;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{
-    errors::ATMError,
-    messages::{sending::InboundMessageResponse, EmptyResponse},
-    transports::SendMessageResponse,
-    ATM,
-};
+use crate::{errors::ATMError, messages::EmptyResponse, profiles::Profile, ATM};
 
 #[derive(Default)]
 pub struct TrustPing {}
@@ -35,9 +31,10 @@ impl TrustPing {
     ///
     /// Returns: The message ID and sha256 hash of the ping message
     /// [^note]: Anonymous pings cannot expect a response, the SDK will automatically set this to false if anonymous is true
-    pub async fn send_ping<'c>(
+    pub async fn send_ping(
         &self,
-        atm: &'c mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         to_did: &str,
         signed: bool,
         expect_response: bool,
@@ -47,8 +44,8 @@ impl TrustPing {
             "Pinging {}, signed?({}) response_expected?({})",
             to_did, signed, expect_response
         );
-        let (my_did, _) = atm.dids()?;
-
+        let _profile = profile.read().await;
+        let (profile_did, _) = _profile.dids()?;
         // If an anonymous ping is being sent, we should ensure that expect_response is false
         let expect_response = if !signed && expect_response {
             debug!("Anonymous pings cannot expect a response, changing to false...");
@@ -73,8 +70,8 @@ impl TrustPing {
             // Can support anonymous pings
             None
         } else {
-            msg = msg.from(my_did.clone());
-            Some(my_did.clone())
+            msg = msg.from(profile_did.to_string());
+            Some(profile_did)
         };
         let msg = msg.created_time(now).expires_time(now + 300).finalize();
         let mut msg_info = TrustPingSent {
@@ -87,13 +84,14 @@ impl TrustPing {
         debug!("Ping message: {:#?}", msg);
 
         // Pack the message
+        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
                 to_did,
-                from_did.as_deref(),
-                from_did.as_deref(),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
+                from_did,
+                from_did,
+                &lock.did_resolver,
+                &lock.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -104,26 +102,8 @@ impl TrustPing {
         msg_info.message_hash = digest(&msg).to_string();
         msg_info.bytes = msg.len() as u32;
 
-        if atm.ws_send_stream.is_some() {
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_info.message_id)
-                .await?;
-        } else {
-            let response = atm
-                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
-            msg_info.response =
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Stored(m))) =
-                    response
-                {
-                    if let Some((_, msg_id)) = m.messages.first() {
-                        Some(msg_id.to_owned())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-        }
+        atm.send_message::<EmptyResponse>(profile, &msg, &msg_info.message_id)
+            .await?;
         Ok(msg_info)
     }
 }

@@ -3,32 +3,43 @@ use tracing::{debug, span, Level};
 use crate::{
     errors::ATMError,
     messages::{GetMessagesResponse, SuccessResponse},
+    profiles::Profile,
     ATM,
 };
 
 use super::GetMessagesRequest;
 
-impl<'c> ATM<'c> {
+impl ATM {
     /// Returns a list of messages that are stored in the ATM
     /// - messages : List of message IDs to retrieve
     pub async fn get_messages(
-        &mut self,
+        &self,
+        profile: &mut Profile,
         messages: &GetMessagesRequest,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(Level::DEBUG, "get_messages").entered();
 
         // Check if authenticated
-        let tokens = self.authenticate().await?;
+        let tokens = profile.authenticate(&self.inner).await?;
 
         let body = serde_json::to_string(messages).map_err(|e| {
             ATMError::TransportError(format!("Could not serialize get message request: {:?}", e))
         })?;
 
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::TransportError(
+                "No mediator URL found".to_string(),
+            ));
+        };
+
         debug!("Sending get_messages request: {:?}", body);
 
         let res = self
+            .inner
+            .read()
+            .await
             .client
-            .post(format!("{}/outbound", self.config.atm_api))
+            .post([&mediator_url, "/outbound"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .body(body)

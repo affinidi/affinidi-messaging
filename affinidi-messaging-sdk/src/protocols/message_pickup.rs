@@ -2,16 +2,19 @@ use affinidi_messaging_didcomm::{AttachmentData, Message, PackEncryptedOptions, 
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::{Duration, SystemTime};
-use tokio::select;
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+use tokio::{select, sync::RwLock};
 use tracing::{debug, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
     errors::ATMError,
-    messages::{sending::InboundMessageResponse, EmptyResponse, GenericDataStruct},
-    transports::SendMessageResponse,
-    websockets::ws_handler::WSCommand,
+    messages::{EmptyResponse, GenericDataStruct},
+    profiles::Profile,
+    transports::websockets::ws_handler::WsHandlerCommands,
     ATM,
 };
 
@@ -77,93 +80,59 @@ impl MessagePickup {
     /// Returns a StatusReply if successful
     pub async fn send_status_request(
         &self,
-        atm: &mut ATM<'_>,
-        recipient_did: Option<String>,
-        mediator_did: Option<String>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         wait: Option<Duration>,
     ) -> Result<MessagePickupStatusReply, ATMError> {
         let _span = span!(Level::DEBUG, "send_status_request",).entered();
+        let _profile = &profile.read().await;
         debug!(
-            "Status Request to recipient_did: {:?}, mediator_did: {:?}, wait: {:?}",
-            recipient_did, mediator_did, wait
+            "Profile ({}): Status Request wait: {:?}",
+            _profile.alias, wait
         );
 
-        let (my_did, atm_did) = atm.dids()?;
+        let (profile_did, mediator_did) = _profile.dids()?;
 
-        let mut msg = Message::build(
-            Uuid::new_v4().into(),
-            "https://didcomm.org/messagepickup/3.0/status-request".to_owned(),
-            json!({}),
-        )
-        .header("return_route".into(), Value::String("all".into()));
-
-        if let Some(recipient_did) = &recipient_did {
-            msg = msg.body(json!({"recipient_did": recipient_did}));
-        }
-
-        let to_did = if let Some(mediator_did) = mediator_did {
-            mediator_did
-        } else {
-            atm_did.clone()
-        };
-        msg = msg.to(to_did.clone());
-
-        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let msg = msg.created_time(now).expires_time(now + 300).finalize();
+
+        let msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/status-request".to_owned(),
+            json!({"recipient_did": profile_did}),
+        )
+        .to(mediator_did.to_string())
+        .from(profile_did.to_string())
+        .header("return_route".into(), Value::String("all".into()))
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+
         let msg_id = msg.id.clone();
 
         debug!("Status-Request message: {:?}", msg);
 
         // Pack the message
+        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
-                &to_did,
-                Some(my_did),
-                Some(my_did),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
+                mediator_did,
+                Some(profile_did),
+                Some(profile_did),
+                &lock.did_resolver,
+                &lock.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if atm.ws_send_stream.is_some() {
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                .await?;
-            let response = self
-                .live_stream_get(
-                    atm,
-                    &msg_id,
-                    wait.unwrap_or_else(|| Duration::from_secs(10)),
-                )
-                .await?;
+        let response = atm
+            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+            .await?;
 
-            if let Some((message, _)) = response {
-                self._parse_status_response(&message).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        } else {
-            let a = atm
-                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
-
-            debug!("Response: {:?}", a);
-
-            // Unpack the response
-            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-                a
-            {
-                let (message, _) = atm.unpack(&message).await?;
-                self._parse_status_response(&message).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        }
+        self._parse_status_response(&response).await
     }
 
     pub(crate) async fn _parse_status_response(
@@ -180,12 +149,14 @@ impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Live Delivery` message
     pub async fn toggle_live_delivery(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         live_delivery: bool,
     ) -> Result<(), ATMError> {
         let _span = span!(Level::DEBUG, "toggle_live_delivery",).entered();
         debug!("Setting live_delivery to ({})", live_delivery);
-        let (my_did, atm_did) = atm.dids()?;
+        let _profile = profile.read().await;
+        let (profile_did, mediator_did) = _profile.dids()?;
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -200,31 +171,27 @@ impl MessagePickup {
         .header("return_route".into(), Value::String("all".into()))
         .created_time(now)
         .expires_time(now + 300)
-        .from(my_did.clone())
-        .to(atm_did.clone())
+        .from(profile_did.into())
+        .to(mediator_did.into())
         .finalize();
         let msg_id = msg.id.clone();
 
         // Pack the message
+        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
-                atm_did,
-                Some(my_did),
-                Some(my_did),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
+                mediator_did,
+                Some(profile_did),
+                Some(profile_did),
+                &lock.did_resolver,
+                &lock.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if atm.ws_send_stream.is_some() {
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                .await?;
-        } else {
-            atm.send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
-        }
+        atm.send_message::<EmptyResponse>(profile, &msg, &msg_id)
+            .await?;
         Ok(())
     }
 
@@ -236,35 +203,32 @@ impl MessagePickup {
     /// NOTE: You still need to delete the message from the server after receiving it
     pub async fn live_stream_next(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         wait: Duration,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_next");
 
         async move {
-            let binding = atm.ws_recv_stream.as_mut();
-            let stream = if let Some(stream) = binding {
-                stream
-            } else {
-                return Err(ATMError::TransportError("No websocket recv stream".into()));
-            };
-
             // Send the next request to the ws_handler
-            if let Some(tx_stream) = &atm.ws_send_stream {
-                tx_stream.send(WSCommand::Next).await.map_err(|err| {
+            atm.inner
+                .read()
+                .await
+                .ws_handler_send_stream
+                .send(WsHandlerCommands::Next(profile.clone()))
+                .await
+                .map_err(|err| {
                     ATMError::TransportError(format!(
                         "Could not send message to ws_handler: {:?}",
                         err
                     ))
                 })?;
-                debug!("sent next request to ws_handler");
-            } else {
-                return Err(ATMError::TransportError("No websocket send stream".into()));
-            }
+            debug!("sent next request to ws_handler");
 
             // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
             let sleep: tokio::time::Sleep = tokio::time::sleep(wait);
 
+            let stream = &mut atm.inner.write().await.ws_handler_recv_stream;
             select! {
                 _ = sleep, if wait.as_millis() > 0 => {
                     debug!("Timeout reached, no message received");
@@ -273,7 +237,7 @@ impl MessagePickup {
                 value = stream.recv() => {
                     if let Some(msg) = value {
                         match msg {
-                            WSCommand::MessageReceived(message, meta) => {
+                            WsHandlerCommands::MessageReceived(message, meta) => {
                                 Ok(Some((message, meta)))
                             }
                             _ => {
@@ -299,46 +263,36 @@ impl MessagePickup {
     /// NOTE: You still need to delete the message from the server after receiving it
     pub async fn live_stream_get(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         msg_id: &str,
         wait: Duration,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_get");
 
         async move {
-            let binding = atm.ws_recv_stream.as_mut();
-            let stream = if let Some(stream) = binding {
-                stream
-            } else {
-                return Err(ATMError::TransportError("No websocket stream".into()));
-            };
-
             // Send the get request to the ws_handler
-            let tx_stream = if let Some(tx_stream) = &atm.ws_send_stream {
-                tx_stream
-                    .send(WSCommand::Get(msg_id.to_string()))
-                    .await
-                    .map_err(|err| {
-                        ATMError::TransportError(format!(
-                            "Could not send get message to ws_handler: {:?}",
-                            err
-                        ))
-                    })?;
-                debug!("sent get request to ws_handler");
-                tx_stream
-            } else {
-                return Err(ATMError::TransportError("No websocket send stream".into()));
-            };
+            atm.inner.read().await.ws_handler_send_stream
+                .send(WsHandlerCommands::Get(profile.clone(), msg_id.to_string()))
+                .await
+                .map_err(|err| {
+                    ATMError::TransportError(format!(
+                        "Could not send get message to ws_handler: {:?}",
+                        err
+                    ))
+                })?;
+            debug!("sent get request to ws_handler");
 
             // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
             let sleep = tokio::time::sleep(wait);
             tokio::pin!(sleep);
 
+            let stream = &mut atm.inner.write().await.ws_handler_recv_stream;
             loop {
             select! {
                 _ = &mut sleep, if wait.as_millis() > 0 => {
                     debug!("Timeout reached, no message received");
-                    tx_stream.send(WSCommand::TimeOut(msg_id.to_string())).await.map_err(|err| {
+                    atm.inner.read().await.ws_handler_send_stream.send(WsHandlerCommands::TimeOut(profile.clone(), msg_id.to_string())).await.map_err(|err| {
                         ATMError::TransportError(format!("Could not send timeout message to ws_handler: {:?}", err))
                     })?;
                     return Ok(None);
@@ -346,10 +300,10 @@ impl MessagePickup {
                 value = stream.recv() => {
                     if let Some(msg) = value {
                         match msg {
-                            WSCommand::MessageReceived(message, meta) => {
+                            WsHandlerCommands::MessageReceived(message, meta) => {
                                 return Ok(Some((message, meta)));
                             }
-                            WSCommand::NotFound => {
+                            WsHandlerCommands::NotFound => {
                                 // Do nothing, keep waiting
                             }
                             _ => {
@@ -369,125 +323,75 @@ impl MessagePickup {
 
     /// Sends a Message Pickup 3.0 `Delivery Request` message
     /// atm           : The ATM SDK to use
-    /// recipient_did : Optional, allows you to ask for status for a specific DID. If none, will ask for default DID in ATM
-    /// mediator_did  : Optional, allows you to ask a specific mediator. If none, will ask for default mediator in ATM
     /// limit         : # of messages to retrieve, defaults to 10 if None
-    /// wait          : Time Duration to wait for a response from websocket. Default (10 Seconds)
     pub async fn send_delivery_request(
         &self,
-        atm: &mut ATM<'_>,
-        recipient_did: Option<String>,
-        mediator_did: Option<String>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         limit: Option<usize>,
-        wait: Option<Duration>,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
         let _span = span!(Level::DEBUG, "send_delivery_request",).entered();
+        let _profile = profile.read().await;
         debug!(
-            "Delivery Request for recipient_did: {:?}, mediator_did: {:?} limit: {:?}",
-            recipient_did, mediator_did, limit
+            "Profile ({}): Delivery Request limit: {:?}",
+            _profile.alias, limit
         );
-        let (my_did, atm_did) = atm.dids()?;
+        let (profile_did, mediator_did) = _profile.dids()?;
 
         let body = MessagePickupDeliveryRequest {
-            recipient_did: if let Some(recipient) = recipient_did {
-                recipient
-            } else {
-                my_did.clone()
-            },
+            recipient_did: profile_did.into(),
             limit: limit.unwrap_or(10),
         };
 
-        let mut msg = Message::build(
-            Uuid::new_v4().into(),
-            "https://didcomm.org/messagepickup/3.0/delivery-request".to_owned(),
-            serde_json::to_value(body).unwrap(),
-        )
-        .header("return_route".into(), Value::String("all".into()));
-
-        let to_did = if let Some(mediator_did) = mediator_did {
-            mediator_did
-        } else {
-            atm_did.clone()
-        };
-        msg = msg.to(to_did.clone());
-
-        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let msg = msg.created_time(now).expires_time(now + 300).finalize();
+
+        let msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/delivery-request".to_owned(),
+            serde_json::to_value(body).unwrap(),
+        )
+        .header("return_route".into(), Value::String("all".into()))
+        .to(mediator_did.into())
+        .from(profile_did.into())
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+
         let msg_id = msg.id.clone();
 
         debug!("Delivery-Request message: {:?}", msg);
 
         // Pack the message
-        let (msg, _) = msg
-            .pack_encrypted(
-                &to_did,
-                Some(my_did),
-                Some(my_did),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
-                &PackEncryptedOptions::default(),
-            )
-            .await
-            .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
-
-        if atm.ws_send_stream.is_some() {
-            let wait_duration = if let Some(wait) = wait {
-                wait
-            } else {
-                Duration::from_secs(10)
-            };
-
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                .await?;
-
-            if let Some((message, _)) = self.live_stream_get(atm, &msg_id, wait_duration).await? {
-                debug!("unpacked: {:#?}", message);
-            }
-
-            // wait for the response from the server
-            let message = self
-                .live_stream_get(
-                    atm,
-                    &msg_id,
-                    wait.unwrap_or_else(|| Duration::from_secs(10)),
+        let msg = {
+            let lock = atm.inner.read().await;
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
+                    &PackEncryptedOptions::default(),
                 )
-                .await?;
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let Some((message, _)) = message {
-                self._handle_delivery(atm, &message).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        } else {
-            let a = atm
-                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
+            msg
+        };
 
-            debug!("Response: {:?}", a);
-
-            // Unpack the response
-            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-                a
-            {
-                let (unpacked, _) = atm.unpack(&message).await?;
-
-                debug!("unpacked: {:#?}", unpacked);
-
-                self._handle_delivery(atm, &unpacked).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        }
+        let response = atm
+            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+            .await?;
+        self._handle_delivery(atm, &response).await
     }
 
     /// Iterates through each attachment and unpacks each message into an array to return
     pub(crate) async fn _handle_delivery(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
         message: &Message,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
         let mut response: Vec<(Message, UnpackMetadata)> = Vec::new();
@@ -543,114 +447,63 @@ impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Messages Received` message
     /// This effectively deletes the messages from the server
     /// atm           : The ATM SDK to use
-    /// recipient_did : Optional, allows you to ask for status for a specific DID. If none, will ask for default DID in ATM
-    /// mediator_did  : Optional, allows you to ask a specific mediator. If none, will ask for default mediator in ATM
     /// list          : List of messages to delete (message ID's)
-    /// wait          : Time Duration to wait for a response from websocket. Default (10 Seconds)
     ///
     /// A status reply will be returned if successful
     pub async fn send_messages_received(
         &self,
-        atm: &mut ATM<'_>,
-        recipient_did: Option<String>,
-        mediator_did: Option<String>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         list: &Vec<String>,
-        wait: Option<Duration>,
     ) -> Result<MessagePickupStatusReply, ATMError> {
         let _span = span!(Level::DEBUG, "send_messages_received",).entered();
+        let _profile = profile.read().await;
         debug!(
-            "Messages Received for recipient_did: {:?}, mediator_did: {:?}, # msgs to delete: {}",
-            recipient_did,
-            mediator_did,
+            "Profile ({}): Messages Received, # msgs to delete: {}",
+            _profile.alias,
             list.len()
         );
 
-        let (my_did, atm_did) = atm.dids()?;
+        let (profile_did, mediator_did) = _profile.dids()?;
 
-        let mut msg = Message::build(
-            Uuid::new_v4().into(),
-            "https://didcomm.org/messagepickup/3.0/messages-received".to_owned(),
-            json!({"message_id_list": list}),
-        )
-        .header("return_route".into(), Value::String("all".into()));
-
-        let to_did = if let Some(mediator_did) = mediator_did {
-            mediator_did
-        } else {
-            atm_did.clone()
-        };
-        msg = msg.to(to_did.clone());
-
-        msg = msg.from(my_did.clone());
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let msg = msg.created_time(now).expires_time(now + 300).finalize();
+
+        let msg = Message::build(
+            Uuid::new_v4().into(),
+            "https://didcomm.org/messagepickup/3.0/messages-received".to_owned(),
+            json!({"message_id_list": list}),
+        )
+        .header("return_route".into(), Value::String("all".into()))
+        .to(mediator_did.into())
+        .from(profile_did.into())
+        .created_time(now)
+        .expires_time(now + 300)
+        .finalize();
+
         let msg_id = msg.id.clone();
 
         debug!("messages-received message: {:?}", msg);
 
         // Pack the message
+        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
-                &to_did,
-                Some(my_did),
-                Some(my_did),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
+                mediator_did,
+                Some(profile_did),
+                Some(profile_did),
+                &lock.did_resolver,
+                &lock.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if atm.ws_send_stream.is_some() {
-            let wait_duration = if let Some(wait) = wait {
-                wait
-            } else {
-                Duration::from_secs(10)
-            };
-
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                .await?;
-
-            if let Some((message, _)) = self.live_stream_get(atm, &msg_id, wait_duration).await? {
-                debug!("unpacked: {:#?}", message);
-            }
-
-            // wait for the response from the server
-            let message = self
-                .live_stream_get(
-                    atm,
-                    &msg_id,
-                    wait.unwrap_or_else(|| Duration::from_secs(10)),
-                )
-                .await?;
-
-            if let Some((message, _)) = message {
-                self._parse_status_response(&message).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        } else {
-            let a = atm
-                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
-
-            debug!("Response: {:?}", a);
-
-            // Unpack the response
-            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-                a
-            {
-                let (message, _) = atm.unpack(&message).await?;
-
-                debug!("unpacked: {:#?}", message);
-
-                self._parse_status_response(&message).await
-            } else {
-                Err(ATMError::MsgSendError("No response from API".into()))
-            }
-        }
+        let response = atm
+            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+            .await?;
+        self._parse_status_response(&response).await
     }
 }

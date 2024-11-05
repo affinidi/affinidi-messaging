@@ -2,23 +2,16 @@
 //! Admin account management
 //! Global ACL management
 
-use std::time::{Duration, SystemTime};
-
+use crate::{errors::ATMError, messages::EmptyResponse, profiles::Profile, ATM};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha256::digest;
+use std::{sync::Arc, time::SystemTime};
+use tokio::sync::RwLock;
 use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
-
-use crate::{
-    errors::ATMError,
-    messages::{known::MessageType, sending::InboundMessageResponse, EmptyResponse},
-    protocols::message_pickup::MessagePickup,
-    transports::SendMessageResponse,
-    ATM,
-};
 #[derive(Default)]
 pub struct Mediator {}
 
@@ -45,25 +38,16 @@ pub struct MediatorAdminList {
 pub type MediatorAccountList = MediatorAdminList;
 
 impl Mediator {
-    pub async fn get_config(&self, atm: &mut ATM<'_>) -> Result<Value, ATMError> {
+    pub async fn get_config(
+        &self,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
+    ) -> Result<Value, ATMError> {
         let _span = span!(Level::DEBUG, "get_config");
 
         async move {
-            let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
-                mediator_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide the DID for the ATM service!".to_owned(),
-                ));
-            };
-
-            let my_did = if let Some(my_did) = &atm.config.my_did {
-                my_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide a DID for the SDK, used for authentication!".to_owned(),
-                ));
-            };
+            let _profile = profile.read().await;
+            let (profile_did, mediator_did) = _profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -75,65 +59,33 @@ impl Mediator {
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
                 json!({"Configuration": {}}),
             )
-            .to(mediator_did.clone())
-            .from(my_did.clone())
+            .to(mediator_did.into())
+            .from(profile_did.into())
             .created_time(now)
             .expires_time(now + 10)
             .finalize();
 
             let msg_id = msg.id.clone();
 
+            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
-                    &mediator_did,
-                    Some(&my_did),
-                    Some(&my_did),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let pickup = MessagePickup::default();
-            let message = if atm.ws_send_stream.is_some() {
-                atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                    .await?;
-                let response = pickup
-                    .live_stream_get(atm, &msg_id, Duration::from_secs(10))
-                    .await?;
+            let response = atm
+                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+                .await?;
 
-                if let Some((message, _)) = response {
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            } else {
-                let a = atm
-                    .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                    .await?;
-
-                debug!("Response: {:?}", a);
-
-                // Unpack the response
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(
-                    message,
-                ))) = a
-                {
-                    let (message, _) = atm.unpack(&message).await?;
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            };
-
-            let type_ = message.type_.parse::<MessageType>()?;
-            if let MessageType::ProblemReport = type_ {
-                Err(ATMError::from_problem_report(&message))
-            } else {
-                Ok(message.body)
-            }
+            Ok(response.body)
         }
         .instrument(_span)
         .await
@@ -156,7 +108,12 @@ impl Mediator {
     /// # Returns
     /// Success: Number of admins added to the mediator
     /// Error: An error message
-    pub async fn add_admins(&self, atm: &mut ATM<'_>, admins: &[String]) -> Result<i32, ATMError> {
+    pub async fn add_admins(
+        &self,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
+        admins: &[String],
+    ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "add_admins");
 
         async move {
@@ -171,21 +128,8 @@ impl Mediator {
                 ));
             }
 
-            let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
-                mediator_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide the DID for the ATM service!".to_owned(),
-                ));
-            };
-
-            let my_did = if let Some(my_did) = &atm.config.my_did {
-                my_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide a DID for the SDK, used for authentication!".to_owned(),
-                ));
-            };
+            let _profile = profile.read().await;
+            let (profile_did, mediator_did) = _profile.dids()?;
 
             let mut digests: Vec<String> = Vec::new();
             let re = Regex::new(r"[0-9a-f]{64}").unwrap();
@@ -215,65 +159,33 @@ impl Mediator {
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
                 json!({"AdminAdd": digests}),
             )
-            .to(mediator_did.clone())
-            .from(my_did.clone())
+            .to(mediator_did.into())
+            .from(profile_did.into())
             .created_time(now)
             .expires_time(now + 10)
             .finalize();
 
             let msg_id = msg.id.clone();
 
+            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
-                    &mediator_did,
-                    Some(&my_did),
-                    Some(&my_did),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let pickup = MessagePickup::default();
-            let message = if atm.ws_send_stream.is_some() {
-                atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                    .await?;
-                let response = pickup
-                    .live_stream_get(atm, &msg_id, Duration::from_secs(10))
-                    .await?;
+            let response = atm
+                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+                .await?;
 
-                if let Some((message, _)) = response {
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            } else {
-                let a = atm
-                    .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                    .await?;
-
-                debug!("Response: {:?}", a);
-
-                // Unpack the response
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(
-                    message,
-                ))) = a
-                {
-                    let (message, _) = atm.unpack(&message).await?;
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            };
-
-            let type_ = message.type_.parse::<MessageType>()?;
-            if let MessageType::ProblemReport = type_ {
-                Err(ATMError::from_problem_report(&message))
-            } else {
-                self._parse_add_admins_response(&message)
-            }
+            self._parse_add_admins_response(&response)
         }
         .instrument(_span)
         .await
@@ -298,7 +210,8 @@ impl Mediator {
     /// Error: An error message
     pub async fn remove_admins(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "remove_admins");
@@ -315,21 +228,8 @@ impl Mediator {
                 ));
             }
 
-            let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
-                mediator_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide the DID for the ATM service!".to_owned(),
-                ));
-            };
-
-            let my_did = if let Some(my_did) = &atm.config.my_did {
-                my_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide a DID for the SDK, used for authentication!".to_owned(),
-                ));
-            };
+            let _profile = profile.read().await;
+            let (profile_did, mediator_did) = _profile.dids()?;
 
             // Check that these are digests
             let re = Regex::new(r"[0-9a-f]{64}").unwrap();
@@ -351,65 +251,33 @@ impl Mediator {
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
                 json!({"AdminRemove": admins}),
             )
-            .to(mediator_did.clone())
-            .from(my_did.clone())
+            .to(mediator_did.into())
+            .from(profile_did.into())
             .created_time(now)
             .expires_time(now + 10)
             .finalize();
 
             let msg_id = msg.id.clone();
 
+            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
-                    &mediator_did,
-                    Some(&my_did),
-                    Some(&my_did),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let pickup = MessagePickup::default();
-            let message = if atm.ws_send_stream.is_some() {
-                atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                    .await?;
-                let response = pickup
-                    .live_stream_get(atm, &msg_id, Duration::from_secs(10))
-                    .await?;
+            let response = atm
+                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+                .await?;
 
-                if let Some((message, _)) = response {
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            } else {
-                let a = atm
-                    .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                    .await?;
-
-                debug!("Response: {:?}", a);
-
-                // Unpack the response
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(
-                    message,
-                ))) = a
-                {
-                    let (message, _) = atm.unpack(&message).await?;
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            };
-
-            let type_ = message.type_.parse::<MessageType>()?;
-            if let MessageType::ProblemReport = type_ {
-                Err(ATMError::from_problem_report(&message))
-            } else {
-                self._parse_remove_admins_response(&message)
-            }
+            self._parse_remove_admins_response(&response)
         }
         .instrument(_span)
         .await
@@ -436,7 +304,8 @@ impl Mediator {
     /// A list of admins in the mediator
     pub async fn list_admins(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAdminList, ATMError> {
@@ -449,21 +318,8 @@ impl Mediator {
                 limit.unwrap_or(100)
             );
 
-            let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
-                mediator_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide the DID for the ATM service!".to_owned(),
-                ));
-            };
-
-            let my_did = if let Some(my_did) = &atm.config.my_did {
-                my_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide a DID for the SDK, used for authentication!".to_owned(),
-                ));
-            };
+            let _profile = profile.read().await;
+            let (profile_did, mediator_did) = _profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -475,65 +331,34 @@ impl Mediator {
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
                 json!({"AdminList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
-            .to(mediator_did.clone())
-            .from(my_did.clone())
+            .to(mediator_did.into())
+            .from(profile_did.into())
             .created_time(now)
             .expires_time(now + 10)
             .finalize();
 
             let msg_id = msg.id.clone();
 
+            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
-                    &mediator_did,
-                    Some(&my_did),
-                    Some(&my_did),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let pickup = MessagePickup::default();
-            let message = if atm.ws_send_stream.is_some() {
-                atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                    .await?;
-                let response = pickup
-                    .live_stream_get(atm, &msg_id, Duration::from_secs(10))
-                    .await?;
+                let response = atm
+                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+                .await?;
 
-                if let Some((message, _)) = response {
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            } else {
-                let a = atm
-                    .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                    .await?;
+                self._parse_list_admins_response(&response)
 
-                debug!("Response: {:?}", a);
-
-                // Unpack the response
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(
-                    message,
-                ))) = a
-                {
-                    let (message, _) = atm.unpack(&message).await?;
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            };
-
-            let type_ = message.type_.parse::<MessageType>()?;
-            if let MessageType::ProblemReport = type_ {
-                Err(ATMError::from_problem_report(&message))
-            } else {
-                self._parse_list_admins_response(&message)
-            }
         }
         .instrument(_span)
         .await
@@ -561,7 +386,8 @@ impl Mediator {
     /// NOTE: This will also include the admin accounts
     pub async fn list_accounts(
         &self,
-        atm: &mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<RwLock<Profile>>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAccountList, ATMError> {
@@ -574,21 +400,8 @@ impl Mediator {
                 limit.unwrap_or(100)
             );
 
-            let mediator_did = if let Some(mediator_did) = &atm.config.atm_did {
-                mediator_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide the DID for the ATM service!".to_owned(),
-                ));
-            };
-
-            let my_did = if let Some(my_did) = &atm.config.my_did {
-                my_did.to_string()
-            } else {
-                return Err(ATMError::ConfigError(
-                    "You must provide a DID for the SDK, used for authentication!".to_owned(),
-                ));
-            };
+            let _profile = profile.read().await;
+            let (profile_did, mediator_did) = _profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -600,65 +413,34 @@ impl Mediator {
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
                 json!({"AccountList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
-            .to(mediator_did.clone())
-            .from(my_did.clone())
+            .to(mediator_did.into())
+            .from(profile_did.into())
             .created_time(now)
             .expires_time(now + 10)
             .finalize();
 
             let msg_id = msg.id.clone();
 
+            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
-                    &mediator_did,
-                    Some(&my_did),
-                    Some(&my_did),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let pickup = MessagePickup::default();
-            let message = if atm.ws_send_stream.is_some() {
-                atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_id)
-                    .await?;
-                let response = pickup
-                    .live_stream_get(atm, &msg_id, Duration::from_secs(10))
-                    .await?;
+                let response = atm
+                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
+                .await?;
 
-                if let Some((message, _)) = response {
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            } else {
-                let a = atm
-                    .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                    .await?;
+                self._parse_list_accounts_response(&response)
 
-                debug!("Response: {:?}", a);
-
-                // Unpack the response
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(
-                    message,
-                ))) = a
-                {
-                    let (message, _) = atm.unpack(&message).await?;
-                    message
-                } else {
-                    return Err(ATMError::MsgSendError("No response from API".into()));
-                }
-            };
-
-            let type_ = message.type_.parse::<MessageType>()?;
-            if let MessageType::ProblemReport = type_ {
-                Err(ATMError::from_problem_report(&message))
-            } else {
-                self._parse_list_accounts_response(&message)
-            }
         }
         .instrument(_span)
         .await

@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::ATM;
-
 use super::GenericDataStruct;
 
 /// Response from the ATM API when sending messages (inbound messages)
@@ -29,5 +27,3 @@ pub struct InboundMessageList {
     pub errors: Vec<(String, String)>,
 }
 impl GenericDataStruct for InboundMessageList {}
-
-impl<'c> ATM<'c> {}

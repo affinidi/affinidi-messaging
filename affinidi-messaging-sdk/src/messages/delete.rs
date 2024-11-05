@@ -1,22 +1,23 @@
 use tracing::{debug, span, Level};
 
-use crate::{errors::ATMError, messages::SuccessResponse, ATM};
+use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
 
 const MAX_DELETED_MESSAGES: usize = 100;
 
-impl<'c> ATM<'c> {
+impl ATM {
     /// Delete messages from ATM
     /// - messages: List of message_ids to delete
     pub async fn delete_messages(
-        &mut self,
+        &self,
+        profile: &mut Profile,
         messages: &DeleteMessageRequest,
     ) -> Result<DeleteMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "delete_messages").entered();
 
         // Check if authenticated
-        let tokens = self.authenticate().await?;
+        let tokens = profile.authenticate(&self.inner).await?;
         if messages.message_ids.len() > MAX_DELETED_MESSAGES {
             return  Err(ATMError::MsgSendError(format!(
                 "Operation exceeds the allowed limit. You may delete a maximum of 100 messages per request. Received {} ids.",
@@ -30,11 +31,19 @@ impl<'c> ATM<'c> {
             ))
         })?;
 
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::TransportError(
+                "No mediator URL found".to_string(),
+            ));
+        };
         debug!("Sending delete_messages request: {:?}", msg);
 
         let res = self
+            .inner
+            .read()
+            .await
             .client
-            .delete(format!("{}/delete", self.config.atm_api))
+            .delete([&mediator_url, "/delete"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .body(msg)

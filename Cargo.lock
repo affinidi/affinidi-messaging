@@ -89,7 +89,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "ssi 0.9.0",
+ "ssi",
  "thiserror",
  "tokio",
  "tokio-tungstenite",
@@ -116,7 +116,7 @@ dependencies = [
  "serde-enum-str",
  "serde_json",
  "sha2 0.10.8",
- "ssi 0.10.0",
+ "ssi",
  "thiserror",
  "tokio",
  "tracing",
@@ -148,7 +148,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha256",
- "ssi 0.10.0",
+ "ssi",
  "time",
  "tokio",
  "toml 0.8.19",
@@ -193,7 +193,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha256",
- "ssi 0.10.0",
+ "ssi",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -234,7 +234,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha256",
- "ssi 0.10.0",
+ "ssi",
  "thiserror",
  "time",
  "tokio",
@@ -2517,7 +2517,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "ssi 0.9.0",
+ "ssi",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4916,9 +4916,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "4.4.0"
+version = "4.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83e7ccb95e240b7c9506a3d544f10d935e142cc90b0a1d56954fb44d89ad6b97"
+checksum = "c65ee1f9701bf938026630b455d5315f490640234259037edb259798b3bcf85e"
 dependencies = [
  "num-traits",
  "rand",
@@ -6750,40 +6750,13 @@ dependencies = [
 
 [[package]]
 name = "ssi"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f229125b266e40f97a6e518989d0dcb6a854e100b4d26e933b60b1967fc34958"
-dependencies = [
- "document-features",
- "ssi-caips",
- "ssi-claims 0.1.1",
- "ssi-core",
- "ssi-crypto",
- "ssi-dids",
- "ssi-eip712",
- "ssi-json-ld",
- "ssi-jwk",
- "ssi-jws",
- "ssi-multicodec",
- "ssi-rdf",
- "ssi-security",
- "ssi-ssh",
- "ssi-status 0.2.1",
- "ssi-ucan",
- "ssi-verification-methods",
- "ssi-zcap-ld 0.2.1",
- "xsd-types",
-]
-
-[[package]]
-name = "ssi"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf6c9acc113fab505c72e63aa389c686ed8106c53622a0d1d0a1953296850ba"
 dependencies = [
  "document-features",
  "ssi-caips",
- "ssi-claims 0.2.0",
+ "ssi-claims",
  "ssi-core",
  "ssi-crypto",
  "ssi-dids",
@@ -6795,10 +6768,10 @@ dependencies = [
  "ssi-rdf",
  "ssi-security",
  "ssi-ssh",
- "ssi-status 0.3.0",
+ "ssi-status",
  "ssi-ucan",
  "ssi-verification-methods",
- "ssi-zcap-ld 0.3.0",
+ "ssi-zcap-ld",
  "xsd-types",
 ]
 
@@ -6814,40 +6787,6 @@ dependencies = [
  "ssi-jwk",
  "thiserror",
  "xsd-types",
-]
-
-[[package]]
-name = "ssi-claims"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c88a68e774d47601b3f7d6cc50cb3177c7a08b73f8469458b53af12847cb4c75"
-dependencies = [
- "educe 0.4.23",
- "iref",
- "json-syntax",
- "linked-data",
- "locspan",
- "pin-project",
- "rdf-types",
- "serde",
- "serde_json",
- "ssi-claims-core",
- "ssi-core",
- "ssi-cose",
- "ssi-crypto",
- "ssi-data-integrity",
- "ssi-dids-core",
- "ssi-eip712",
- "ssi-json-ld",
- "ssi-jwk",
- "ssi-jws",
- "ssi-jwt",
- "ssi-sd-jwt",
- "ssi-security",
- "ssi-vc 0.3.1",
- "ssi-vc-jose-cose 0.1.1",
- "ssi-verification-methods",
- "thiserror",
 ]
 
 [[package]]
@@ -6878,8 +6817,8 @@ dependencies = [
  "ssi-jwt",
  "ssi-sd-jwt",
  "ssi-security",
- "ssi-vc 0.4.0",
- "ssi-vc-jose-cose 0.2.0",
+ "ssi-vc",
+ "ssi-vc-jose-cose",
  "ssi-verification-methods",
  "thiserror",
 ]
@@ -7259,7 +7198,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "iref",
  "json-syntax",
- "ordered-float 4.4.0",
+ "ordered-float 4.5.0",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -7349,34 +7288,6 @@ dependencies = [
 
 [[package]]
 name = "ssi-status"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9916abcffaceda17352a41562217ebe12960676760f4c49c6fd90fdfd3b0589a"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "iref",
- "log",
- "multibase 0.9.1",
- "parking_lot",
- "rdf-types",
- "reqwest 0.12.9",
- "serde",
- "serde_json",
- "ssi-claims-core",
- "ssi-data-integrity",
- "ssi-json-ld",
- "ssi-jwk",
- "ssi-jws",
- "ssi-jwt",
- "ssi-vc 0.3.1",
- "ssi-verification-methods",
- "thiserror",
- "xsd-types",
-]
-
-[[package]]
-name = "ssi-status"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfe9d5f4f648f387e1da536502562024c337c7c1613e133fa3ba5c35ab2ba146"
@@ -7397,7 +7308,7 @@ dependencies = [
  "ssi-jwk",
  "ssi-jws",
  "ssi-jwt",
- "ssi-vc 0.4.0",
+ "ssi-vc",
  "ssi-verification-methods",
  "thiserror",
  "xsd-types",
@@ -7427,37 +7338,6 @@ dependencies = [
  "ssi-jwt",
  "ssi-verification-methods",
  "thiserror",
-]
-
-[[package]]
-name = "ssi-vc"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c5b03ae806ad98c7f2681ad09a5e90a58a57f2486e1250762200c8267e20b24"
-dependencies = [
- "base64 0.22.1",
- "bitvec",
- "chrono",
- "educe 0.4.23",
- "flate2",
- "iref",
- "json-syntax",
- "linked-data",
- "rdf-types",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "ssi-claims-core",
- "ssi-core",
- "ssi-data-integrity",
- "ssi-dids-core",
- "ssi-json-ld",
- "ssi-jwt",
- "ssi-rdf",
- "ssi-verification-methods",
- "static-iref",
- "thiserror",
- "xsd-types",
 ]
 
 [[package]]
@@ -7493,27 +7373,6 @@ dependencies = [
 
 [[package]]
 name = "ssi-vc-jose-cose"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17246ad15799958df36da01b214eb6dcfce7793a20ba410ac67e30f416f962fa"
-dependencies = [
- "base64 0.22.1",
- "ciborium",
- "serde",
- "serde_json",
- "ssi-claims-core",
- "ssi-cose",
- "ssi-json-ld",
- "ssi-jws",
- "ssi-jwt",
- "ssi-sd-jwt",
- "ssi-vc 0.3.1",
- "thiserror",
- "xsd-types",
-]
-
-[[package]]
-name = "ssi-vc-jose-cose"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1c8bb574b42fe1b2eaef562f26777aceafd5173be25fb4fde90c11dc2fe9615"
@@ -7528,7 +7387,7 @@ dependencies = [
  "ssi-jws",
  "ssi-jwt",
  "ssi-sd-jwt",
- "ssi-vc 0.4.0",
+ "ssi-vc",
  "thiserror",
  "xsd-types",
 ]
@@ -7600,30 +7459,6 @@ dependencies = [
 
 [[package]]
 name = "ssi-zcap-ld"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66fe2eb394b3567857f200e5f9f50782c1112236e7cfbde766d4ea3a241ba7bc"
-dependencies = [
- "async-trait",
- "iref",
- "json-syntax",
- "rdf-types",
- "serde",
- "serde_json",
- "ssi-claims 0.1.1",
- "ssi-core",
- "ssi-dids-core",
- "ssi-eip712",
- "ssi-json-ld",
- "ssi-jwk",
- "ssi-rdf",
- "ssi-verification-methods",
- "static-iref",
- "thiserror",
-]
-
-[[package]]
-name = "ssi-zcap-ld"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "187334be04d40753c8721394d053bf5b77c4cd775b2bfb3f7b834bbb045f7586"
@@ -7634,7 +7469,7 @@ dependencies = [
  "rdf-types",
  "serde",
  "serde_json",
- "ssi-claims 0.2.0",
+ "ssi-claims",
  "ssi-core",
  "ssi-dids-core",
  "ssi-eip712",
@@ -7919,7 +7754,7 @@ dependencies = [
  "nix 0.26.4",
  "num-derive 0.3.3",
  "num-traits",
- "ordered-float 4.4.0",
+ "ordered-float 4.5.0",
  "pest",
  "pest_derive",
  "phf",
@@ -7944,18 +7779,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.66"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d171f59dbaa811dbbb1aee1e73db92ec2b122911a48e1390dfe327a821ddede"
+checksum = "3b3c6efbfc763e64eb85c11c25320f0737cb7364c4b6336db90aa9ebe27a0bbd"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.66"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b08be0f17bd307950653ce45db00cd31200d82b624b36e181337d9c7d92765b5"
+checksum = "b607164372e89797d78b8e23a6d67d5d1038c1c65efd52e1389ef8b77caba2a6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8793,7 +8628,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfb128bacfa86734e07681fb6068e34c144698e84ee022d6e009145d1abb77b5"
 dependencies = [
  "log",
- "ordered-float 4.4.0",
+ "ordered-float 4.5.0",
  "strsim 0.10.0",
  "thiserror",
  "wezterm-dynamic-derive",

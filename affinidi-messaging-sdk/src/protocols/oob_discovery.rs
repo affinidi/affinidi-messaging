@@ -7,6 +7,7 @@ Used to help discover 3rd party DID's while protecting your own privacy.
 use crate::{
     errors::ATMError,
     messages::{GenericDataStruct, SuccessResponse},
+    profiles::Profile,
     ATM,
 };
 use affinidi_messaging_didcomm::Message;
@@ -30,13 +31,14 @@ impl OOBDiscovery {
     /// Creates an OOB Invite
     /// atm :: ATM SDK Client
     /// expiry :: Optional - how long should this invitation exist for in seconds?
-    pub async fn create_invite<'c>(
+    pub async fn create_invite(
         &self,
-        atm: &'c mut ATM<'_>,
+        atm: &ATM,
+        profile: &mut Profile,
         expiry: Option<Duration>,
     ) -> Result<String, ATMError> {
         // Check if authenticated
-        let tokens = atm.authenticate().await?;
+        let tokens = profile.authenticate(&atm.inner).await?;
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -48,11 +50,8 @@ impl OOBDiscovery {
             "https://didcomm.org/out-of-band/2.0/invitation".into(),
             json!({}),
         )
+        .from(profile.did.clone())
         .created_time(now);
-
-        if let Some(from) = &atm.config.my_did {
-            msg = msg.from(from.into());
-        }
 
         if let Some(expiry) = expiry {
             msg = msg.expires_time(now + expiry.as_secs());
@@ -65,9 +64,19 @@ impl OOBDiscovery {
             ATMError::SDKError(format!("Could not serialize Invitation message: {:?}", e))
         })?;
 
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::MsgSendError(format!(
+                "Profile ({}): Missing a valid mediator URL",
+                profile.alias
+            )));
+        };
+
         let res = atm
+            .inner
+            .read()
+            .await
             .client
-            .post(format!("{}/oob", atm.config.atm_api,))
+            .post([&mediator_url, "/oob"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .body(msg)
@@ -109,12 +118,11 @@ impl OOBDiscovery {
     /// Retrieve an Invitation from a shortened OOB Invitation URL
     /// atm :: ATM SDK Client
     /// url :: Invitation OOB URL
-    pub async fn retrieve_invite<'c>(
-        &self,
-        atm: &'c mut ATM<'_>,
-        url: &str,
-    ) -> Result<Message, ATMError> {
+    pub async fn retrieve_invite(&self, atm: &ATM, url: &str) -> Result<Message, ATMError> {
         let res = atm
+            .inner
+            .read()
+            .await
             .client
             .get(url)
             .header("Content-Type", "application/json")
@@ -179,17 +187,28 @@ impl OOBDiscovery {
     /// Deletes OOB Invite
     /// atm :: ATM SDK Client
     /// oobid :: ID of the OOB Invitation to delete
-    pub async fn delete_invite<'c>(
+    pub async fn delete_invite(
         &self,
-        atm: &'c mut ATM<'_>,
+        atm: &ATM,
+        profile: &mut Profile,
         oobid: &str,
     ) -> Result<String, ATMError> {
         // Check if authenticated
-        let tokens = atm.authenticate().await?;
+        let tokens = profile.authenticate(&atm.inner).await?;
+
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::MsgSendError(format!(
+                "Profile ({}): Missing a valid mediator URL",
+                profile.alias
+            )));
+        };
 
         let res = atm
+            .inner
+            .read()
+            .await
             .client
-            .delete(format!("{}/oob?_oobid={}", atm.config.atm_api, oobid))
+            .delete(format!("{}/oob?_oobid={}", mediator_url, oobid))
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .send()

@@ -2,7 +2,8 @@ use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
+use tokio::sync::RwLock;
 use tracing::{debug, error, span, Instrument, Level};
 use uuid::Uuid;
 
@@ -11,7 +12,8 @@ use crate::{
     messages::{
         AuthenticationChallenge, AuthorizationResponse, GenericDataStruct, SuccessResponse,
     },
-    ATM,
+    profiles::Profile,
+    SharedState,
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -21,22 +23,25 @@ pub struct AuthRefreshResponse {
 }
 impl GenericDataStruct for AuthRefreshResponse {}
 
-impl<'c> ATM<'c> {
+impl Profile {
     /// Authenticate the SDK against Affinidi Trusted Messaging
     ///
     /// Will loop until successful authentication
     /// Will backoff on retries to a max of 10 seconds
-    pub async fn authenticate(&mut self) -> Result<AuthorizationResponse, ATMError> {
+    pub(crate) async fn authenticate(
+        &mut self,
+        shared_state: &Arc<RwLock<SharedState>>,
+    ) -> Result<AuthorizationResponse, ATMError> {
         let mut retry_count = 0;
         let mut timer = 1;
         loop {
-            match self._authenticate().await {
+            match self._authenticate(shared_state).await {
                 Ok(response) => return Ok(response),
                 Err(err) => {
                     retry_count += 1;
                     error!(
-                        "Attempt #{}. Error authenticating: {:?} :: Sleeping for ({}) seconds",
-                        retry_count, err, timer
+                        "Profile ({}): Attempt #{}. Error authenticating: {:?} :: Sleeping for ({}) seconds",
+                        self.alias, retry_count, err, timer
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(timer)).await;
                     if timer < 10 {
@@ -48,12 +53,15 @@ impl<'c> ATM<'c> {
     }
 
     // Where the bulk of the authentication logic is actually done
-    async fn _authenticate(&mut self) -> Result<AuthorizationResponse, ATMError> {
+    async fn _authenticate(
+        &mut self,
+        shared_state: &Arc<RwLock<SharedState>>,
+    ) -> Result<AuthorizationResponse, ATMError> {
         if self.authenticated {
             // Already authenticated
 
             // Check if we need to refresh the tokens
-            match self._refresh_authentication().await {
+            match self._refresh_authentication(shared_state).await {
                 Ok(_) => {}
                 Err(err) => {
                     // Couldn't refresh the tokens
@@ -62,9 +70,10 @@ impl<'c> ATM<'c> {
                 }
             };
 
-            if let Some(tokens) = &self.jwt_tokens {
+            if let Some(tokens) = &self.authorization {
                 return Ok(tokens.clone());
             } else {
+                self.authenticated = false;
                 return Err(ATMError::AuthenticationError(
                     "Authenticated but no tokens found".to_owned(),
                 ));
@@ -75,12 +84,18 @@ impl<'c> ATM<'c> {
         async move {
             debug!("Retrieving authentication challenge...");
 
-            let (my_did, atm_did) = self.dids()?;
+            let (profile_did, mediator_did) = self.dids()?;
+            let Some(mediator_endpoint) = self.get_mediator_rest_endpoint() else {
+                return Err(ATMError::AuthenticationError(
+                    "there is no mediation REST endpoint".to_string(),
+                ));
+            };
+
             // Step 1. Get the challenge
             let step1_response = _http_post::<AuthenticationChallenge>(
-                &self.client,
-                &format!("{}/authenticate/challenge", self.config.atm_api),
-                &format!("{{\"did\": \"{}\"}}", my_did).to_string(),
+                &shared_state.read().await.client,
+                &[&mediator_endpoint, "/authenticate/challenge"].concat(),
+                &format!("{{\"did\": \"{}\"}}", profile_did).to_string(),
             )
             .await?;
 
@@ -101,13 +116,14 @@ impl<'c> ATM<'c> {
                 serde_json::to_string_pretty(&auth_response).unwrap()
             );
 
+            let lock = shared_state.read().await;
             let (auth_msg, _) = auth_response
                 .pack_encrypted(
-                    atm_did,
-                    Some(my_did),
-                    Some(my_did),
-                    &self.did_resolver,
-                    &self.secrets_resolver,
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -121,15 +137,15 @@ impl<'c> ATM<'c> {
             debug!("Successfully packed auth message\n{:#?}", auth_msg);
 
             let step2_response = _http_post::<AuthorizationResponse>(
-                &self.client,
-                &format!("{}/authenticate", self.config.atm_api),
+                &lock.client,
+                &[&mediator_endpoint, "/authenticate"].concat(),
                 &auth_msg,
             )
             .await?;
 
             if let Some(tokens) = &step2_response.data {
                 debug!("Tokens received:\n{:#?}", tokens);
-                self.jwt_tokens = Some(tokens.clone());
+                self.authorization = Some(tokens.clone());
                 debug!("Successfully authenticated");
                 self.authenticated = true;
 
@@ -157,7 +173,7 @@ impl<'c> ATM<'c> {
         &self,
         body: &AuthenticationChallenge,
     ) -> Result<Message, ATMError> {
-        let (my_did, atm_did) = self.dids()?;
+        let (profile_did, mediator_did) = self.dids()?;
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -167,8 +183,8 @@ impl<'c> ATM<'c> {
             "https://affinidi.com/atm/1.0/authenticate".to_owned(),
             json!(body),
         )
-        .to(atm_did.to_owned())
-        .from(my_did.to_owned())
+        .to(mediator_did.to_owned())
+        .from(profile_did.to_owned())
         .created_time(now)
         .expires_time(now + 60)
         .finalize())
@@ -179,8 +195,12 @@ impl<'c> ATM<'c> {
     ///   * `refresh_token` - The refresh token to be used
     /// # Returns
     /// A packed DIDComm message to be sent
-    async fn _create_refresh_request(&self, refresh_token: &str) -> Result<String, ATMError> {
-        let (my_did, atm_did) = self.dids()?;
+    async fn _create_refresh_request(
+        &self,
+        refresh_token: &str,
+        shared_state: &Arc<RwLock<SharedState>>,
+    ) -> Result<String, ATMError> {
+        let (profile_did, mediator_did) = self.dids()?;
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -191,19 +211,20 @@ impl<'c> ATM<'c> {
             "https://affinidi.com/atm/1.0/authenticate/refresh".to_owned(),
             json!(refresh_token),
         )
-        .to(atm_did.to_owned())
-        .from(my_did.to_owned())
+        .to(mediator_did.to_owned())
+        .from(profile_did.to_owned())
         .created_time(now)
         .expires_time(now + 60)
         .finalize();
 
+        let lock = shared_state.read().await;
         match refresh_message
             .pack_encrypted(
-                atm_did,
-                Some(my_did),
-                Some(my_did),
-                &self.did_resolver,
-                &self.secrets_resolver,
+                mediator_did,
+                Some(profile_did),
+                Some(profile_did),
+                &lock.did_resolver,
+                &lock.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -217,8 +238,11 @@ impl<'c> ATM<'c> {
     }
 
     /// Will refresh the access tokens as required
-    async fn _refresh_authentication(&mut self) -> Result<(), ATMError> {
-        if let Some(tokens) = &self.jwt_tokens {
+    async fn _refresh_authentication(
+        &mut self,
+        shared_state: &Arc<RwLock<SharedState>>,
+    ) -> Result<(), ATMError> {
+        if let Some(tokens) = &self.authorization {
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
@@ -234,16 +258,24 @@ impl<'c> ATM<'c> {
                 } else {
                     // Refresh the token
 
-                    let refresh_msg = self._create_refresh_request(&tokens.refresh_token).await?;
+                    let Some(mediator_endpoint) = self.get_mediator_rest_endpoint() else {
+                        return Err(ATMError::AuthenticationError(
+                            "there is no mediation REST endpoint".to_string(),
+                        ));
+                    };
+
+                    let refresh_msg = self
+                        ._create_refresh_request(&tokens.refresh_token, shared_state)
+                        .await?;
                     let new_tokens = _http_post::<AuthRefreshResponse>(
-                        &self.client,
-                        &format!("{}/authenticate/refresh", self.config.atm_api),
+                        &shared_state.read().await.client,
+                        &[&mediator_endpoint, "/authenticate/refresh"].concat(),
                         &refresh_msg,
                     )
                     .await?;
 
                     if let Some(new_tokens) = new_tokens.data {
-                        self.jwt_tokens = Some(AuthorizationResponse {
+                        self.authorization = Some(AuthorizationResponse {
                             access_token: new_tokens.access_token,
                             access_expires_at: new_tokens.access_expires_at,
                             refresh_token: tokens.refresh_token.clone(),

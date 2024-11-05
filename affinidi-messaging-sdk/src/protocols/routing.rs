@@ -4,7 +4,7 @@
 //! The DIDComm Routing Protocol is used to route messages between agents. It is used to ensure that messages are delivered to the correct agent.
 //!
 
-use crate::{errors::ATMError, ATM};
+use crate::{errors::ATMError, profiles::Profile, ATM};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
 use serde_json::{json, Number, Value};
@@ -23,9 +23,11 @@ impl Routing {
     /// - expires_time: The time at which the message expires if not delivered
     /// - delay_milli: The time to wait before delivering the message
     ///                NOTE: If negative, picks a random delay between 0 and the absolute value
-    pub async fn forward_message<'c>(
+    #[allow(clippy::too_many_arguments)]
+    pub async fn forward_message(
         &self,
-        atm: &'c mut ATM<'_>,
+        atm: &ATM,
+        profile: &Profile,
         message: &str,
         target_did: &str,
         next_did: &str,
@@ -45,7 +47,7 @@ impl Routing {
                 json!({"next": next_did}),
             )
             .to(target_did.to_owned())
-            .from(atm.config.my_did.as_deref().unwrap_or("").to_string())
+            .from(profile.did.clone())
             .attachment(attachment);
 
             if let Some(expires_time) = expires_time {
@@ -60,13 +62,14 @@ impl Routing {
             let forwarded = forwarded.finalize();
 
             // Pack the message
+            let lock = atm.inner.read().await;
             let (msg, _) = forwarded
                 .pack_encrypted(
                     target_did,
-                    atm.config.my_did.as_deref(),
-                    atm.config.my_did.as_deref(),
-                    &atm.did_resolver,
-                    &atm.secrets_resolver,
+                    Some(&profile.did),
+                    Some(&profile.did),
+                    &lock.did_resolver,
+                    &lock.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

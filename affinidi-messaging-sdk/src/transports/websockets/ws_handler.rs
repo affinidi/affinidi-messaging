@@ -1,22 +1,19 @@
-use crate::{errors::ATMError, ATM};
+use super::SharedState;
+use crate::{errors::ATMError, profiles::Profile, ATM};
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use futures_util::sink::SinkExt;
-use http::header::AUTHORIZATION;
 use std::{
     collections::{HashMap, HashSet},
     mem::size_of_val,
+    sync::Arc,
 };
 use tokio::{
-    net::TcpStream,
     select,
-    sync::mpsc::{Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        RwLock,
+    },
 };
-use tokio_stream::StreamExt;
-use tokio_tungstenite::{
-    connect_async_tls_with_config, tungstenite::client::IntoClientRequest, MaybeTlsStream,
-    WebSocketStream,
-};
-use tracing::{debug, error, info, span, warn, Instrument, Level};
+use tracing::{debug, info, span, warn, Instrument, Level};
 
 /// Message cache struct
 /// Holds live-stream messages in a cache so we can get the first available or by a specific message ID
@@ -146,73 +143,31 @@ impl MessageCache {
     }
 }
 
+/// Possible messages that can be sent to the websocket handler
 #[derive(Debug)]
-pub(crate) enum WSCommand {
-    Started,      // Signals that the websocket handler has started
-    Exit,         // Exits the websocket handler
-    Send(String), // Sends the message string to the websocket
-    Next,         // Gets the next message from the cache
-    Get(String),  // Gets the message with the specified ID from the cache
+pub(crate) enum WsHandlerCommands {
+    // Messages sent from SDK to the Handler
+    Exit,
+    Activate(Arc<RwLock<Profile>>),
+    Deactivate(Arc<RwLock<Profile>>),
+    Next(Arc<RwLock<Profile>>), // Gets the next message from the cache
+    Get(Arc<RwLock<Profile>>, String), // Gets the message with the specified ID from the cache
+    TimeOut(Arc<RwLock<Profile>>, String), // SDK request timed out, contains msg_id we were looking for
+    // Messages sent from Handler to the SDK
+    Started,
     MessageReceived(Message, Box<UnpackMetadata>), // Message received from the websocket
-    NotFound,     // Message not found in the cache
-    TimeOut(String), // SDK request timed out, contains msg_id we were looking for
+    NotFound,                                      // Message not found in the cache
 }
 
-impl<'c> ATM<'c> {
-    pub(crate) async fn _create_socket(
-        &mut self,
-        //atm: &mut ATM<'_>,
-    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
-        // Check if authenticated
-        let tokens = self.authenticate().await?;
-
-        debug!("Creating websocket connection");
-        // Create a custom websocket request, turn this into a client_request
-        // Allows adding custom headers later
-        let mut request = self
-            .config
-            .atm_api_ws
-            .clone()
-            .into_client_request()
-            .map_err(|e| {
-                ATMError::TransportError(format!(
-                    "Could not create websocket request. Reason: {}",
-                    e
-                ))
-            })?;
-
-        // Add the Authorization header to the request
-        let headers = request.headers_mut();
-        headers.insert(
-            AUTHORIZATION,
-            format!("Bearer {}", tokens.access_token)
-                .parse()
-                .map_err(|e| {
-                    ATMError::TransportError(format!("Could not set Authorization header: {:?}", e))
-                })?,
-        );
-
-        // Connect to the websocket
-        let ws_stream =
-            connect_async_tls_with_config(request, None, false, Some(self.ws_connector.clone()))
-                .await
-                .expect("Failed to connect")
-                .0;
-
-        debug!("Completed websocket connection");
-
-        Ok(ws_stream)
-    }
-
+impl ATM {
     /// WebSocket streaming handler
     /// from_sdk is an MPSC channel used to receive messages from the main thread that will be sent to the websocket
     /// to_sdk is an MPSC channel used to send messages to the main thread that were received from the websocket
     /// web_socket is the websocket stream itself which can be used to send and receive messages
     pub(crate) async fn ws_handler(
-        atm: &mut ATM<'_>,
-        from_sdk: &mut Receiver<WSCommand>,
-        to_sdk: &Sender<WSCommand>,
-        // web_socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+        shared_state: Arc<RwLock<SharedState>>,
+        from_sdk: &mut Receiver<WsHandlerCommands>,
+        to_sdk: Sender<WsHandlerCommands>,
     ) -> Result<(), ATMError> {
         let _span = span!(Level::INFO, "ws_handler");
         async move {
@@ -220,110 +175,50 @@ impl<'c> ATM<'c> {
 
             // Set up a message cache
             let mut cache = MessageCache {
-                fetch_cache_limit_count: atm.config.fetch_cache_limit_count,
-                fetch_cache_limit_bytes: atm.config.fetch_cache_limit_bytes,
+                fetch_cache_limit_count: shared_state.read().await.config.fetch_cache_limit_count,
+                fetch_cache_limit_bytes: shared_state.read().await.config.fetch_cache_limit_bytes,
                 ..Default::default()
             };
 
-            let mut web_socket = atm._create_socket().await?;
-            to_sdk.send(WSCommand::Started).await.map_err(|err| {
+            // Set up the channel for WS_Connections to communicate to the handler
+        // Create a new channel with a capacity of at most 32. This communicates from WS_Connections to the WS_Handler
+        let ( handler_tx, mut handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
+
+            shared_state.read().await.ws_handler_send_stream.send(WsHandlerCommands::Started).await.map_err(|err| {
                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
             })?;
+
             loop {
                 select! {
-                    value = web_socket.next(), if !cache.is_full() => {
-                        if let Some(msg) = value {
-                            if let Ok(payload) = msg {
-                                if payload.is_text() {
-                                    if let Ok(msg) = payload.to_text() {
-                                        debug!("Received text message ({})", msg);
-                                        let (message, meta) = match atm.unpack(msg).await {
-                                            Ok((msg, meta)) => (msg, meta),
-                                            Err(err) => {
-                                                error!("Error unpacking message: {:?}", err);
-                                                continue;
-                                            }
-                                        };
-                                        // Check if we are searching for this message via a get request
-                                        if let Some(thid) = &message.thid {
-                                            if cache.search_list.contains(thid) {
-                                                cache.remove(thid);
-                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                                })?;
-                                            }
-                                        } else if let Some(pthid) = &message.pthid {
-                                            if cache.search_list.contains(pthid) {
-                                                cache.remove(pthid);
-                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                                })?;
-                                            }
-                                        } else if cache.search_list.contains(&message.id) {
-                                            to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
-                                            cache.remove(&message.id);
-                                        }
-
-                                        // Send the message to the SDK if next_flag is set
-                                        if cache.next_flag {
-                                            cache.next_flag = false;
-                                            to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
-                                        } else {
-                                            // Add to cache
-                                            cache.insert(message, meta);
-                                        }
-                                    } else {
-                                        error!("Error getting text from message")
-                                    }
-                                } else {
-                                    error!("Received non-text message");
-                                }
-                            } else {
-                                error!("Error getting payload from message");
-                                continue;
-                            }
-                        } else {
-
-                            error!("Error getting message");
-                            break;
-                        }
+                    value = handler_rx.recv(), if !cache.is_full() => {
+                        // do something here
                     }
                     value = from_sdk.recv() => {
                         if let Some(cmd) = value {
                             match cmd {
-                                WSCommand::Send(msg) => {
-                                    debug!("Sending message: {}", msg);
-                                    web_socket.send(msg.into()).await.map_err(|err| {
-                                        ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
-                                    })?;
-                                }
-                                WSCommand::Next => {
+                                WsHandlerCommands::Next(profile) => {
                                     if let Some((message, meta)) = cache.next() {
-                                        to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                        to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }
                                 }
-                                WSCommand::Get(id) => {
+                                WsHandlerCommands::Get(profile, id) => {
                                     if let Some((message, meta)) = cache.get(&id) {
-                                        to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                        to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     } else {
-                                        to_sdk.send(WSCommand::NotFound).await.map_err(|err| {
+                                        to_sdk.send(WsHandlerCommands::NotFound).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }
                                 }
-                                WSCommand::Exit => {
-                                    debug!("Received EXIT message, closing channel");
+                                WsHandlerCommands::Exit => {
+                                    debug!("Received EXIT message, closing channels");
                                     break;
                                 }
-                                WSCommand::TimeOut(id) => {
+                                WsHandlerCommands::TimeOut(profile, id) => {
                                     cache.search_list.remove(&id);
                                 }
                                 _ => {
@@ -338,7 +233,6 @@ impl<'c> ATM<'c> {
                 }
             }
 
-            let _ = web_socket.close(None).await;
             from_sdk.close();
 
             debug!("Channel closed, stopping websocket handler");

@@ -1,4 +1,4 @@
-use crate::errors::ATMError;
+use crate::{errors::ATMError, profiles::Mediator};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::secrets::Secret;
 use rustls::pki_types::CertificateDer;
@@ -14,21 +14,17 @@ use tracing::error;
 /// let config = Config::builder().build();
 /// ```
 #[derive(Clone)]
-pub struct Config<'a> {
-    pub(crate) my_did: Option<String>,
-    pub(crate) ssl_certificates: Vec<CertificateDer<'a>>,
-    pub(crate) atm_api: String,
-    pub(crate) atm_api_ws: String,
-    pub(crate) atm_did: Option<String>,
+pub struct Config {
+    pub(crate) ssl_certificates: Vec<CertificateDer<'static>>,
     pub(crate) ssl_only: bool,
-    pub(crate) ws_enabled: bool,
     pub(crate) fetch_cache_limit_count: u32,
     pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
     pub(crate) did_resolver: Option<DIDCacheClient>,
+    pub(crate) default_mediator: Option<Mediator>,
 }
 
-impl<'a> Config<'a> {
+impl Config {
     /// Returns a builder for `Config`
     /// Example:
     /// ```
@@ -55,32 +51,24 @@ impl<'a> Config<'a> {
 /// ```
 pub struct ConfigBuilder {
     ssl_certificates: Vec<String>,
-    my_did: Option<String>,
-    atm_api: Option<String>,
-    atm_api_ws: Option<String>,
-    atm_did: Option<String>,
     ssl_only: bool,
-    ws_enabled: bool,
     fetch_cache_limit_count: u32,
     fetch_cache_limit_bytes: u64,
     secrets: Vec<Secret>,
     did_resolver: Option<DIDCacheClient>,
+    default_mediator: Option<Mediator>,
 }
 
 impl Default for ConfigBuilder {
     fn default() -> Self {
         ConfigBuilder {
             ssl_certificates: vec![],
-            my_did: None,
-            atm_api: None,
-            atm_api_ws: None,
-            atm_did: None,
             ssl_only: true,
-            ws_enabled: true,
             fetch_cache_limit_count: 100,
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
             secrets: Vec::new(),
             did_resolver: None,
+            default_mediator: None,
         }
     }
 }
@@ -98,44 +86,11 @@ impl ConfigBuilder {
         self
     }
 
-    /// Add the DID for the client itself to ATM
-    pub fn with_my_did(mut self, my_did: &str) -> Self {
-        self.my_did = Some(my_did.to_owned());
-        self
-    }
-
-    /// Add the URL for the ATM API
-    pub fn with_atm_api(mut self, api_url: &str) -> Self {
-        self.atm_api = Some(api_url.to_owned());
-        self
-    }
-
-    /// Add the URL for the ATM API WebSocket
-    /// Defaults: ATM API URL with `/ws` appended
-    pub fn with_atm_websocket_api(mut self, ws_api_url: &str) -> Self {
-        self.atm_api_ws = Some(ws_api_url.to_owned());
-        self
-    }
-
-    /// Add the DID for the ATM service itself
-    pub fn with_atm_did(mut self, atm_did: &str) -> Self {
-        self.atm_did = Some(atm_did.to_owned());
-        self
-    }
-
     /// Allow non-SSL connections to the ATM service
     /// This is not recommended for production use
     /// Default: `true`
     pub fn with_non_ssl(mut self) -> Self {
         self.ssl_only = false;
-        self
-    }
-
-    /// Disables WebSocket connections to the ATM service
-    /// This is not recommended for production use
-    /// Default: `true`
-    pub fn with_websocket_disabled(mut self) -> Self {
-        self.ws_enabled = false;
         self
     }
 
@@ -177,7 +132,14 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn build<'a>(self) -> Result<Config<'a>, ATMError> {
+    /// If no mediator is provided in individual profiles, use the default mediator
+    /// If not specified and no Mediator is provided in the profile, the SDK will fail
+    pub fn with_default_mediator(mut self, mediator: Mediator) -> Self {
+        self.default_mediator = Some(mediator);
+        self
+    }
+
+    pub fn build(self) -> Result<Config, ATMError> {
         // Process any custom SSL certificates
         let mut certs = vec![];
         let mut failed_certs = false;
@@ -206,38 +168,14 @@ impl ConfigBuilder {
             ));
         }
 
-        let atm_api = if let Some(atm_url) = self.atm_api {
-            atm_url
-        } else {
-            // TODO: Change this to the production URL
-            "https://localhost:7037/mediator/v1".to_string()
-        };
-
-        // convert the ATM API URL to a WebSocket URL
-        let atm_api_ws = if let Some(atm_api_ws) = self.atm_api_ws {
-            atm_api_ws
-        } else if atm_api.starts_with("http://") {
-            format!("ws://{}/ws", atm_api.split_at(7).1)
-        } else if atm_api.starts_with("https://") {
-            format!("wss://{}/ws", atm_api.split_at(8).1)
-        } else {
-            return Err(ATMError::ConfigError(
-                "ATM API URL must start with http:// or https://".to_string(),
-            ));
-        };
-
         Ok(Config {
             ssl_certificates: certs,
-            my_did: self.my_did,
-            atm_api,
-            atm_api_ws,
-            atm_did: self.atm_did,
             ssl_only: self.ssl_only,
-            ws_enabled: self.ws_enabled,
             fetch_cache_limit_count: self.fetch_cache_limit_count,
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
             did_resolver: self.did_resolver,
+            default_mediator: self.default_mediator,
         })
     }
 }
