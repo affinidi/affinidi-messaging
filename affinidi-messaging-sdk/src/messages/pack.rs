@@ -16,11 +16,7 @@ impl ATM {
         from: Option<&str>,
         sign_by: Option<&str>,
     ) -> Result<(String, PackEncryptedMetadata), ATMError> {
-        self.inner
-            .read()
-            .await
-            .pack_encrypted(message, to, from, sign_by)
-            .await
+        self.inner.pack_encrypted(message, to, from, sign_by).await
     }
 }
 

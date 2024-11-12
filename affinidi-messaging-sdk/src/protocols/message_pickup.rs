@@ -115,14 +115,13 @@ impl MessagePickup {
         debug!("Status-Request message: {:?}", msg);
 
         // Pack the message
-        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &lock.did_resolver,
-                &lock.secrets_resolver,
+                &atm.inner.did_resolver,
+                &atm.inner.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -177,14 +176,13 @@ impl MessagePickup {
         let msg_id = msg.id.clone();
 
         // Pack the message
-        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &lock.did_resolver,
-                &lock.secrets_resolver,
+                &atm.inner.did_resolver,
+                &atm.inner.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -212,8 +210,6 @@ impl MessagePickup {
         async move {
             // Send the next request to the ws_handler
             atm.inner
-                .read()
-                .await
                 .ws_handler_send_stream
                 .send(WsHandlerCommands::Next(profile.clone()))
                 .await
@@ -228,7 +224,7 @@ impl MessagePickup {
             // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
             let sleep: tokio::time::Sleep = tokio::time::sleep(wait);
 
-            let stream = &mut atm.inner.write().await.ws_handler_recv_stream;
+            let stream = &mut atm.inner.ws_handler_recv_stream.lock().await;
             select! {
                 _ = sleep, if wait.as_millis() > 0 => {
                     debug!("Timeout reached, no message received");
@@ -272,7 +268,7 @@ impl MessagePickup {
 
         async move {
             // Send the get request to the ws_handler
-            atm.inner.read().await.ws_handler_send_stream
+            atm.inner.ws_handler_send_stream
                 .send(WsHandlerCommands::Get(profile.clone(), msg_id.to_string()))
                 .await
                 .map_err(|err| {
@@ -287,12 +283,12 @@ impl MessagePickup {
             let sleep = tokio::time::sleep(wait);
             tokio::pin!(sleep);
 
-            let stream = &mut atm.inner.write().await.ws_handler_recv_stream;
+            let stream = &mut atm.inner.ws_handler_recv_stream.lock().await;
             loop {
             select! {
                 _ = &mut sleep, if wait.as_millis() > 0 => {
                     debug!("Timeout reached, no message received");
-                    atm.inner.read().await.ws_handler_send_stream.send(WsHandlerCommands::TimeOut(profile.clone(), msg_id.to_string())).await.map_err(|err| {
+                    atm.inner.ws_handler_send_stream.send(WsHandlerCommands::TimeOut(profile.clone(), msg_id.to_string())).await.map_err(|err| {
                         ATMError::TransportError(format!("Could not send timeout message to ws_handler: {:?}", err))
                     })?;
                     return Ok(None);
@@ -366,14 +362,13 @@ impl MessagePickup {
 
         // Pack the message
         let msg = {
-            let lock = atm.inner.read().await;
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -488,14 +483,13 @@ impl MessagePickup {
         debug!("messages-received message: {:?}", msg);
 
         // Pack the message
-        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &lock.did_resolver,
-                &lock.secrets_resolver,
+                &atm.inner.did_resolver,
+                &atm.inner.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
@@ -30,7 +31,7 @@ pub mod secrets;
 pub mod transports;
 
 pub struct ATM {
-    pub(crate) inner: Arc<RwLock<SharedState>>,
+    pub(crate) inner: Arc<SharedState>,
 }
 
 /// Private SharedState struct for the ATM to be used across tasks
@@ -42,8 +43,8 @@ pub(crate) struct SharedState {
     pub(crate) ws_connector: Connector,
     pub(crate) ws_handler: Option<JoinHandle<()>>,
     pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>,
-    pub(crate) ws_handler_recv_stream: Receiver<WsHandlerCommands>,
-    pub(crate) profiles: Profiles,
+    pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>,
+    pub(crate) profiles: Arc<RwLock<Profiles>>,
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -72,7 +73,6 @@ impl ATM {
         // Set up the HTTP/HTTPS client
         let mut client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
-            .https_only(config.ssl_only)
             .user_agent("Affinidi Trusted Messaging");
 
         for cert in config.get_ssl_certificates() {
@@ -143,10 +143,10 @@ impl ATM {
 
         // Set up the channels for the WebSocket handler
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
-        let (sdk_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
+        let (sdk_tx, ws_handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
 
         // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
-        let (ws_handler_tx, ws_handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
+        let (ws_handler_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
 
         let shared_state = SharedState {
             config: config.clone(),
@@ -156,21 +156,22 @@ impl ATM {
             ws_connector,
             ws_handler: None,
             ws_handler_send_stream: sdk_tx,
-            ws_handler_recv_stream: ws_handler_rx,
-            profiles: Profiles::default(),
+            ws_handler_recv_stream: Mutex::new(sdk_rx),
+            profiles: Arc::new(RwLock::new(Profiles::default())),
         };
 
         let atm = ATM {
-            inner: Arc::new(RwLock::new(shared_state)),
+            inner: Arc::new(shared_state),
         };
 
         // Add any pre-loaded secrets
         for secret in &config.secrets {
-            atm.add_secret(secret).await;
+            atm.add_secret(secret);
         }
 
         // Start the websocket handler
-        atm.start_websocket_handler(sdk_rx, ws_handler_tx).await?;
+        atm.start_websocket_handler(ws_handler_rx, ws_handler_tx)
+            .await?;
         debug!("ATM SDK initialized");
 
         Ok(atm)
@@ -183,7 +184,7 @@ impl ATM {
         let _span = span!(tracing::Level::DEBUG, "add_did", did = did).entered();
         debug!("Adding DID to resolver");
 
-        match self.inner.write().await.did_resolver.resolve(did).await {
+        match self.inner.did_resolver.resolve(did).await {
             Ok(results) => Ok(results.doc),
             Err(err) => Err(ATMError::DIDError(format!(
                 "Couldn't resolve did ({}). Reason: {}",
@@ -194,19 +195,14 @@ impl ATM {
 
     /// Adds secret to the secrets resolver
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
-    pub async fn add_secret(&self, secret: &Secret) {
-        self.inner
-            .write()
-            .await
-            .secrets_resolver
-            .insert(secret.to_owned());
+    pub fn add_secret(&self, secret: &Secret) {
+        self.inner.secrets_resolver.insert(secret.to_owned());
     }
 
     /// Adds a Vec of secrets to the secrets resolver
-    pub async fn add_secrets(&mut self, secrets: Vec<Secret>) {
-        let mut lock = self.inner.write().await;
+    pub async fn add_secrets(&self, secrets: &Vec<Secret>) {
         for secret in secrets {
-            lock.secrets_resolver.insert(secret);
+            self.inner.secrets_resolver.insert(secret.clone());
         }
     }
 }

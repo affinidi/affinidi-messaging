@@ -62,14 +62,13 @@ impl Routing {
             let forwarded = forwarded.finalize();
 
             // Pack the message
-            let lock = atm.inner.read().await;
             let (msg, _) = forwarded
                 .pack_encrypted(
                     target_did,
                     Some(&profile.did),
                     Some(&profile.did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

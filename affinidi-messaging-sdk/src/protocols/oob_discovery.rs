@@ -73,8 +73,6 @@ impl OOBDiscovery {
 
         let res = atm
             .inner
-            .read()
-            .await
             .client
             .post([&mediator_url, "/oob"].concat())
             .header("Content-Type", "application/json")
@@ -121,8 +119,6 @@ impl OOBDiscovery {
     pub async fn retrieve_invite(&self, atm: &ATM, url: &str) -> Result<Message, ATMError> {
         let res = atm
             .inner
-            .read()
-            .await
             .client
             .get(url)
             .header("Content-Type", "application/json")
@@ -205,8 +201,6 @@ impl OOBDiscovery {
 
         let res = atm
             .inner
-            .read()
-            .await
             .client
             .delete(format!("{}/oob?_oobid={}", mediator_url, oobid))
             .header("Content-Type", "application/json")

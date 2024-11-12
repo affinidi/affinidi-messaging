@@ -84,14 +84,13 @@ impl TrustPing {
         debug!("Ping message: {:#?}", msg);
 
         // Pack the message
-        let lock = atm.inner.read().await;
         let (msg, _) = msg
             .pack_encrypted(
                 to_did,
                 from_did,
                 from_did,
-                &lock.did_resolver,
-                &lock.secrets_resolver,
+                &atm.inner.did_resolver,
+                &atm.inner.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await

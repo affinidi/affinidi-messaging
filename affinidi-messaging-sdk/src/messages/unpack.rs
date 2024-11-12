@@ -7,7 +7,7 @@ impl ATM {
     pub async fn unpack(&self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {
         let _span = span!(Level::DEBUG, "unpack",);
 
-        async move { self.inner.read().await.unpack(message).await }
+        async move { self.inner.unpack(message).await }
             .instrument(_span)
             .await
     }

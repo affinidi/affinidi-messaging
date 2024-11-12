@@ -401,7 +401,7 @@ async fn _start_mediator_server() {
     println!("Server running");
 }
 
-fn init_client(config: Config<'_>) -> Client {
+fn init_client(config: Config) -> Client {
     // Set up the HTTPS client
     let mut client = ClientBuilder::new()
         .use_rustls_tls()

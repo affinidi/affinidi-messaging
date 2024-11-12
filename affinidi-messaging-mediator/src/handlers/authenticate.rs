@@ -362,8 +362,17 @@ pub async fn authentication_refresh(
             }
         }
 
-        let refresh_token = if let Some(refresh_token) = msg.body.as_str() {
-            refresh_token
+        let refresh_token = if let Some(refresh_token) = msg.body.get("refresh_token") {
+            if let Some(refresh_token) = refresh_token.as_str() {
+                refresh_token
+            } else {
+                return Err(MediatorError::ParseError(
+                    "UNKNOWN".into(),
+                    "msg.body".into(),
+                    "Couldn't parse message body into refresh_token".into(),
+                )
+                .into());
+            }
         } else {
             return Err(MediatorError::ParseError(
                 "UNKNOWN".into(),

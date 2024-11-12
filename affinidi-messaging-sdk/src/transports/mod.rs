@@ -61,7 +61,7 @@ impl ATM {
             ));
         };
 
-        let message_received = if mediator.ws_enabled {
+        let message_received = if mediator.ws_connected {
             // Send to the WS_Connection task for this profile
 
             if let Some(channel) = &mediator.ws_channel_tx {
@@ -140,8 +140,6 @@ impl ATM {
 
         let res = self
             .inner
-            .read()
-            .await
             .client
             .post([&mediator_url, "/inbound"].concat())
             .header("Content-Type", "application/json")

@@ -29,8 +29,6 @@ impl ATM {
 
             let res = self
                 .inner
-                .read()
-                .await
                 .client
                 .get(format!(
                     "{}/list/{}/{}",

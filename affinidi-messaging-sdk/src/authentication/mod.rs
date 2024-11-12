@@ -3,7 +3,6 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::SystemTime};
-use tokio::sync::RwLock;
 use tracing::{debug, error, span, Instrument, Level};
 use uuid::Uuid;
 
@@ -30,7 +29,7 @@ impl Profile {
     /// Will backoff on retries to a max of 10 seconds
     pub(crate) async fn authenticate(
         &mut self,
-        shared_state: &Arc<RwLock<SharedState>>,
+        shared_state: &Arc<SharedState>,
     ) -> Result<AuthorizationResponse, ATMError> {
         let mut retry_count = 0;
         let mut timer = 1;
@@ -55,7 +54,7 @@ impl Profile {
     // Where the bulk of the authentication logic is actually done
     async fn _authenticate(
         &mut self,
-        shared_state: &Arc<RwLock<SharedState>>,
+        shared_state: &Arc<SharedState>,
     ) -> Result<AuthorizationResponse, ATMError> {
         if self.authenticated {
             // Already authenticated
@@ -93,7 +92,7 @@ impl Profile {
 
             // Step 1. Get the challenge
             let step1_response = _http_post::<AuthenticationChallenge>(
-                &shared_state.read().await.client,
+                &shared_state.client,
                 &[&mediator_endpoint, "/authenticate/challenge"].concat(),
                 &format!("{{\"did\": \"{}\"}}", profile_did).to_string(),
             )
@@ -116,14 +115,13 @@ impl Profile {
                 serde_json::to_string_pretty(&auth_response).unwrap()
             );
 
-            let lock = shared_state.read().await;
             let (auth_msg, _) = auth_response
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &shared_state.did_resolver,
+                    &shared_state.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -137,7 +135,7 @@ impl Profile {
             debug!("Successfully packed auth message\n{:#?}", auth_msg);
 
             let step2_response = _http_post::<AuthorizationResponse>(
-                &lock.client,
+                &shared_state.client,
                 &[&mediator_endpoint, "/authenticate"].concat(),
                 &auth_msg,
             )
@@ -198,7 +196,7 @@ impl Profile {
     async fn _create_refresh_request(
         &self,
         refresh_token: &str,
-        shared_state: &Arc<RwLock<SharedState>>,
+        shared_state: &Arc<SharedState>,
     ) -> Result<String, ATMError> {
         let (profile_did, mediator_did) = self.dids()?;
         let now = SystemTime::now()
@@ -209,7 +207,7 @@ impl Profile {
         let refresh_message = Message::build(
             Uuid::new_v4().into(),
             "https://affinidi.com/atm/1.0/authenticate/refresh".to_owned(),
-            json!(refresh_token),
+            json!({"refresh_token": refresh_token}),
         )
         .to(mediator_did.to_owned())
         .from(profile_did.to_owned())
@@ -217,14 +215,13 @@ impl Profile {
         .expires_time(now + 60)
         .finalize();
 
-        let lock = shared_state.read().await;
         match refresh_message
             .pack_encrypted(
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &lock.did_resolver,
-                &lock.secrets_resolver,
+                &shared_state.did_resolver,
+                &shared_state.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -240,7 +237,7 @@ impl Profile {
     /// Will refresh the access tokens as required
     async fn _refresh_authentication(
         &mut self,
-        shared_state: &Arc<RwLock<SharedState>>,
+        shared_state: &Arc<SharedState>,
     ) -> Result<(), ATMError> {
         if let Some(tokens) = &self.authorization {
             let now = SystemTime::now()
@@ -268,7 +265,7 @@ impl Profile {
                         ._create_refresh_request(&tokens.refresh_token, shared_state)
                         .await?;
                     let new_tokens = _http_post::<AuthRefreshResponse>(
-                        &shared_state.read().await.client,
+                        &shared_state.client,
                         &[&mediator_endpoint, "/authenticate/refresh"].concat(),
                         &refresh_msg,
                     )

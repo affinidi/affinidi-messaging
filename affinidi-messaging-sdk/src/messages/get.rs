@@ -36,8 +36,6 @@ impl ATM {
 
         let res = self
             .inner
-            .read()
-            .await
             .client
             .post([&mediator_url, "/outbound"].concat())
             .header("Content-Type", "application/json")

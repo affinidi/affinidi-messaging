@@ -34,7 +34,7 @@ impl ATM {
         });
 
         // Wait for Started message
-        if let Some(msg) = self.inner.write().await.ws_handler_recv_stream.recv().await {
+        if let Some(msg) = self.inner.ws_handler_recv_stream.lock().await.recv().await {
             match msg {
                 WsHandlerCommands::Started => {
                     debug!("Websocket connection started");
@@ -54,8 +54,6 @@ impl ATM {
     pub async fn abort_websocket_task(&mut self) -> Result<(), ATMError> {
         let _ = self
             .inner
-            .read()
-            .await
             .ws_handler_send_stream
             .send(WsHandlerCommands::Exit)
             .await;

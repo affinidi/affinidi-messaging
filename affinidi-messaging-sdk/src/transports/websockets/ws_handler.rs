@@ -1,5 +1,10 @@
 use super::SharedState;
-use crate::{errors::ATMError, profiles::Profile, ATM};
+use crate::{
+    errors::ATMError,
+    profiles::Profile,
+    transports::{websockets::ws_connection::WsConnection, WsConnectionCommands},
+    ATM,
+};
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use std::{
     collections::{HashMap, HashSet},
@@ -145,7 +150,7 @@ impl MessageCache {
 
 /// Possible messages that can be sent to the websocket handler
 #[derive(Debug)]
-pub(crate) enum WsHandlerCommands {
+pub enum WsHandlerCommands {
     // Messages sent from SDK to the Handler
     Exit,
     Activate(Arc<RwLock<Profile>>),
@@ -157,6 +162,8 @@ pub(crate) enum WsHandlerCommands {
     Started,
     MessageReceived(Message, Box<UnpackMetadata>), // Message received from the websocket
     NotFound,                                      // Message not found in the cache
+    // Messages sent from the Connector to the Handler
+    Connected(Arc<RwLock<Profile>>),
 }
 
 impl ATM {
@@ -165,7 +172,7 @@ impl ATM {
     /// to_sdk is an MPSC channel used to send messages to the main thread that were received from the websocket
     /// web_socket is the websocket stream itself which can be used to send and receive messages
     pub(crate) async fn ws_handler(
-        shared_state: Arc<RwLock<SharedState>>,
+        shared_state: Arc<SharedState>,
         from_sdk: &mut Receiver<WsHandlerCommands>,
         to_sdk: Sender<WsHandlerCommands>,
     ) -> Result<(), ATMError> {
@@ -174,17 +181,22 @@ impl ATM {
             debug!("Starting websocket handler");
 
             // Set up a message cache
+            let mut cache = {
+
             let mut cache = MessageCache {
-                fetch_cache_limit_count: shared_state.read().await.config.fetch_cache_limit_count,
-                fetch_cache_limit_bytes: shared_state.read().await.config.fetch_cache_limit_bytes,
+                fetch_cache_limit_count: shared_state.config.fetch_cache_limit_count,
+                fetch_cache_limit_bytes: shared_state.config.fetch_cache_limit_bytes,
                 ..Default::default()
             };
+            cache
+        };
+
 
             // Set up the channel for WS_Connections to communicate to the handler
         // Create a new channel with a capacity of at most 32. This communicates from WS_Connections to the WS_Handler
         let ( handler_tx, mut handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
 
-            shared_state.read().await.ws_handler_send_stream.send(WsHandlerCommands::Started).await.map_err(|err| {
+            to_sdk.send(WsHandlerCommands::Started).await.map_err(|err| {
                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
             })?;
 
@@ -192,10 +204,23 @@ impl ATM {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {
                         // do something here
+                        if let Some(message) = value {
+                            match message {
+                                WsHandlerCommands::Connected(profile) => {
+                                    debug!("Profile({}): Connected", profile.read().await.alias);
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     value = from_sdk.recv() => {
                         if let Some(cmd) = value {
                             match cmd {
+                                WsHandlerCommands::Activate(profile) => {
+                                    debug!("Profile({}): Activating", profile.read().await.alias);
+                                    let ( connection_tx, mut connection_rx) = mpsc::channel::<WsConnectionCommands>(32);
+                                    WsConnection::activate(shared_state.clone(), &profile, handler_tx.clone(), connection_rx).await;
+                                }
                                 WsHandlerCommands::Next(profile) => {
                                     if let Some((message, meta)) = cache.next() {
                                         to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {

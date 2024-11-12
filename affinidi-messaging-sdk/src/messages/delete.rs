@@ -40,8 +40,6 @@ impl ATM {
 
         let res = self
             .inner
-            .read()
-            .await
             .client
             .delete([&mediator_url, "/delete"].concat())
             .header("Content-Type", "application/json")

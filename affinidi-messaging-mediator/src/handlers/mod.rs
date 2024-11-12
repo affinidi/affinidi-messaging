@@ -22,7 +22,7 @@ pub mod websocket;
 pub mod well_known_did_fetch;
 
 pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router {
-    let app = Router::new()
+    let mut app = Router::new()
         // Inbound message handling from ATM clients
         .route("/inbound", post(message_inbound::message_inbound_handler))
         // Outbound message handling to ATM clients
@@ -64,6 +64,13 @@ pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router 
             "/.well-known/did",
             get(well_known_did_fetch::well_known_did_fetch_handler),
         );
+
+    if shared_data.config.mediator_did_doc.is_some() {
+        app = app.route(
+            "/.well-known/did.json",
+            get(well_known_did_fetch::well_known_web_did_handler),
+        );
+    }
 
     Router::new()
         .nest(api_prefix, app)

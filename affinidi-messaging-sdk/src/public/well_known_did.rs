@@ -19,8 +19,6 @@ impl ATM {
 
         let res = self
             .inner
-            .read()
-            .await
             .client
             .get(well_known_did_atm_api)
             .header("Content-Type", "application/json")

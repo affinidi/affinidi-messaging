@@ -3,12 +3,12 @@
     "https://www.w3.org/ns/did/v1",
     "https://w3id.org/security/suites/jws-2020/v1"
   ],
-  "id": "did:web:localhost",
+  "id": "did:web:localhost%3A7037:mediator:v1:.well-known",
   "verificationMethod": [
     {
-      "id": "did:web:localhost#key-0",
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#key-0",
       "type": "JsonWebKey2020",
-      "controller": "did:web:localhost",
+      "controller": "did:web:localhost%3A7037:mediator:v1:.well-known",
       "publicKeyJwk": {
         "crv": "Ed25519",
         "kty": "OKP",
@@ -16,9 +16,9 @@
       }
     },
     {
-      "id": "did:web:localhost#key-1",
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#key-1",
       "type": "JsonWebKey2020",
-      "controller": "did:web:localhost",
+      "controller": "did:web:localhost%3A7037:mediator:v1:.well-known",
       "publicKeyJwk": {
         "crv": "P-256",
         "kty": "EC",
@@ -27,9 +27,9 @@
       }
     },
     {
-      "id": "did:web:localhost#key-2",
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#key-2",
       "type": "JsonWebKey2020",
-      "controller": "did:web:localhost",
+      "controller": "did:web:localhost%3A7037:mediator:v1:.well-known",
       "publicKeyJwk": {
         "crv": "secp256k1",
         "kty": "EC",
@@ -38,9 +38,9 @@
       }
     },
     {
-      "id": "did:web:localhost#key-3",
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#key-3",
       "type": "JsonWebKey2020",
-      "controller": "did:web:localhost",
+      "controller": "did:web:localhost%3A7037:mediator:v1:.well-known",
       "publicKeyJwk": {
         "crv": "P-256",
         "kty": "EC",
@@ -50,31 +50,31 @@
     }
   ],
   "authentication": [
-    "did:web:localhostkey-0",
-    "did:web:localhost#key-2"
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-0",
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-1"
   ],
   "assertionMethod": [
-    "did:web:localhost#key-0",
-    "did:web:localhost#key-2"
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-0",
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-1"
   ],
   "keyAgreement": [
-    "did:web:localhost#key-1",
-    "did:web:localhost#key-3"
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-2",
+    "did:web:localhost%3A7037:mediator:v1:.well-known#key-3"
   ],
   "service": [
     {
-      "id": "#service",
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#service",
       "type": "DIDCommMessaging",
       "serviceEndpoint": [
         {
-          "uri": "https://127.0.0.1:7037/mediator/v1",
+          "uri": "http://127.0.0.1:7037/mediator/v1",
           "routingKeys": [],
           "accept": [
             "didcomm/v2"
           ]
         },
         {
-          "uri": "wss://127.0.0.1:7037/mediator/v1/ws",
+          "uri": "ws://127.0.0.1:7037/mediator/v1/ws",
           "routingKeys": [],
           "accept": [
             "didcomm/v2"

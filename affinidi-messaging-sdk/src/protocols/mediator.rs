@@ -67,15 +67,14 @@ impl Mediator {
 
             let msg_id = msg.id.clone();
 
-            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -167,15 +166,14 @@ impl Mediator {
 
             let msg_id = msg.id.clone();
 
-            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -259,15 +257,14 @@ impl Mediator {
 
             let msg_id = msg.id.clone();
 
-            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -339,15 +336,14 @@ impl Mediator {
 
             let msg_id = msg.id.clone();
 
-            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -421,15 +417,14 @@ impl Mediator {
 
             let msg_id = msg.id.clone();
 
-            let lock = atm.inner.read().await;
             // Pack the message
             let (msg, _) = msg
                 .pack_encrypted(
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &lock.did_resolver,
-                    &lock.secrets_resolver,
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

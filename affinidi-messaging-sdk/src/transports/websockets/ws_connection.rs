@@ -3,22 +3,24 @@ A per Profile WebSocket connection to a DIDComm Mediator.
 */
 use std::sync::Arc;
 
-use super::SharedState;
+use super::{ws_handler::WsHandlerCommands, SharedState};
 use crate::{errors::ATMError, profiles::Profile};
 use http::header::AUTHORIZATION;
 use tokio::{
     net::TcpStream,
+    select,
     sync::{
         mpsc::{Receiver, Sender},
         RwLock,
     },
     task::JoinHandle,
 };
+use tokio_stream::StreamExt;
 use tokio_tungstenite::{
     connect_async_tls_with_config, tungstenite::client::IntoClientRequest, MaybeTlsStream,
     WebSocketStream,
 };
-use tracing::debug;
+use tracing::{debug, error};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -40,119 +42,109 @@ enum State {
 }
 
 pub struct WsConnection {
-    profile: String,
-    shared: Arc<RwLock<SharedState>>,
+    profile: Arc<RwLock<Profile>>,
+    shared: Arc<SharedState>,
     state: State,
     url: String,
     from_handler: Receiver<WsConnectionCommands>,
-    to_handler: Sender<WsConnectionCommands>,
+    to_handler: Sender<WsHandlerCommands>,
 }
 
 impl WsConnection {
-    pub(crate) async fn new(
-        shared_state: &Arc<RwLock<SharedState>>,
-        profile: &Profile,
-        to_handler: Sender<WsConnectionCommands>,
+    pub(crate) async fn activate(
+        shared_state: Arc<SharedState>,
+        profile: &Arc<RwLock<Profile>>,
+        to_handler: Sender<WsHandlerCommands>,
         from_handler: Receiver<WsConnectionCommands>,
     ) -> Result<JoinHandle<()>, ATMError> {
-        let Some(mediator) = &profile.mediator else {
+        let profile_alias = profile.read().await.alias.clone();
+
+        let Some(mediator) = &profile.read().await.mediator else {
             return Err(ATMError::ConfigError(format!(
                 "Profile ({}) is missing a valid mediator configuration!",
-                profile.alias
+                profile_alias
             )));
         };
 
         let Some(url) = &mediator.websocket_endpoint else {
             return Err(ATMError::ConfigError(format!(
                 "Profile ({}) is missing a valid websocket endpoint!",
-                profile.alias
+                profile_alias
             )));
         };
 
         let mut connection = WsConnection {
-            profile: profile.alias.clone(),
+            profile: profile.clone(),
             shared: shared_state.clone(),
             state: State::Disconnected,
             url: url.to_string(),
             from_handler,
             to_handler,
         };
+        debug!(
+            "Activating websocket connection for profile ({})",
+            profile_alias
+        );
 
-        Ok(tokio::spawn(async move {
-            let _ = WsConnection::run(&mut connection).await;
-        }))
+        let handle = tokio::spawn(async move {
+            let _ = connection.run().await;
+        });
+
+        Ok(handle)
     }
 
-    async fn run(connection: &mut WsConnection) {
+    async fn run(&mut self) -> Result<(), ATMError> {
+        debug!("Starting websocket connection");
         let mut connected: bool = false;
-        let websocket = WsConnection::_create_socket(connection).await;
+        let mut web_socket = self._create_socket().await?;
+        // TODO: Need to implement a recovery here
+        debug!("Websocket connected");
 
-        /*
-            loop {
-                select! {
-                    value = web_socket.next(), if !cache.is_full() => {
-                        if let Some(msg) = value {
-                            if let Ok(payload) = msg {
-                                if payload.is_text() {
-                                    if let Ok(msg) = payload.to_text() {
-                                        debug!("Received text message ({})", msg);
-                                        let (message, meta) = match shared_state.unpack(msg).await {
-                                            Ok((msg, meta)) => (msg, meta),
-                                            Err(err) => {
-                                                error!("Error unpacking message: {:?}", err);
-                                                continue;
-                                            }
-                                        };
-                                        // Check if we are searching for this message via a get request
-                                        if let Some(thid) = &message.thid {
-                                            if cache.search_list.contains(thid) {
-                                                cache.remove(thid);
-                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                                })?;
-                                            }
-                                        } else if let Some(pthid) = &message.pthid {
-                                            if cache.search_list.contains(pthid) {
-                                                cache.remove(pthid);
-                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                                })?;
-                                            }
-                                        } else if cache.search_list.contains(&message.id) {
-                                            to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
-                                            cache.remove(&message.id);
-                                        }
+        self.to_handler
+            .send(WsHandlerCommands::Connected(self.profile.clone()))
+            .await;
 
-                                        // Send the message to the SDK if next_flag is set
-                                        if cache.next_flag {
-                                            cache.next_flag = false;
-                                            to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
+        loop {
+            select! {
+                value = web_socket.next() => {
+                                if let Some(msg) = value {
+                                    if let Ok(payload) = msg {
+                                        if payload.is_text() {
+                                            if let Ok(msg) = payload.to_text() {
+                                                debug!("Received text message ({})", msg);
                                         } else {
-                                            // Add to cache
-                                            cache.insert(message, meta);
+                                            error!("Received non-text message");
                                         }
                                     } else {
-                                        error!("Error getting text from message")
+                                        error!("Error getting payload from message");
+                                        continue;
                                     }
                                 } else {
-                                    error!("Received non-text message");
-                                }
-                            } else {
-                                error!("Error getting payload from message");
-                                continue;
-                            }
-                        } else {
 
-                            error!("Error getting message");
-                            break;
+                                    error!("Error getting message");
+                                    break;
+                                }
+                            }
+                }
+                value = self.from_handler.recv() => {
+                    if let Some(cmd) = value {
+                        match cmd {
+                            WsConnectionCommands::Stop => {
+                                debug!("Stopping websocket connection");
+                                break;
+                            }
+                            WsConnectionCommands::Send(msg) => {
+                                debug!("Sending message ({}) to websocket", msg);
+                                // Send the message to the websocket
+                            }
+                            _ => {}
                         }
                     }
+                }
+            }
         }
-        */
+
+        Ok(())
     }
 
     /// Responsible for creating a websocket connection to the mediator
@@ -160,26 +152,18 @@ impl WsConnection {
         &mut self,
     ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
         // Check if authenticated
-        let (profile, tokens) = {
-            let lock = self.shared.write().await;
-            let Some(profile) = lock.profiles.get(&self.profile) else {
-                return Err(ATMError::ConfigError(format!(
-                    "Profile ({}) not found!",
-                    self.profile
-                )));
-            };
-
-            let mut _profile = profile.write().await;
+        let tokens = {
+            let mut _profile = self.profile.write().await;
             let tokens = _profile.authenticate(&self.shared).await?;
 
-            (profile.clone(), tokens)
+            tokens
         };
 
         debug!("Creating websocket connection");
         // Create a custom websocket request, turn this into a client_request
         // Allows adding custom headers later
 
-        let _profile = profile.read().await;
+        let _profile = self.profile.read().await;
         let Some(mediator) = &_profile.mediator else {
             return Err(ATMError::ConfigError(format!(
                 "Profile ({}) is missing a valid mediator configuration!",
@@ -214,7 +198,7 @@ impl WsConnection {
             request,
             None,
             false,
-            Some(self.shared.read().await.ws_connector.clone()),
+            Some(self.shared.ws_connector.clone()),
         )
         .await
         .expect("Failed to connect")

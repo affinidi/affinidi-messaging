@@ -14,10 +14,11 @@ use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use ssi::dids::Document;
 use std::{
     env,
     fmt::{self, Debug},
-    fs::File,
+    fs::{self, File},
     io::{self, BufRead},
     path::Path,
 };
@@ -30,6 +31,7 @@ pub struct ServerConfig {
     pub listen_address: String,
     pub api_prefix: String,
     pub admin_did: String,
+    pub did_web_self_hosted: Option<String>,
 }
 
 /// Database Struct contains database and storage of messages related configuration details
@@ -413,6 +415,7 @@ pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
+    pub mediator_did_doc: Option<Document>,
     pub admin_did: String,
     pub api_prefix: String,
     pub streaming_enabled: bool,
@@ -458,6 +461,7 @@ impl Default for Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
             mediator_did: "".into(),
+            mediator_did_doc: None,
             admin_did: "".into(),
             database: DatabaseConfig::default(),
             streaming_enabled: true,
@@ -507,6 +511,33 @@ impl TryFrom<ConfigRaw> for Config {
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
+
+        // Are we self-hosting our own did:web Document?
+        if let Some(path) = raw.server.did_web_self_hosted {
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    let doc: Document = serde_json::from_str(&content).map_err(|err| {
+                        event!(
+                            Level::ERROR,
+                            "Could not parse DID Document. Reason: {}",
+                            err
+                        );
+                        MediatorError::ConfigError(
+                            "NA".into(),
+                            format!("Could not parse DID Document. Reason: {}", err),
+                        )
+                    })?;
+                    config.mediator_did_doc = Some(doc);
+                }
+                Err(err) => {
+                    event!(Level::ERROR, "Could not read DID Document. Reason: {}", err);
+                    return Err(MediatorError::ConfigError(
+                        "NA".into(),
+                        format!("Could not read DID Document. Reason: {}", err),
+                    ));
+                }
+            }
+        }
 
         // Ensure that the security JWT expiry times are valid
         if config.security.jwt_access_expiry >= config.security.jwt_refresh_expiry {

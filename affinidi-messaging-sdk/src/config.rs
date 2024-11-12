@@ -16,7 +16,6 @@ use tracing::error;
 #[derive(Clone)]
 pub struct Config {
     pub(crate) ssl_certificates: Vec<CertificateDer<'static>>,
-    pub(crate) ssl_only: bool,
     pub(crate) fetch_cache_limit_count: u32,
     pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
@@ -51,7 +50,6 @@ impl Config {
 /// ```
 pub struct ConfigBuilder {
     ssl_certificates: Vec<String>,
-    ssl_only: bool,
     fetch_cache_limit_count: u32,
     fetch_cache_limit_bytes: u64,
     secrets: Vec<Secret>,
@@ -63,7 +61,6 @@ impl Default for ConfigBuilder {
     fn default() -> Self {
         ConfigBuilder {
             ssl_certificates: vec![],
-            ssl_only: true,
             fetch_cache_limit_count: 100,
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
             secrets: Vec::new(),
@@ -83,14 +80,6 @@ impl ConfigBuilder {
     /// Each certificate should be a file path to a PEM encoded certificate
     pub fn with_ssl_certificates(mut self, ssl_certificates: &mut Vec<String>) -> Self {
         self.ssl_certificates.append(ssl_certificates);
-        self
-    }
-
-    /// Allow non-SSL connections to the ATM service
-    /// This is not recommended for production use
-    /// Default: `true`
-    pub fn with_non_ssl(mut self) -> Self {
-        self.ssl_only = false;
         self
     }
 
@@ -170,7 +159,6 @@ impl ConfigBuilder {
 
         Ok(Config {
             ssl_certificates: certs,
-            ssl_only: self.ssl_only,
             fetch_cache_limit_count: self.fetch_cache_limit_count,
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
