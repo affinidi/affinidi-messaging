@@ -2,14 +2,13 @@
 //! Admin account management
 //! Global ACL management
 
-use crate::{errors::ATMError, messages::EmptyResponse, profiles::Profile, ATM};
+use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha256::digest;
 use std::{sync::Arc, time::SystemTime};
-use tokio::sync::RwLock;
 use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
 #[derive(Default)]
@@ -38,16 +37,11 @@ pub struct MediatorAdminList {
 pub type MediatorAccountList = MediatorAdminList;
 
 impl Mediator {
-    pub async fn get_config(
-        &self,
-        atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
-    ) -> Result<Value, ATMError> {
+    pub async fn get_config(&self, atm: &ATM, profile: &Arc<Profile>) -> Result<Value, ATMError> {
         let _span = span!(Level::DEBUG, "get_config");
 
         async move {
-            let _profile = profile.read().await;
-            let (profile_did, mediator_did) = _profile.dids()?;
+            let (profile_did, mediator_did) = profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -80,11 +74,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let response = atm
-                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-                .await?;
-
-            Ok(response.body)
+            if let SendMessageResponse::Message(message) =
+                atm.send_message(profile, &msg, &msg_id, true).await?
+            {
+                Ok(message.body)
+            } else {
+                Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                ))
+            }
         }
         .instrument(_span)
         .await
@@ -110,7 +108,7 @@ impl Mediator {
     pub async fn add_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "add_admins");
@@ -127,8 +125,7 @@ impl Mediator {
                 ));
             }
 
-            let _profile = profile.read().await;
-            let (profile_did, mediator_did) = _profile.dids()?;
+            let (profile_did, mediator_did) = profile.dids()?;
 
             let mut digests: Vec<String> = Vec::new();
             let re = Regex::new(r"[0-9a-f]{64}").unwrap();
@@ -179,11 +176,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let response = atm
-                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-                .await?;
-
-            self._parse_add_admins_response(&response)
+            if let SendMessageResponse::Message(message) =
+                atm.send_message(profile, &msg, &msg_id, true).await?
+            {
+                self._parse_add_admins_response(&message)
+            } else {
+                Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                ))
+            }
         }
         .instrument(_span)
         .await
@@ -209,7 +210,7 @@ impl Mediator {
     pub async fn remove_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "remove_admins");
@@ -226,8 +227,7 @@ impl Mediator {
                 ));
             }
 
-            let _profile = profile.read().await;
-            let (profile_did, mediator_did) = _profile.dids()?;
+            let (profile_did, mediator_did) = profile.dids()?;
 
             // Check that these are digests
             let re = Regex::new(r"[0-9a-f]{64}").unwrap();
@@ -270,11 +270,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            let response = atm
-                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-                .await?;
-
-            self._parse_remove_admins_response(&response)
+            if let SendMessageResponse::Message(message) =
+                atm.send_message(profile, &msg, &msg_id, true).await?
+            {
+                self._parse_remove_admins_response(&message)
+            } else {
+                Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                ))
+            }
         }
         .instrument(_span)
         .await
@@ -302,7 +306,7 @@ impl Mediator {
     pub async fn list_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAdminList, ATMError> {
@@ -315,8 +319,7 @@ impl Mediator {
                 limit.unwrap_or(100)
             );
 
-            let _profile = profile.read().await;
-            let (profile_did, mediator_did) = _profile.dids()?;
+            let (profile_did, mediator_did) = profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -349,12 +352,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-                let response = atm
-                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-                .await?;
-
-                self._parse_list_admins_response(&response)
-
+                if let SendMessageResponse::Message(message) = atm
+                .send_message(profile, &msg, &msg_id, true)
+                .await? {
+                self._parse_list_admins_response(&message)
+                } else {
+                    Err(ATMError::MsgReceiveError(
+                        "No response from mediator".to_owned(),
+                    ))
+                }
         }
         .instrument(_span)
         .await
@@ -383,7 +389,7 @@ impl Mediator {
     pub async fn list_accounts(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAccountList, ATMError> {
@@ -396,8 +402,7 @@ impl Mediator {
                 limit.unwrap_or(100)
             );
 
-            let _profile = profile.read().await;
-            let (profile_did, mediator_did) = _profile.dids()?;
+            let (profile_did, mediator_did) = profile.dids()?;
 
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -430,12 +435,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-                let response = atm
-                .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-                .await?;
-
-                self._parse_list_accounts_response(&response)
-
+                if let SendMessageResponse::Message(message) = atm
+                .send_message(profile, &msg, &msg_id, true)
+                .await? {
+                self._parse_list_accounts_response(&message)
+                } else {
+                    Err(ATMError::MsgReceiveError(
+                        "No response from mediator".to_owned(),
+                    ))
+                }
         }
         .instrument(_span)
         .await

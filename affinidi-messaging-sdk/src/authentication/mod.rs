@@ -2,7 +2,10 @@ use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{sync::Arc, time::SystemTime};
+use std::{
+    sync::{atomic::Ordering, Arc},
+    time::SystemTime,
+};
 use tracing::{debug, error, span, Instrument, Level};
 use uuid::Uuid;
 
@@ -28,7 +31,7 @@ impl Profile {
     /// Will loop until successful authentication
     /// Will backoff on retries to a max of 10 seconds
     pub(crate) async fn authenticate(
-        &mut self,
+        &self,
         shared_state: &Arc<SharedState>,
     ) -> Result<AuthorizationResponse, ATMError> {
         let mut retry_count = 0;
@@ -40,7 +43,7 @@ impl Profile {
                     retry_count += 1;
                     error!(
                         "Profile ({}): Attempt #{}. Error authenticating: {:?} :: Sleeping for ({}) seconds",
-                        self.alias, retry_count, err, timer
+                        self.inner.alias, retry_count, err, timer
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(timer)).await;
                     if timer < 10 {
@@ -53,10 +56,10 @@ impl Profile {
 
     // Where the bulk of the authentication logic is actually done
     async fn _authenticate(
-        &mut self,
+        &self,
         shared_state: &Arc<SharedState>,
     ) -> Result<AuthorizationResponse, ATMError> {
-        if self.authenticated {
+        if self.inner.authenticated.load(Ordering::Relaxed) {
             // Already authenticated
 
             // Check if we need to refresh the tokens
@@ -64,15 +67,15 @@ impl Profile {
                 Ok(_) => {}
                 Err(err) => {
                     // Couldn't refresh the tokens
-                    self.authenticated = false;
+                    self.inner.authenticated.store(true, Ordering::Relaxed);
                     return Err(err);
                 }
             };
 
-            if let Some(tokens) = &self.authorization {
+            if let Some(tokens) = &*self.inner.authorization.lock().await {
                 return Ok(tokens.clone());
             } else {
-                self.authenticated = false;
+                self.inner.authenticated.store(false, Ordering::Relaxed);
                 return Err(ATMError::AuthenticationError(
                     "Authenticated but no tokens found".to_owned(),
                 ));
@@ -143,9 +146,9 @@ impl Profile {
 
             if let Some(tokens) = &step2_response.data {
                 debug!("Tokens received:\n{:#?}", tokens);
-                self.authorization = Some(tokens.clone());
+                *self.inner.authorization.lock().await = Some(tokens.clone());
                 debug!("Successfully authenticated");
-                self.authenticated = true;
+                self.inner.authenticated.store(true, Ordering::Relaxed);
 
                 Ok(tokens.clone())
             } else {
@@ -236,10 +239,10 @@ impl Profile {
 
     /// Will refresh the access tokens as required
     async fn _refresh_authentication(
-        &mut self,
+        &self,
         shared_state: &Arc<SharedState>,
     ) -> Result<(), ATMError> {
-        if let Some(tokens) = &self.authorization {
+        if let Some(tokens) = &*self.inner.authorization.lock().await {
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
@@ -272,7 +275,7 @@ impl Profile {
                     .await?;
 
                     if let Some(new_tokens) = new_tokens.data {
-                        self.authorization = Some(AuthorizationResponse {
+                        *self.inner.authorization.lock().await = Some(AuthorizationResponse {
                             access_token: new_tokens.access_token,
                             access_expires_at: new_tokens.access_expires_at,
                             refresh_token: tokens.refresh_token.clone(),

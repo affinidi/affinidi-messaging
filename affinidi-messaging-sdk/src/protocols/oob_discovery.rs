@@ -14,7 +14,10 @@ use affinidi_messaging_didcomm::Message;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -34,7 +37,7 @@ impl OOBDiscovery {
     pub async fn create_invite(
         &self,
         atm: &ATM,
-        profile: &mut Profile,
+        profile: &Arc<Profile>,
         expiry: Option<Duration>,
     ) -> Result<String, ATMError> {
         // Check if authenticated
@@ -50,7 +53,7 @@ impl OOBDiscovery {
             "https://didcomm.org/out-of-band/2.0/invitation".into(),
             json!({}),
         )
-        .from(profile.did.clone())
+        .from(profile.inner.did.clone())
         .created_time(now);
 
         if let Some(expiry) = expiry {
@@ -67,7 +70,7 @@ impl OOBDiscovery {
         let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
             return Err(ATMError::MsgSendError(format!(
                 "Profile ({}): Missing a valid mediator URL",
-                profile.alias
+                profile.inner.alias
             )));
         };
 
@@ -186,7 +189,7 @@ impl OOBDiscovery {
     pub async fn delete_invite(
         &self,
         atm: &ATM,
-        profile: &mut Profile,
+        profile: &Arc<Profile>,
         oobid: &str,
     ) -> Result<String, ATMError> {
         // Check if authenticated
@@ -195,7 +198,7 @@ impl OOBDiscovery {
         let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
             return Err(ATMError::MsgSendError(format!(
                 "Profile ({}): Missing a valid mediator URL",
-                profile.alias
+                profile.inner.alias
             )));
         };
 

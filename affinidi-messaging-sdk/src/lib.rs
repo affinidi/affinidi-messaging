@@ -13,7 +13,6 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
 use tracing::{debug, span, warn};
 use transports::websockets::ws_handler::WsHandlerCommands;
@@ -41,9 +40,9 @@ pub(crate) struct SharedState {
     pub(crate) secrets_resolver: AffinidiSecrets,
     pub(crate) client: Client,
     pub(crate) ws_connector: Connector,
-    pub(crate) ws_handler: Option<JoinHandle<()>>,
-    pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>,
-    pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>,
+    pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the WebSocket handler
+    pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>, // Receives MPSC messages from the WebSocket handler
+    pub(crate) sdk_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the SDK
     pub(crate) profiles: Arc<RwLock<Profiles>>,
 }
 
@@ -154,9 +153,9 @@ impl ATM {
             secrets_resolver: AffinidiSecrets::new(vec![]),
             client,
             ws_connector,
-            ws_handler: None,
             ws_handler_send_stream: sdk_tx,
             ws_handler_recv_stream: Mutex::new(sdk_rx),
+            sdk_send_stream: ws_handler_tx.clone(),
             profiles: Arc::new(RwLock::new(Profiles::default())),
         };
 

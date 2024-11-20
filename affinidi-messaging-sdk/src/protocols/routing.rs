@@ -4,6 +4,8 @@
 //! The DIDComm Routing Protocol is used to route messages between agents. It is used to ensure that messages are delivered to the correct agent.
 //!
 
+use std::sync::Arc;
+
 use crate::{errors::ATMError, profiles::Profile, ATM};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
@@ -27,7 +29,7 @@ impl Routing {
     pub async fn forward_message(
         &self,
         atm: &ATM,
-        profile: &Profile,
+        profile: &Arc<Profile>,
         message: &str,
         target_did: &str,
         next_did: &str,
@@ -47,7 +49,7 @@ impl Routing {
                 json!({"next": next_did}),
             )
             .to(target_did.to_owned())
-            .from(profile.did.clone())
+            .from(profile.inner.did.clone())
             .attachment(attachment);
 
             if let Some(expires_time) = expires_time {
@@ -65,8 +67,8 @@ impl Routing {
             let (msg, _) = forwarded
                 .pack_encrypted(
                     target_did,
-                    Some(&profile.did),
-                    Some(&profile.did),
+                    Some(&profile.inner.did),
+                    Some(&profile.inner.did),
                     &atm.inner.did_resolver,
                     &atm.inner.secrets_resolver,
                     &PackEncryptedOptions::default(),

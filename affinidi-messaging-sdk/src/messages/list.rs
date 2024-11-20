@@ -1,6 +1,7 @@
 use super::{Folder, MessageList};
 use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
 use sha256::digest;
+use std::sync::Arc;
 use tracing::{debug, span, Instrument, Level};
 
 impl ATM {
@@ -10,12 +11,12 @@ impl ATM {
     /// - `folder`: The folder to list messages from
     pub async fn list_messages(
         &self,
-        profile: &mut Profile,
+        profile: &Arc<Profile>,
         folder: Folder,
     ) -> Result<MessageList, ATMError> {
         let _span = span!(Level::DEBUG, "list_messages", folder = folder.to_string());
         async move {
-            let profile_did = profile.did.clone();
+            let profile_did = profile.inner.did.clone();
             debug!("listing folder({}) for DID({})", profile_did, folder);
 
             // Check if authenticated

@@ -1,19 +1,16 @@
-use std::{sync::Arc, time::Duration};
-
-use affinidi_messaging_didcomm::Message;
-use tokio::sync::RwLock;
-use tracing::debug;
-use websockets::ws_connection::WsConnectionCommands;
-
 use crate::{
     errors::ATMError,
-    messages::{
-        known::MessageType, sending::InboundMessageResponse, GenericDataStruct, SuccessResponse,
-    },
+    messages::{known::MessageType, GenericDataStruct, GetMessagesRequest},
     profiles::Profile,
     protocols::message_pickup::MessagePickup,
     ATM,
 };
+use affinidi_messaging_didcomm::Message;
+use serde_json::Value;
+use sha256::digest;
+use std::{sync::Arc, time::Duration};
+use tracing::debug;
+use websockets::ws_connection::WsConnectionCommands;
 
 pub mod websockets;
 
@@ -30,41 +27,64 @@ pub struct WebSocketSendResponse {
 
 /// SendMessageResponse is the response from sending a message
 /// Allows for returning the response from the API or the WebSocket
+/// - RestAPI: The response from the API (JSON Value response)
+/// - Message: The response from the WebSocket (DIDComm Message)
+/// - EmptyResponse: No response was received or expected
 #[derive(Debug)]
-pub enum SendMessageResponse<T> {
-    RestAPI(Option<T>),
-    WebSocket(WebSocketSendResponse),
+pub enum SendMessageResponse {
+    RestAPI(Value),
+    Message(Message),
+    EmptyResponse,
 }
 
-impl<T> SendMessageResponse<T> {
-    pub fn get_http_response(&self) -> Option<&T> {
+impl SendMessageResponse {
+    pub fn get_http_response<T>(&self) -> Option<T>
+    where
+        T: GenericDataStruct,
+    {
         match self {
-            SendMessageResponse::RestAPI(Some(response)) => Some(response),
-            SendMessageResponse::WebSocket(_) => None,
-            _ => None,
+            SendMessageResponse::RestAPI(value) => serde_json::from_value(value.to_owned()).ok(),
+            SendMessageResponse::Message(_) => None,
+            SendMessageResponse::EmptyResponse => None,
         }
     }
 }
 
 impl ATM {
-    pub async fn send_message<T>(
+    /// Send a message to a mediator based on a given profile
+    /// - profile: The profile to connect to the mediator with
+    /// - message: The message to send (already packed as a DIDComm message)
+    /// - msg_id: The ID of the message (used for message response pickup)
+    /// - wait_for_response: Whether to wait for a message response from the mediator
+    ///
+    /// Returns: If wait_for_response is true, the response message from the mediator
+    ///          Else Ok(None) - Message sent Successfully
+    ///          Else Err - Error sending message    
+    ///
+    pub async fn send_message(
         &self,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         message: &str,
         msg_id: &str,
-    ) -> Result<Message, ATMError> {
-        let _profile = &profile.read().await;
-
-        let Some(mediator) = &_profile.mediator else {
+        wait_for_response: bool,
+    ) -> Result<SendMessageResponse, ATMError> {
+        let Some(mediator) = &*profile.inner.mediator else {
             return Err(ATMError::ConfigError(
                 "No Mediator is configured for this Profile".to_string(),
             ));
         };
 
-        let message_received = if mediator.ws_connected {
+        if mediator
+            .ws_connected
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
             // Send to the WS_Connection task for this profile
+            debug!(
+                "Profile ({}): Sending message to WebSocket Connection Handler",
+                profile.inner.alias
+            );
 
-            if let Some(channel) = &mediator.ws_channel_tx {
+            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
                 channel
                     .send(WsConnectionCommands::Send(message.to_owned()))
                     .await
@@ -76,65 +96,89 @@ impl ATM {
                     })?;
             }
 
-            debug!("Profile ({}): WebSocket Channel notified", _profile.alias);
+            debug!(
+                "Profile ({}): WebSocket Channel notified",
+                profile.inner.alias
+            );
 
-            let response = MessagePickup::default()
-                .live_stream_get(self, profile, msg_id, Duration::from_secs(10))
-                .await?;
+            if wait_for_response {
+                let response = MessagePickup::default()
+                    .live_stream_get(self, profile, true, msg_id, Duration::from_secs(10))
+                    .await?;
 
-            if let Some((message, _)) = response {
-                message
+                if let Some((message, _)) = response {
+                    let type_ = message.type_.parse::<MessageType>()?;
+                    if let MessageType::ProblemReport = type_ {
+                        Err(ATMError::from_problem_report(&message))
+                    } else {
+                        Ok(SendMessageResponse::Message(message))
+                    }
+                } else {
+                    Err(ATMError::MsgSendError("No response from API".into()))
+                }
             } else {
-                return Err(ATMError::MsgSendError("No response from API".into()));
+                Ok(SendMessageResponse::EmptyResponse)
             }
         } else {
+            debug!("Profile ({}): Sending message to API", profile.inner.alias);
             // Send HTTP message
-            let a = self
-                .send_didcomm_message::<InboundMessageResponse>(profile, message, true)
-                .await?;
+            let a = self.send_didcomm_message(profile, message, true).await?;
 
-            debug!("Response: {:?}", a);
+            debug!("Response: {:#?}", a);
 
-            // Unpack the response
-            if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Ephemeral(message))) =
-                a
-            {
-                let (message, _) = self.unpack(&message).await?;
-                message
+            if wait_for_response {
+                let response = self
+                    .get_messages(
+                        profile,
+                        &GetMessagesRequest {
+                            message_ids: vec![digest(message)],
+                            delete: true,
+                        },
+                    )
+                    .await?;
+
+                if let Some(first) = response.success.first() {
+                    if let Some(msg) = &first.msg {
+                        let unpack = self.unpack(msg).await?;
+
+                        Ok(SendMessageResponse::Message(unpack.0))
+                    } else {
+                        Err(ATMError::MsgReceiveError(
+                            "Received message response, but no actual message".into(),
+                        ))
+                    }
+                } else {
+                    Err(ATMError::MsgReceiveError(
+                        "No Message retrieved from Mediator".into(),
+                    ))
+                }
             } else {
-                return Err(ATMError::MsgSendError("No response from API".into()));
+                Ok(a)
             }
-        };
-
-        let type_ = message_received.type_.parse::<MessageType>()?;
-        if let MessageType::ProblemReport = type_ {
-            Err(ATMError::from_problem_report(&message_received))
-        } else {
-            Ok(message_received)
         }
     }
 
     /// send_didcomm_message
     /// - msg: Packed DIDComm message that we want to send
     /// - return_response: Whether to return the response from the API
-    pub async fn send_didcomm_message<T>(
+    pub(crate) async fn send_didcomm_message(
         &self,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         message: &str,
         return_response: bool,
-    ) -> Result<SendMessageResponse<T>, ATMError>
-    where
-        T: GenericDataStruct,
-    {
-        let _profile = &profile.read().await;
-        let Some(mediator_url) = _profile.get_mediator_rest_endpoint() else {
-            return Err(ATMError::MsgSendError(format!(
-                "Profile ({}): Missing a valid mediator URL",
-                _profile.alias
-            )));
+    ) -> Result<SendMessageResponse, ATMError> {
+        let mediator_url = {
+            let url = profile.get_mediator_rest_endpoint();
+            if let Some(url) = url {
+                url
+            } else {
+                return Err(ATMError::MsgSendError(
+                    "Profile is missing a valid mediator URL".into(),
+                ));
+            }
         };
 
-        let tokens = profile.write().await.authenticate(&self.inner).await?;
+        let tokens = profile.authenticate(&self.inner).await?;
 
         let msg = message.to_owned();
 
@@ -164,13 +208,12 @@ impl ATM {
             )));
         }
         debug!("body =\n{}", body);
-        let http_response: Option<T> = if return_response {
-            let r: SuccessResponse<T> = serde_json::from_str(&body).map_err(|e| {
+        let http_response: Value = if return_response {
+            serde_json::from_str(&body).map_err(|e| {
                 ATMError::TransportError(format!("Couldn't parse response: {:?}", e))
-            })?;
-            r.data
+            })?
         } else {
-            None
+            Value::Null
         };
 
         Ok(SendMessageResponse::RestAPI(http_response))

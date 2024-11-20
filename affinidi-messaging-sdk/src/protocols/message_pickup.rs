@@ -6,15 +6,15 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
-use tokio::{select, sync::RwLock};
+use tokio::select;
 use tracing::{debug, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
     errors::ATMError,
-    messages::{EmptyResponse, GenericDataStruct},
+    messages::GenericDataStruct,
     profiles::Profile,
-    transports::websockets::ws_handler::WsHandlerCommands,
+    transports::{websockets::ws_handler::WsHandlerCommands, SendMessageResponse},
     ATM,
 };
 
@@ -81,17 +81,16 @@ impl MessagePickup {
     pub async fn send_status_request(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         wait: Option<Duration>,
     ) -> Result<MessagePickupStatusReply, ATMError> {
         let _span = span!(Level::DEBUG, "send_status_request",).entered();
-        let _profile = &profile.read().await;
         debug!(
             "Profile ({}): Status Request wait: {:?}",
-            _profile.alias, wait
+            profile.inner.alias, wait
         );
 
-        let (profile_did, mediator_did) = _profile.dids()?;
+        let (profile_did, mediator_did) = profile.dids()?;
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -127,11 +126,15 @@ impl MessagePickup {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        let response = atm
-            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-            .await?;
-
-        self._parse_status_response(&response).await
+        if let SendMessageResponse::Message(message) =
+            atm.send_message(profile, &msg, &msg_id, true).await?
+        {
+            self._parse_status_response(&message).await
+        } else {
+            Err(ATMError::MsgReceiveError(
+                "Invalid response from API".into(),
+            ))
+        }
     }
 
     pub(crate) async fn _parse_status_response(
@@ -146,51 +149,54 @@ impl MessagePickup {
     }
 
     /// Sends a Message Pickup 3.0 `Live Delivery` message
+    /// Returns the msg_id of the message sent, helpful to get the status response
     pub async fn toggle_live_delivery(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         live_delivery: bool,
-    ) -> Result<(), ATMError> {
-        let _span = span!(Level::DEBUG, "toggle_live_delivery",).entered();
-        debug!("Setting live_delivery to ({})", live_delivery);
-        let _profile = profile.read().await;
-        let (profile_did, mediator_did) = _profile.dids()?;
+    ) -> Result<String, ATMError> {
+        let _span = span!(Level::DEBUG, "toggle_live_delivery",);
+        async move {
+            debug!("Setting live_delivery to ({})", live_delivery);
+            let (profile_did, mediator_did) = profile.dids()?;
 
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
 
-        let msg = Message::build(
-            Uuid::new_v4().into(),
-            "https://didcomm.org/messagepickup/3.0/live-delivery-change".to_owned(),
-            json!({"live_delivery": live_delivery}),
-        )
-        .header("return_route".into(), Value::String("all".into()))
-        .created_time(now)
-        .expires_time(now + 300)
-        .from(profile_did.into())
-        .to(mediator_did.into())
-        .finalize();
-        let msg_id = msg.id.clone();
-
-        // Pack the message
-        let (msg, _) = msg
-            .pack_encrypted(
-                mediator_did,
-                Some(profile_did),
-                Some(profile_did),
-                &atm.inner.did_resolver,
-                &atm.inner.secrets_resolver,
-                &PackEncryptedOptions::default(),
+            let msg = Message::build(
+                Uuid::new_v4().into(),
+                "https://didcomm.org/messagepickup/3.0/live-delivery-change".to_owned(),
+                json!({"live_delivery": live_delivery}),
             )
-            .await
-            .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+            .header("return_route".into(), Value::String("all".into()))
+            .created_time(now)
+            .expires_time(now + 300)
+            .from(profile_did.into())
+            .to(mediator_did.into())
+            .finalize();
+            let msg_id = msg.id.clone();
 
-        atm.send_message::<EmptyResponse>(profile, &msg, &msg_id)
-            .await?;
-        Ok(())
+            // Pack the message
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+            atm.send_message(profile, &msg, &msg_id, false).await?;
+            Ok(msg_id)
+        }
+        .instrument(_span)
+        .await
     }
 
     /// Waits for the next message to be received via websocket live delivery
@@ -202,7 +208,6 @@ impl MessagePickup {
     pub async fn live_stream_next(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
         wait: Duration,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_next");
@@ -211,7 +216,7 @@ impl MessagePickup {
             // Send the next request to the ws_handler
             atm.inner
                 .ws_handler_send_stream
-                .send(WsHandlerCommands::Next(profile.clone()))
+                .send(WsHandlerCommands::Next)
                 .await
                 .map_err(|err| {
                     ATMError::TransportError(format!(
@@ -251,25 +256,35 @@ impl MessagePickup {
     }
 
     /// Attempts to retrieve a specific message from the server via websocket live delivery
-    /// atm  : The ATM SDK to use
-    /// msg_id : The ID of the message to retrieve (matches on either `id` or `pthid`)
-    /// wait : How long to wait (in milliseconds) for a message before returning None
-    ///        If 0, will not block
+    /// atm                 : The ATM SDK to use
+    /// profile             : The profile to use
+    /// use_profile_channel : If true, then send the response to the profile RX channel rather than the generic SDK Channel
+    /// msg_id              : The ID of the message to retrieve (matches on either `id` or `pthid`)
+    /// wait                : How long to wait (in milliseconds) for a message before returning None
+    ///                       If 0, will not block
     /// Returns a tuple of the message and metadata, or None if no message was received
     /// NOTE: You still need to delete the message from the server after receiving it
     pub async fn live_stream_get(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
+        use_profile_channel: bool,
         msg_id: &str,
         wait: Duration,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_get");
 
         async move {
+            // Pick the correct response channel for the message when returned
+            let return_channel_tx = if use_profile_channel {
+                profile.inner.channel_tx.lock().await.clone()
+            } else {
+                atm.inner.sdk_send_stream.clone()
+            };
+
             // Send the get request to the ws_handler
             atm.inner.ws_handler_send_stream
-                .send(WsHandlerCommands::Get(profile.clone(), msg_id.to_string()))
+                .send(WsHandlerCommands::Get(msg_id.to_string(), return_channel_tx))
                 .await
                 .map_err(|err| {
                     ATMError::TransportError(format!(
@@ -283,7 +298,12 @@ impl MessagePickup {
             let sleep = tokio::time::sleep(wait);
             tokio::pin!(sleep);
 
-            let stream = &mut atm.inner.ws_handler_recv_stream.lock().await;
+            let return_channel_rx = if use_profile_channel {
+                &mut profile.inner.channel_rx.lock().await
+            } else {
+                &mut atm.inner.ws_handler_recv_stream.lock().await
+            };
+
             loop {
             select! {
                 _ = &mut sleep, if wait.as_millis() > 0 => {
@@ -293,7 +313,7 @@ impl MessagePickup {
                     })?;
                     return Ok(None);
                 }
-                value = stream.recv() => {
+                value = return_channel_rx.recv() => {
                     if let Some(msg) = value {
                         match msg {
                             WsHandlerCommands::MessageReceived(message, meta) => {
@@ -323,16 +343,15 @@ impl MessagePickup {
     pub async fn send_delivery_request(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         limit: Option<usize>,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
         let _span = span!(Level::DEBUG, "send_delivery_request",).entered();
-        let _profile = profile.read().await;
         debug!(
             "Profile ({}): Delivery Request limit: {:?}",
-            _profile.alias, limit
+            profile.inner.alias, limit
         );
-        let (profile_did, mediator_did) = _profile.dids()?;
+        let (profile_did, mediator_did) = profile.dids()?;
 
         let body = MessagePickupDeliveryRequest {
             recipient_did: profile_did.into(),
@@ -377,10 +396,13 @@ impl MessagePickup {
             msg
         };
 
-        let response = atm
-            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-            .await?;
-        self._handle_delivery(atm, &response).await
+        if let SendMessageResponse::Message(message) =
+            atm.send_message(profile, &msg, &msg_id, true).await?
+        {
+            self._handle_delivery(atm, &message).await
+        } else {
+            Err(ATMError::MsgReceiveError("No Messages from API".into()))
+        }
     }
 
     /// Iterates through each attachment and unpacks each message into an array to return
@@ -448,18 +470,17 @@ impl MessagePickup {
     pub async fn send_messages_received(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         list: &Vec<String>,
     ) -> Result<MessagePickupStatusReply, ATMError> {
         let _span = span!(Level::DEBUG, "send_messages_received",).entered();
-        let _profile = profile.read().await;
         debug!(
             "Profile ({}): Messages Received, # msgs to delete: {}",
-            _profile.alias,
+            profile.inner.alias,
             list.len()
         );
 
-        let (profile_did, mediator_did) = _profile.dids()?;
+        let (profile_did, mediator_did) = profile.dids()?;
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -495,9 +516,14 @@ impl MessagePickup {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        let response = atm
-            .send_message::<EmptyResponse>(profile, &msg, &msg_id)
-            .await?;
-        self._parse_status_response(&response).await
+        if let SendMessageResponse::Message(message) =
+            atm.send_message(profile, &msg, &msg_id, true).await?
+        {
+            self._parse_status_response(&message).await
+        } else {
+            Err(ATMError::MsgReceiveError(
+                "Invalid response from API".into(),
+            ))
+        }
     }
 }

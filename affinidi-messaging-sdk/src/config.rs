@@ -2,7 +2,7 @@ use crate::{errors::ATMError, profiles::Mediator};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::secrets::Secret;
 use rustls::pki_types::CertificateDer;
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::BufReader, sync::Arc};
 use tracing::error;
 
 /// Configuration for the Affinidi Trusted Messaging (ATM) Service
@@ -20,7 +20,7 @@ pub struct Config {
     pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
     pub(crate) did_resolver: Option<DIDCacheClient>,
-    pub(crate) default_mediator: Option<Mediator>,
+    pub(crate) default_mediator: Arc<Option<Mediator>>,
 }
 
 impl Config {
@@ -163,7 +163,7 @@ impl ConfigBuilder {
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
             did_resolver: self.did_resolver,
-            default_mediator: self.default_mediator,
+            default_mediator: Arc::new(self.default_mediator),
         })
     }
 }

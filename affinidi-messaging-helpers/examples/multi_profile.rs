@@ -1,26 +1,11 @@
 //! Sends a message from Alice to Bob and then retrieves it.
 
-use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
-use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{
-    config::{Config, ConfigBuilder},
-    errors::ATMError,
-    messages::EmptyResponse,
-    profiles::Profile,
-    protocols::Protocols,
-    ATM,
-};
+use affinidi_messaging_sdk::{config::ConfigBuilder, errors::ATMError, profiles::Profile, ATM};
 use clap::Parser;
-use serde_json::json;
-use std::{
-    env,
-    time::{Duration, SystemTime},
-};
+use std::{env, time::Duration};
 use tokio::time::sleep;
-use tracing::{error, info};
 use tracing_subscriber::filter;
-use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -53,43 +38,6 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let bob = if let Some(bob) = profile.friends.get("Bob") {
-        bob
-    } else {
-        return Err(ATMError::ConfigError(
-            format!("Bob not found in Profile: {}", profile_name).to_string(),
-        ));
-    };
-
-    /*
-    let mut alice_config = Config::builder()
-        .with_my_did(&alice.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(alice.keys.clone())
-        .with_atm_api(&profile.network_address);
-
-    let mut bob_config = Config::builder()
-        .with_my_did(&bob.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(bob.keys.clone())
-        .with_atm_api(&profile.network_address);
-
-    if let Some(ssl_cert) = &profile.ssl_certificate {
-        alice_config = alice_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        bob_config = bob_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        info!("Using SSL Certificate: {}", ssl_cert);
-    } else {
-        alice_config = alice_config.with_non_ssl();
-        bob_config = bob_config.with_non_ssl();
-        error!("  **** Not using SSL/TLS ****");
-    }
-    */
-
-    // Create a new ATM Client
-    //let mut alice_atm = ATM::new(alice_config.build()?).await?;
-    //let mut bob_atm = ATM::new(bob_config.build()?).await?;
-    let protocols = Protocols::new();
-
     println!("Start ATM");
 
     let atm = ATM::new(ConfigBuilder::default().build()?).await?;
@@ -107,7 +55,7 @@ async fn main() -> Result<(), ATMError> {
     println!("Created Alice's Profile");
 
     // add and enable the profile
-    atm.profile_add(&p, true).await;
+    let _ = atm.profile_add(&p, true).await;
 
     println!("Added Alice's Profile");
 

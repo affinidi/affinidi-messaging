@@ -3,11 +3,10 @@ use std::{sync::Arc, time::SystemTime};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde_json::json;
 use sha256::digest;
-use tokio::sync::RwLock;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, messages::EmptyResponse, profiles::Profile, ATM};
+use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
 
 #[derive(Default)]
 pub struct TrustPing {}
@@ -16,42 +15,46 @@ pub struct TrustPing {}
 /// - `message_id` - The ID of the message sent
 /// - `message_hash` - The sha256 hash of the message sent
 /// - `bytes` - The number of bytes sent
+/// - `response` - The response from the endpoint
 pub struct TrustPingSent {
     pub message_id: String,
     pub message_hash: String,
     pub bytes: u32,
-    pub response: Option<String>,
+    pub response: SendMessageResponse,
 }
 
 impl TrustPing {
     /// Sends a DIDComm Trust-Ping message
     /// - `to_did` - The DID to send the ping to
     /// - `signed` - Whether the ping should signed or anonymous?
-    /// - `expect_response` - Whether a response is expected[^note]
+    /// - `expect_pong` - whether a ping response from endpoint is expected[^note]
+    /// - `wait_response` - whether to wait for a response from the endpoint
     ///
     /// Returns: The message ID and sha256 hash of the ping message
     /// [^note]: Anonymous pings cannot expect a response, the SDK will automatically set this to false if anonymous is true
     pub async fn send_ping(
         &self,
         atm: &ATM,
-        profile: &Arc<RwLock<Profile>>,
+        profile: &Arc<Profile>,
         to_did: &str,
         signed: bool,
-        expect_response: bool,
+        expect_pong: bool,
+        wait_response: bool,
     ) -> Result<TrustPingSent, ATMError> {
         let _span = span!(Level::DEBUG, "create_ping_message",).entered();
         debug!(
-            "Pinging {}, signed?({}) response_expected?({})",
-            to_did, signed, expect_response
+            "Pinging {}, signed?({}) pong_response_expected?({}) wait_response({})",
+            to_did, signed, expect_pong, wait_response
         );
-        let _profile = profile.read().await;
-        let (profile_did, _) = _profile.dids()?;
+
+        let (profile_did, _) = profile.dids()?;
+
         // If an anonymous ping is being sent, we should ensure that expect_response is false
-        let expect_response = if !signed && expect_response {
+        let expect_response = if !signed && expect_pong {
             debug!("Anonymous pings cannot expect a response, changing to false...");
             false
         } else {
-            expect_response
+            expect_pong
         };
 
         let now = SystemTime::now()
@@ -78,7 +81,7 @@ impl TrustPing {
             message_id: msg.id.clone(),
             message_hash: "".to_string(),
             bytes: 0,
-            response: None,
+            response: SendMessageResponse::EmptyResponse,
         };
 
         debug!("Ping message: {:#?}", msg);
@@ -101,8 +104,10 @@ impl TrustPing {
         msg_info.message_hash = digest(&msg).to_string();
         msg_info.bytes = msg.len() as u32;
 
-        atm.send_message::<EmptyResponse>(profile, &msg, &msg_info.message_id)
+        msg_info.response = atm
+            .send_message(profile, &msg, &msg_info.message_id, wait_response)
             .await?;
+
         Ok(msg_info)
     }
 }

@@ -9,6 +9,7 @@ For Profile network connections:
 use crate::{
     errors::ATMError,
     messages::AuthorizationResponse,
+    protocols::message_pickup::MessagePickup,
     transports::websockets::{ws_connection::WsConnectionCommands, ws_handler::WsHandlerCommands},
     ATM,
 };
@@ -18,21 +19,38 @@ use ssi::dids::{
     document::{service::Endpoint, Service},
     Document,
 };
-use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{mpsc::Sender, RwLock};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Mutex,
+};
 use tracing::debug;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Profile {
+    #[serde(flatten)]
+    pub inner: Arc<ProfileInner>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProfileInner {
     pub did: String,
     pub alias: String,
     #[serde(skip)]
-    pub secrets: Vec<Secret>,
-    pub mediator: Option<Mediator>,
+    pub secrets: Mutex<Vec<Secret>>,
+    pub mediator: Arc<Option<Mediator>>,
     #[serde(skip)]
-    pub(crate) authorization: Option<AuthorizationResponse>,
+    pub(crate) authorization: Mutex<Option<AuthorizationResponse>>,
     #[serde(skip)]
-    pub(crate) authenticated: bool,
+    pub(crate) authenticated: AtomicBool,
+    #[serde(skip)]
+    pub(crate) channel_tx: Mutex<Sender<WsHandlerCommands>>,
+    #[serde(skip)]
+    pub(crate) channel_rx: Mutex<Receiver<WsHandlerCommands>>,
 }
 
 impl Profile {
@@ -59,15 +77,21 @@ impl Profile {
             None
         };
 
-        println!("Mediator: {:?}", mediator);
+        debug!("Mediator: {:?}", mediator);
+
+        let (tx, rx) = tokio::sync::mpsc::channel(32);
 
         let profile = Profile {
-            did,
-            alias,
-            secrets,
-            mediator,
-            authorization: None,
-            authenticated: false,
+            inner: Arc::new(ProfileInner {
+                did,
+                alias,
+                secrets: Mutex::new(secrets),
+                mediator: Arc::new(mediator),
+                authorization: Mutex::new(None),
+                authenticated: AtomicBool::new(false),
+                channel_tx: Mutex::new(tx),
+                channel_rx: Mutex::new(rx),
+            }),
         };
 
         Ok(profile)
@@ -77,18 +101,18 @@ impl Profile {
     /// Will return an error if no Mediator
     /// Returns Ok(profile_did, mediator_did)
     pub fn dids(&self) -> Result<(&str, &str), ATMError> {
-        let Some(mediator) = &self.mediator else {
+        let Some(mediator) = &*self.inner.mediator else {
             return Err(ATMError::ConfigError(
                 "No Mediator is configured for this Profile".to_string(),
             ));
         };
 
-        Ok((&self.did, &mediator.did))
+        Ok((&self.inner.did, &mediator.did))
     }
 
     /// Return the REST endpoint for this profile if it exists
     pub fn get_mediator_rest_endpoint(&self) -> Option<String> {
-        if let Some(mediator) = &self.mediator {
+        if let Some(mediator) = &*self.inner.mediator {
             mediator.rest_endpoint.clone()
         } else {
             None
@@ -96,7 +120,7 @@ impl Profile {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Mediator {
     pub did: String,
     #[serde(skip)]
@@ -104,9 +128,9 @@ pub struct Mediator {
     #[serde(skip)]
     pub(crate) websocket_endpoint: Option<String>,
     #[serde(skip)]
-    pub(crate) ws_connected: bool, // Whether the websocket is connected
+    pub(crate) ws_connected: AtomicBool, // Whether the websocket is connected
     #[serde(skip)]
-    pub(crate) ws_channel_tx: Option<Sender<WsConnectionCommands>>,
+    pub(crate) ws_channel_tx: Mutex<Option<Sender<WsConnectionCommands>>>,
 }
 
 impl Mediator {
@@ -125,8 +149,8 @@ impl Mediator {
             did,
             rest_endpoint: Mediator::find_rest_endpoint(&mediator_doc),
             websocket_endpoint: Mediator::find_ws_endpoint(&mediator_doc),
-            ws_connected: false,
-            ws_channel_tx: None,
+            ws_connected: AtomicBool::new(false),
+            ws_channel_tx: Mutex::new(None),
         };
 
         Ok(mediator)
@@ -195,15 +219,20 @@ impl Mediator {
 /// Key is the alias of the profile
 /// If no alias is provided, the DID is used as the key
 #[derive(Default)]
-pub struct Profiles(HashMap<String, Arc<RwLock<Profile>>>);
+pub struct Profiles(HashMap<String, Arc<Profile>>);
 
 impl Profiles {
-    pub fn insert(&mut self, profile: Profile) -> Option<Arc<RwLock<Profile>>> {
-        self.0
-            .insert(profile.alias.clone(), Arc::new(RwLock::new(profile)))
+    /// Inserts a new profile into the ATM SDK profiles HashMap
+    /// Returns the thread-safe wrapped profile
+    pub fn insert(&mut self, profile: Profile) -> Arc<Profile> {
+        let _key = profile.inner.alias.clone();
+        let _profile = Arc::new(profile);
+        self.0.insert(_key, _profile.clone());
+
+        _profile
     }
 
-    pub fn get(&self, key: &str) -> Option<Arc<RwLock<Profile>>> {
+    pub fn get(&self, key: &str) -> Option<Arc<Profile>> {
         self.0.get(key).cloned()
     }
 
@@ -219,58 +248,98 @@ impl Profiles {
 impl ATM {
     /// Adds a profile to the ATM instance
     /// Returns None if the profile is new
-    /// Returns Some(profile) if the profile already exists
+    /// Returns thread-safe wrapped profile
     ///   NOTE: It will have replaced the old profile with the new one
     /// Inputs:
     ///   profile: Profile - DID and Mediator information
     ///   live_stream: bool - If true, then start websocket connection and live_streaming
+    ///
+    /// NOTE:
     pub async fn profile_add(
         &self,
         profile: &Profile,
         live_stream: bool,
-    ) -> Result<Option<Arc<RwLock<Profile>>>, ATMError> {
-        let _insert = self.inner.profiles.write().await.insert(profile.clone());
+    ) -> Result<Arc<Profile>, ATMError> {
+        let _profile = self.inner.profiles.write().await.insert(profile.clone());
+        debug!("Profile({}): Added to profiles", _profile.inner.alias);
 
         // Add the profile secrets to Secrets Manager
-        self.add_secrets(&profile.secrets).await;
+        {
+            self.add_secrets(&*profile.inner.secrets.lock().await).await;
+            debug!("Profile({}): Secrets added", _profile.inner.alias);
+        }
 
         if live_stream {
             // Grab a copy of the wrapped Profile
-            if let Some(profile) = self.inner.profiles.read().await.get(&profile.alias) {
-                self.profile_enable_websocket(&profile).await?;
-            }
+            self.profile_enable_websocket(&_profile).await?;
         }
-        Ok(_insert)
+        Ok(_profile)
     }
 
     /// Will create a websocket connection for the profile if one doesn't already exist
     /// Will return Ok() if a connection already exists, or if it successfully started a new connection
-    pub async fn profile_enable_websocket(
-        &self,
-        profile: &Arc<RwLock<Profile>>,
-    ) -> Result<(), ATMError> {
-        let Some(mediator) = &profile.read().await.mediator else {
-            return Err(ATMError::ConfigError(
-                "No Mediator is configured for this Profile".to_string(),
-            ));
+    pub async fn profile_enable_websocket(&self, profile: &Arc<Profile>) -> Result<(), ATMError> {
+        let mediator = {
+            let Some(mediator) = &*profile.inner.mediator else {
+                return Err(ATMError::ConfigError(
+                    "No Mediator is configured for this Profile".to_string(),
+                ));
+            };
+            mediator
         };
 
-        if mediator.ws_connected {
+        if mediator
+            .ws_connected
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
             // Already connected
             debug!(
                 "Profile ({}): is already connected to the WebSocket",
-                profile.read().await.alias
+                profile.inner.alias
             );
             return Ok(());
         }
 
-        debug!("Profile({}): enabling...", profile.read().await.alias);
+        debug!("Profile({}): enabling...", profile.inner.alias);
 
         // Send this profile info to the WS_Handler
-        let a = self
+        let status_msg_id = match self
             .inner
             .ws_handler_send_stream
             .send(WsHandlerCommands::Activate(profile.clone()))
+            .await
+        {
+            Ok(_) => {
+                debug!(
+                    "Profile({}): Successfully sent Activate command to WS_Handler",
+                    profile.inner.alias
+                );
+
+                // Wait for the Activated message from the WS_handler
+                let mut rx_guard = profile.inner.channel_rx.lock().await;
+                match rx_guard.recv().await {
+                    Some(WsHandlerCommands::Activated(status_msg_id)) => {
+                        debug!("Profile({}): Activated", profile.inner.alias);
+                        status_msg_id
+                    }
+                    _ => {
+                        return Err(ATMError::TransportError(format!(
+                            "Profile({}): Couldn't activate the profile",
+                            profile.inner.alias
+                        )))
+                    }
+                }
+            }
+            Err(err) => {
+                return Err(ATMError::TransportError(format!(
+                    "Profile({}): Couldn't send Activate command to WS_Handler. Reason: {}",
+                    profile.inner.alias, err
+                )))
+            }
+        };
+
+        let _ = MessagePickup::default()
+            .live_stream_get(self, profile, true, &status_msg_id, Duration::from_secs(10))
             .await;
 
         Ok(())

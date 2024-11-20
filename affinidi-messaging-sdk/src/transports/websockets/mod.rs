@@ -17,6 +17,7 @@ use tokio::{
 use tracing::{debug, warn};
 use ws_handler::WsHandlerCommands;
 
+pub(crate) mod ws_cache;
 pub(crate) mod ws_connection;
 pub(crate) mod ws_handler;
 
