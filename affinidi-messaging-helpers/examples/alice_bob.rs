@@ -3,7 +3,7 @@
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, messages::EmptyResponse, protocols::Protocols, ATM,
+    config::Config, errors::ATMError, profiles::Profile, protocols::Protocols, ATM,
 };
 use clap::Parser;
 use serde_json::json;
@@ -11,7 +11,7 @@ use std::{
     env,
     time::{Duration, SystemTime},
 };
-use tracing::{error, info};
+use tracing::debug;
 use tracing_subscriber::filter;
 use uuid::Uuid;
 
@@ -54,40 +54,47 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let mut alice_config = Config::builder()
-        .with_my_did(&alice.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(alice.keys.clone())
-        .with_atm_api(&profile.network_address);
-
-    let mut bob_config = Config::builder()
-        .with_my_did(&bob.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(bob.keys.clone())
-        .with_atm_api(&profile.network_address);
+    let mut config = Config::builder();
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
-        alice_config = alice_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        bob_config = bob_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        info!("Using SSL Certificate: {}", ssl_cert);
-    } else {
-        alice_config = alice_config.with_non_ssl();
-        bob_config = bob_config.with_non_ssl();
-        error!("  **** Not using SSL/TLS ****");
+        config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
+        println!("Using SSL Certificate: {}", ssl_cert);
     }
 
     // Create a new ATM Client
-    let mut alice_atm = ATM::new(alice_config.build()?).await?;
-    let mut bob_atm = ATM::new(bob_config.build()?).await?;
+    let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
-    // Turn on live streaming for Bob
-    protocols
-        .message_pickup
-        .toggle_live_delivery(&mut bob_atm, true)
-        .await?;
+    println!("Creating Alice's Profile");
+    let p_alice = Profile::new(
+        &atm,
+        Some("Alice".to_string()),
+        alice.did.clone(),
+        Some(profile.mediator_did.clone()),
+        alice.keys.clone(), // alice.keys.clone(),
+    )
+    .await?;
 
-    println!("Bob turned on live streaming");
+    debug!("Enabling Alice's Profile");
+
+    // add and enable the profile
+    let alice = atm.profile_add(&p_alice, true).await?;
+
+    println!("Creating Bob's Profile");
+    let p_bob = Profile::new(
+        &atm,
+        Some("Bob".to_string()),
+        bob.did.clone(),
+        Some(profile.mediator_did.clone()),
+        bob.keys.clone(), // alice.keys.clone(),
+    )
+    .await?;
+
+    debug!("Enabling Bob's Profile");
+
+    // add and enable the profile
+    let bob = atm.profile_add(&p_bob, true).await?;
+
     let start = SystemTime::now();
 
     // Create message from Alice to Bob
@@ -101,8 +108,8 @@ async fn main() -> Result<(), ATMError> {
         "Chatty Alice".into(),
         json!("Hello Bob!"),
     )
-    .to(bob.did.clone())
-    .from(alice.did.clone())
+    .to(bob.inner.did.clone())
+    .from(alice.inner.did.clone())
     .created_time(now)
     .expires_time(now + 10)
     .finalize();
@@ -115,8 +122,13 @@ async fn main() -> Result<(), ATMError> {
     );
     println!();
 
-    let packed_msg = alice_atm
-        .pack_encrypted(&msg, &bob.did, Some(&alice.did), Some(&alice.did))
+    let packed_msg = atm
+        .pack_encrypted(
+            &msg,
+            &bob.inner.did,
+            Some(&alice.inner.did),
+            Some(&alice.inner.did),
+        )
         .await?;
 
     println!(
@@ -127,13 +139,14 @@ async fn main() -> Result<(), ATMError> {
     println!();
 
     // Wrap it in a forward
-    let forward_msg = protocols
+    let (forward_id, forward_msg) = protocols
         .routing
         .forward_message(
-            &mut alice_atm,
+            &atm,
+            &alice,
             &packed_msg.0,
             &profile.mediator_did,
-            &bob.did,
+            &bob.inner.did,
             None,
             None,
         )
@@ -146,8 +159,7 @@ async fn main() -> Result<(), ATMError> {
     println!();
 
     // Send the message
-    alice_atm
-        .send_didcomm_message::<EmptyResponse>(&forward_msg, false)
+    atm.send_message(&alice, &forward_msg, &forward_id, false)
         .await?;
 
     println!("Alice sent message to Bob");
@@ -157,7 +169,7 @@ async fn main() -> Result<(), ATMError> {
     println!("Bob receiving messages");
     match protocols
         .message_pickup
-        .live_stream_get(&mut bob_atm, &msg_id, Duration::from_secs(5))
+        .live_stream_get(&atm, &bob, true, &msg_id, Duration::from_secs(5))
         .await?
     {
         Some(msg) => {

@@ -1,11 +1,3 @@
-[[bench]]
-name = 'pack_signed'
-harness = false
-
-[[bench]]
-name = 'pack_encrypted'
-harness = false
-
 [package]
 name = 'affinidi-messaging-didcomm'
 version.workspace = true

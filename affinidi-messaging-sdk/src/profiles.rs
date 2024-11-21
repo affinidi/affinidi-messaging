@@ -124,7 +124,7 @@ impl Profile {
 pub struct Mediator {
     pub did: String,
     #[serde(skip)]
-    pub(crate) rest_endpoint: Option<String>,
+    pub rest_endpoint: Option<String>,
     #[serde(skip)]
     pub(crate) websocket_endpoint: Option<String>,
     #[serde(skip)]

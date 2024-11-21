@@ -1,19 +1,14 @@
-//! Sends a message from Alice to Bob and then retrieves it.
+//! Example using OOB Discovery to create and retrieve an invitation
+//! Does not show the next steps of creating the connection, this is outside of the scope of this example
 
-use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, messages::EmptyResponse, protocols::Protocols, ATM,
+    config::Config, errors::ATMError, profiles::Profile, protocols::Protocols, ATM,
 };
 use clap::Parser;
-use serde_json::json;
-use std::{
-    env,
-    time::{Duration, SystemTime},
-};
-use tracing::{error, info};
+use std::env;
+use tracing::debug;
 use tracing_subscriber::filter;
-use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -54,47 +49,64 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let mut alice_config = Config::builder()
-        .with_my_did(&alice.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(alice.keys.clone())
-        .with_atm_api(&profile.network_address);
-
-    let mut bob_config = Config::builder()
-        .with_my_did(&bob.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_secrets(bob.keys.clone())
-        .with_atm_api(&profile.network_address);
+    let mut config = Config::builder();
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
-        alice_config = alice_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        bob_config = bob_config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        info!("Using SSL Certificate: {}", ssl_cert);
-    } else {
-        alice_config = alice_config.with_non_ssl();
-        bob_config = bob_config.with_non_ssl();
-        error!("  **** Not using SSL/TLS ****");
+        config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
+        println!("Using SSL Certificate: {}", ssl_cert);
     }
 
     // Create a new ATM Client
-    let mut alice_atm = ATM::new(alice_config.build()?).await?;
-    let mut bob_atm = ATM::new(bob_config.build()?).await?;
+    let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
+
+    println!("Creating Alice's Profile");
+    let p_alice = Profile::new(
+        &atm,
+        Some("Alice".to_string()),
+        alice.did.clone(),
+        Some(profile.mediator_did.clone()),
+        alice.keys.clone(), // alice.keys.clone(),
+    )
+    .await?;
+
+    debug!("Enabling Alice's Profile");
+
+    // add and enable the profile
+    let alice = atm.profile_add(&p_alice, true).await?;
+
+    println!("Creating Bob's Profile");
+    let p_bob = Profile::new(
+        &atm,
+        Some("Bob".to_string()),
+        bob.did.clone(),
+        Some(profile.mediator_did.clone()),
+        bob.keys.clone(), // alice.keys.clone(),
+    )
+    .await?;
+
+    debug!("Enabling Bob's Profile");
+
+    // add and enable the profile
+    let _bob = atm.profile_add(&p_bob, true).await?;
 
     let oob_id = protocols
         .oob_discovery
-        .create_invite(&mut alice_atm, None)
+        .create_invite(&atm, &alice, None)
         .await?;
 
     println!("oob_id = {}", oob_id);
     println!();
 
-    let url = [&profile.network_address, "/oob?_oobid=", &oob_id].concat();
+    let endpoint = if let Some(mediator) = &*alice.inner.mediator {
+        mediator.rest_endpoint.as_ref().unwrap().to_string()
+    } else {
+        panic!("Alice's mediator is not set");
+    };
+
+    let url = [&endpoint, "/oob?_oobid=", &oob_id].concat();
     println!("Attempting to retrieve an invitation: {}", url);
-    let invitation = protocols
-        .oob_discovery
-        .retrieve_invite(&mut alice_atm, &url)
-        .await?;
+    let invitation = protocols.oob_discovery.retrieve_invite(&atm, &url).await?;
 
     println!(
         "Received invitation:\n{}",
@@ -104,7 +116,7 @@ async fn main() -> Result<(), ATMError> {
     println!();
     let del_response = protocols
         .oob_discovery
-        .delete_invite(&mut alice_atm, &oob_id)
+        .delete_invite(&atm, &alice, &oob_id)
         .await?;
 
     println!("Delete response: deleted? {}", del_response);

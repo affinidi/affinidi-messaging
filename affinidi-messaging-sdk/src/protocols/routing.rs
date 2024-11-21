@@ -25,6 +25,9 @@ impl Routing {
     /// - expires_time: The time at which the message expires if not delivered
     /// - delay_milli: The time to wait before delivering the message
     ///                NOTE: If negative, picks a random delay between 0 and the absolute value
+    ///
+    /// Returns:
+    ///     (message_id, message)
     #[allow(clippy::too_many_arguments)]
     pub async fn forward_message(
         &self,
@@ -35,16 +38,16 @@ impl Routing {
         next_did: &str,
         expires_time: Option<u64>,
         delay_milli: Option<i64>,
-    ) -> Result<String, ATMError> {
+    ) -> Result<(String, String), ATMError> {
         let _span = span!(Level::DEBUG, "forward_message");
 
         async move {
-            let id = Uuid::new_v4();
+            let id = Uuid::new_v4().to_string();
 
             let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(message)).finalize();
 
             let mut forwarded = Message::build(
-                id.into(),
+                id.clone(),
                 "https://didcomm.org/routing/2.0/forward".to_owned(),
                 json!({"next": next_did}),
             )
@@ -76,7 +79,7 @@ impl Routing {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            Ok(msg)
+            Ok((id, msg))
         }
         .instrument(_span)
         .await
