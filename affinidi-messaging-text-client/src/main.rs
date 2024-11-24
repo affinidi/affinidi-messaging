@@ -30,7 +30,7 @@ mod messages;
 mod ui;
 
 // Global variable to store the ATM instances
-static mut ATMS: RwLock<LazyLock<HashMap<String, ATM<'static>>>> =
+static mut ATMS: RwLock<LazyLock<HashMap<String, ATM>>> =
     RwLock::new(LazyLock::new(|| HashMap::new()));
 
 #[tokio::main]
@@ -132,12 +132,10 @@ impl App {
 
         // Check the settings
         if app.settings_checks().await {
-            let mut atm_config = ConfigBuilder::default()
-                .with_atm_did(&app.history.mediator_did)
-                .with_external_did_resolver(&app.did_resolver);
+            let mut atm_config =
+                ConfigBuilder::default().with_external_did_resolver(&app.did_resolver);
 
             for contact in app.history.contacts.iter() {
-                atm_config = atm_config.with_my_did(&contact.our_did);
                 /*ATMS.write()
                 .unwrap()
                 .insert(contact.alias, ATM::new(atm_config.build()).await?);*/

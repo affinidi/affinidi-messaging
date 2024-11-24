@@ -59,8 +59,10 @@ image = "0.25.5"
 itertools = "0.13"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
+log = "0.4.22"
 rand = "0.8"
 ratatui = "0.29"
+ratatui-image = { version = "3", features = ["crossterm", "image-defaults"] }
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
@@ -97,6 +99,8 @@ tracing = { version = "0.1", features = [
 ] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-test = "0.2"
+tui-input = "0.11.0"
+tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
 uuid = { version = "1.11", features = ["v4", "fast-rng"] }
 varint = "0.9"

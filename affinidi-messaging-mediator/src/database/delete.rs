@@ -1,6 +1,6 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
-use tracing::{debug, event, info, span, Instrument, Level};
+use tracing::{debug, info, span, Instrument, Level};
 
 impl DatabaseHandler {
     /// Deletes a message in the database

@@ -24,13 +24,7 @@ serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-tui-logger = { version = "0.13.3", path = "./tui-logger", features = [
-    "tracing-support",
-] }
-ratatui-image = { version = "2.0.1", path = "./ratatui-image", features = [
-    "crossterm",
-    "image-defaults",
-] }
-tui-input = "0.11.0"
-log = "0.4.22"
+ratatui-image.workspace = true
+tui-logger.workspace = true
+tui-input.workspace = true
+log.workspace = true
