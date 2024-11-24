@@ -174,7 +174,7 @@ impl IntoResponse for AppError {
                     errorCodeStr: "DatabaseError".to_string(),
                     message,
                 };
-                event!(Level::WARN, "{}", response.to_string());
+                event!(Level::WARN, "{}: {}", session_id, response.to_string());
                 response
             }
             MediatorError::MessageUnpackError(session_id, message) => {
