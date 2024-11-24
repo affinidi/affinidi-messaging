@@ -45,7 +45,7 @@ impl GenericDataStruct for AuthorizationResponse {}
 /// Response from message_delete
 /// - successful: Contains list of message_id's that were deleted successfully
 /// - errors: Contains a list of message_id's and error messages for failed deletions
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct DeleteMessageResponse {
     pub success: Vec<String>,
     pub errors: Vec<(String, String)>,
@@ -125,14 +125,14 @@ pub struct GetMessagesResponse {
 impl GenericDataStruct for GetMessagesResponse {}
 
 /// Enum for the delete policy when retrieving messages
+/// Optimistic  - Deletes messages as they are fetched, occurs automatically within ATM
+/// OnReceive   - Will delete messages after they are received by the SDK
+/// DoNotDelete - Messages are not deleted (Default behavior)
+///               It is up to the caller as to when and how they want to delete messages
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub enum FetchDeletePolicy {
-    /// Deletes messages as they are fetched, occurs automatically within ATM
     Optimistic,
-    /// The SDK will delete messages after they are received by the SDK
     OnReceive,
-    /// Messages are not deleted (Default behavior)
-    /// It is up to the caller as to when and how they want to delete messages
     #[default]
     DoNotDelete,
 }

@@ -1,5 +1,6 @@
 //! Methods relating to working with DID's
 
+use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
 use affinidi_messaging_didcomm::secrets::{Secret, SecretMaterial, SecretType};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
@@ -7,7 +8,7 @@ use did_peer::{
 };
 use serde_json::json;
 use ssi::{
-    dids::{document::service::Endpoint, DIDBuf, DIDKey, DIDResolver},
+    dids::{document::service::Endpoint, DIDBuf, DIDKey},
     jwk::Params,
     JWK,
 };
@@ -118,12 +119,13 @@ pub fn create_did(service: Option<String>) -> Result<(String, Vec<Secret>), Box<
 
 /// Helper function to resolve a DID and retrieve the URI address of the service endpoint
 pub async fn get_service_address(did: &str) -> Result<String, Box<dyn Error>> {
-    let did_peer = DIDPeer;
-    let doc = did_peer
+    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build()).await?;
+
+    let resolve_response = did_resolver
         .resolve(DIDBuf::from_string(did.into())?.as_did())
         .await?;
 
-    let uri = if let Some(service) = doc.document.service.first() {
+    let uri = if let Some(service) = resolve_response.doc.service.first() {
         if let Some(end_point) = &service.service_endpoint {
             if let Some(endpoint) = end_point.first() {
                 match endpoint {

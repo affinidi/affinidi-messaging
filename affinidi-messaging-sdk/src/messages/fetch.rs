@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use tracing::{debug, span, Level};
 
@@ -53,7 +55,7 @@ impl ATM {
     /// ```
     pub async fn fetch_messages(
         &self,
-        profile: &mut Profile,
+        profile: &Arc<Profile>,
         options: &FetchOptions,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(

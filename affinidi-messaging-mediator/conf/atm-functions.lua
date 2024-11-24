@@ -84,8 +84,9 @@ local function delete_message(keys, args)
 
     -- Retrieve message metadata
     local meta = redis.call('HGETALL', 'MSG:META:' .. keys[1])
-    if meta.map == nil then
-        return redis.error_reply('Couldn\'t retrieve metadata')
+    local next = next
+    if next(meta.map) == nil then
+        return redis.error_reply('Message ('.. keys[1] ..') not found')
     end
 
     -- Check that the requesting DID has some form of ownership of this message

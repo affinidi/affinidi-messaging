@@ -116,7 +116,7 @@ pub struct MessageBuilder {
 }
 
 impl MessageBuilder {
-    fn new(id: String, type_: String, body: Value) -> Self {
+    pub fn new(id: String, type_: String, body: Value) -> Self {
         MessageBuilder {
             id,
             type_,

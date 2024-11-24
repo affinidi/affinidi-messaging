@@ -33,6 +33,7 @@
   * Version check added
   * Redis 7.4 minimum version required
   * LUA scripts shifted
+* FIX: deleting a message was returning the incorrect error response when the message_id didn't exist
 
 ### Affinidi Processors
 

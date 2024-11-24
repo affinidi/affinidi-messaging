@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tracing::{debug, span, Level};
 
 use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
@@ -11,7 +13,7 @@ impl ATM {
     /// - messages: List of message_ids to delete
     pub async fn delete_messages(
         &self,
-        profile: &mut Profile,
+        profile: &Arc<Profile>,
         messages: &DeleteMessageRequest,
     ) -> Result<DeleteMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "delete_messages").entered();

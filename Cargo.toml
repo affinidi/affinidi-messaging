@@ -36,7 +36,7 @@ aws-config = "1.5"
 aws-sdk-dynamodb = "1.54"
 aws-sdk-memorydb = "1.50"
 aws-sdk-secretsmanager = "1.53"
-aws-sdk-ssm = "1.54"
+aws-sdk-ssm = "1.55"
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }

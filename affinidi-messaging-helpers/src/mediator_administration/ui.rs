@@ -1,5 +1,7 @@
 //! UI Related functions
-use affinidi_messaging_sdk::{protocols::Protocols, ATM};
+use std::sync::Arc;
+
+use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use regex::Regex;
@@ -24,12 +26,17 @@ pub(crate) fn main_menu(theme: &ColorfulTheme) -> usize {
 
 /// List first 100 Administration DIDs
 pub(crate) async fn list_admins(
-    atm: &mut ATM<'static>,
+    atm: &ATM,
+    profile: &Arc<Profile>,
     protocols: &Protocols,
     admin_hash: &str,
     root_admin_hash: &str,
 ) {
-    match protocols.mediator.list_admins(atm, None, None).await {
+    match protocols
+        .mediator
+        .list_admins(atm, profile, None, None)
+        .await
+    {
         Ok(admins) => {
             println!(
                 "{}",
@@ -55,7 +62,8 @@ pub(crate) async fn list_admins(
 
 /// Add new Administration DID
 pub(crate) async fn add_admin(
-    atm: &mut ATM<'static>,
+    atm: &ATM,
+    profile: &Arc<Profile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
 ) {
@@ -83,7 +91,11 @@ pub(crate) async fn add_admin(
         .interact()
         .unwrap()
     {
-        match protocols.mediator.add_admins(atm, &[input.clone()]).await {
+        match protocols
+            .mediator
+            .add_admins(atm, profile, &[input.clone()])
+            .await
+        {
             Ok(result) => {
                 if result == 1 {
                     println!(
@@ -110,12 +122,17 @@ pub(crate) async fn add_admin(
 }
 
 pub(crate) async fn remove_admins(
-    atm: &mut ATM<'static>,
+    atm: &ATM,
+    profile: &Arc<Profile>,
     protocols: &Protocols,
     admin_hash: &String,
     theme: &ColorfulTheme,
 ) {
-    match protocols.mediator.list_admins(atm, None, None).await {
+    match protocols
+        .mediator
+        .list_admins(atm, profile, None, None)
+        .await
+    {
         Ok(admins) => {
             // remove the mediator administrator account from the list
             let admins: Vec<&String> = admins
@@ -151,7 +168,11 @@ pub(crate) async fn remove_admins(
                     .iter()
                     .map(|&idx| admins[idx].clone())
                     .collect::<Vec<_>>();
-                match protocols.mediator.remove_admins(atm, &admins).await {
+                match protocols
+                    .mediator
+                    .remove_admins(atm, profile, &admins)
+                    .await
+                {
                     Ok(result) => {
                         println!("{}", style(format!("Removed {} DIDs", result)).green());
                     }

@@ -5,7 +5,9 @@ use affinidi_messaging_helpers::common::{
     profiles::{Profile, Profiles},
 };
 use affinidi_messaging_mediator::common::config::ACLMode;
-use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{
+    config::Config, profiles::Profile as ATMProfile, protocols::Protocols, ATM,
+};
 use clap::Parser;
 use console::{style, Style, Term};
 use dialoguer::theme::ColorfulTheme;
@@ -88,7 +90,7 @@ impl BasicMediatorConfig {
     }
 }
 
-async fn init() -> Result<(ColorfulTheme, Config<'static>, Profile), Box<dyn Error>> {
+async fn init() -> Result<(ColorfulTheme, Config, Profile), Box<dyn Error>> {
     let args: Args = Args::parse();
 
     let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())?;
@@ -119,11 +121,9 @@ async fn init() -> Result<(ColorfulTheme, Config<'static>, Profile), Box<dyn Err
         style("Welcome to the Affinidi Messaging Mediator Administration wizard").green(),
     );
 
-    let admin_did = if let Some(admin_did) = &profile.admin_did {
-        admin_did
-    } else {
+    if profile.admin_did.is_none() {
         return Err("Admin DID not found in Profile".into());
-    };
+    }
 
     let mut ssl_certificates = Vec::new();
     if let Some(ssl_certificate) = &profile.ssl_certificate {
@@ -132,10 +132,6 @@ async fn init() -> Result<(ColorfulTheme, Config<'static>, Profile), Box<dyn Err
 
     // Connect to the Mediator
     let config = Config::builder()
-        .with_my_did(&admin_did.did)
-        .with_atm_did(&profile.mediator_did)
-        .with_atm_api(&profile.network_address)
-        .with_secrets(admin_did.keys.clone())
         .with_ssl_certificates(&mut ssl_certificates)
         .build()?;
 
@@ -146,29 +142,35 @@ async fn init() -> Result<(ColorfulTheme, Config<'static>, Profile), Box<dyn Err
 async fn main() -> Result<(), Box<dyn Error>> {
     let (theme, config, profile) = init().await?;
 
-    let admin_hash = if let Some(admin) = profile.admin_did {
-        digest(admin.did.as_bytes())
+    let admin = if let Some(admin) = profile.admin_did {
+        admin
     } else {
         return Err("Admin DID not found in Profile".into());
     };
 
+    let admin_hash = digest(&admin.did);
+
     // Create a new ATM Client
-    let mut atm = ATM::new(config).await?;
+    let atm = ATM::new(config).await?;
     let protocols = Protocols::new();
 
-    protocols
-        .message_pickup
-        .toggle_live_delivery(&mut atm, true)
-        .await?;
-    println!(
-        "{}",
-        style("Live Delivery enabled using MessagePickup Protocol via WebSocket transport...")
-            .green()
-    );
+    // Create the admin profile and enable it
+
+    let admin_profile = ATMProfile::new(
+        &atm,
+        Some("Admin".to_string()),
+        admin.did.clone(),
+        Some(profile.mediator_did),
+        admin.keys.clone(),
+    )
+    .await?;
+    let admin = atm.profile_add(&admin_profile, true).await?;
+
+    println!("{}", style("Admin account connected...").green());
 
     println!("{}", style("Fetching Mediator Configuration...").blue());
     let mediator_config: HashMap<String, Value> =
-        serde_json::from_value(protocols.mediator.get_config(&mut atm).await?)?;
+        serde_json::from_value(protocols.mediator.get_config(&atm, &admin).await?)?;
     let mediator_config = BasicMediatorConfig::new(mediator_config)?;
     println!(
         "{}{}{}",
@@ -185,16 +187,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match selection {
             0 => {
                 list_admins(
-                    &mut atm,
+                    &atm,
+                    &admin,
                     &protocols,
                     &admin_hash,
                     &digest(&mediator_config.root_admin_did),
                 )
                 .await
             }
-            1 => add_admin(&mut atm, &protocols, &theme).await,
-            2 => remove_admins(&mut atm, &protocols, &admin_hash, &theme).await,
-            3 => global_acls_menu(&mut atm, &protocols, &theme, &mediator_config).await?,
+            1 => add_admin(&atm, &admin, &protocols, &theme).await,
+            2 => remove_admins(&atm, &admin, &protocols, &admin_hash, &theme).await,
+            3 => global_acls_menu(&atm, &admin, &protocols, &theme, &mediator_config).await?,
             4 => {
                 println!("Quitting");
                 break;

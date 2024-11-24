@@ -212,7 +212,7 @@ pub trait AsKnownKeyPairSecret {
     fn key_alg(&self) -> KnownKeyAlg;
     fn as_key_pair(&self) -> Result<KnownKeyPair>;
 
-    fn as_ed25519(&self) -> Result<Ed25519KeyPair> {
+    /*fn as_ed25519(&self) -> Result<Ed25519KeyPair> {
         if self.key_alg() != KnownKeyAlg::Ed25519 {
             Err(err_msg(ErrorKind::InvalidState, "Unexpected key alg"))?
         }
@@ -221,7 +221,7 @@ pub trait AsKnownKeyPairSecret {
             KnownKeyPair::Ed25519(k) => Ok(k),
             _ => Err(err_msg(ErrorKind::InvalidState, "Unexpected key pair type"))?,
         }
-    }
+    }*/
 
     fn as_x25519(&self) -> Result<X25519KeyPair> {
         if self.key_alg() != KnownKeyAlg::X25519 {

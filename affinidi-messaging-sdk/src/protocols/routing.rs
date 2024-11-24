@@ -16,9 +16,11 @@ use uuid::Uuid;
 pub struct Routing {}
 
 impl Routing {
-    /// Takes a DIDComm message and constructs a new message that is forwarded to the target DID.
-    /// The message is forwarded to the target DID using the routing protocol.
+    /// Takes a DIDComm message and constructs a new message that can be forwarded to the target DID.
+    /// NOTE: You still need to send the actual message
+    ///
     /// - atm: The Affinidi Messaging instance
+    /// - profile: The profile of the agent forwarding the message
     /// - message: The message to be forwarded
     /// - target_did: The DID of the target agent (typically a mediator)
     /// - next_did: The DID of the next agent to forward the message to
