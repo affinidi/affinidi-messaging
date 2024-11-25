@@ -1,25 +1,17 @@
-use affinidi_messaging_didcomm::{Message, MessageBuilder};
+use affinidi_messaging_didcomm::MessageBuilder;
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
     config::Config,
     errors::ATMError,
-    messages::{
-        fetch::FetchOptions, sending::InboundMessageResponse, DeleteMessageRequest,
-        FetchDeletePolicy, Folder, GetMessagesRequest,
-    },
-    profiles::Profile,
+    messages::{fetch::FetchOptions, DeleteMessageRequest, FetchDeletePolicy, Folder},
+    profiles::ProfileConfig,
     protocols::Protocols,
-    transports::SendMessageResponse,
     ATM,
 };
 use clap::Parser;
 use serde_json::json;
-use std::{
-    env,
-    time::{Duration, SystemTime},
-};
-use tokio::time::sleep;
-use tracing::{debug, error, info};
+use std::env;
+use tracing::debug;
 use tracing_subscriber::filter;
 use uuid::Uuid;
 
@@ -73,35 +65,24 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
-    println!("Creating Alice's Profile");
-    let p = Profile::new(
-        &atm,
-        Some("Alice".to_string()),
-        alice.did.clone(),
-        Some(profile.mediator_did.clone()),
-        alice.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
-
     debug!("Enabling Alice's Profile");
-
-    // add and enable the profile
-    let alice = atm.profile_add(&p, false).await?;
-
-    println!("Creating Bob's Profile");
-    let p = Profile::new(
-        &atm,
-        Some("Bob".to_string()),
-        bob.did.clone(),
-        Some(profile.mediator_did.clone()),
-        bob.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
+    let alice = atm
+        .profile_add(&alice.into_profile(&atm).await?, true)
+        .await?;
 
     debug!("Enabling Bob's Profile");
+    let bob = atm
+        .profile_add(&bob.into_profile(&atm).await?, true)
+        .await?;
 
-    // add and enable the profile
-    let bob = atm.profile_add(&p, false).await?;
+    // Ensure Profile has a valid mediator to forward through
+    let mediator_did = if let Some(mediator) = profile.default_mediator {
+        mediator.clone()
+    } else {
+        return Err(ATMError::ConfigError(
+            "Profile Mediator not found".to_string(),
+        ));
+    };
 
     // Delete all messages for Alice
     let response = atm
@@ -166,7 +147,7 @@ async fn main() -> Result<(), ATMError> {
             &atm,
             &bob,
             &packed.0,
-            &profile.mediator_did,
+            &mediator_did,
             &alice.inner.did,
             None,
             None,
@@ -224,6 +205,11 @@ async fn main() -> Result<(), ATMError> {
         .await?;
 
     println!("Deleted real message: {:#?}", response);
+
+    println!(" **** ");
+    let profiles = ProfileConfig::from_profiles(&*atm.get_profiles().read().await).await;
+
+    println!("{}", serde_json::to_string_pretty(&profiles).unwrap());
 
     Ok(())
 }

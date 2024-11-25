@@ -5,9 +5,9 @@ use crate::{
 };
 use affinidi_messaging_helpers::common::{
     did::{create_did, get_service_address},
-    friends::Friend,
     profiles::{Profile, Profiles},
 };
+use affinidi_messaging_sdk::profiles::ProfileConfig;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use regex::Regex;
@@ -107,7 +107,7 @@ fn save_profile(
             .default(true)
             .interact()?
         {
-            if profiles.add(&name, profile) {
+            if profiles.add_profile(&name, profile) {
                 println!("  {}", style("Profile added").green());
             } else {
                 println!("  {}", style("Profile replaced").color256(208));
@@ -171,14 +171,14 @@ pub(crate) async fn init_remote_mediator(
         }
     }
 
-    fn _admin_did(theme: &ColorfulTheme) -> Option<Friend> {
+    fn _admin_did(theme: &ColorfulTheme) -> Option<ProfileConfig> {
         if Confirm::with_theme(theme)
             .with_prompt("Do you want to create an Admin account?")
             .default(true)
             .interact()
             .unwrap()
         {
-            let admin_did = Friend::new("Admin", None).unwrap();
+            let admin_did = Profile::create_new_friend("Admin", None, None).unwrap();
             println!(
                 "  {}{}",
                 style("Admin DID: ").blue(),
@@ -206,10 +206,11 @@ pub(crate) async fn init_remote_mediator(
                     .blink()
                     .red()
             );
-            Some(Friend {
-                name: "Admin".into(),
+            Some(ProfileConfig {
+                alias: "Admin".to_string(),
                 did: admin_did,
-                keys: vec![],
+                mediator: None,
+                secrets: vec![],
             })
         } else {
             None
@@ -282,11 +283,10 @@ pub(crate) async fn init_remote_mediator(
     let admin_did = _admin_did(theme);
 
     let profile = Profile {
-        mediator_did,
-        network_address,
-        ssl_certificate,
+        default_mediator: Some(mediator_did.clone()),
         friends: HashMap::new(),
         admin_did,
+        ssl_certificate,
     };
 
     Ok((
@@ -400,7 +400,7 @@ pub(crate) async fn init_local_mediator(
     }
 
     // Creating new Admin account
-    let admin_did = Friend::new("Admin", None)?;
+    let admin_did = Profile::create_new_friend("Admin", None, None)?;
     new_mediator_config.admin_did = Some(admin_did.did.clone());
 
     println!();
@@ -428,11 +428,10 @@ pub(crate) async fn init_local_mediator(
     }
 
     let profile = Profile {
-        mediator_did: new_mediator_config.mediator_did.clone().unwrap(),
-        network_address: _rewrite_network_address(&mediator_config)?,
-        ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.chain".to_string()),
+        default_mediator: new_mediator_config.mediator_did.clone(),
         friends: HashMap::new(),
         admin_did: Some(admin_did),
+        ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.chain".to_string()),
     };
     Ok((
         MediatorType::Local,

@@ -26,30 +26,77 @@ use std::{
 };
 use tokio::sync::{
     mpsc::{Receiver, Sender},
-    Mutex,
+    Mutex, RwLock,
 };
 use tracing::debug;
 
-#[derive(Clone, Debug, Serialize)]
+/// ProfileConfig is a helper struct wrapper that allows for saving/reading the Profile from config files
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProfileConfig {
+    pub alias: String,
+    pub did: String,
+    pub mediator: Option<String>,
+    pub secrets: Vec<Secret>,
+}
+
+impl ProfileConfig {
+    /// Converts a Profile into a ProfileConfig
+    pub async fn from(profile: &Profile) -> Self {
+        ProfileConfig {
+            alias: profile.inner.alias.clone(),
+            did: profile.inner.did.clone(),
+            mediator: profile
+                .inner
+                .mediator
+                .as_ref()
+                .as_ref()
+                .map(|m| m.did.clone()),
+            secrets: profile.inner.secrets.lock().await.clone(),
+        }
+    }
+
+    /// Helper function to convert ATM Profiles into a vec<ProfileConfig>
+    pub async fn from_profiles(profiles: &Profiles) -> Vec<Self> {
+        let profiles = profiles.0.values().collect::<Vec<&Arc<Profile>>>();
+        let mut profiles_config = Vec::new();
+
+        for profile in profiles {
+            profiles_config.push(ProfileConfig::from(profile).await);
+        }
+
+        profiles_config
+    }
+
+    /// Convert ProfileConfig into a Profile
+    pub async fn into_profile(&self, atm: &ATM) -> Result<Profile, ATMError> {
+        Profile::new(
+            atm,
+            Some(self.alias.clone()),
+            self.did.clone(),
+            self.mediator.clone(),
+            self.secrets.clone(),
+        )
+        .await
+    }
+}
+
+/// Wrapper for ProfileInner that lowers the cost of cloning the Profile
+#[derive(Clone, Debug)]
 pub struct Profile {
-    #[serde(flatten)]
     pub inner: Arc<ProfileInner>,
 }
 
-#[derive(Debug, Serialize)]
+/// Working struct of a Profile
+/// This is used within ATM and contains everything to manage a Profile
+#[derive(Debug)]
 pub struct ProfileInner {
     pub did: String,
     pub alias: String,
-    #[serde(skip)]
     pub secrets: Mutex<Vec<Secret>>,
     pub mediator: Arc<Option<Mediator>>,
-    #[serde(skip)]
     pub(crate) authorization: Mutex<Option<AuthorizationResponse>>,
-    #[serde(skip)]
     pub(crate) authenticated: AtomicBool,
-    #[serde(skip)]
     pub(crate) channel_tx: Mutex<Sender<WsHandlerCommands>>,
-    #[serde(skip)]
     pub(crate) channel_rx: Mutex<Receiver<WsHandlerCommands>>,
 }
 
@@ -120,16 +167,12 @@ impl Profile {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Mediator {
     pub did: String,
-    #[serde(skip)]
     pub rest_endpoint: Option<String>,
-    #[serde(skip)]
     pub(crate) websocket_endpoint: Option<String>,
-    #[serde(skip)]
     pub(crate) ws_connected: AtomicBool, // Whether the websocket is connected
-    #[serde(skip)]
     pub(crate) ws_channel_tx: Mutex<Option<Sender<WsConnectionCommands>>>,
 }
 
@@ -343,5 +386,9 @@ impl ATM {
             .await;
 
         Ok(())
+    }
+
+    pub fn get_profiles(&self) -> Arc<RwLock<Profiles>> {
+        self.inner.profiles.clone()
     }
 }

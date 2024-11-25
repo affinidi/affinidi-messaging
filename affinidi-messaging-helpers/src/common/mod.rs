@@ -2,7 +2,6 @@ use std::{env, error::Error};
 
 pub mod affinidi_logo;
 pub mod did;
-pub mod friends;
 pub mod profiles;
 
 /// Returns the path to the top level directory depending on where you are

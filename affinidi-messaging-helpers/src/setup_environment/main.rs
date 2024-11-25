@@ -2,7 +2,6 @@
 //! This helps to create consistency in the examples and also to avoid code duplication.
 use affinidi_messaging_helpers::common::{
     affinidi_logo, check_path,
-    friends::Friend,
     profiles::{Profiles, PROFILES_PATH},
 };
 use console::{style, Style, Term};
@@ -83,14 +82,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .default(true)
         .interact()?
     {
-        profile.friends.insert("Alice".into(),  Friend::new("Alice", None)?);
-        println!("  {}{}", style("Friend Alice created with DID: ").blue(), style(&profile.friends.get("Alice").unwrap().did).color256(208));
-        profile.friends.insert("Bob".into(),  Friend::new("Bob", Some(profile.mediator_did.clone()))?);
-        println!("  {}{}", style("Friend Bob created with DID: ").blue(), style(&profile.friends.get("Bob").unwrap().did).color256(208));
-        profile.friends.insert("Charlie".into(),  Friend::new("Charlie", None)?);
-        println!("  {}{}", style("Friend Charlie created with DID: ").blue(), style(&profile.friends.get("Charlie").unwrap().did).color256(208));
-        profile.friends.insert("Malorie".into(),  Friend::new("Malorie", None)?);
-        println!("  {}{}{}{}", style("Friend(?) ").blue(), style("Malorie").red(), style(" created with DID: ").blue(), style(&profile.friends.get("Malorie").unwrap().did).color256(208));
+        profile.insert_new_friend( "Alice", profile.default_mediator.clone(), None)?;
+        println!("  {}{}", style("Friend Alice created with DID: ").blue(), style(&profile.find_friend("Alice").unwrap().did).color256(208));
+        profile.insert_new_friend( "Bob", profile.default_mediator.clone(), None)?;
+        println!("  {}{}", style("Friend Bob created with DID: ").blue(), style(&profile.find_friend("Bob").unwrap().did).color256(208));
+        profile.insert_new_friend( "Charlie", profile.default_mediator.clone(), None)?;
+        println!("  {}{}", style("Friend Charlie created with DID: ").blue(), style(&profile.find_friend("Charlie").unwrap().did).color256(208));
+        profile.insert_new_friend( "Malorie", profile.default_mediator.clone(), None)?;
+        println!("  {}{}{}{}", style("Friend(?) ").blue(), style("Malorie").red(), style(" created with DID: ").blue(), style(&profile.find_friend("Malorie").unwrap().did).color256(208));
     }
 
     if Confirm::with_theme(&theme)
@@ -98,7 +97,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .default(true)
         .interact()?
     {
-        profiles.add(&profile_name, profile);
+        profiles.add_profile(&profile_name, profile);
         profiles.save()?;
     }
 

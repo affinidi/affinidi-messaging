@@ -2,9 +2,7 @@
 
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, profiles::Profile, protocols::Protocols, ATM,
-};
+use affinidi_messaging_sdk::{config::Config, errors::ATMError, protocols::Protocols, ATM};
 use clap::Parser;
 use serde_json::json;
 use std::{
@@ -65,37 +63,26 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
-    println!("Creating Alice's Profile");
-    let p_alice = Profile::new(
-        &atm,
-        Some("Alice".to_string()),
-        alice.did.clone(),
-        Some(profile.mediator_did.clone()),
-        alice.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
-
     debug!("Enabling Alice's Profile");
-
-    // add and enable the profile
-    let alice = atm.profile_add(&p_alice, true).await?;
-
-    println!("Creating Bob's Profile");
-    let p_bob = Profile::new(
-        &atm,
-        Some("Bob".to_string()),
-        bob.did.clone(),
-        Some(profile.mediator_did.clone()),
-        bob.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
+    let alice = atm
+        .profile_add(&alice.into_profile(&atm).await?, true)
+        .await?;
 
     debug!("Enabling Bob's Profile");
-
-    // add and enable the profile
-    let bob = atm.profile_add(&p_bob, true).await?;
+    let bob = atm
+        .profile_add(&bob.into_profile(&atm).await?, true)
+        .await?;
 
     let start = SystemTime::now();
+
+    // Ensure Profile has a valid mediator to forward through
+    let mediator_did = if let Some(mediator) = profile.default_mediator {
+        mediator.clone()
+    } else {
+        return Err(ATMError::ConfigError(
+            "Profile Mediator not found".to_string(),
+        ));
+    };
 
     // Create message from Alice to Bob
     let now = SystemTime::now()
@@ -145,7 +132,7 @@ async fn main() -> Result<(), ATMError> {
             &atm,
             &alice,
             &packed_msg.0,
-            &profile.mediator_did,
+            &mediator_did,
             &bob.inner.did,
             None,
             None,

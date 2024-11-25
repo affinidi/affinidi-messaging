@@ -1,5 +1,6 @@
 use super::check_path;
-use super::friends::Friend;
+use super::did::create_did;
+use affinidi_messaging_sdk::profiles::ProfileConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -15,17 +16,58 @@ pub struct Profiles {
     pub profiles: HashMap<String, Profile>,
 }
 
-/// Profile contains all the required information to run the various examples
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
-    pub mediator_did: String,
+    pub default_mediator: Option<String>,
+    pub admin_did: Option<ProfileConfig>,
     pub ssl_certificate: Option<String>,
-    pub network_address: String,
-    pub friends: HashMap<String, Friend>,
-    pub admin_did: Option<Friend>, // Administration account for this profile
+    pub friends: HashMap<String, ProfileConfig>,
 }
 
 pub const PROFILES_PATH: &str = "affinidi-messaging-helpers/conf/profiles.json";
+
+impl Profile {
+    /// Creates a new friend into the named profile
+    /// - friend: The name of the friend
+    /// - mediator: The mediator to use for the DID
+    /// - service: The service to use for the DID if required
+    pub fn create_new_friend(
+        friend: &str,
+        mediator: Option<String>,
+        service: Option<String>,
+    ) -> Result<ProfileConfig, Box<dyn Error>> {
+        let did = create_did(service)?;
+
+        let _profile = ProfileConfig {
+            alias: friend.to_string(),
+            did: did.0,
+            mediator,
+            secrets: did.1,
+        };
+
+        Ok(_profile)
+    }
+
+    /// Creates and inserts a new friend into the named profile
+    /// - friend: The name of the friend
+    /// - mediator: The mediator to use for the DID
+    /// - service: The service to use for the DID if required
+    pub fn insert_new_friend(
+        &mut self,
+        friend: &str,
+        mediator: Option<String>,
+        service: Option<String>,
+    ) -> Result<ProfileConfig, Box<dyn Error>> {
+        let _friend = Profile::create_new_friend(friend, mediator, service).unwrap();
+
+        self.friends.insert(friend.to_string(), _friend.clone());
+        Ok(_friend)
+    }
+
+    pub fn find_friend(&self, friend: &str) -> Option<&ProfileConfig> {
+        self.friends.get(friend)
+    }
+}
 
 impl Profiles {
     /// Loads profile config using Environment or command line argument
@@ -91,7 +133,7 @@ impl Profiles {
     }
 
     // Adds a new profile
-    pub fn add(&mut self, name: &str, profile: Profile) -> bool {
+    pub fn add_profile(&mut self, name: &str, profile: Profile) -> bool {
         self.profiles.insert(name.to_string(), profile).is_none()
     }
 

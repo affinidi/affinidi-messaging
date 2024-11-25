@@ -5,9 +5,7 @@ use affinidi_messaging_helpers::common::{
     profiles::{Profile, Profiles},
 };
 use affinidi_messaging_mediator::common::config::ACLMode;
-use affinidi_messaging_sdk::{
-    config::Config, profiles::Profile as ATMProfile, protocols::Protocols, ATM,
-};
+use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
 use clap::Parser;
 use console::{style, Style, Term};
 use dialoguer::theme::ColorfulTheme;
@@ -156,14 +154,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Create the admin profile and enable it
 
-    let admin_profile = ATMProfile::new(
-        &atm,
-        Some("Admin".to_string()),
-        admin.did.clone(),
-        Some(profile.mediator_did),
-        admin.keys.clone(),
-    )
-    .await?;
+    let admin_profile = admin.into_profile(&atm).await?;
     let admin = atm.profile_add(&admin_profile, true).await?;
 
     println!("{}", style("Admin account connected...").green());

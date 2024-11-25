@@ -7,7 +7,6 @@ use affinidi_messaging_sdk::{
     config::Config,
     errors::ATMError,
     messages::{sending::InboundMessageResponse, GetMessagesRequest},
-    profiles::Profile,
     protocols::Protocols,
     transports::SendMessageResponse,
     ATM,
@@ -63,20 +62,10 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
-    println!("Creating Alice's Profile");
-    let p = Profile::new(
-        &atm,
-        Some("Alice".to_string()),
-        alice.did.clone(),
-        Some(profile.mediator_did),
-        alice.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
-
     debug!("Enabling Alice's Profile");
-
-    // add and enable the profile
-    let alice = atm.profile_add(&p, false).await?;
+    let alice = atm
+        .profile_add(&alice.into_profile(&atm).await?, false)
+        .await?;
 
     let mut success_count = 0;
     let mediator = alice.inner.mediator.clone();
@@ -86,6 +75,7 @@ async fn main() -> Result<(), ATMError> {
         error!("No mediator found in Alice's profile");
         return Ok(());
     };
+    println!("Mediator = {}", mediator_did);
 
     // Ready to send a trust-ping to ATM
     let start = SystemTime::now();

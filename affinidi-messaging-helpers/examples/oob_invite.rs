@@ -2,9 +2,7 @@
 //! Does not show the next steps of creating the connection, this is outside of the scope of this example
 
 use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, profiles::Profile, protocols::Protocols, ATM,
-};
+use affinidi_messaging_sdk::{config::Config, errors::ATMError, protocols::Protocols, ATM};
 use clap::Parser;
 use std::env;
 use tracing::debug;
@@ -41,14 +39,6 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let bob = if let Some(bob) = profile.friends.get("Bob") {
-        bob
-    } else {
-        return Err(ATMError::ConfigError(
-            format!("Bob not found in Profile: {}", profile_name).to_string(),
-        ));
-    };
-
     let mut config = Config::builder();
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
@@ -60,35 +50,10 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(config.build()?).await?;
     let protocols = Protocols::new();
 
-    println!("Creating Alice's Profile");
-    let p_alice = Profile::new(
-        &atm,
-        Some("Alice".to_string()),
-        alice.did.clone(),
-        Some(profile.mediator_did.clone()),
-        alice.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
-
     debug!("Enabling Alice's Profile");
-
-    // add and enable the profile
-    let alice = atm.profile_add(&p_alice, true).await?;
-
-    println!("Creating Bob's Profile");
-    let p_bob = Profile::new(
-        &atm,
-        Some("Bob".to_string()),
-        bob.did.clone(),
-        Some(profile.mediator_did.clone()),
-        bob.keys.clone(), // alice.keys.clone(),
-    )
-    .await?;
-
-    debug!("Enabling Bob's Profile");
-
-    // add and enable the profile
-    let _bob = atm.profile_add(&p_bob, true).await?;
+    let alice = atm
+        .profile_add(&alice.into_profile(&atm).await?, true)
+        .await?;
 
     let oob_id = protocols
         .oob_discovery
