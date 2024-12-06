@@ -89,6 +89,10 @@ impl DatabaseHandler {
                 .arg("FIELDS")
                 .arg(1)
                 .arg(&invite_hash)
+                .cmd("HINCRBY")
+                .arg("GLOBAL")
+                .arg("OOB_INVITES_CREATED")
+                .arg(1)
                 .query_async::<Value>(&mut conn)
                 .await
             {
@@ -116,13 +120,19 @@ impl DatabaseHandler {
         async move {
             let mut conn = self.get_async_connection().await?;
 
-            let invitation: Option<String> = match deadpool_redis::redis::cmd("HGET")
+            let invitation: Option<String> = match deadpool_redis::redis::pipe()
+                .atomic()
+                .cmd("HGET")
                 .arg(HASH_KEY)
                 .arg(oob_id)
-                .query_async::<Option<String>>(&mut conn)
+                .cmd("HINCRBY")
+                .arg("GLOBAL")
+                .arg("OOB_INVITES_CLAIMED")
+                .arg(1)
+                .query_async::<Vec<String>>(&mut conn)
                 .await
             {
-                Ok(invitation) => invitation,
+                Ok(invitation) => invitation.first().map(|a| a.to_string()),
                 Err(err) => {
                     error!("Database Error: {}", err);
                     return Err(MediatorError::DatabaseError(
