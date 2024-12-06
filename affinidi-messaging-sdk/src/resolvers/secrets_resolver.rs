@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
-
+use crate::secrets::Secret as SDKSecret;
 use affinidi_messaging_didcomm::{
     error::Result,
     secrets::{Secret, SecretsResolver},
 };
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 use tracing::debug;
 
 #[derive(Clone, Debug)]
@@ -19,13 +19,9 @@ impl AffinidiSecrets {
         }
     }
 
-    pub fn insert(&self, secret: Secret) {
+    pub fn insert(&self, secret: SDKSecret) {
         debug!("Adding secret ({})", secret.id);
-        self.known_secrets.lock().unwrap().push(secret);
-    }
-
-    pub fn len(&self) -> usize {
-        self.known_secrets.lock().unwrap().len()
+        self.known_secrets.lock().unwrap().push(secret.into());
     }
 }
 

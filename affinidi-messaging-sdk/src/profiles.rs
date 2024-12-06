@@ -10,10 +10,10 @@ use crate::{
     errors::ATMError,
     messages::AuthorizationResponse,
     protocols::message_pickup::MessagePickup,
+    secrets::Secret,
     transports::websockets::{ws_connection::WsConnectionCommands, ws_handler::WsHandlerCommands},
     ATM,
 };
-use affinidi_messaging_didcomm::secrets::Secret;
 use serde::{Deserialize, Serialize};
 use ssi::dids::{
     document::{service::Endpoint, Service},
@@ -31,7 +31,7 @@ use tokio::sync::{
 use tracing::debug;
 
 /// ProfileConfig is a helper struct wrapper that allows for saving/reading the Profile from config files
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
     pub alias: String,
     pub did: String,

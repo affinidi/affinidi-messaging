@@ -1,7 +1,7 @@
 //! Methods relating to working with DID's
 
 use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_messaging_sdk::secrets::{Secret, SecretMaterial, SecretType};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,

@@ -1,6 +1,5 @@
-use crate::{errors::ATMError, profiles::Mediator};
+use crate::{errors::ATMError, profiles::Mediator, secrets::Secret};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_didcomm::secrets::Secret;
 use rustls::pki_types::CertificateDer;
 use std::{fs::File, io::BufReader, sync::Arc};
 use tracing::error;

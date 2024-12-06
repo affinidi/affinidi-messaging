@@ -69,7 +69,7 @@ pub async fn oobid_handler(
     } else {
         return Err(MediatorError::RequestDataError(
             "NA".into(),
-            "no _oob_id parameter in URL!".into(),
+            "no _oobid parameter in URL!".into(),
         )
         .into());
     };

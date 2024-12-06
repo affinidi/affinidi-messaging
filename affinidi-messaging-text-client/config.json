@@ -1,0 +1,7 @@
+{
+  "settings": {
+    "mediator_did": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+    "avatar_path": "avatar.png"
+  },
+  "chat_data_map": {}
+}

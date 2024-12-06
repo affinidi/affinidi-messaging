@@ -1,11 +1,13 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_didcomm::secrets::Secret;
 use config::Config;
 use errors::ATMError;
 use profiles::Profiles;
 use reqwest::{Certificate, Client};
 use resolvers::secrets_resolver::AffinidiSecrets;
+use rustls::ClientConfig as TlsClientConfig;
 use rustls::{ClientConfig, RootCertStore};
+use rustls_platform_verifier::ConfigVerifierExt;
+use secrets::Secret;
 use ssi::dids::Document;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -68,10 +70,12 @@ impl ATM {
     pub async fn new(config: Config) -> Result<ATM, ATMError> {
         // Set a process wide default crypto provider.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let tls_config = TlsClientConfig::with_platform_verifier();
 
         // Set up the HTTP/HTTPS client
         let mut client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
+            .use_preconfigured_tls(tls_config.clone())
             .user_agent("Affinidi Trusted Messaging");
 
         for cert in config.get_ssl_certificates() {
@@ -92,19 +96,20 @@ impl ATM {
             }
         };
 
+        /*
         // Set up the WebSocket Client
         let mut root_store = RootCertStore::empty();
         if config.get_ssl_certificates().is_empty() {
             debug!("Use native SSL Certs");
-
-            for cert in
-                rustls_native_certs::load_native_certs().expect("Could not load platform certs")
-            {
-                root_store.add(cert).map_err(|e| {
-                    warn!("Couldn't add cert: {:?}", e);
-                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
-                })?;
-            }
+        /*
+        for cert in
+            rustls_native_certs::load_native_certs().expect("Could not load platform certs")
+        {
+            root_store.add(cert).map_err(|e| {
+                warn!("Couldn't add cert: {:?}", e);
+                ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
+            })?;
+        }*/
         } else {
             debug!("Use custom SSL Certs");
             for cert in config.get_ssl_certificates() {
@@ -118,8 +123,8 @@ impl ATM {
         let ws_config = ClientConfig::builder()
             .with_root_certificates(root_store)
             .with_no_client_auth();
-
-        let ws_connector = Connector::Rustls(Arc::new(ws_config));
+        */
+        let ws_connector = Connector::Rustls(Arc::new(tls_config));
 
         // Set up the DID Resolver
         let did_resolver = if let Some(did_resolver) = &config.did_resolver {
