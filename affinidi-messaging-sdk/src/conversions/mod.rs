@@ -2,7 +2,6 @@ use affinidi_messaging_didcomm::secrets::Secret;
 use serde_json::Value;
 
 /// Helper functions for converting between different types.
-
 /// Create a new Secret from a JWK JSON string
 /// Example:
 /// ```ignore

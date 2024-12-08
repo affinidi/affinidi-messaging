@@ -174,10 +174,24 @@ pub async fn create_invitation(
                                 // DynamicImage::ImageLuma8(code.render::<Luma<u8>>().build());
 
                                 state.invite_popup.invite = Some(Invite {
-                                    invite_url: url,
+                                    invite_url: url.clone(),
                                     invite_profile: Some(profile.clone()),
                                     qr_code: Some(qr_code),
                                 });
+
+                                state
+                                    .chat_list
+                                    .create_chat(
+                                        &profile.inner.alias,
+                                        &format!(
+                                            "OOB Invite stage 1. Ephemeral DID: {}",
+                                            profile.inner.did
+                                        ),
+                                        &profile,
+                                        None,
+                                        Some(url.clone()),
+                                    )
+                                    .await;
                             }
                             Err(e) => {
                                 state.invite_popup.invite_error =

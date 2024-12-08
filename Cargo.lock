@@ -251,6 +251,7 @@ name = "affinidi-messaging-text-client"
 version = "0.8.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
+ "affinidi-messaging-didcomm",
  "affinidi-messaging-sdk",
  "anyhow",
  "chrono",

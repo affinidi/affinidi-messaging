@@ -7,6 +7,7 @@ use ratatui::Frame;
 use settings_popup::settings_popup::SettingsPopup;
 use tokio::sync::mpsc::UnboundedSender;
 
+mod chat_details_popup;
 mod invite_popup;
 mod main_page;
 mod settings_popup;

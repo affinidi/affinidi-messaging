@@ -1,5 +1,7 @@
 use std::fs::OpenOptions;
 
+use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
+use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use log::LevelFilter;
 use state_store::StateStore;
 use termination::{create_termination, Interrupted};
@@ -9,8 +11,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{filter, fmt, Layer};
 use ui_management::UiManager;
 
-mod contact;
-mod messages;
 mod state_store;
 mod termination;
 mod ui_management;
@@ -33,12 +33,20 @@ async fn main() -> anyhow::Result<()> {
 
     tui_logger::init_logger(LevelFilter::Info).unwrap();
 
+    // Setup the initial state
+    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build()).await?;
+
     let (terminator, mut interrupt_rx) = create_termination();
     let (state_store, state_rx) = StateStore::new();
     let (ui_manager, action_rx) = UiManager::new();
 
     tokio::try_join!(
-        state_store.main_loop(terminator, action_rx, interrupt_rx.resubscribe()),
+        state_store.main_loop(
+            terminator,
+            action_rx,
+            interrupt_rx.resubscribe(),
+            did_resolver
+        ),
         ui_manager.main_loop(state_rx, interrupt_rx.resubscribe()),
     )?;
 
@@ -54,17 +62,6 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-/*
-#[derive(Clone, PartialEq)]
-pub enum Windows {
-    Channels,
-    Chat,
-    Help,
-    Invite,
-    Settings,
-}
-    */
 
 #[derive(Clone, PartialEq)]
 pub enum InputType {

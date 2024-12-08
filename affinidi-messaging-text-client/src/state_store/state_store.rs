@@ -1,16 +1,18 @@
 use super::{actions::Action, State};
 use crate::{
-    state_store::actions::invitation::create_invitation,
+    state_store::{actions::invitation::create_invitation, inbound_messages::handle_message},
     termination::{Interrupted, Terminator},
 };
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_sdk::{config::ConfigBuilder, ATM};
+use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_messaging_sdk::{
+    config::ConfigBuilder, transports::websockets::ws_handler::WsHandlerMode, ATM,
+};
 use std::time::Duration;
 use tokio::sync::{
     broadcast,
     mpsc::{self, UnboundedReceiver, UnboundedSender},
 };
-use tracing::warn;
+use tracing::{info, warn};
 
 pub struct StateStore {
     state_tx: UnboundedSender<State>,
@@ -30,13 +32,13 @@ impl StateStore {
         mut terminator: Terminator,
         mut action_rx: UnboundedReceiver<Action>,
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
+        did_resolver: DIDCacheClient,
     ) -> anyhow::Result<Interrupted> {
         // Setup the initial state
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build()).await?;
-
         let atm = match ATM::new(
             ConfigBuilder::default()
                 .with_external_did_resolver(&did_resolver)
+                .with_ws_handler_mode(WsHandlerMode::DirectChannel)
                 .build()?,
         )
         .await
@@ -48,36 +50,71 @@ impl StateStore {
             }
         };
 
+        // Load any profiles from existing chats.
         let mut state = State::read_from_file("config.json").unwrap_or_default();
+
         // Send the initial state once
         self.state_tx.send(state.clone())?;
+
+        info!("Activating ({}) profiles", state.chat_list.chats.len());
+        for chat in state.chat_list.chats.values() {
+            let profile = match chat.our_profile.into_profile(&atm).await {
+                Ok(profile) => profile,
+                Err(e) => {
+                    warn!("Failed to load profile for chat {}: {}", chat.name, e);
+                    return Ok(Interrupted::SystemError);
+                }
+            };
+
+            match atm.profile_add(&profile, true).await {
+                Ok(_) => info!(
+                    "Profile ({}) added for chat {}",
+                    profile.inner.alias, chat.name
+                ),
+                Err(e) => {
+                    warn!("Failed to add profile for chat {}: {}", chat.name, e);
+                    return Ok(Interrupted::SystemError);
+                }
+            }
+        }
+
+        let mut inbound_message_channel = if let Some(channel) = atm.get_inbound_channel() {
+            channel
+        } else {
+            warn!("Failed to get inbound channel");
+            return Ok(Interrupted::SystemError);
+        };
 
         let mut ticker = tokio::time::interval(Duration::from_secs(1));
 
         let result = loop {
             tokio::select! {
-                // Handle the server events as they come in
-                /*maybe_event = event_stream.next() => match maybe_event {
-                    Some(Ok(event)) => {
-                        state.handle_server_event(&event);
-                    },
-                    // server disconnected, we need to reset the state
-                    None => {
-                        opt_server_handle = None;
-                        state = State::default();
-                    },
-                    _ => (),
+                message_received = inbound_message_channel.recv() => {
+                    match message_received {
+                        Ok((message, meta)) => {
+                            handle_message(&atm, &mut state, &message, &meta);
+                        },
+                        Err(e) => {
+                            warn!("Failed to receive message: {}", e);
+                        }
+                    }
+                    //handle_message(&atm, &mut state, message, meta);
                 },
-                */
-                // Handle the actions coming from the UI
-                // and process them to do async operations
                 Some(action) = action_rx.recv() => match action {
                     Action::SendMessage { content } => {
                         // TODO: send the message
                         warn!("Sending message: {}", content);
                     },
                     Action::SelectChat { chat } => {
-                        state.try_set_active_chat(chat.as_str());
+                        state.chat_list.try_set_active_chat(chat.as_str());
+                    },
+                    Action::ShowChatDetails { chat} => {
+                        state.chat_details_popup.show = true;
+                        state.chat_details_popup.chat_name = Some(chat.clone());
+                    },
+                    Action::CloseChatDetails => {
+                        state.chat_details_popup.show = false;
+                        state.chat_details_popup.chat_name = None;
                     },
                     Action::Exit => {
                         let _ = terminator.terminate(Interrupted::UserInt);
@@ -97,6 +134,7 @@ impl StateStore {
                     }
                     Action::InvitePopupStart => {
                         let _ = create_invitation(&mut state, &self.state_tx, &atm).await;
+                        info!("OOB Invitation created and added to Chats");
                     },
                     Action::InvitePopupStop => {
                         state.invite_popup.show_invite_popup = false;

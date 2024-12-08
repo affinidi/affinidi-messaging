@@ -1,6 +1,13 @@
 use crate::{
-    state_store::{actions::Action, ChatData, MessageBoxItem, State},
+    state_store::{
+        actions::{
+            chat_list::{Chat, ChatList},
+            Action,
+        },
+        State,
+    },
     ui_management::pages::{
+        chat_details_popup::chat_details_popup::ChatDetailsPopup,
         invite_popup::invite_popup::InvitePopup, settings_popup::settings_popup::SettingsPopup,
     },
 };
@@ -11,13 +18,13 @@ use ratatui::{
     widgets::*,
     Frame,
 };
-use std::collections::HashMap;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::info;
 
 use super::{
     components::{
         bottom_menu::{self, BottomMenu},
-        chat_list::{self, ChatList},
+        chat_list::{self, ChatListComponent},
         chat_logs::{self, ChatLogs},
         date_time::{self, DateTime},
         message_input_box::{self, MessageInputBox},
@@ -59,17 +66,14 @@ impl TryFrom<usize> for Section {
 }
 
 struct Props {
-    /// The currently active chat
-    active_chat: Option<String>,
     /// The chat data map
-    chat_data_map: HashMap<String, ChatData>,
+    chat_list: ChatList,
 }
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         Props {
-            active_chat: state.active_chat.clone(),
-            chat_data_map: state.chat_data_map.clone(),
+            chat_list: state.chat_list.clone(),
         }
     }
 }
@@ -90,16 +94,17 @@ pub struct MainPage {
     // Child Components
     bottom_menu: BottomMenu,
     date_time: DateTime,
-    chat_list: ChatList,
+    chat_list: ChatListComponent,
     chat_logs: ChatLogs,
     message_input_box: MessageInputBox,
     pub settings_popup: SettingsPopup,
     pub invite_popup: InvitePopup,
+    pub chat_details_popup: ChatDetailsPopup,
 }
 
 impl MainPage {
-    fn get_chat_data(&self, name: &str) -> Option<&ChatData> {
-        self.props.chat_data_map.get(name)
+    fn get_chat_data(&self, name: &str) -> Option<&Chat> {
+        self.props.chat_list.chats.get(name)
     }
 
     fn get_component_for_section<'a>(&'a self, section: &Section) -> &'a dyn Component {
@@ -173,11 +178,12 @@ impl Component for MainPage {
             // child components
             bottom_menu: BottomMenu,
             date_time: DateTime,
-            chat_list: ChatList::new(state, action_tx.clone()),
+            chat_list: ChatListComponent::new(state, action_tx.clone()),
             chat_logs: ChatLogs,
             message_input_box: MessageInputBox::new(state, action_tx.clone()),
             settings_popup: SettingsPopup::new(state, action_tx.clone()),
-            invite_popup: InvitePopup::new(state, action_tx),
+            invite_popup: InvitePopup::new(state, action_tx.clone()),
+            chat_details_popup: ChatDetailsPopup::new(state, action_tx),
         }
         .move_with_state(state)
     }
@@ -192,6 +198,7 @@ impl Component for MainPage {
             chat_list: self.chat_list.move_with_state(state),
             settings_popup: self.settings_popup.move_with_state(state),
             invite_popup: self.invite_popup.move_with_state(state),
+            chat_details_popup: self.chat_details_popup.move_with_state(state),
             ..self
         }
     }
@@ -209,12 +216,14 @@ impl Component for MainPage {
             self.settings_popup.handle_key_event(key);
         } else if self.invite_popup.props.invite_state.show_invite_popup {
             self.invite_popup.handle_key_event(key);
+        } else if self.chat_details_popup.props.chat_details_popup_state.show {
+            self.chat_details_popup.handle_key_event(key);
         } else {
             let active_section = self.active_section.clone();
 
             match active_section {
                 None => match key.code {
-                    KeyCode::Char('e') => {
+                    KeyCode::Enter => {
                         let last_hovered_section = self.last_hovered_section.clone();
 
                         self.active_section = Some(last_hovered_section.clone());
@@ -310,10 +319,12 @@ impl ComponentRender<()> for MainPage {
             },
         );
 
+        //info!("Active Chat: {:?}", self.props.active_chat);
         // Active Chat Rendering
         // Chat Title
         let chat_description = if let Some(chat_data) = self
             .props
+            .chat_list
             .active_chat
             .as_ref()
             .and_then(|active_chat| self.get_chat_data(active_chat))
@@ -322,7 +333,7 @@ impl ComponentRender<()> for MainPage {
                 "on ".into(),
                 Span::from(format!("#{}", chat_data.name)).bold(),
                 " for ".into(),
-                Span::from(format!(r#""{}""#, chat_data.description)).italic(),
+                Span::from(format!(r#""{}""#, "Boo")).italic(),
             ])
         } else {
             Line::from(NO_CHAT_SELECTED_MESSAGE)
@@ -337,7 +348,7 @@ impl ComponentRender<()> for MainPage {
         frame.render_widget(chat_description, chat_title);
 
         // Chat Messages
-        let messages = if let Some(active_chat) = self.props.active_chat.as_ref() {
+        let messages = if let Some(active_chat) = self.props.chat_list.active_chat.as_ref() {
             self.get_chat_data(active_chat)
                 .map(|chat_data| {
                     let message_offset =
@@ -348,14 +359,7 @@ impl ComponentRender<()> for MainPage {
                         .asc_iter()
                         .skip(message_offset)
                         .map(|mbi| {
-                            let line = match mbi {
-                                MessageBoxItem::Message { user_id, content } => {
-                                    Line::from(Span::raw(format!("@{}: {}", user_id, content)))
-                                }
-                                MessageBoxItem::Notification(content) => {
-                                    Line::from(Span::raw(content.clone()).italic())
-                                }
-                            };
+                            let line = Line::from(Span::raw(mbi.clone()).italic());
 
                             ListItem::new(line)
                         })
@@ -403,6 +407,10 @@ impl ComponentRender<()> for MainPage {
         if self.invite_popup.props.invite_state.show_invite_popup {
             self.invite_popup.render(frame, ());
         }
+
+        if self.chat_details_popup.props.chat_details_popup_state.show {
+            self.chat_details_popup.render(frame, ());
+        }
     }
 }
 
@@ -428,7 +436,7 @@ impl HasUsageInfo for MainPage {
                         description: "to hover widgets".into(),
                     },
                     UsageInfoLine {
-                        keys: vec!["e".into()],
+                        keys: vec!["Enter/Return".into()],
                         description: format!(
                             "to activate {}",
                             self.get_component_for_section(&self.last_hovered_section)

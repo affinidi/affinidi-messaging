@@ -23,7 +23,7 @@ struct Props {
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         Self {
-            active_room: state.active_chat.clone(),
+            active_room: state.chat_list.active_chat.clone(),
         }
     }
 }

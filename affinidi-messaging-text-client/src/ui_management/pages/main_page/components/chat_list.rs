@@ -9,7 +9,13 @@ use ratatui::{
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    state_store::{actions::Action, State},
+    state_store::{
+        actions::{
+            chat_list::{Chat, ChatList},
+            Action,
+        },
+        State,
+    },
     ui_management::{
         components::{Component, ComponentRender},
         pages::main_page::section::{
@@ -18,45 +24,46 @@ use crate::{
         },
     },
 };
-pub struct ChatState {
-    pub name: String,
-    pub description: String,
-    pub has_unread: bool,
-}
 
 struct Props {
     /// List of chats and current state of those chats
-    chats: Vec<ChatState>,
+    chat_list: ChatList,
     /// Current active chat
-    active_chat: Option<String>,
+    chats: Vec<Chat>,
 }
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         let mut chats = state
-            .chat_data_map
+            .chat_list
+            .chats
             .iter()
-            .map(|(name, chat_data)| ChatState {
+            .map(|(name, chat_data)| Chat {
                 name: name.clone(),
+                messages: chat_data.messages.clone(),
                 description: chat_data.description.clone(),
+                our_profile: chat_data.our_profile.clone(),
+                remote_did: chat_data.remote_did.clone(),
                 has_unread: chat_data.has_unread,
+                invitation_link: chat_data.invitation_link.clone(),
+                status: chat_data.status.clone(),
             })
-            .collect::<Vec<ChatState>>();
+            .collect::<Vec<Chat>>();
 
         chats.sort_by(|chat_a, chat_b| chat_a.name.cmp(&chat_b.name));
 
         Self {
+            chat_list: state.chat_list.clone(),
             chats,
-            active_chat: state.active_chat.clone(),
         }
     }
 }
 
-impl ChatList {
+impl ChatListComponent {
     fn next(&mut self) {
         let i = match self.list_state.selected() {
             Some(i) => {
-                if i >= self.props.chats.len() - 1 {
+                if i >= self.props.chat_list.chats.len() - 1 {
                     0
                 } else {
                     i + 1
@@ -71,7 +78,7 @@ impl ChatList {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    self.props.chats.len() - 1
+                    self.props.chat_list.chats.len() - 1
                 } else {
                     i - 1
                 }
@@ -82,7 +89,7 @@ impl ChatList {
         self.list_state.select(Some(i));
     }
 
-    pub(super) fn chats(&self) -> &Vec<ChatState> {
+    pub(super) fn chats(&self) -> &Vec<Chat> {
         &self.props.chats
     }
 
@@ -101,13 +108,13 @@ impl ChatList {
     }
 }
 
-pub struct ChatList {
+pub struct ChatListComponent {
     action_tx: UnboundedSender<Action>,
     props: Props,
     pub list_state: ListState,
 }
 
-impl Component for ChatList {
+impl Component for ChatListComponent {
     fn new(state: &State, action_tx: UnboundedSender<Action>) -> Self {
         Self {
             action_tx,
@@ -146,10 +153,13 @@ impl Component for ChatList {
                 let selected_idx = self.list_state.selected().unwrap();
 
                 let chats = self.chats();
-                let chat_state = chats.get(selected_idx).unwrap();
+                let chat_state = if let Some(chat) = chats.get(selected_idx) {
+                    chat
+                } else {
+                    return;
+                };
 
-                // TODO: handle the error scenario somehow
-                let _ = self.action_tx.send(Action::SelectChat {
+                let _ = self.action_tx.send(Action::ShowChatDetails {
                     chat: chat_state.name.clone(),
                 });
             }
@@ -158,10 +168,11 @@ impl Component for ChatList {
     }
 }
 
-impl SectionActivation for ChatList {
+impl SectionActivation for ChatListComponent {
     fn activate(&mut self) {
         let idx: usize = self
             .props
+            .chat_list
             .active_chat
             .as_ref()
             .and_then(|chat_name| self.get_chat_idx(chat_name.as_str()))
@@ -182,9 +193,9 @@ pub struct RenderProps {
     pub area: Rect,
 }
 
-impl ComponentRender<RenderProps> for ChatList {
+impl ComponentRender<RenderProps> for ChatListComponent {
     fn render(&self, frame: &mut Frame, props: RenderProps) {
-        let active_chat = self.props.active_chat.clone();
+        let active_chat = self.props.chat_list.active_chat.clone();
         let chat_list: Vec<ListItem> = self
             .chats()
             .iter()
@@ -231,7 +242,7 @@ impl ComponentRender<RenderProps> for ChatList {
     }
 }
 
-impl HasUsageInfo for ChatList {
+impl HasUsageInfo for ChatListComponent {
     fn usage_info(&self) -> UsageInfo {
         UsageInfo {
             description: Some("Select the chat to talk in".into()),
@@ -246,7 +257,7 @@ impl HasUsageInfo for ChatList {
                 },
                 UsageInfoLine {
                     keys: vec!["Enter".into()],
-                    description: "to join room".into(),
+                    description: "to show chat details".into(),
                 },
             ],
         }

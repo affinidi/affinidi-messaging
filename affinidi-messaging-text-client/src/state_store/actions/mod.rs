@@ -1,5 +1,6 @@
 use super::CommonSettings;
 
+pub mod chat_list;
 pub mod invitation;
 
 #[derive(Debug, Clone)]
@@ -11,5 +12,7 @@ pub enum Action {
     InvitePopupStop,
     SendMessage { content: String },
     SelectChat { chat: String },
+    ShowChatDetails { chat: String },
+    CloseChatDetails,
     Exit,
 }

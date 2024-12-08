@@ -3,5 +3,38 @@
     "mediator_did": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
     "avatar_path": "avatar.png"
   },
-  "chat_data_map": {}
+  "chat_list": {
+    "chats": {
+      "Invite-HyG5": {
+        "name": "Invite-HyG5",
+        "status": "AwaitingInvitationAcceptance",
+        "description": "OOB Invite stage 1. Ephemeral DID: did:key:zDnaeoDQivphMJ7VuKccgS5UvkiMWxC7CfR8TAVw2w8B3HyG5",
+        "messages": {
+          "capacity": 50,
+          "values": []
+        },
+        "our_profile": {
+          "alias": "Invite-HyG5",
+          "did": "did:key:zDnaeoDQivphMJ7VuKccgS5UvkiMWxC7CfR8TAVw2w8B3HyG5",
+          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+          "secrets": [
+            {
+              "id": "did:key:zDnaeoDQivphMJ7VuKccgS5UvkiMWxC7CfR8TAVw2w8B3HyG5#zDnaeoDQivphMJ7VuKccgS5UvkiMWxC7CfR8TAVw2w8B3HyG5",
+              "type": "JsonWebKey2020",
+              "privateKeyJwk": {
+                "crv": "P-256",
+                "d": "7h-9SG7ALGPIekrSs3ZyhpFjYZqNxy8U5-5hSgdQQC4",
+                "kty": "EC",
+                "x": "UoVIT5qHyiauX6ZpTZVJD3M0UXn-t7nCtdtiZff0r-o",
+                "y": "2IaZ4sGOALRmxkdGKzf9fuIpGVqlWXCp0UGDJ4q15PU"
+              }
+            }
+          ]
+        },
+        "remote_did": null,
+        "has_unread": false,
+        "invitation_link": "https://mediator-nlb.storm.ws/mediator/v1/oob?_oobid=23a4608f84349344385927241139a41c4c858c4d2a7f152113ff728ef25de147"
+      }
+    }
+  }
 }

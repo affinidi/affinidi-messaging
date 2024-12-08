@@ -4,7 +4,10 @@ use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
 
-use super::actions::invitation::InvitePopupState;
+use super::actions::{
+    chat_list::{Chat, ChatList},
+    invitation::InvitePopupState,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBoxItem {
@@ -12,26 +15,10 @@ pub enum MessageBoxItem {
     Notification(String),
 }
 
-const MAX_MESSAGES_TO_STORE_PER_CHAT: usize = 100;
-
-/// Holds the state for a chat channel
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatData {
-    pub name: String,
-    pub description: String,
-    pub messages: CircularQueue<MessageBoxItem>,
-    pub has_unread: bool,
-}
-
-impl Default for ChatData {
-    fn default() -> Self {
-        ChatData {
-            name: String::new(),
-            description: String::new(),
-            messages: CircularQueue::with_capacity(MAX_MESSAGES_TO_STORE_PER_CHAT),
-            has_unread: false,
-        }
-    }
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct ChatDetailsPopupState {
+    pub chat_name: Option<String>,
+    pub show: bool,
 }
 
 /// Common configuration across all chats
@@ -120,25 +107,15 @@ impl CommonSettings {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct State {
     pub settings: CommonSettings,
-    #[serde(skip)]
-    pub active_chat: Option<String>,
-    /// Storage of room data
-    pub chat_data_map: HashMap<String, ChatData>,
+    /// Storage of chat data
+    pub chat_list: ChatList,
     #[serde(skip)]
     pub invite_popup: InvitePopupState,
+    #[serde(skip)]
+    pub chat_details_popup: ChatDetailsPopupState,
 }
 
 impl State {
-    /// Tries to set the active chat as the given chat. Returns the [ChatData] associated to the chat.
-    pub fn try_set_active_chat(&mut self, chat: &str) -> Option<&ChatData> {
-        let chat_data = self.chat_data_map.get_mut(chat)?;
-        chat_data.has_unread = false;
-
-        self.active_chat = Some(String::from(chat));
-
-        Some(chat_data)
-    }
-
     pub fn save_to_file(&self, file_path: &str) -> Result<(), std::io::Error> {
         let file = std::fs::File::create(file_path)?;
         serde_json::to_writer_pretty(file, self)?;
