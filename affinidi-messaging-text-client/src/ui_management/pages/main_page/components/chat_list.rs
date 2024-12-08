@@ -149,6 +149,20 @@ impl Component for ChatListComponent {
             KeyCode::Down => {
                 self.next();
             }
+            KeyCode::Delete | KeyCode::Backspace if self.list_state.selected().is_some() => {
+                let selected_idx = self.list_state.selected().unwrap();
+
+                let chats = self.chats();
+                let chat_state = if let Some(chat) = chats.get(selected_idx) {
+                    chat
+                } else {
+                    return;
+                };
+
+                let _ = self.action_tx.send(Action::DeleteChat {
+                    chat: chat_state.name.clone(),
+                });
+            }
             KeyCode::Enter if self.list_state.selected().is_some() => {
                 let selected_idx = self.list_state.selected().unwrap();
 
@@ -254,6 +268,10 @@ impl HasUsageInfo for ChatListComponent {
                 UsageInfoLine {
                     keys: vec!["↑".into(), "↓".into()],
                     description: "to navigate".into(),
+                },
+                UsageInfoLine {
+                    keys: vec!["Delete".into()],
+                    description: "to delete Chat".into(),
                 },
                 UsageInfoLine {
                     keys: vec!["Enter".into()],

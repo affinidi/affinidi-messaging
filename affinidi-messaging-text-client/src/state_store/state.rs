@@ -1,13 +1,6 @@
-use std::collections::HashMap;
-
+use super::actions::{chat_list::ChatList, invitation::InvitePopupState};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
-
-use super::actions::{
-    chat_list::{Chat, ChatList},
-    invitation::InvitePopupState,
-};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBoxItem {
@@ -32,6 +25,8 @@ pub struct CommonSettings {
     pub avatar_path: Option<String>,
     #[serde(skip)]
     pub avatar_path_error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub our_name: Option<String>,
     #[serde(skip)]
     pub show_settings_popup: bool,
 }
@@ -96,6 +91,7 @@ impl CommonSettings {
         if self.check(state, did_resolver).await {
             state.settings.mediator_did = self.mediator_did.clone();
             state.settings.avatar_path = self.avatar_path.clone();
+            state.settings.our_name = self.our_name.clone();
             true
         } else {
             false

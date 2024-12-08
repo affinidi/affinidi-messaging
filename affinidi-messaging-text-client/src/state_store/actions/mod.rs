@@ -11,8 +11,8 @@ pub enum Action {
     InvitePopupStart,
     InvitePopupStop,
     SendMessage { content: String },
-    SelectChat { chat: String },
     ShowChatDetails { chat: String },
     CloseChatDetails,
+    DeleteChat { chat: String },
     Exit,
 }

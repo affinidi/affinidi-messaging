@@ -19,7 +19,6 @@ use ratatui::{
     Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::info;
 
 use super::{
     components::{
@@ -68,12 +67,14 @@ impl TryFrom<usize> for Section {
 struct Props {
     /// The chat data map
     chat_list: ChatList,
+    our_name: Option<String>,
 }
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         Props {
             chat_list: state.chat_list.clone(),
+            our_name: state.settings.our_name.clone(),
         }
     }
 }
@@ -282,8 +283,9 @@ impl ComponentRender<()> for MainPage {
         else {
             panic!("Invalid layout for main page")
         };
-        // Split the bottom into main menu items and date/time
-        let [bottom_menu, date_time] = *Layout::horizontal([Min(0), Length(20)]).split(main_bottom)
+        // Split the bottom into main menu items name, and date/time
+        let [bottom_menu, name, date_time] =
+            *Layout::horizontal([Min(0), Length(20), Length(20)]).split(main_bottom)
         else {
             panic!("Invalid layout for main_bottom")
         };
@@ -309,6 +311,15 @@ impl ComponentRender<()> for MainPage {
             .render(frame, bottom_menu::RenderProps { area: bottom_menu });
         self.date_time
             .render(frame, date_time::RenderProps { area: date_time });
+
+        if let Some(our_name) = &self.props.our_name {
+            Paragraph::new(Span::styled(
+                format!(" {} ", our_name),
+                Style::default().bg(Color::Green).fg(Color::Black).bold(),
+            ))
+            .alignment(Alignment::Right)
+            .render(name, frame.buffer_mut());
+        }
 
         // Chat List
         self.chat_list.render(

@@ -20,6 +20,7 @@ pub struct Props {
     avatar_path: String,
     mediator_did_error: Option<String>,
     avatar_path_error: Option<String>,
+    our_name: Option<String>,
     pub show_settings_popup: bool,
 }
 
@@ -31,6 +32,7 @@ impl From<&State> for Props {
             avatar_path_error: state.settings.avatar_path_error.clone(),
             mediator_did_error: state.settings.mediator_did_error.clone(),
             show_settings_popup: state.settings.show_settings_popup,
+            our_name: state.settings.our_name.clone(),
         }
     }
 }
@@ -44,6 +46,7 @@ pub struct SettingsPopup {
     pub active_field: InputType,
     pub mediator_did: Input,
     pub avatar_path: Input,
+    pub our_name: Input,
 }
 
 impl SettingsPopup {
@@ -65,6 +68,7 @@ impl Component for SettingsPopup {
             active_field: InputType::MediatorDID,
             mediator_did: Input::from(state.settings.mediator_did.clone().unwrap_or_default()),
             avatar_path: Input::from(state.settings.avatar_path.clone().unwrap_or_default()),
+            our_name: Input::from(state.settings.our_name.clone().unwrap_or_default()),
         }
         .move_with_state(state)
     }
@@ -110,13 +114,9 @@ impl Component for SettingsPopup {
                         mediator_did_error: None,
                         avatar_path_error: None,
                         show_settings_popup: self.props.show_settings_popup,
+                        our_name: _convert_input(self.our_name.value()),
                     },
                 });
-
-                //self.history.mediator_did = self.settings_input.mediator_did.value().to_string();
-                //self.history.our_avatar_path = self.settings_input.avatar_path.value().to_string();
-                //self.history_changed = true;
-                //self._reset_inputs();
             }
             KeyCode::Up => {
                 let _ = self.action_tx.send(Action::SettingsCheck {
@@ -126,6 +126,7 @@ impl Component for SettingsPopup {
                         mediator_did_error: None,
                         avatar_path_error: None,
                         show_settings_popup: self.props.show_settings_popup,
+                        our_name: self.props.our_name.clone(),
                     },
                 });
                 // Switch to the next input field
@@ -134,6 +135,9 @@ impl Component for SettingsPopup {
                         self.active_field = InputType::AvatarPath;
                     }
                     InputType::AvatarPath => {
+                        self.active_field = InputType::OurName;
+                    }
+                    InputType::OurName => {
                         self.active_field = InputType::MediatorDID;
                     }
                     _ => {}
@@ -147,6 +151,7 @@ impl Component for SettingsPopup {
                         mediator_did_error: None,
                         avatar_path_error: None,
                         show_settings_popup: self.props.show_settings_popup,
+                        our_name: self.props.our_name.clone(),
                     },
                 });
                 // Switch to the next input field
@@ -155,6 +160,9 @@ impl Component for SettingsPopup {
                         self.active_field = InputType::AvatarPath;
                     }
                     InputType::AvatarPath => {
+                        self.active_field = InputType::OurName;
+                    }
+                    InputType::OurName => {
                         self.active_field = InputType::MediatorDID;
                     }
                     _ => {}
@@ -168,6 +176,7 @@ impl Component for SettingsPopup {
                         mediator_did_error: None,
                         avatar_path_error: None,
                         show_settings_popup: self.props.show_settings_popup,
+                        our_name: self.props.our_name.clone(),
                     },
                 });
                 // Switch to the next input field
@@ -176,6 +185,9 @@ impl Component for SettingsPopup {
                         self.active_field = InputType::AvatarPath;
                     }
                     InputType::AvatarPath => {
+                        self.active_field = InputType::OurName;
+                    }
+                    InputType::OurName => {
                         self.active_field = InputType::MediatorDID;
                     }
                     _ => {}
@@ -191,6 +203,9 @@ impl Component for SettingsPopup {
                 }
                 InputType::AvatarPath => {
                     self.avatar_path.handle_event(&Event::Key(key));
+                }
+                InputType::OurName => {
+                    self.our_name.handle_event(&Event::Key(key));
                 }
                 _ => {}
             },
@@ -216,12 +231,14 @@ impl ComponentRender<()> for SettingsPopup {
         // Mediator error message?
         // <Avatar  Input>
         // Avatar error message?
+        // <Our Name Input>
         // Help Text
         let vertical = Layout::vertical([
             Constraint::Length(3),
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
+            Constraint::Length(3),
             Constraint::Length(1),
         ])
         .split(inner_area);
@@ -233,10 +250,12 @@ impl ComponentRender<()> for SettingsPopup {
         let input_area = match self.active_field {
             InputType::MediatorDID => vertical[0],
             InputType::AvatarPath => vertical[2],
+            InputType::OurName => vertical[4],
             _ => vertical[0],
         };
         let mediator_scroll = self.mediator_did.visual_scroll(width as usize);
         let avatar_scroll = self.avatar_path.visual_scroll(width as usize);
+        let our_name_scroll = self.our_name.visual_scroll(width as usize);
 
         // Mediator DID
         let input = Paragraph::new(self.mediator_did.value())
@@ -272,6 +291,17 @@ impl ComponentRender<()> for SettingsPopup {
             error.render(vertical[3], frame.buffer_mut());
         }
 
+        // Our Name Input
+        let our_name = Paragraph::new(self.our_name.value())
+            .style(if self.active_field == InputType::OurName {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::Black)
+            })
+            .scroll((0, our_name_scroll as u16))
+            .block(Block::bordered().title("Our Name?"));
+        our_name.render(vertical[4], frame.buffer_mut());
+
         // Help text
         let help_line = Line::from(vec![
             Span::styled("<TAB> ", Style::default().fg(Color::LightRed).bold()),
@@ -282,7 +312,7 @@ impl ComponentRender<()> for SettingsPopup {
             Span::styled("to quit, ", Style::default()),
         ]);
         let help = Paragraph::new(help_line).left_aligned();
-        help.render(vertical[4], frame.buffer_mut());
+        help.render(vertical[5], frame.buffer_mut());
 
         // set the cursor position
         let cursor: Position = (
@@ -292,9 +322,14 @@ impl ComponentRender<()> for SettingsPopup {
                     + ((self.mediator_did.visual_cursor()).max(mediator_scroll) - mediator_scroll)
                         as u16
                     + 1
-            } else {
+            } else if self.active_field == InputType::AvatarPath {
                 input_area.x
                     + ((self.avatar_path.visual_cursor()).max(avatar_scroll) - avatar_scroll) as u16
+                    + 1
+            } else {
+                input_area.x
+                    + ((self.our_name.visual_cursor()).max(our_name_scroll) - our_name_scroll)
+                        as u16
                     + 1
             },
             // Move one line down, from the border to the input line

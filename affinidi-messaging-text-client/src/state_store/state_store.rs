@@ -105,8 +105,15 @@ impl StateStore {
                         // TODO: send the message
                         warn!("Sending message: {}", content);
                     },
-                    Action::SelectChat { chat } => {
-                        state.chat_list.try_set_active_chat(chat.as_str());
+                    Action::DeleteChat { chat } => {
+                        match state.chat_list.chats.remove(&chat) {
+                            Some(_) => {
+                                info!("Chat {} removed", chat);
+                            },
+                            None => {
+                                warn!("Chat {} not found", chat);
+                            }
+                        }
                     },
                     Action::ShowChatDetails { chat} => {
                         state.chat_details_popup.show = true;

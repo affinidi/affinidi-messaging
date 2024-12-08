@@ -68,5 +68,6 @@ pub enum InputType {
     None,
     MediatorDID,
     AvatarPath,
+    OurName,
     ChatMessage,
 }
