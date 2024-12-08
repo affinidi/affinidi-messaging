@@ -49,3 +49,6 @@
 * Added ability to support multiple DID Profiles per SDK ATM Instance
   * Ensures that each DID is authenticated separately, and has their own WebSocket connection
   * Can turn on live-delivery on a per DID basis, or all together
+* Added different WebSocket operating modes
+  1. Cached Mode: SDK Caches inbound messages and handles a lot of the heavy lifting for you
+  2. DirectMode: No caching, you can request a broadcast channel and receive messages directly and handle the logic on the client side.

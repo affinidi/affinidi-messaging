@@ -1,7 +1,7 @@
-use crate::{errors::ATMError, profiles::Mediator, secrets::Secret};
+use crate::{errors::ATMError, secrets::Secret, transports::websockets::ws_handler::WsHandlerMode};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use rustls::pki_types::CertificateDer;
-use std::{fs::File, io::BufReader, sync::Arc};
+use std::{fs::File, io::BufReader};
 use tracing::error;
 
 /// Configuration for the Affinidi Trusted Messaging (ATM) Service
@@ -19,7 +19,7 @@ pub struct Config {
     pub(crate) fetch_cache_limit_bytes: u64,
     pub(crate) secrets: Vec<Secret>,
     pub(crate) did_resolver: Option<DIDCacheClient>,
-    pub(crate) default_mediator: Arc<Option<Mediator>>,
+    pub(crate) ws_handler_mode: WsHandlerMode,
 }
 
 impl Config {
@@ -53,7 +53,7 @@ pub struct ConfigBuilder {
     fetch_cache_limit_bytes: u64,
     secrets: Vec<Secret>,
     did_resolver: Option<DIDCacheClient>,
-    default_mediator: Option<Mediator>,
+    ws_handler_mode: WsHandlerMode,
 }
 
 impl Default for ConfigBuilder {
@@ -64,7 +64,7 @@ impl Default for ConfigBuilder {
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
             secrets: Vec::new(),
             did_resolver: None,
-            default_mediator: None,
+            ws_handler_mode: WsHandlerMode::Cached,
         }
     }
 }
@@ -120,10 +120,12 @@ impl ConfigBuilder {
         self
     }
 
-    /// If no mediator is provided in individual profiles, use the default mediator
-    /// If not specified and no Mediator is provided in the profile, the SDK will fail
-    pub fn with_default_mediator(mut self, mediator: Mediator) -> Self {
-        self.default_mediator = Some(mediator);
+    /// Set the mode for the websocket handler
+    /// Default: Cached
+    /// Cached: Messages are cached and sent to the SDK when requested (using the message_pickup protocol)
+    /// DirectChannel: Messages are sent directly to the SDK via a channel
+    pub fn with_ws_handler_mode(mut self, mode: WsHandlerMode) -> Self {
+        self.ws_handler_mode = mode;
         self
     }
 
@@ -162,7 +164,7 @@ impl ConfigBuilder {
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
             secrets: self.secrets,
             did_resolver: self.did_resolver,
-            default_mediator: Arc::new(self.default_mediator),
+            ws_handler_mode: self.ws_handler_mode,
         })
     }
 }

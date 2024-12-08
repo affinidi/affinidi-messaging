@@ -11,7 +11,10 @@ use crate::{
     messages::AuthorizationResponse,
     protocols::message_pickup::MessagePickup,
     secrets::Secret,
-    transports::websockets::{ws_connection::WsConnectionCommands, ws_handler::WsHandlerCommands},
+    transports::websockets::{
+        ws_connection::WsConnectionCommands,
+        ws_handler::{WsHandlerCommands, WsHandlerMode},
+    },
     ATM,
 };
 use serde::{Deserialize, Serialize};
@@ -381,9 +384,12 @@ impl ATM {
             }
         };
 
-        let _ = MessagePickup::default()
-            .live_stream_get(self, profile, true, &status_msg_id, Duration::from_secs(10))
-            .await;
+        // If we are running in cached mode, then we should wait for the live-pickup status message and clear it
+        if let WsHandlerMode::Cached = self.inner.config.ws_handler_mode {
+            let _ = MessagePickup::default()
+                .live_stream_get(self, profile, true, &status_msg_id, Duration::from_secs(10))
+                .await;
+        }
 
         Ok(())
     }

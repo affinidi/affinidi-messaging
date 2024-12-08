@@ -12,15 +12,37 @@ use crate::{
     ATM,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug, Formatter},
+    sync::Arc,
+};
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
 use tracing::{debug, info, span, warn, Instrument, Level};
 
+/// The mode in which the handler should operate
+/// Cached: Messages are cached and sent to the SDK when requested
+/// DirectChannel: Messages are sent directly to the SDK without caching
+#[derive(Clone)]
+pub enum WsHandlerMode {
+    Cached,
+    DirectChannel,
+}
+
+impl Debug for WsHandlerMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WsHandlerMode::Cached => write!(f, "Cached"),
+            WsHandlerMode::DirectChannel => write!(f, "DirectChannel"),
+        }
+    }
+}
+
 /// Possible messages that can be sent to the websocket handler
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum WsHandlerCommands {
     // Messages sent from SDK to the Handler
     Exit,
@@ -35,13 +57,13 @@ pub enum WsHandlerCommands {
     NotFound, // Message not found in the cache
     // Messages sent from the Handler to a specific Profile
     Activated(String), // Profile WebSocket connection is active (status_message to get)
+    InDirectChannelModeError, // WsHandler is in DirectChannelMode and is not caching messages
 }
 
 impl ATM {
     /// WebSocket streaming handler
     /// from_sdk is an MPSC channel used to receive messages from the main thread that will be sent to the websocket
     /// to_sdk is an MPSC channel used to send messages to the main thread that were received from the websocket
-    /// web_socket is the websocket stream itself which can be used to send and receive messages
     pub(crate) async fn ws_handler(
         shared_state: Arc<SharedState>,
         from_sdk: &mut Receiver<WsHandlerCommands>,
@@ -49,14 +71,14 @@ impl ATM {
     ) -> Result<(), ATMError> {
         let _span = span!(Level::INFO, "ws_handler");
         async move {
-            debug!("Starting websocket handler");
+            let ws_handler_mode = shared_state.config.ws_handler_mode.clone();
+            debug!("Starting websocket handler. Mode: {:?}", ws_handler_mode);
 
             // Set up a message cache
             let mut cache = MessageCache {
                 fetch_cache_limit_count: shared_state.config.fetch_cache_limit_count,
                 fetch_cache_limit_bytes: shared_state.config.fetch_cache_limit_bytes,
-                ..Default::default()
-            };
+                ..Default::default()};
 
             // A list of all the active connections
             let mut connections: HashMap<String, Arc<Profile>> = HashMap::new();
@@ -83,13 +105,21 @@ impl ATM {
                                 WsConnectionCommands::MessageReceived(data) => {
                                     let (message, meta) = *data;
                                     debug!("Message received from WS_Connection");
-                                    if let Some(channel) = cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) {
-                                        debug!("Message found in cache");
-                                        // notify the SDK that a message has been found
-                                        let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
-                                        debug!("Message delivered to receive channel");
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        // If we are in cached mode, we need to cache the message
+                                        if let Some(channel) = cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) {
+                                            debug!("Message found in cache");
+                                            // notify the SDK that a message has been found
+                                            let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
+                                            debug!("Message delivered to receive channel");
+                                        } else {
+                                            cache.insert(message, meta);
+                                        }
                                     } else {
-                                        cache.insert(message, meta);
+                                        // Send the message directly to the broadcast channel
+                                        if let Some(broadcast) = &shared_state.direct_stream_sender {
+                                            let _ = broadcast.send((message, meta));
+                                        }
                                     }
                                 }
                                 _ => {
@@ -117,19 +147,31 @@ impl ATM {
                                     }
                                 }
                                 WsHandlerCommands::Next => {
-                                    if let Some((message, meta)) = cache.next() {
-                                        to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        if let Some((message, meta)) = cache.next() {
+                                            to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        }
+                                    } else {
+                                        to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }
                                 }
                                 WsHandlerCommands::Get(id, channel) => {
-                                    if let Some((message, meta)) = cache.get(&id, &channel) {
-                                        channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                            ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                        })?;
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        if let Some((message, meta)) = cache.get(&id, &channel) {
+                                            channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        } else {
+                                            channel.send(WsHandlerCommands::NotFound).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        }
                                     } else {
-                                        channel.send(WsHandlerCommands::NotFound).await.map_err(|err| {
+                                        to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }

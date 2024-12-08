@@ -1,23 +1,26 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_didcomm::UnpackMetadata;
 use config::Config;
 use errors::ATMError;
 use profiles::Profiles;
 use reqwest::{Certificate, Client};
 use resolvers::secrets_resolver::AffinidiSecrets;
 use rustls::ClientConfig as TlsClientConfig;
-use rustls::{ClientConfig, RootCertStore};
 use rustls_platform_verifier::ConfigVerifierExt;
 use secrets::Secret;
 use ssi::dids::Document;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio_tungstenite::Connector;
-use tracing::{debug, span, warn};
+use tracing::{debug, span};
 use transports::websockets::ws_handler::WsHandlerCommands;
+use transports::websockets::ws_handler::WsHandlerMode;
 
 pub mod authentication;
 pub mod config;
@@ -44,8 +47,9 @@ pub(crate) struct SharedState {
     pub(crate) ws_connector: Connector,
     pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the WebSocket handler
     pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>, // Receives MPSC messages from the WebSocket handler
-    pub(crate) sdk_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the SDK
+    pub(crate) sdk_send_stream: Sender<WsHandlerCommands>, // Sends messages to the SDK
     pub(crate) profiles: Arc<RwLock<Profiles>>,
+    pub(crate) direct_stream_sender: Option<broadcast::Sender<(Message, UnpackMetadata)>>, // Used if a client outside of ATM wants to direct stream from websocket
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -96,34 +100,6 @@ impl ATM {
             }
         };
 
-        /*
-        // Set up the WebSocket Client
-        let mut root_store = RootCertStore::empty();
-        if config.get_ssl_certificates().is_empty() {
-            debug!("Use native SSL Certs");
-        /*
-        for cert in
-            rustls_native_certs::load_native_certs().expect("Could not load platform certs")
-        {
-            root_store.add(cert).map_err(|e| {
-                warn!("Couldn't add cert: {:?}", e);
-                ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
-            })?;
-        }*/
-        } else {
-            debug!("Use custom SSL Certs");
-            for cert in config.get_ssl_certificates() {
-                root_store.add(cert.to_owned()).map_err(|e| {
-                    warn!("Couldn't add cert: {:?}", e);
-                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
-                })?;
-            }
-        }
-
-        let ws_config = ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
-        */
         let ws_connector = Connector::Rustls(Arc::new(tls_config));
 
         // Set up the DID Resolver
@@ -152,6 +128,13 @@ impl ATM {
         // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
         let (ws_handler_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
 
+        let direct_stream_sender = if let WsHandlerMode::DirectChannel = config.ws_handler_mode {
+            let (direct_stream_sender, _) = broadcast::channel(32);
+            Some(direct_stream_sender)
+        } else {
+            None
+        };
+
         let shared_state = SharedState {
             config: config.clone(),
             did_resolver,
@@ -162,6 +145,7 @@ impl ATM {
             ws_handler_recv_stream: Mutex::new(sdk_rx),
             sdk_send_stream: ws_handler_tx.clone(),
             profiles: Arc::new(RwLock::new(Profiles::default())),
+            direct_stream_sender,
         };
 
         let atm = ATM {
@@ -208,5 +192,14 @@ impl ATM {
         for secret in secrets {
             self.inner.secrets_resolver.insert(secret.clone());
         }
+    }
+
+    /// If you have set the ATM SDK to be in DirectChannel mode, you can get the inbound channel here
+    /// This allows you to directly stream messages from the WebSocket Handler to your own client code
+    pub fn get_inbound_channel(&self) -> Option<broadcast::Receiver<(Message, UnpackMetadata)>> {
+        self.inner
+            .direct_stream_sender
+            .as_ref()
+            .map(|sender| sender.subscribe())
     }
 }

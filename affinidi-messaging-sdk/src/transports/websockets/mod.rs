@@ -19,7 +19,7 @@ use ws_handler::WsHandlerCommands;
 
 pub(crate) mod ws_cache;
 pub(crate) mod ws_connection;
-pub(crate) mod ws_handler;
+pub mod ws_handler;
 
 impl ATM {
     /// Starts the WebSocket Handler - won't do anything though until Profiles requiring WebSocket connections are added
