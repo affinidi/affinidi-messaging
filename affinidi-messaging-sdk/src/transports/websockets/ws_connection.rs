@@ -84,7 +84,7 @@ impl WsConnection {
     async fn run(&mut self) -> Result<(), ATMError> {
         //let alias = { self.profile.read().await.alias.clone() };
 
-        let _span = span!(tracing::Level::DEBUG, "WsConnection::run",);
+        let _span = span!(tracing::Level::DEBUG, "WsConnection::run", profile = %self.profile.inner.alias.clone());
 
         async move {
             // ATM utility for this connection

@@ -31,6 +31,7 @@ hostname.workspace = true
 http.workspace = true
 jsonwebtoken.workspace = true
 itertools.workspace = true
+num-format.workspace = true
 rand.workspace = true
 redis.workspace = true
 regex.workspace = true

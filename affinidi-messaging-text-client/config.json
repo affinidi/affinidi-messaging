@@ -2,9 +2,40 @@
   "settings": {
     "mediator_did": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
     "avatar_path": "avatar.png",
-    "our_name": "Bob"
+    "our_name": "Alice"
   },
   "chat_list": {
-    "chats": {}
+    "chats": {
+      "Invite-CLdZ": {
+        "name": "Invite-CLdZ",
+        "status": "AwaitingInvitationAcceptance",
+        "description": "OOB Invite stage 1. Ephemeral DID: did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+        "messages": {
+          "capacity": 50,
+          "values": []
+        },
+        "our_profile": {
+          "alias": "Invite-CLdZ",
+          "did": "did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+          "secrets": [
+            {
+              "id": "did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ#zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+              "type": "JsonWebKey2020",
+              "privateKeyJwk": {
+                "crv": "P-256",
+                "d": "ZC85l1UDxeogbqMlNN4AonJ00cqmdGSdnlzrTlXjaxg",
+                "kty": "EC",
+                "x": "fX_cC9nqZEe3vHZfoGFAlmXcPGykX_gcYj_d9cSNRKw",
+                "y": "EE4_68YZ2IGC9xR-l_mo5RZwUzUnXKO691fVS0ZxqJw"
+              }
+            }
+          ]
+        },
+        "remote_did": null,
+        "has_unread": false,
+        "invitation_link": "https://mediator-nlb.storm.ws/mediator/v1/oob?_oobid=f55aa756994a2d3433bd81420dabe8da9de32d7f3f4a2c9c3038036746a71b27"
+      }
+    }
   }
 }

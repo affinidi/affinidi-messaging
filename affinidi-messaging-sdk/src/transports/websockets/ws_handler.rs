@@ -146,6 +146,16 @@ impl ATM {
                                         }
                                     }
                                 }
+                                WsHandlerCommands::Deactivate(profile) => {
+                                    debug!("Profile({}): Shutting Down", profile.inner.alias);
+                                    if let Some(profile) = connections.remove(&profile.inner.alias) {
+                                        if let Some(mediator) = &*profile.inner.mediator {
+                                            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                                                let _ = channel.send(WsConnectionCommands::Stop).await;
+                                            }
+                                        }
+                                    }
+                                }
                                 WsHandlerCommands::Next => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
                                         if let Some((message, meta)) = cache.next() {

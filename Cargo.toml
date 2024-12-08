@@ -22,13 +22,10 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-# rustls-native-certs = "0.8"
 affinidi-messaging-sdk = { version = "0.8", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.8", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.8", path = "./affinidi-messaging-mediator" }
-affinidi-did-resolver-cache-sdk = { version = "0.2", path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk", features = [
-    "network",
-] }
+affinidi-did-resolver-cache-sdk = { version = "0.2", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.1"
 async-convert = "1"
@@ -62,6 +59,7 @@ itertools = "0.13"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
 log = "0.4.22"
+num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.8"
 ratatui = "0.29"

@@ -1,6 +1,7 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use itertools::Itertools;
+use num_format::{Locale, ToFormattedString};
 use redis::{from_redis_value, Value};
 use std::fmt::{self, Display, Formatter};
 use tracing::{debug, event, Level};
@@ -32,21 +33,21 @@ impl Display for MetadataStats {
     Connections: ws_open({}) ws_close({}) ws_current({}) :: sessions_created({}), sessions_authenticated({})
     OOB Invites: created({}) claimed({})
             "#,
-            self.received_count,
-            self.sent_count,
-            self.deleted_count,
-            self.received_count - self.deleted_count,
-            self.received_bytes,
-            self.sent_bytes,
-            self.deleted_bytes,
-            self.received_bytes - self.deleted_bytes,
-            self.websocket_open,
-            self.websocket_close,
-            self.websocket_open - self.websocket_close,
-            self.sessions_created,
-            self.sessions_success,
-            self.oob_invites_created,
-            self.oob_invites_claimed
+            self.received_count.to_formatted_string(&Locale::en),
+            self.sent_count.to_formatted_string(&Locale::en),
+            self.deleted_count.to_formatted_string(&Locale::en),
+            (self.received_count - self.deleted_count).to_formatted_string(&Locale::en),
+            self.received_bytes.to_formatted_string(&Locale::en),
+            self.sent_bytes.to_formatted_string(&Locale::en),
+            self.deleted_bytes.to_formatted_string(&Locale::en),
+            (self.received_bytes - self.deleted_bytes).to_formatted_string(&Locale::en),
+            self.websocket_open.to_formatted_string(&Locale::en),
+            self.websocket_close.to_formatted_string(&Locale::en),
+            (self.websocket_open - self.websocket_close).to_formatted_string(&Locale::en),
+            self.sessions_created.to_formatted_string(&Locale::en),
+            self.sessions_success.to_formatted_string(&Locale::en),
+            self.oob_invites_created.to_formatted_string(&Locale::en),
+            self.oob_invites_claimed.to_formatted_string(&Locale::en)
         )
     }
 }

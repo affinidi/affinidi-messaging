@@ -322,6 +322,27 @@ impl ATM {
         Ok(_profile)
     }
 
+    /// Removes a profile from the ATM instance
+    /// Will shutdown any websockets and related tasks if they exist
+    /// profile: &str - The alias of the profile to remove
+    ///
+    /// Returns true if the profile was removed
+    pub async fn profile_remove(&self, profile: &str) -> Result<bool, ATMError> {
+        if let Some(profile) = self.inner.profiles.write().await.0.remove(profile) {
+            // Send a signal to the WsHandler to Remove this Profile
+            let _ = self
+                .inner
+                .ws_handler_send_stream
+                .send(WsHandlerCommands::Deactivate(profile.clone()))
+                .await;
+
+            debug!("Profile({}): Removed from profiles", &profile.inner.alias);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Will create a websocket connection for the profile if one doesn't already exist
     /// Will return Ok() if a connection already exists, or if it successfully started a new connection
     pub async fn profile_enable_websocket(&self, profile: &Arc<Profile>) -> Result<(), ATMError> {

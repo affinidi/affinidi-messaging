@@ -114,6 +114,7 @@ impl StateStore {
                                 warn!("Chat {} not found", chat);
                             }
                         }
+                        let _ = atm.profile_remove(&chat).await;
                     },
                     Action::ShowChatDetails { chat} => {
                         state.chat_details_popup.show = true;
