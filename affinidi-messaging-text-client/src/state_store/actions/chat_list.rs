@@ -2,11 +2,12 @@
  * State for managing the list of chats
  */
 
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, hash::Hasher};
 
 use affinidi_messaging_sdk::profiles::{Profile, ProfileConfig};
 use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ChatList {
@@ -36,18 +37,12 @@ impl ChatList {
         self.chats.insert(name.to_string(), chat);
     }
 
-    pub fn get_mut_chat(&mut self, name: &str) -> Option<&mut Chat> {
-        self.chats.get_mut(name)
-    }
-
-    /// Tries to set the active chat as the given chat. Returns the [Chat] associated to the chat.
-    pub fn try_set_active_chat(&mut self, name: &str) -> Option<&Chat> {
-        let chat_data = self.chats.get_mut(name)?;
-        chat_data.has_unread = false;
-
-        self.active_chat = Some(String::from(name));
-
-        Some(chat_data)
+    /// Find a chat by our local DID
+    pub fn find_chat_by_did(&self, did: &str) -> Option<Chat> {
+        self.chats
+            .values()
+            .find(|c| c.our_profile.did.as_str() == did)
+            .cloned()
     }
 }
 
@@ -75,6 +70,20 @@ pub struct Chat {
     pub has_unread: bool,
     // This is used to store the invitation link for the chat
     pub invitation_link: Option<String>,
+}
+
+impl PartialEq for Chat {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Chat {}
+
+impl Hash for Chat {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
 }
 
 impl Default for Chat {

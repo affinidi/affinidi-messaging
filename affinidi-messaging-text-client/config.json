@@ -6,35 +6,35 @@
   },
   "chat_list": {
     "chats": {
-      "Invite-CLdZ": {
-        "name": "Invite-CLdZ",
+      "Glenn Flutter": {
+        "name": "Glenn Flutter",
         "status": "AwaitingInvitationAcceptance",
-        "description": "OOB Invite stage 1. Ephemeral DID: did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+        "description": "Chatting with Glenn Flutter",
         "messages": {
           "capacity": 50,
           "values": []
         },
         "our_profile": {
-          "alias": "Invite-CLdZ",
-          "did": "did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+          "alias": "Secure-Chat",
+          "did": "did:key:zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7",
           "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
           "secrets": [
             {
-              "id": "did:key:zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ#zDnaeYss64Rco7AvgNRGifWFutBVwgxNnmCTjApSk5vGfCLdZ",
+              "id": "did:key:zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7#zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7",
               "type": "JsonWebKey2020",
               "privateKeyJwk": {
                 "crv": "P-256",
-                "d": "ZC85l1UDxeogbqMlNN4AonJ00cqmdGSdnlzrTlXjaxg",
+                "d": "zF4uNSLIep1psyM5hlCMkXaGBW4On3aAi395V9AxbXo",
                 "kty": "EC",
-                "x": "fX_cC9nqZEe3vHZfoGFAlmXcPGykX_gcYj_d9cSNRKw",
-                "y": "EE4_68YZ2IGC9xR-l_mo5RZwUzUnXKO691fVS0ZxqJw"
+                "x": "pEjiwJQgtMCbanFqcZe-Ab7D0k6aHAUpJtHTimKrJGo",
+                "y": "wojhDEzl8YnIFOFZwTb9OKOUgjbs3wDpVo9aW83Bsjw"
               }
             }
           ]
         },
-        "remote_did": null,
+        "remote_did": "did:key:zDnaecBecvpLjHtVuonjkFtPeZECp95sHBShyMfgEL8MXdW2U",
         "has_unread": false,
-        "invitation_link": "https://mediator-nlb.storm.ws/mediator/v1/oob?_oobid=f55aa756994a2d3433bd81420dabe8da9de32d7f3f4a2c9c3038036746a71b27"
+        "invitation_link": null
       }
     }
   }

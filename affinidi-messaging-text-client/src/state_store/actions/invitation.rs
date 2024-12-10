@@ -46,7 +46,11 @@ pub struct InvitePopupState {
     pub messages: Vec<Line<'static>>,
 }
 
-pub async fn create_new_profile(atm: &ATM, mediator_did: &str) -> anyhow::Result<Profile> {
+pub async fn create_new_profile(
+    atm: &ATM,
+    mediator_did: &str,
+    alias: Option<String>,
+) -> anyhow::Result<Profile> {
     let p256_key = JWK::generate_p256();
     let did_key = DIDKey::generate(&p256_key).unwrap();
 
@@ -74,12 +78,18 @@ pub async fn create_new_profile(atm: &ATM, mediator_did: &str) -> anyhow::Result
         },
     };
 
-    match Profile::new(
-        atm,
-        Some(format!(
+    let alias = if let Some(alias) = alias {
+        alias
+    } else {
+        format!(
             "Invite-{}",
             &did_key.to_string()[did_key.to_string().char_indices().nth_back(3).unwrap().0..]
-        )),
+        )
+    };
+
+    match Profile::new(
+        atm,
+        Some(alias),
         did_key.to_string(),
         Some(mediator_did.to_string()),
         vec![secret],
@@ -107,7 +117,7 @@ pub async fn create_invitation(
     // Send the state immediately so we render the popup while waiting for the rest to complete
     state_tx.send(state.clone())?;
     if let Some(mediator_did) = state.settings.mediator_did.clone() {
-        match create_new_profile(atm, &mediator_did).await {
+        match create_new_profile(atm, &mediator_did, None).await {
             Ok(profile) => {
                 state.invite_popup.messages.push(Line::from(vec![
                     Span::styled(

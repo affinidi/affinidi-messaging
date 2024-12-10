@@ -2,7 +2,7 @@ use crate::{
     errors::ATMError,
     messages::{known::MessageType, GenericDataStruct, GetMessagesRequest},
     profiles::Profile,
-    protocols::message_pickup::MessagePickup,
+    protocols::{message_pickup::MessagePickup, routing::Routing},
     ATM,
 };
 use affinidi_messaging_didcomm::Message;
@@ -156,6 +156,53 @@ impl ATM {
                 Ok(a)
             }
         }
+    }
+
+    /// Takes a packed message, wraps it in a forward envelope and sends it to the target DID
+    /// - profile: The profile to send the message from
+    /// - message: The packed message to send
+    /// - msg_id: The ID of the message (used for message response pickup), if None, then the forwarded message ID is used
+    /// - target_did: The DID of the target agent (this is where the message will be sent - typically a mediator)
+    /// - next_did: The DID of the next agent to forward the message to
+    /// - expires_time: The time at which the message expires if not delivered
+    /// - delay_milli: The time to wait before delivering the message
+    ///               NOTE: If negative, picks a random delay between 0 and the absolute value
+    /// - wait_for_response: Whether to wait for a message response from the mediator
+    #[allow(clippy::too_many_arguments)]
+    pub async fn forward_and_send_message(
+        &self,
+        profile: &Arc<Profile>,
+        message: &str,
+        msg_id: Option<&str>,
+        target_did: &str,
+        next_did: &str,
+        expires_time: Option<u64>,
+        delay_milli: Option<i64>,
+        wait_for_response: bool,
+    ) -> Result<SendMessageResponse, ATMError> {
+        let routing = Routing::default();
+
+        // Wrap the message in a forward message
+        let forwarded_message = routing
+            .forward_message(
+                self,
+                profile,
+                message,
+                target_did,
+                next_did,
+                expires_time,
+                delay_milli,
+            )
+            .await?;
+
+        let msg_id = if let Some(msg_id) = msg_id {
+            msg_id
+        } else {
+            forwarded_message.0.as_str()
+        };
+
+        self.send_message(profile, &forwarded_message.1, msg_id, wait_for_response)
+            .await
     }
 
     /// send_didcomm_message

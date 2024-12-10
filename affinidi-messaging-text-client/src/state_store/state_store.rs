@@ -91,8 +91,8 @@ impl StateStore {
             tokio::select! {
                 message_received = inbound_message_channel.recv() => {
                     match message_received {
-                        Ok((message, meta)) => {
-                            handle_message(&atm, &mut state, &message, &meta);
+                        Ok((message, _)) => {
+                            handle_message(&atm, &mut state, &message).await;
                         },
                         Err(e) => {
                             warn!("Failed to receive message: {}", e);

@@ -265,7 +265,7 @@ impl Mediator {
 /// Key is the alias of the profile
 /// If no alias is provided, the DID is used as the key
 #[derive(Default)]
-pub struct Profiles(HashMap<String, Arc<Profile>>);
+pub struct Profiles(pub HashMap<String, Arc<Profile>>);
 
 impl Profiles {
     /// Inserts a new profile into the ATM SDK profiles HashMap
@@ -288,6 +288,17 @@ impl Profiles {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Searches through the profiles to find a profile with the given DID
+    pub fn find_by_did(&self, did: &str) -> Option<Arc<Profile>> {
+        for profile in self.0.values() {
+            if profile.inner.did == did {
+                return Some(profile.clone());
+            }
+        }
+
+        None
     }
 }
 

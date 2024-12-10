@@ -7,6 +7,7 @@ use crate::{
         State,
     },
     ui_management::pages::{
+        accept_invite_popup::accept_invite_popup::AcceptInvitePopup,
         chat_details_popup::chat_details_popup::ChatDetailsPopup,
         invite_popup::invite_popup::InvitePopup, settings_popup::settings_popup::SettingsPopup,
     },
@@ -101,6 +102,7 @@ pub struct MainPage {
     pub settings_popup: SettingsPopup,
     pub invite_popup: InvitePopup,
     pub chat_details_popup: ChatDetailsPopup,
+    pub accept_invite_popup: AcceptInvitePopup,
 }
 
 impl MainPage {
@@ -184,7 +186,8 @@ impl Component for MainPage {
             message_input_box: MessageInputBox::new(state, action_tx.clone()),
             settings_popup: SettingsPopup::new(state, action_tx.clone()),
             invite_popup: InvitePopup::new(state, action_tx.clone()),
-            chat_details_popup: ChatDetailsPopup::new(state, action_tx),
+            chat_details_popup: ChatDetailsPopup::new(state, action_tx.clone()),
+            accept_invite_popup: AcceptInvitePopup::new(state, action_tx),
         }
         .move_with_state(state)
     }

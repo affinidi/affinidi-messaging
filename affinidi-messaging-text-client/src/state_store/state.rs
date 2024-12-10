@@ -1,6 +1,11 @@
-use super::actions::{chat_list::ChatList, invitation::InvitePopupState};
+use super::actions::{
+    chat_list::{Chat, ChatList},
+    invitation::InvitePopupState,
+};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_messaging_sdk::{protocols::oob_discovery::OOBDiscovery, ATM};
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageBoxItem {
@@ -123,5 +128,52 @@ impl State {
         let state: Self = serde_json::from_reader(file)?;
 
         Ok(state)
+    }
+
+    /// Shutdowns and removes a chat.
+    pub async fn remove_chat(&mut self, chat: &Chat, atm: &ATM) {
+        // Find our current ATM Profile
+        let current_profile = {
+            let Some(current_profile) = atm
+                .get_profiles()
+                .read()
+                .await
+                .find_by_did(&chat.our_profile.did)
+            else {
+                error!("Profile not found for DID({})", chat.our_profile.did);
+                return;
+            };
+            current_profile
+        };
+
+        // Delete the invitation link from the mediator if it exists
+        if let Some(invite_link) = &chat.invitation_link {
+            if let Some((_, oobid)) = invite_link.split_once("=") {
+                // Delete the invite link
+                let _ = OOBDiscovery::default()
+                    .delete_invite(atm, &current_profile, oobid)
+                    .await;
+            } else {
+                error!("Invalid invite link: {}", invite_link);
+            }
+        }
+
+        // Shutdown the profile on ATM
+        let _ = atm.profile_remove(&current_profile.inner.alias).await;
+
+        // Remove the chat from the list
+        self.chat_list.chats.remove(&chat.name);
+
+        // Is the active chat the one we are removing?
+        if self
+            .chat_list
+            .active_chat
+            .as_ref()
+            .map(|c| c == &chat.name)
+            .unwrap_or(false)
+        {
+            self.chat_list.active_chat = None;
+        }
+        info!("Chat removed: {}", chat.name);
     }
 }

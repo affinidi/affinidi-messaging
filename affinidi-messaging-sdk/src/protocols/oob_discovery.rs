@@ -53,6 +53,8 @@ impl OOBDiscovery {
             "https://didcomm.org/out-of-band/2.0/invitation".into(),
             json!({}),
         )
+        // GG TIMTAM
+        .thid(Uuid::new_v4().into())
         .from(profile.inner.did.clone())
         .created_time(now);
 
