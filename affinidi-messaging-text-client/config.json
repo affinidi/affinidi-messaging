@@ -35,6 +35,41 @@
         "remote_did": "did:key:zDnaecBecvpLjHtVuonjkFtPeZECp95sHBShyMfgEL8MXdW2U",
         "has_unread": false,
         "invitation_link": null
+      },
+      "Glenn Flutter 5QxcZ": {
+        "name": "Glenn Flutter 5QxcZ",
+        "status": "AwaitingInvitationAcceptance",
+        "description": "Chatting with Glenn Flutter 5QxcZ",
+        "messages": {
+          "capacity": 50,
+          "values": [
+            "Start of conversation with Glenn Flutter 5QxcZ",
+            "Hello",
+            "Cool",
+            "Test"
+          ]
+        },
+        "our_profile": {
+          "alias": "Glenn Flutter",
+          "did": "did:key:zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ",
+          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+          "secrets": [
+            {
+              "id": "did:key:zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ#zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ",
+              "type": "JsonWebKey2020",
+              "privateKeyJwk": {
+                "crv": "P-256",
+                "d": "6QVzBHrYOExxUrG_MpNS_NV4vZxD0QZ9LgerDfM4TSM",
+                "kty": "EC",
+                "x": "2Z_X8BBec1oNb38bVQcbK3NrI74nRHvC80dJjUuydEI",
+                "y": "sobwO1nQefzZVW6z34iJh4PqxL_VUi2hvpeqSPDAY2A"
+              }
+            }
+          ]
+        },
+        "remote_did": "did:key:zDnaetp9QPxuWUBtfTfjsKPEfCo8p9BiWg1buNaS5LTEsEz75",
+        "has_unread": true,
+        "invitation_link": null
       }
     }
   }

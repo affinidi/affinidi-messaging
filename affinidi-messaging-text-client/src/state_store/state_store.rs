@@ -124,6 +124,12 @@ impl StateStore {
                         state.chat_details_popup.show = false;
                         state.chat_details_popup.chat_name = None;
                     },
+                    Action::SetCurrentChat { chat } => {
+                        state.chat_list.active_chat = Some(chat.clone());
+                        if let Some(chat) = state.chat_list.chats.get_mut(&chat) {
+                            chat.has_unread = false;
+                        }
+                    },
                     Action::Exit => {
                         let _ = terminator.terminate(Interrupted::UserInt);
 

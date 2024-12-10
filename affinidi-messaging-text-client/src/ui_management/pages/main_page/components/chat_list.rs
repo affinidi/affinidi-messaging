@@ -59,6 +59,12 @@ impl From<&State> for Props {
     }
 }
 
+pub struct ChatListComponent {
+    action_tx: UnboundedSender<Action>,
+    props: Props,
+    pub list_state: ListState,
+}
+
 impl ChatListComponent {
     fn next(&mut self) {
         let i = match self.list_state.selected() {
@@ -108,12 +114,6 @@ impl ChatListComponent {
     }
 }
 
-pub struct ChatListComponent {
-    action_tx: UnboundedSender<Action>,
-    props: Props,
-    pub list_state: ListState,
-}
-
 impl Component for ChatListComponent {
     fn new(state: &State, action_tx: UnboundedSender<Action>) -> Self {
         Self {
@@ -145,9 +145,25 @@ impl Component for ChatListComponent {
         match key.code {
             KeyCode::Up => {
                 self.previous();
+
+                if let Some(selected_idx) = self.list_state.selected() {
+                    if let Some(chat) = self.chats().get(selected_idx) {
+                        let _ = self.action_tx.send(Action::SetCurrentChat {
+                            chat: chat.name.clone(),
+                        });
+                    }
+                }
             }
             KeyCode::Down => {
                 self.next();
+
+                if let Some(selected_idx) = self.list_state.selected() {
+                    if let Some(chat) = self.chats().get(selected_idx) {
+                        let _ = self.action_tx.send(Action::SetCurrentChat {
+                            chat: chat.name.clone(),
+                        });
+                    }
+                }
             }
             KeyCode::Delete | KeyCode::Backspace if self.list_state.selected().is_some() => {
                 let selected_idx = self.list_state.selected().unwrap();
@@ -166,8 +182,7 @@ impl Component for ChatListComponent {
             KeyCode::Enter if self.list_state.selected().is_some() => {
                 let selected_idx = self.list_state.selected().unwrap();
 
-                let chats = self.chats();
-                let chat_state = if let Some(chat) = chats.get(selected_idx) {
+                let chat_state = if let Some(chat) = self.chats().get(selected_idx) {
                     chat
                 } else {
                     return;
@@ -215,7 +230,7 @@ impl ComponentRender<RenderProps> for ChatListComponent {
             .iter()
             .map(|room_state| {
                 let room_tag = format!(
-                    "#{}{}",
+                    "{}{}",
                     room_state.name,
                     if room_state.has_unread { "*" } else { "" }
                 );

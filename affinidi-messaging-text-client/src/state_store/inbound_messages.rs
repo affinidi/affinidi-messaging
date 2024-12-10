@@ -23,6 +23,11 @@ struct VCard {
     n: Name,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ChatMessage {
+    text: String,
+}
+
 /// Responsible for completing an incoming OOB Invitation flow.
 /// This occurs after this client has shared a QR Code with another client.
 async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Message) {
@@ -220,7 +225,7 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
         "https://affinidi.com/atm/client-actions/connection-setup" => {
             _handle_connection_setup(atm, state, message).await;
         }
-        "https://www.affinidi.com/atm/client-actions/chat-activity" => {
+        "https://affinidi.com/atm/client-actions/chat-activity" => {
             // Notice that someone else is typing
             /*
                 Message {
@@ -255,39 +260,42 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
         "https://affinidi.com/atm/client-actions/chat-message" => {
             // Received a chat message - need to add this to our chats
 
-            // Find the current chat for this DID
-            // Add it to the messages for this chat
-            // Update the unread message if not the current chat
+            let to_did = if let Some(to_did) = &message.to {
+                to_did.first().map(|f| f.to_string())
+            } else {
+                None
+            };
 
-            /*
-                  Message {
-                   id: "ac1f962e-bf28-45d0-970c-daf220e9a823",
-                   typ: "application/didcomm-plain+json",
-                   type_: "https://affinidi.com/atm/client-actions/chat-message",
-                   body: Object {
-                       "text": String("Hello"),
-                   },
-                   from: Some(
-                       "did:key:zDnaejpsRCMGt1HbTptCh9toKYsDrUukRshMVGBNkZYDb4Sv8",
-                   ),
-                   to: Some(
-                       [
-                           "did:key:zDnaeh4gZ787EKUUgt4Jwyq9EbVh7F4qrF3UUkQK8dTSiX43y",
-                       ],
-                   ),
-                   thid: Some(
-                       "ac1f962e-bf28-45d0-970c-daf220e9a823",
-                   ),
-                   pthid: None,
-                   extra_headers: {},
-                   created_time: Some(
-                       1733764622,
-                   ),
-                   expires_time: None,
-                   from_prior: None,
-                   attachments: None,
-               }
-            */
+            let Some(to_did) = to_did else {
+                warn!("No to DID found in message");
+                return;
+            };
+
+            let Some(chat) = state.chat_list.find_chat_by_did(&to_did) else {
+                warn!("Chat not found for DID({})", &to_did);
+                return;
+            };
+
+            let chat_msg: ChatMessage =
+                match serde_json::from_value::<ChatMessage>(message.body.clone()) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        warn!("Failed to parse chat message: {}", e);
+                        return;
+                    }
+                };
+
+            let Some(mut_chat) = state.chat_list.chats.get_mut(&chat.name) else {
+                warn!("Couldn't get mutable chat({})", &chat.name);
+                return;
+            };
+
+            if let Some(active_chat) = &state.chat_list.active_chat {
+                if active_chat != &chat.name {
+                    mut_chat.has_unread = true;
+                }
+            }
+            mut_chat.messages.push(chat_msg.text);
         }
         "https://didcomm.org/messagepickup/3.0/status" => {
             info!("Received message pickup status message");
