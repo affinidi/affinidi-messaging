@@ -8,22 +8,18 @@ use crate::{
     ui_management::pages::main_page::section::SectionActivation,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{
-    prelude::{Backend, Rect},
-    style::Color,
-    Frame,
-};
+use ratatui::{prelude::Rect, style::Color, Frame};
 use tokio::sync::mpsc::UnboundedSender;
 
 struct Props {
-    /// Active room that the user is chatting in
-    active_room: Option<String>,
+    /// Active chat that the user is chatting in
+    active_chat: Option<String>,
 }
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         Self {
-            active_room: state.chat_list.active_chat.clone(),
+            active_chat: state.chat_list.active_chat.clone(),
         }
     }
 }
@@ -44,7 +40,7 @@ impl MessageInputBox {
 
         // TODO: handle the error scenario
         let _ = self.action_tx.send(Action::SendMessage {
-            content: String::from(self.input_box.text()),
+            chat_msg: String::from(self.input_box.text()),
         });
 
         self.input_box.reset();
@@ -80,7 +76,7 @@ impl Component for MessageInputBox {
             return;
         }
 
-        if self.props.active_room.is_some() {
+        if self.props.active_chat.is_some() {
             self.input_box.handle_key_event(key);
 
             if key.code == KeyCode::Enter {
@@ -120,9 +116,9 @@ impl ComponentRender<RenderProps> for MessageInputBox {
 
 impl HasUsageInfo for MessageInputBox {
     fn usage_info(&self) -> UsageInfo {
-        if self.props.active_room.is_none() {
+        if self.props.active_chat.is_none() {
             UsageInfo {
-                description: Some("You can not send a message until you enter a room.".into()),
+                description: Some("You can not send a message until you select a chat.".into()),
                 lines: vec![UsageInfoLine {
                     keys: vec!["Esc".into()],
                     description: "to cancel".into(),
@@ -130,7 +126,7 @@ impl HasUsageInfo for MessageInputBox {
             }
         } else {
             UsageInfo {
-                description: Some("Type your message to send a message to the active room".into()),
+                description: Some("Type your message to send a message to the active chat".into()),
                 lines: vec![
                     UsageInfoLine {
                         keys: vec!["Esc".into()],

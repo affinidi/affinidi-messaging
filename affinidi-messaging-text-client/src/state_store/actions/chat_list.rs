@@ -44,6 +44,11 @@ impl ChatList {
             .find(|c| c.our_profile.did.as_str() == did)
             .cloned()
     }
+
+    /// Find a chat by name
+    pub fn find_chat_by_name(&self, name: &str) -> Option<Chat> {
+        self.chats.get(name).cloned()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

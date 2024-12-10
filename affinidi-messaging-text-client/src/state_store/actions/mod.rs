@@ -18,6 +18,6 @@ pub enum Action {
     DeleteChat { chat: String },
     SetCurrentChat { chat: String },
     // other
-    SendMessage { content: String },
+    SendMessage { chat_msg: String },
     Exit,
 }

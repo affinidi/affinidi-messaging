@@ -1,6 +1,9 @@
 use super::{actions::Action, State};
 use crate::{
-    state_store::{actions::invitation::create_invitation, inbound_messages::handle_message},
+    state_store::{
+        actions::invitation::create_invitation, inbound_messages::handle_message,
+        outbound_messages::send_message,
+    },
     termination::{Interrupted, Terminator},
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
@@ -101,9 +104,8 @@ impl StateStore {
                     //handle_message(&atm, &mut state, message, meta);
                 },
                 Some(action) = action_rx.recv() => match action {
-                    Action::SendMessage { content } => {
-                        // TODO: send the message
-                        warn!("Sending message: {}", content);
+                    Action::SendMessage { chat_msg } => {
+                       send_message(&mut state, &atm, &chat_msg).await;
                     },
                     Action::DeleteChat { chat } => {
                         match state.chat_list.chats.remove(&chat) {

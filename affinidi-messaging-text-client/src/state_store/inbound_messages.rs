@@ -298,7 +298,40 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
             mut_chat.messages.push(chat_msg.text);
         }
         "https://didcomm.org/messagepickup/3.0/status" => {
-            info!("Received message pickup status message");
+            //info!("Received message pickup status message");
+        }
+        "https://affinidi.com/atm/client-actions/chat-delivered" => {
+            /*
+                Message {
+                    id: "62f8bffb-fde5-4e04-841e-de7fc98e248e",
+                    typ: "application/didcomm-plain+json",
+                    type_: "https://affinidi.com/atm/client-actions/chat-delivered",
+                    body: Object {
+                        "messages": Array [
+                            String("1c7b9964-92f0-430c-8ec9-6bbe852d0e4d"),
+                        ],
+                    },
+                    from: Some(
+                        "did:key:zDnaetp9QPxuWUBtfTfjsKPEfCo8p9BiWg1buNaS5LTEsEz75",
+                    ),
+                    to: Some(
+                        [
+                            "did:key:zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ",
+                        ],
+                    ),
+                    thid: Some(
+                        "62f8bffb-fde5-4e04-841e-de7fc98e248e",
+                    ),
+                    pthid: None,
+                    extra_headers: {},
+                    created_time: Some(
+                        1733846313,
+                    ),
+                    expires_time: None,
+                    from_prior: None,
+                    attachments: None,
+                }
+            */
         }
         _ => {
             warn!("Unknown message type: {}", message.type_);

@@ -203,6 +203,7 @@ impl Component for MainPage {
             settings_popup: self.settings_popup.move_with_state(state),
             invite_popup: self.invite_popup.move_with_state(state),
             chat_details_popup: self.chat_details_popup.move_with_state(state),
+            message_input_box: self.message_input_box.move_with_state(state),
             ..self
         }
     }

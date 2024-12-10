@@ -46,7 +46,13 @@
             "Start of conversation with Glenn Flutter 5QxcZ",
             "Hello",
             "Cool",
-            "Test"
+            "Test",
+            ">> Sent: Test From Rust",
+            ">> Sent: Test from rust land",
+            ">> Sent: Hello",
+            ">> Sent: garmin watch",
+            "Nice watch",
+            ">> Sent: thank you"
           ]
         },
         "our_profile": {
@@ -68,7 +74,7 @@
           ]
         },
         "remote_did": "did:key:zDnaetp9QPxuWUBtfTfjsKPEfCo8p9BiWg1buNaS5LTEsEz75",
-        "has_unread": true,
+        "has_unread": false,
         "invitation_link": null
       }
     }
