@@ -132,13 +132,13 @@ impl Component for SettingsPopup {
                 // Switch to the next input field
                 match self.active_field {
                     InputType::MediatorDID => {
-                        self.active_field = InputType::AvatarPath;
-                    }
-                    InputType::AvatarPath => {
                         self.active_field = InputType::OurName;
                     }
-                    InputType::OurName => {
+                    InputType::AvatarPath => {
                         self.active_field = InputType::MediatorDID;
+                    }
+                    InputType::OurName => {
+                        self.active_field = InputType::AvatarPath;
                     }
                     _ => {}
                 }

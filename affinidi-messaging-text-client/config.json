@@ -12,68 +12,33 @@
         "description": "Chatting with Glenn Flutter",
         "messages": {
           "capacity": 50,
-          "values": []
-        },
-        "our_profile": {
-          "alias": "Secure-Chat",
-          "did": "did:key:zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7",
-          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
-          "secrets": [
-            {
-              "id": "did:key:zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7#zDnaebVGNN3oQZMU2ZDC4ZTesvgP5k27Hd3xTwiZv42VPFwP7",
-              "type": "JsonWebKey2020",
-              "privateKeyJwk": {
-                "crv": "P-256",
-                "d": "zF4uNSLIep1psyM5hlCMkXaGBW4On3aAi395V9AxbXo",
-                "kty": "EC",
-                "x": "pEjiwJQgtMCbanFqcZe-Ab7D0k6aHAUpJtHTimKrJGo",
-                "y": "wojhDEzl8YnIFOFZwTb9OKOUgjbs3wDpVo9aW83Bsjw"
-              }
-            }
-          ]
-        },
-        "remote_did": "did:key:zDnaecBecvpLjHtVuonjkFtPeZECp95sHBShyMfgEL8MXdW2U",
-        "has_unread": false,
-        "invitation_link": null
-      },
-      "Glenn Flutter 5QxcZ": {
-        "name": "Glenn Flutter 5QxcZ",
-        "status": "AwaitingInvitationAcceptance",
-        "description": "Chatting with Glenn Flutter 5QxcZ",
-        "messages": {
-          "capacity": 50,
           "values": [
-            "Start of conversation with Glenn Flutter 5QxcZ",
-            "Hello",
-            "Cool",
-            "Test",
-            ">> Sent: Test From Rust",
-            ">> Sent: Test from rust land",
-            ">> Sent: Hello",
-            ">> Sent: garmin watch",
-            "Nice watch",
-            ">> Sent: thank you"
+            "Start of conversation with Glenn Flutter",
+            ">> Sent: Hello from the land of Rust",
+            "Hi there",
+            "Welcome",
+            ">> Sent: thanks"
           ]
         },
         "our_profile": {
           "alias": "Glenn Flutter",
-          "did": "did:key:zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ",
+          "did": "did:key:zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo",
           "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
           "secrets": [
             {
-              "id": "did:key:zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ#zDnaef5UtAgL3Nayo7aWLkWh86EuMfkW5Vio6DvNN86U5QxcZ",
+              "id": "did:key:zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo#zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo",
               "type": "JsonWebKey2020",
               "privateKeyJwk": {
                 "crv": "P-256",
-                "d": "6QVzBHrYOExxUrG_MpNS_NV4vZxD0QZ9LgerDfM4TSM",
+                "d": "OmtPnN05s5t1C6gyHHQTUbxYa2imQh10J3V8Ii9U01k",
                 "kty": "EC",
-                "x": "2Z_X8BBec1oNb38bVQcbK3NrI74nRHvC80dJjUuydEI",
-                "y": "sobwO1nQefzZVW6z34iJh4PqxL_VUi2hvpeqSPDAY2A"
+                "x": "SSCembeQyuFLnxHRrqqDIkQi02wiEjzQL_kkhhZXZO4",
+                "y": "7fTvvtY4uu-GvwNzmYBfRxEm1O1NZqU8EPRAeEfWfN4"
               }
             }
           ]
         },
-        "remote_did": "did:key:zDnaetp9QPxuWUBtfTfjsKPEfCo8p9BiWg1buNaS5LTEsEz75",
+        "remote_did": "did:key:zDnaeeEiiHhwVHsty744u3dKqBfQNnYwFfeUG56szr9Tz2Rkj",
         "has_unread": false,
         "invitation_link": null
       }

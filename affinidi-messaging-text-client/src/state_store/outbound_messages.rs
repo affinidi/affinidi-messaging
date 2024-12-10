@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use affinidi_messaging_didcomm::MessageBuilder;
 use affinidi_messaging_sdk::ATM;
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use super::State;
