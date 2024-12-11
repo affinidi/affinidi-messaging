@@ -870,14 +870,20 @@ pub async fn init(
     // Read configuration file parameters
     let config = read_config_file(config_file)?;
 
-    // Setup logging
-    if reload_handle.is_some() {
+    // Setup logging if RUST_LOG env not set
+    if env::var("RUST_LOG").is_err() && reload_handle.is_some() {
         let level: EnvFilter = EnvFilter::new(config.log_level.as_str());
         reload_handle
             .unwrap()
             .modify(|filter| *filter = level)
             .map_err(|e| MediatorError::InternalError("NA".into(), e.to_string()))?;
         event!(Level::INFO, "Log level set to ({})", config.log_level);
+    } else {
+        event!(
+            Level::INFO,
+            "Log level set to ({}) :: RUST_LOG environment",
+            env::var("RUST_LOG").unwrap_or_default()
+        );
     }
 
     match <Config as async_convert::TryFrom<ConfigRaw>>::try_from(config).await {
