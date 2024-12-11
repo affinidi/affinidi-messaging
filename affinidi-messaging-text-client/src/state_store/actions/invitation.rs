@@ -22,6 +22,8 @@ use tracing::warn;
 
 use crate::state_store::State;
 
+use super::chat_list::ChatStatus;
+
 #[derive(Clone, Default)]
 pub struct Invite {
     pub invite_url: String,
@@ -200,6 +202,7 @@ pub async fn create_invitation(
                                         &profile,
                                         None,
                                         Some(url.clone()),
+                                        ChatStatus::AwaitingInvitationAcceptance,
                                     )
                                     .await;
                             }

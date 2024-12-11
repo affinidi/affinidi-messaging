@@ -25,9 +25,9 @@ use crate::{
     },
 };
 
-struct Props {
+pub struct Props {
     /// List of chats and current state of those chats
-    chat_list: ChatList,
+    pub chat_list: ChatList,
     /// Current active chat
     chats: Vec<Chat>,
 }
@@ -61,12 +61,12 @@ impl From<&State> for Props {
 
 pub struct ChatListComponent {
     action_tx: UnboundedSender<Action>,
-    props: Props,
+    pub props: Props,
     pub list_state: ListState,
 }
 
 impl ChatListComponent {
-    fn next(&mut self) {
+    pub fn next(&mut self) {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i >= self.props.chat_list.chats.len() - 1 {
@@ -80,7 +80,7 @@ impl ChatListComponent {
         self.list_state.select(Some(i));
     }
 
-    fn previous(&mut self) {
+    pub fn previous(&mut self) {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -95,7 +95,7 @@ impl ChatListComponent {
         self.list_state.select(Some(i));
     }
 
-    pub(super) fn chats(&self) -> &Vec<Chat> {
+    pub fn chats(&self) -> &Vec<Chat> {
         &self.props.chats
     }
 
@@ -137,7 +137,8 @@ impl Component for ChatListComponent {
         "Chat List"
     }
 
-    fn handle_key_event(&mut self, key: KeyEvent) {
+    fn handle_key_event(&mut self, _key: KeyEvent) {}
+    /*fn handle_key_event(&mut self, key: KeyEvent) {
         if key.kind != KeyEventKind::Press {
             return;
         }
@@ -194,7 +195,7 @@ impl Component for ChatListComponent {
             }
             _ => (),
         }
-    }
+    }*/
 }
 
 impl SectionActivation for ChatListComponent {
@@ -274,25 +275,8 @@ impl ComponentRender<RenderProps> for ChatListComponent {
 impl HasUsageInfo for ChatListComponent {
     fn usage_info(&self) -> UsageInfo {
         UsageInfo {
-            description: Some("Select the chat to talk in".into()),
-            lines: vec![
-                UsageInfoLine {
-                    keys: vec!["Esc".into()],
-                    description: "to cancel".into(),
-                },
-                UsageInfoLine {
-                    keys: vec!["↑".into(), "↓".into()],
-                    description: "to navigate".into(),
-                },
-                UsageInfoLine {
-                    keys: vec!["Delete".into()],
-                    description: "to delete Chat".into(),
-                },
-                UsageInfoLine {
-                    keys: vec!["Enter".into()],
-                    description: "to show chat details".into(),
-                },
-            ],
+            description: None,
+            lines: vec![],
         }
     }
 }

@@ -110,13 +110,6 @@ impl MainPage {
         self.props.chat_list.chats.get(name)
     }
 
-    fn get_component_for_section<'a>(&'a self, section: &Section) -> &'a dyn Component {
-        match section {
-            Section::ChatList => &self.chat_list,
-            Section::ChatInput => &self.message_input_box,
-        }
-    }
-
     fn get_component_for_section_mut<'a>(&'a mut self, section: &Section) -> &'a mut dyn Component {
         match section {
             Section::ChatList => &mut self.chat_list,
@@ -229,16 +222,73 @@ impl Component for MainPage {
             match active_section {
                 None => match key.code {
                     KeyCode::Enter => {
-                        let last_hovered_section = self.last_hovered_section.clone();
+                        if self.last_hovered_section == Section::ChatList {
+                            if self.chat_list.list_state.selected().is_none() {
+                                if self.chat_list.props.chat_list.active_chat.is_some() {
+                                    self.chat_list.list_state.select(Some(0));
+                                } else {
+                                    return;
+                                }
+                            }
+                            let selected_idx = self.chat_list.list_state.selected().unwrap();
 
-                        self.active_section = Some(last_hovered_section.clone());
-                        self.get_section_activation_for_section(&last_hovered_section)
-                            .activate();
+                            let chat_state =
+                                if let Some(chat) = self.chat_list.chats().get(selected_idx) {
+                                    chat
+                                } else {
+                                    return;
+                                };
+
+                            let _ = self.action_tx.send(Action::ShowChatDetails {
+                                chat: chat_state.name.clone(),
+                            });
+                        } else {
+                            let last_hovered_section = self.last_hovered_section.clone();
+
+                            self.active_section = Some(last_hovered_section.clone());
+                            self.get_section_activation_for_section(&last_hovered_section)
+                                .activate();
+                        }
+                    }
+                    KeyCode::Up => {
+                        self.chat_list.previous();
+
+                        if let Some(selected_idx) = self.chat_list.list_state.selected() {
+                            if let Some(chat) = self.chat_list.chats().get(selected_idx) {
+                                let _ = self.action_tx.send(Action::SetCurrentChat {
+                                    chat: chat.name.clone(),
+                                });
+                            }
+                        }
+                    }
+                    KeyCode::Down => {
+                        self.chat_list.next();
+
+                        if let Some(selected_idx) = self.chat_list.list_state.selected() {
+                            if let Some(chat) = self.chat_list.chats().get(selected_idx) {
+                                let _ = self.action_tx.send(Action::SetCurrentChat {
+                                    chat: chat.name.clone(),
+                                });
+                            }
+                        }
                     }
                     KeyCode::Left => self.hover_previous(),
                     KeyCode::Right => self.hover_next(),
-                    KeyCode::Char('q') => {
-                        let _ = self.action_tx.send(Action::Exit);
+                    KeyCode::Delete | KeyCode::Backspace
+                        if self.chat_list.list_state.selected().is_some() =>
+                    {
+                        let selected_idx = self.chat_list.list_state.selected().unwrap();
+
+                        let chats = self.chat_list.chats();
+                        let chat_state = if let Some(chat) = chats.get(selected_idx) {
+                            chat
+                        } else {
+                            return;
+                        };
+
+                        let _ = self.action_tx.send(Action::DeleteChat {
+                            chat: chat_state.name.clone(),
+                        });
                     }
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                         let _ = self.action_tx.send(Action::Exit);
@@ -250,6 +300,9 @@ impl Component for MainPage {
                     KeyCode::F(2) => {
                         // Display the Invitation Popup
                         let _ = self.action_tx.send(Action::InvitePopupStart);
+                    }
+                    KeyCode::F(10) => {
+                        let _ = self.action_tx.send(Action::Exit);
                     }
                     _ => {}
                 },
@@ -345,10 +398,11 @@ impl ComponentRender<()> for MainPage {
             .and_then(|active_chat| self.get_chat_data(active_chat))
         {
             Line::from(vec![
-                "on ".into(),
-                Span::from(format!("#{}", chat_data.name)).bold(),
-                " for ".into(),
-                Span::from(format!(r#""{}""#, "Boo")).italic(),
+                "Chat:  (".into(),
+                Span::from(&chat_data.name).bold(),
+                "} Remote DID: (".into(),
+                Span::from(chat_data.remote_did.clone().unwrap_or("NONE".to_string())).italic(),
+                ")".into(),
             ])
         } else {
             Line::from(NO_CHAT_SELECTED_MESSAGE)
@@ -435,27 +489,36 @@ impl HasUsageInfo for MainPage {
 
             handler.usage_info()
         } else {
-            UsageInfo {
+            let mut usage = UsageInfo {
                 description: Some("Select a widget".into()),
                 lines: vec![
                     UsageInfoLine {
-                        keys: vec!["q".into()],
-                        description: "to exit".into(),
+                        keys: vec!["↑".into(), "↓".into()],
+                        description: "to select chat".into(),
                     },
                     UsageInfoLine {
                         keys: vec!["←".into(), "→".into()],
                         description: "to hover widgets".into(),
                     },
-                    UsageInfoLine {
-                        keys: vec!["Enter/Return".into()],
-                        description: format!(
-                            "to activate {}",
-                            self.get_component_for_section(&self.last_hovered_section)
-                                .name()
-                        ),
-                    },
                 ],
+            };
+
+            if self.last_hovered_section == Section::ChatList {
+                usage.lines.push(UsageInfoLine {
+                    keys: vec!["Enter/Return".into()],
+                    description: "to show chat information".into(),
+                });
+                usage.lines.push(UsageInfoLine {
+                    keys: vec!["Delete".into()],
+                    description: "to delete Chat".into(),
+                });
+            } else {
+                usage.lines.push(UsageInfoLine {
+                    keys: vec!["Enter/Return".into()],
+                    description: "to start typing a message".into(),
+                });
             }
+            usage
         }
     }
 }

@@ -56,6 +56,11 @@ impl StateStore {
         // Load any profiles from existing chats.
         let mut state = State::read_from_file("config.json").unwrap_or_default();
 
+        if !state.chat_list.chats.is_empty() {
+            // Set the first chat as the active chat
+            state.chat_list.active_chat = state.chat_list.chats.keys().next().cloned();
+        }
+
         // Send the initial state once
         self.state_tx.send(state.clone())?;
 
@@ -117,6 +122,7 @@ impl StateStore {
                             }
                         }
                         let _ = atm.profile_remove(&chat).await;
+                        state.chat_list.active_chat = state.chat_list.chats.keys().next().cloned();
                     },
                     Action::ShowChatDetails { chat} => {
                         state.chat_details_popup.show = true;

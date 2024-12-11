@@ -1,5 +1,6 @@
 //! Handles processing of inbound messages
 use super::State;
+use crate::state_store::actions::chat_list::ChatStatus;
 use crate::state_store::actions::invitation::create_new_profile;
 use crate::state_store::chat_message::{ChatEffect, ChatMessage, ChatMessageType};
 use affinidi_messaging_didcomm::{Attachment, AttachmentData, Message};
@@ -55,7 +56,6 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
             if let AttachmentData::Base64 { value } = &vcard.data {
                 let vcard_decoded = BASE64_URL_SAFE_NO_PAD.decode(value.base64.clone()).unwrap();
                 let vcard: VCard = serde_json::from_slice(&vcard_decoded).unwrap();
-                info!("Received vCard: {:#?}", vcard);
                 let first = if let Some(first) = vcard.n.given.as_ref() {
                     first
                 } else {
@@ -239,6 +239,7 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
             &our_new_profile,
             Some(new_bob.to_string()),
             None,
+            ChatStatus::EstablishedChannel,
         )
         .await;
 
@@ -255,6 +256,10 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
             },
             format!("Start of conversation with {}", new_chat_name),
         ));
+
+    if state.chat_list.active_chat.is_none() {
+        state.chat_list.active_chat = Some(new_chat_name.clone());
+    }
 }
 
 pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {

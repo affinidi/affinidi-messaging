@@ -26,6 +26,7 @@ impl ChatList {
         our_profile: &Profile,
         remote_did: Option<String>,
         invitation_link: Option<String>,
+        status: ChatStatus,
     ) {
         let chat = Chat {
             name: name.to_string(),
@@ -33,6 +34,7 @@ impl ChatList {
             our_profile: ProfileConfig::from(our_profile).await,
             remote_did,
             invitation_link,
+            status,
             ..Default::default()
         };
 
@@ -56,12 +58,14 @@ impl ChatList {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChatStatus {
     AwaitingInvitationAcceptance,
+    EstablishedChannel,
 }
 
 impl fmt::Display for ChatStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ChatStatus::AwaitingInvitationAcceptance => write!(f, "Awaiting Invitation Acceptance"),
+            ChatStatus::EstablishedChannel => write!(f, "Established Secure Channel"),
         }
     }
 }

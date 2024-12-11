@@ -5,6 +5,52 @@
     "our_name": "Rusty"
   },
   "chat_list": {
-    "chats": {}
+    "chats": {
+      "Glenn Gore": {
+        "name": "Glenn Gore",
+        "status": "AwaitingInvitationAcceptance",
+        "description": "Chatting with Glenn Gore",
+        "messages": {
+          "capacity": 50,
+          "values": [
+            {
+              "_type": {
+                "Effect": {
+                  "effect": "System"
+                }
+              },
+              "message": "Start of conversation with Glenn Gore",
+              "timestamp": "2024-12-11T18:43:41.372892+08:00"
+            },
+            {
+              "_type": "Outbound",
+              "message": "test",
+              "timestamp": "2024-12-11T19:03:57.749238+08:00"
+            }
+          ]
+        },
+        "our_profile": {
+          "alias": "Glenn Gore",
+          "did": "did:key:zDnaeiSnjazCoxFqdKtWnJPtW5sNZXaJ6U8dQHq64Y46XdvNQ",
+          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+          "secrets": [
+            {
+              "id": "did:key:zDnaeiSnjazCoxFqdKtWnJPtW5sNZXaJ6U8dQHq64Y46XdvNQ#zDnaeiSnjazCoxFqdKtWnJPtW5sNZXaJ6U8dQHq64Y46XdvNQ",
+              "type": "JsonWebKey2020",
+              "privateKeyJwk": {
+                "crv": "P-256",
+                "d": "HmeOEwFW2xoLw47LkZCcGi8lo2GJigwuN_aGxABJnxA",
+                "kty": "EC",
+                "x": "C6hJYmebxJnwB5UOfGkkBpwmR2zFJb2S3ooH4DV0DC0",
+                "y": "m6p0bWv1IPYMinesWn0Ut2J5hAxJ6OesNEffHaYxXi0"
+              }
+            }
+          ]
+        },
+        "remote_did": "did:key:zDnaeaV16XK6cHoY1TLPwaNRGXfjUWg8aGrFfePiVavjkqBzd",
+        "has_unread": false,
+        "invitation_link": null
+      }
+    }
   }
 }
