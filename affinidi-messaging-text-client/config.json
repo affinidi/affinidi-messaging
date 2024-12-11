@@ -2,46 +2,9 @@
   "settings": {
     "mediator_did": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
     "avatar_path": "avatar.png",
-    "our_name": "Alice"
+    "our_name": "Rusty"
   },
   "chat_list": {
-    "chats": {
-      "Glenn Flutter": {
-        "name": "Glenn Flutter",
-        "status": "AwaitingInvitationAcceptance",
-        "description": "Chatting with Glenn Flutter",
-        "messages": {
-          "capacity": 50,
-          "values": [
-            "Start of conversation with Glenn Flutter",
-            ">> Sent: Hello from the land of Rust",
-            "Hi there",
-            "Welcome",
-            ">> Sent: thanks"
-          ]
-        },
-        "our_profile": {
-          "alias": "Glenn Flutter",
-          "did": "did:key:zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo",
-          "mediator": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
-          "secrets": [
-            {
-              "id": "did:key:zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo#zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo",
-              "type": "JsonWebKey2020",
-              "privateKeyJwk": {
-                "crv": "P-256",
-                "d": "OmtPnN05s5t1C6gyHHQTUbxYa2imQh10J3V8Ii9U01k",
-                "kty": "EC",
-                "x": "SSCembeQyuFLnxHRrqqDIkQi02wiEjzQL_kkhhZXZO4",
-                "y": "7fTvvtY4uu-GvwNzmYBfRxEm1O1NZqU8EPRAeEfWfN4"
-              }
-            }
-          ]
-        },
-        "remote_did": "did:key:zDnaeeEiiHhwVHsty744u3dKqBfQNnYwFfeUG56szr9Tz2Rkj",
-        "has_unread": false,
-        "invitation_link": null
-      }
-    }
+    "chats": {}
   }
 }

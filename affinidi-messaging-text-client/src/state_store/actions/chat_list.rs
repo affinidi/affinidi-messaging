@@ -9,6 +9,8 @@ use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
+use crate::state_store::chat_message::ChatMessage;
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ChatList {
     pub chats: HashMap<String, Chat>,
@@ -69,7 +71,7 @@ pub struct Chat {
     pub name: String,
     pub status: ChatStatus,
     pub description: String,
-    pub messages: CircularQueue<String>,
+    pub messages: CircularQueue<ChatMessage>,
     pub our_profile: ProfileConfig,
     pub remote_did: Option<String>,
     pub has_unread: bool,

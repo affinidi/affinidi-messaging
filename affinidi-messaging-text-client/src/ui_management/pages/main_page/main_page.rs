@@ -373,11 +373,7 @@ impl ComponentRender<()> for MainPage {
                         .messages
                         .asc_iter()
                         .skip(message_offset)
-                        .map(|mbi| {
-                            let line = Line::from(Span::raw(mbi.clone()).italic());
-
-                            ListItem::new(line)
-                        })
+                        .map(|mbi| ListItem::new(mbi.render()))
                         .collect::<Vec<ListItem>>()
                 })
                 .unwrap_or_default()

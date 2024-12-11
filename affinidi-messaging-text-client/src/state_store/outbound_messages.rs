@@ -6,7 +6,10 @@ use serde_json::json;
 use tracing::warn;
 use uuid::Uuid;
 
-use super::State;
+use super::{
+    chat_message::{ChatMessage, ChatMessageType},
+    State,
+};
 
 /// Takes a chat_msg and sends it to the right
 pub(crate) async fn send_message(state: &mut State, atm: &ATM, chat_msg: &str) {
@@ -88,12 +91,16 @@ pub(crate) async fn send_message(state: &mut State, atm: &ATM, chat_msg: &str) {
     {
         Ok(_) => {
             // Update the chat with the new message
-            mut_chat.messages.push(format!(">> Sent: {}", chat_msg));
+            mut_chat.messages.push(ChatMessage::new(
+                ChatMessageType::Outbound,
+                chat_msg.to_string(),
+            ));
         }
         Err(e) => {
-            mut_chat
-                .messages
-                .push(format!(">> ERROR SENDING: {}", chat_msg));
+            mut_chat.messages.push(ChatMessage::new(
+                ChatMessageType::Error,
+                chat_msg.to_string(),
+            ));
             warn!("Failed to send message: {}", e);
         }
     }

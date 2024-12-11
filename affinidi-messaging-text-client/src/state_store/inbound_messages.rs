@@ -1,6 +1,7 @@
 //! Handles processing of inbound messages
 use super::State;
 use crate::state_store::actions::invitation::create_new_profile;
+use crate::state_store::chat_message::{ChatEffect, ChatMessage, ChatMessageType};
 use affinidi_messaging_didcomm::{Attachment, AttachmentData, Message};
 use affinidi_messaging_sdk::{protocols::Protocols, ATM};
 use base64::prelude::*;
@@ -19,13 +20,28 @@ struct Name {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct VCard {
-    n: Name,
+struct VcardType {
+    r#type: VcardTypes,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ChatMessage {
-    text: String,
+enum VcardTypes {
+    #[serde(rename = "work")]
+    Work(String),
+    #[serde(rename = "cell")]
+    Cell(String),
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct VCard {
+    n: Name,
+    email: Option<VcardType>,
+    tel: Option<VcardType>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct _ChatMessage {
+    pub text: Option<String>,
+    pub effect: Option<String>,
 }
 
 /// Responsible for completing an incoming OOB Invitation flow.
@@ -134,12 +150,28 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
     let our_new_profile = atm.profile_add(&our_new_did, true).await.unwrap();
     info!("Added new profile to ATM");
 
-    let attachment = Attachment::base64("eyJuIjp7ImdpdmVuIjoiUnVzdHkiLCJzdXJuYW1lIjoiQ2xpZW50In0sImVtYWlsIjp7InR5cGUiOnsid29yayI6InJ1c3R5QCJ9fSwidGVsIjp7InR5cGUiOnsiY2VsbCI6IjEyMzQ1Njc4In19fQ".into())
-                .id(Uuid::new_v4().into())
-                .description("Alice's vCard Info".into())
-                .media_type("text/x-vcard".into())
-                .format("https://affinidi.com/atm/client-attachment/contact-card".into())
-                .finalize();
+    let vcard = VCard {
+        n: Name {
+            given: Some(state.settings.our_name.clone().unwrap()),
+            surname: Some(String::new()),
+        },
+        email: Some(VcardType {
+            r#type: VcardTypes::Work(String::new()),
+        }),
+        tel: Some(VcardType {
+            r#type: VcardTypes::Cell(String::new()),
+        }),
+    };
+    let vcard = serde_json::to_string(&vcard).unwrap();
+    let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(vcard))
+        .id(Uuid::new_v4().into())
+        .description(format!(
+            "{}'s vCard Info",
+            state.settings.our_name.clone().unwrap()
+        ))
+        .media_type("text/x-vcard".into())
+        .format("https://affinidi.com/atm/client-attachment/contact-card".into())
+        .finalize();
 
     // Create the response message
     let new_message = Message::build(
@@ -217,7 +249,12 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
         .get_mut(&new_chat_name)
         .unwrap()
         .messages
-        .push(format!("Start of conversation with {}", new_chat_name));
+        .push(ChatMessage::new(
+            ChatMessageType::Effect {
+                effect: ChatEffect::System,
+            },
+            format!("Start of conversation with {}", new_chat_name),
+        ));
 }
 
 pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
@@ -276,8 +313,8 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
                 return;
             };
 
-            let chat_msg: ChatMessage =
-                match serde_json::from_value::<ChatMessage>(message.body.clone()) {
+            let chat_msg: _ChatMessage =
+                match serde_json::from_value::<_ChatMessage>(message.body.clone()) {
                     Ok(msg) => msg,
                     Err(e) => {
                         warn!("Failed to parse chat message: {}", e);
@@ -295,7 +332,10 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
                     mut_chat.has_unread = true;
                 }
             }
-            mut_chat.messages.push(chat_msg.text);
+            mut_chat.messages.push(ChatMessage::new(
+                ChatMessageType::Inbound,
+                chat_msg.text.unwrap(),
+            ));
         }
         "https://didcomm.org/messagepickup/3.0/status" => {
             //info!("Received message pickup status message");
@@ -326,6 +366,82 @@ pub async fn handle_message(atm: &ATM, state: &mut State, message: &Message) {
                     extra_headers: {},
                     created_time: Some(
                         1733846313,
+                    ),
+                    expires_time: None,
+                    from_prior: None,
+                    attachments: None,
+                }
+            */
+        }
+        "https://affinidi.com/atm/client-actions/chat-effect" => {
+            let to_did = if let Some(to_did) = &message.to {
+                to_did.first().map(|f| f.to_string())
+            } else {
+                None
+            };
+
+            let Some(to_did) = to_did else {
+                warn!("No to DID found in message");
+                return;
+            };
+
+            let Some(chat) = state.chat_list.find_chat_by_did(&to_did) else {
+                warn!("Chat not found for DID({})", &to_did);
+                return;
+            };
+
+            let chat_msg: _ChatMessage =
+                match serde_json::from_value::<_ChatMessage>(message.body.clone()) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        warn!("Failed to parse chat message: {}", e);
+                        return;
+                    }
+                };
+
+            let Some(mut_chat) = state.chat_list.chats.get_mut(&chat.name) else {
+                warn!("Couldn't get mutable chat({})", &chat.name);
+                return;
+            };
+
+            if let Some(active_chat) = &state.chat_list.active_chat {
+                if active_chat != &chat.name {
+                    mut_chat.has_unread = true;
+                }
+            }
+
+            let effect = match chat_msg.effect.unwrap().as_str() {
+                "balloons" => ChatEffect::Ballons,
+                "confetti" => ChatEffect::Confetti,
+                _ => ChatEffect::System,
+            };
+            mut_chat.messages.push(ChatMessage::new(
+                ChatMessageType::Effect { effect },
+                String::new(),
+            ));
+            /*
+                Message {
+                    id: "51f7e352-a553-4958-b4b1-8362247d41c5",
+                    typ: "application/didcomm-plain+json",
+                    type_: "https://affinidi.com/atm/client-actions/chat-effect",
+                    body: Object {
+                        "effect": String("balloons"),
+                    },
+                    from: Some(
+                        "did:key:zDnaeeEiiHhwVHsty744u3dKqBfQNnYwFfeUG56szr9Tz2Rkj",
+                    ),
+                    to: Some(
+                        [
+                            "did:key:zDnaeVMRf4Q3RqKfD3wsuEiWeCpQKzpjRLhKnSe6aHJ5xCiKo",
+                        ],
+                    ),
+                    thid: Some(
+                        "51f7e352-a553-4958-b4b1-8362247d41c5",
+                    ),
+                    pthid: None,
+                    extra_headers: {},
+                    created_time: Some(
+                        1733901904,
                     ),
                     expires_time: None,
                     from_prior: None,
