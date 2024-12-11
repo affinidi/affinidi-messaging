@@ -48,7 +48,12 @@ struct _ChatMessage {
 
 /// Responsible for completing an incoming OOB Invitation flow.
 /// This occurs after this client has shared a QR Code with another client.
-async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Message) {
+async fn _handle_connection_setup(
+    atm: &ATM,
+    state: &mut State,
+    message: &Message,
+    meta: &UnpackMetadata,
+) {
     info!("Received connection setup message");
 
     // Unpack the attachment vcard if it exists
@@ -229,6 +234,15 @@ async fn _handle_connection_setup(atm: &ATM, state: &mut State, message: &Messag
     };
 
     // Invitation is complete
+    let _ = MessagePickup::default()
+        .send_messages_received(
+            atm,
+            &current_profile,
+            &vec![meta.sha256_hash.clone()],
+            false,
+        )
+        .await;
+
     // Remove the old invite chat
     state.remove_chat(&chat, atm).await;
 
@@ -298,7 +312,9 @@ pub async fn handle_message(
 
     match message.type_.as_str() {
         "https://affinidi.com/atm/client-actions/connection-setup" => {
-            _handle_connection_setup(atm, state, message).await;
+            // Completes an inbound OOB Invitation flow (after sharing a QR Code)
+            _handle_connection_setup(atm, state, message, meta).await;
+            return; // message was deleted in the function
         }
         "https://affinidi.com/atm/client-actions/chat-activity" => {
             // Notice that someone else is typing
