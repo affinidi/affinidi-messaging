@@ -70,6 +70,9 @@ impl fmt::Display for ChatStatus {
     }
 }
 
+fn _true() -> bool {
+    true
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chat {
     pub name: String,
@@ -81,6 +84,8 @@ pub struct Chat {
     pub has_unread: bool,
     // This is used to store the invitation link for the chat
     pub invitation_link: Option<String>,
+    #[serde(skip, default = "_true")]
+    pub initialization: bool,
 }
 
 impl PartialEq for Chat {
@@ -108,6 +113,7 @@ impl Default for Chat {
             remote_did: None,
             has_unread: false,
             invitation_link: None,
+            initialization: true,
         }
     }
 }

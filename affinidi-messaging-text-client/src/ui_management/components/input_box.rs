@@ -24,10 +24,12 @@ impl InputBox {
         &self.text
     }
 
+    /*
     pub fn set_text(&mut self, new_text: &str) {
         self.text = String::from(new_text);
         self.cursor_position = self.text.len();
     }
+    */
 
     pub fn reset(&mut self) {
         self.cursor_position = 0;

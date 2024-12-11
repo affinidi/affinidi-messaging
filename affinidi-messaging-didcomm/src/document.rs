@@ -34,7 +34,7 @@ pub(crate) fn did_or_url(did_or_url: &str) -> (&str, Option<&str>) {
 
 pub(crate) fn is_did(did: &str) -> bool {
     let parts: Vec<_> = did.split(':').collect();
-    return parts.len() >= 3 && parts.first().unwrap() == &"did";
+    parts.len() >= 3 && parts.first().unwrap() == &"did"
 }
 
 pub(crate) trait DIDCommVerificationMethodExt {
@@ -445,5 +445,5 @@ fn _from_multicodec(value: &[u8]) -> Result<(Codec, &[u8])> {
         .write_unsigned_varint_32(prefix_int)
         .kind(ErrorKind::InvalidState, "Cannot write varint")?;
 
-    return Ok((codec, value.split_at(prefix.into_inner().len()).1));
+    Ok((codec, value.split_at(prefix.into_inner().len()).1))
 }

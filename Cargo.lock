@@ -118,6 +118,7 @@ dependencies = [
  "serde-enum-str",
  "serde_json",
  "sha2 0.10.8",
+ "sha256",
  "ssi",
  "thiserror 2.0.6",
  "tokio",

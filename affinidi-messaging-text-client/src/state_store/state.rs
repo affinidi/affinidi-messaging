@@ -114,6 +114,8 @@ pub struct State {
     pub invite_popup: InvitePopupState,
     #[serde(skip)]
     pub chat_details_popup: ChatDetailsPopupState,
+    #[serde(skip)]
+    pub initialization: bool,
 }
 
 impl State {

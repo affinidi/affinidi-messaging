@@ -438,7 +438,7 @@ pub(crate) async fn messages_received(
                     }
                 }
                 Err(err) => {
-                    info!("Error getting message: {:?}", err);
+                    warn!("Error getting message: {:?}", err);
                 }
             }
         }

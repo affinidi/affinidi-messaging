@@ -55,6 +55,7 @@ impl StateStore {
 
         // Load any profiles from existing chats.
         let mut state = State::read_from_file("config.json").unwrap_or_default();
+        state.initialization = true;
 
         if !state.chat_list.chats.is_empty() {
             // Set the first chat as the active chat
@@ -73,7 +74,6 @@ impl StateStore {
                     return Ok(Interrupted::SystemError);
                 }
             };
-
             match atm.profile_add(&profile, true).await {
                 Ok(_) => info!(
                     "Profile ({}) added for chat {}",
@@ -85,6 +85,8 @@ impl StateStore {
                 }
             }
         }
+
+        state.initialization = false;
 
         let mut inbound_message_channel = if let Some(channel) = atm.get_inbound_channel() {
             channel
@@ -99,8 +101,8 @@ impl StateStore {
             tokio::select! {
                 message_received = inbound_message_channel.recv() => {
                     match message_received {
-                        Ok((message, _)) => {
-                            handle_message(&atm, &mut state, &message).await;
+                        Ok((message, meta)) => {
+                            handle_message(&atm, &mut state, &message, &meta).await;
                         },
                         Err(e) => {
                             warn!("Failed to receive message: {}", e);

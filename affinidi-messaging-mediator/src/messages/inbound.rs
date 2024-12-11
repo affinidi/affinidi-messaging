@@ -31,7 +31,6 @@ pub(crate) async fn handle_inbound(
                 ));
             }
         };
-        debug!("message converted to MetaEnvelope");
 
         // Unpack the message
         let (msg, metadata) = match Message::unpack(

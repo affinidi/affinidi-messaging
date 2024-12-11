@@ -1,3 +1,11 @@
+/*!
+ * Message Pickup Protocol 3.0
+ *
+ * NOTE: All Message ID's are SHA256 hashes of the message
+ *
+ * Do not pass message ID's to the mediator, it cannot see inside messages that it is handling.
+ *
+ */
 use affinidi_messaging_didcomm::{AttachmentData, Message, PackEncryptedOptions, UnpackMetadata};
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -75,6 +83,7 @@ impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Status Request` message
     /// recipient_did : Optional, allows you to ask for status for a specific DID. If none, will ask for default DID in ATM
     /// mediator_did  : Optional, allows you to ask a specific mediator. If none, will ask for default mediator in ATM
+    /// wait_for_response : If true, will wait for a response from the server. If false, will return immediately
     /// wait          : Time Duration to wait for a response from websocket. Default (10 Seconds)
     ///
     /// Returns a StatusReply if successful
@@ -82,8 +91,9 @@ impl MessagePickup {
         &self,
         atm: &ATM,
         profile: &Arc<Profile>,
+        wait_for_response: bool,
         wait: Option<Duration>,
-    ) -> Result<MessagePickupStatusReply, ATMError> {
+    ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
         let _span = span!(Level::DEBUG, "send_status_request",).entered();
         debug!(
             "Profile ({}): Status Request wait: {:?}",
@@ -126,10 +136,15 @@ impl MessagePickup {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if let SendMessageResponse::Message(message) =
-            atm.send_message(profile, &msg, &msg_id, true).await?
+        if let SendMessageResponse::Message(message) = atm
+            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .await?
         {
-            self._parse_status_response(&message).await
+            if wait_for_response {
+                self._parse_status_response(&message).await
+            } else {
+                Ok(None)
+            }
         } else {
             Err(ATMError::MsgReceiveError(
                 "Invalid response from API".into(),
@@ -140,12 +155,12 @@ impl MessagePickup {
     pub(crate) async fn _parse_status_response(
         &self,
         message: &Message,
-    ) -> Result<MessagePickupStatusReply, ATMError> {
+    ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
         let status: MessagePickupStatusReply = serde_json::from_value(message.body.clone())
             .map_err(|err| {
                 ATMError::MsgReceiveError(format!("Error reading status response: {}", err))
             })?;
-        Ok(status)
+        Ok(Some(status))
     }
 
     /// Sends a Message Pickup 3.0 `Live Delivery` message
@@ -345,6 +360,7 @@ impl MessagePickup {
         atm: &ATM,
         profile: &Arc<Profile>,
         limit: Option<usize>,
+        wait_for_response: bool,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
         let _span = span!(Level::DEBUG, "send_delivery_request",).entered();
         debug!(
@@ -396,8 +412,9 @@ impl MessagePickup {
             msg
         };
 
-        if let SendMessageResponse::Message(message) =
-            atm.send_message(profile, &msg, &msg_id, true).await?
+        if let SendMessageResponse::Message(message) = atm
+            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .await?
         {
             self._handle_delivery(atm, &message).await
         } else {
@@ -464,7 +481,7 @@ impl MessagePickup {
     /// Sends a Message Pickup 3.0 `Messages Received` message
     /// This effectively deletes the messages from the server
     /// atm           : The ATM SDK to use
-    /// list          : List of messages to delete (message ID's)
+    /// list          : List of messages to delete (SHA256 message Hashes)
     ///
     /// A status reply will be returned if successful
     pub async fn send_messages_received(
@@ -472,7 +489,8 @@ impl MessagePickup {
         atm: &ATM,
         profile: &Arc<Profile>,
         list: &Vec<String>,
-    ) -> Result<MessagePickupStatusReply, ATMError> {
+        wait_for_response: bool,
+    ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
         let _span = span!(Level::DEBUG, "send_messages_received",).entered();
         debug!(
             "Profile ({}): Messages Received, # msgs to delete: {}",
@@ -516,14 +534,40 @@ impl MessagePickup {
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-        if let SendMessageResponse::Message(message) =
-            atm.send_message(profile, &msg, &msg_id, true).await?
+        match atm
+            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .await
         {
-            self._parse_status_response(&message).await
+            Ok(SendMessageResponse::Message(message)) => {
+                if wait_for_response {
+                    self._parse_status_response(&message).await
+                } else {
+                    Ok(None)
+                }
+            }
+            Ok(SendMessageResponse::EmptyResponse) => Ok(None),
+            Err(err) => Err(ATMError::MsgReceiveError(format!(
+                "Invalid response from API: {}",
+                err
+            ))),
+            _ => Err(ATMError::MsgReceiveError(
+                "Wrong type received from API".into(),
+            )),
+        }
+
+        /*if let SendMessageResponse::Message(message) = atm
+            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .await?
+        {
+            if wait_for_response {
+                self._parse_status_response(&message).await
+            } else {
+                Ok(None)
+            }
         } else {
             Err(ATMError::MsgReceiveError(
                 "Invalid response from API".into(),
             ))
-        }
+        }*/
     }
 }

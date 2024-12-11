@@ -69,6 +69,7 @@ struct Props {
     /// The chat data map
     chat_list: ChatList,
     our_name: Option<String>,
+    initialization: bool,
 }
 
 impl From<&State> for Props {
@@ -76,6 +77,7 @@ impl From<&State> for Props {
         Props {
             chat_list: state.chat_list.clone(),
             our_name: state.settings.our_name.clone(),
+            initialization: state.initialization,
         }
     }
 }
@@ -341,8 +343,8 @@ impl ComponentRender<()> for MainPage {
             panic!("Invalid layout for main page")
         };
         // Split the bottom into main menu items name, and date/time
-        let [bottom_menu, name, date_time] =
-            *Layout::horizontal([Min(0), Length(20), Length(20)]).split(main_bottom)
+        let [bottom_menu, status, name, date_time] =
+            *Layout::horizontal([Min(0), Length(30), Length(20), Length(20)]).split(main_bottom)
         else {
             panic!("Invalid layout for main_bottom")
         };
@@ -369,6 +371,25 @@ impl ComponentRender<()> for MainPage {
         self.date_time
             .render(frame, date_time::RenderProps { area: date_time });
 
+        if self.props.initialization {
+            Paragraph::new(Span::styled(
+                " Initializing... ",
+                Style::default()
+                    .bg(Color::Red)
+                    .fg(Color::White)
+                    .slow_blink()
+                    .bold(),
+            ))
+            .alignment(Alignment::Center)
+            .render(status, frame.buffer_mut());
+        } else {
+            Paragraph::new(Span::styled(
+                " READY ",
+                Style::default().bg(Color::Green).fg(Color::White).bold(),
+            ))
+            .alignment(Alignment::Center)
+            .render(status, frame.buffer_mut());
+        }
         if let Some(our_name) = &self.props.our_name {
             Paragraph::new(Span::styled(
                 format!(" {} ", our_name),

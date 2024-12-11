@@ -22,6 +22,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde-enum-str.workspace = true
 sha2.workspace = true
+sha256.workspace = true
 bs58.workspace = true
 varint.workspace = true
 lazy_static = { workspace = true, optional = true }

@@ -68,14 +68,14 @@ impl ChatMessage {
             ChatMessageType::Effect { effect } => match effect {
                 ChatEffect::Ballons => Line::styled(
                     format!(
-                        "{}: << EFFECT:   You received some balloons!!!",
+                        "{}: << EFFECT:  You received some balloons!!! ",
                         self.timestamp.format("%Y-%m-%d %H:%M:%S")
                     ),
                     Style::default().fg(Color::LightGreen),
                 ),
                 ChatEffect::Confetti => Line::styled(
                     format!(
-                        "{}: << EFFECT:   You received some confetti!!!",
+                        "{}: << EFFECT:  You received some confetti!!! ",
                         self.timestamp.format("%Y-%m-%d %H:%M:%S")
                     ),
                     Style::default().fg(Color::LightGreen),

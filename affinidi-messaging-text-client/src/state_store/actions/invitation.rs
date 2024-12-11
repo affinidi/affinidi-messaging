@@ -48,10 +48,16 @@ pub struct InvitePopupState {
     pub messages: Vec<Line<'static>>,
 }
 
+/// Helper function to create a new profile with a random DID and add it to the mediator
+/// atm: Affinidi Text Messenger instance
+/// mediator_did: Mediator DID to connect to
+/// alias: Optional alias for the profile
+/// alias_suffix: Whether to add a suffix to the alias (last 4 character of the DID)
 pub async fn create_new_profile(
     atm: &ATM,
     mediator_did: &str,
     alias: Option<String>,
+    alias_suffix: bool,
 ) -> anyhow::Result<Profile> {
     let p256_key = JWK::generate_p256();
     let did_key = DIDKey::generate(&p256_key).unwrap();
@@ -80,7 +86,7 @@ pub async fn create_new_profile(
         },
     };
 
-    let alias = if let Some(alias) = alias {
+    let mut alias = if let Some(alias) = alias {
         alias
     } else {
         format!(
@@ -88,6 +94,13 @@ pub async fn create_new_profile(
             &did_key.to_string()[did_key.to_string().char_indices().nth_back(3).unwrap().0..]
         )
     };
+
+    if alias_suffix {
+        alias.push_str(&format!(
+            " {}",
+            &did_key.to_string()[did_key.to_string().char_indices().nth_back(3).unwrap().0..]
+        ));
+    }
 
     match Profile::new(
         atm,
@@ -119,7 +132,7 @@ pub async fn create_invitation(
     // Send the state immediately so we render the popup while waiting for the rest to complete
     state_tx.send(state.clone())?;
     if let Some(mediator_did) = state.settings.mediator_did.clone() {
-        match create_new_profile(atm, &mediator_did, None).await {
+        match create_new_profile(atm, &mediator_did, None, false).await {
             Ok(profile) => {
                 state.invite_popup.messages.push(Line::from(vec![
                     Span::styled(

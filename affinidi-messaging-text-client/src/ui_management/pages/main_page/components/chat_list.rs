@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -19,7 +19,7 @@ use crate::{
     ui_management::{
         components::{Component, ComponentRender},
         pages::main_page::section::{
-            usage::{HasUsageInfo, UsageInfo, UsageInfoLine},
+            usage::{HasUsageInfo, UsageInfo},
             SectionActivation,
         },
     },
@@ -47,6 +47,7 @@ impl From<&State> for Props {
                 has_unread: chat_data.has_unread,
                 invitation_link: chat_data.invitation_link.clone(),
                 status: chat_data.status.clone(),
+                initialization: chat_data.initialization,
             })
             .collect::<Vec<Chat>>();
 
@@ -60,7 +61,6 @@ impl From<&State> for Props {
 }
 
 pub struct ChatListComponent {
-    action_tx: UnboundedSender<Action>,
     pub props: Props,
     pub list_state: ListState,
 }
@@ -115,9 +115,8 @@ impl ChatListComponent {
 }
 
 impl Component for ChatListComponent {
-    fn new(state: &State, action_tx: UnboundedSender<Action>) -> Self {
+    fn new(state: &State, _action_tx: UnboundedSender<Action>) -> Self {
         Self {
-            action_tx,
             props: Props::from(state),
             list_state: ListState::default(),
         }
