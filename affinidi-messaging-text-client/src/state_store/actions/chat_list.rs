@@ -59,6 +59,7 @@ impl ChatList {
 pub enum ChatStatus {
     AwaitingInvitationAcceptance,
     EstablishedChannel,
+    EphemeralAcceptInvite,
 }
 
 impl fmt::Display for ChatStatus {
@@ -66,6 +67,7 @@ impl fmt::Display for ChatStatus {
         match self {
             ChatStatus::AwaitingInvitationAcceptance => write!(f, "Awaiting Invitation Acceptance"),
             ChatStatus::EstablishedChannel => write!(f, "Established Secure Channel"),
+            ChatStatus::EphemeralAcceptInvite => write!(f, "Ephemeral Accept Invite Channel"),
         }
     }
 }
@@ -86,6 +88,7 @@ pub struct Chat {
     pub invitation_link: Option<String>,
     #[serde(skip, default = "_true")]
     pub initialization: bool,
+    pub hidden: Option<String>, // This is used to store anything that we don't need to show. used in OOB Acceptance flow
 }
 
 impl PartialEq for Chat {
@@ -114,6 +117,7 @@ impl Default for Chat {
             has_unread: false,
             invitation_link: None,
             initialization: true,
+            hidden: None,
         }
     }
 }

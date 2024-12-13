@@ -267,6 +267,7 @@ dependencies = [
  "rand",
  "ratatui",
  "ratatui-image",
+ "reqwest 0.12.9",
  "serde",
  "serde_json",
  "ssi",

@@ -25,7 +25,7 @@ impl ComponentRender<RenderProps> for BottomMenu {
             ),
             Span::styled(" F3", Style::default().fg(Color::Gray).bold()),
             Span::styled(
-                " Accept ",
+                " Accept Invite ",
                 Style::default().bg(Color::Cyan).fg(Color::Black),
             ),
             Span::styled(" F10", Style::default().fg(Color::Gray).bold()),

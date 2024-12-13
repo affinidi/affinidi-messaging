@@ -5,16 +5,16 @@ use crate::{
     },
     ui_management::components::{Component, ComponentRender},
 };
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    layout::{Constraint, Flex, Layout, Position},
+    layout::{Constraint, Flex, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph, Widget},
     Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{error, info};
+use tracing::error;
 
 pub struct Props {
     pub chat: Option<Chat>,
@@ -72,11 +72,8 @@ impl Component for ChatDetailsPopup {
             return;
         }
 
-        match key.code {
-            KeyCode::Esc => {
-                let _ = self.action_tx.send(Action::CloseChatDetails);
-            }
-            _ => {}
+        if key.code == KeyCode::Esc {
+            let _ = self.action_tx.send(Action::CloseChatDetails);
         }
     }
 }
@@ -106,6 +103,9 @@ impl ComponentRender<()> for ChatDetailsPopup {
 
         // render the outer block
         outer_block.render(outer_area, frame.buffer_mut());
+
+        let vertical =
+            Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(inner_area);
 
         let mut lines = vec![
             Line::default(),
@@ -167,14 +167,15 @@ impl ComponentRender<()> for ChatDetailsPopup {
             ]));
         }
 
-        lines.push(Line::default());
-        lines.push(Line::from(vec![
-            Span::styled("<ESCAPE> ", Style::default().fg(Color::LightRed).bold()),
-            Span::styled("to close, ", Style::default()),
-        ]));
-
         Paragraph::new(lines)
             .left_aligned()
-            .render(inner_area, frame.buffer_mut());
+            .render(vertical[0], frame.buffer_mut());
+
+        Paragraph::new(Line::from(vec![
+            Span::styled("<ESCAPE> ", Style::default().fg(Color::LightRed).bold()),
+            Span::styled("to close, ", Style::default()),
+        ]))
+        .centered()
+        .render(vertical[1], frame.buffer_mut());
     }
 }

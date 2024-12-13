@@ -199,6 +199,7 @@ impl Component for MainPage {
             invite_popup: self.invite_popup.move_with_state(state),
             chat_details_popup: self.chat_details_popup.move_with_state(state),
             message_input_box: self.message_input_box.move_with_state(state),
+            accept_invite_popup: self.accept_invite_popup.move_with_state(state),
             ..self
         }
     }
@@ -218,6 +219,8 @@ impl Component for MainPage {
             self.invite_popup.handle_key_event(key);
         } else if self.chat_details_popup.props.chat_details_popup_state.show {
             self.chat_details_popup.handle_key_event(key);
+        } else if self.accept_invite_popup.props.show {
+            self.accept_invite_popup.handle_key_event(key);
         } else {
             let active_section = self.active_section.clone();
 
@@ -302,6 +305,10 @@ impl Component for MainPage {
                     KeyCode::F(2) => {
                         // Display the Invitation Popup
                         let _ = self.action_tx.send(Action::InvitePopupStart);
+                    }
+                    KeyCode::F(3) => {
+                        // Display the Accept Invite Popup
+                        let _ = self.action_tx.send(Action::AcceptInvitePopupStart);
                     }
                     KeyCode::F(10) => {
                         let _ = self.action_tx.send(Action::Exit);
@@ -496,6 +503,9 @@ impl ComponentRender<()> for MainPage {
 
         if self.chat_details_popup.props.chat_details_popup_state.show {
             self.chat_details_popup.render(frame, ());
+        }
+        if self.accept_invite_popup.props.show {
+            self.accept_invite_popup.render(frame, ());
         }
     }
 }

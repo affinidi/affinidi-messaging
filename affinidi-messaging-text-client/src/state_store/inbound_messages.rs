@@ -16,34 +16,39 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Name {
-    given: Option<String>,
-    surname: Option<String>,
+pub struct Name {
+    pub given: Option<String>,
+    pub surname: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct VcardType {
-    r#type: VcardTypes,
+pub struct VcardType {
+    pub r#type: VcardTypes,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-enum VcardTypes {
+pub enum VcardTypes {
     #[serde(rename = "work")]
     Work(String),
     #[serde(rename = "cell")]
     Cell(String),
 }
 #[derive(Debug, Serialize, Deserialize)]
-struct VCard {
-    n: Name,
-    email: Option<VcardType>,
-    tel: Option<VcardType>,
+pub struct VCard {
+    pub n: Name,
+    pub email: Option<VcardType>,
+    pub tel: Option<VcardType>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct _ChatMessage {
     pub text: Option<String>,
     pub effect: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct InviteChannel {
+    pub channel_did: String,
 }
 
 /// Responsible for completing an incoming OOB Invitation flow.
@@ -55,6 +60,7 @@ async fn _handle_connection_setup(
     meta: &UnpackMetadata,
 ) {
     info!("Received connection setup message");
+    info!("Invite Message: {:#?}", message);
 
     // Unpack the attachment vcard if it exists
     let mut new_chat_name = if let Some(attachment) = message.attachments.as_ref() {
@@ -132,14 +138,14 @@ async fn _handle_connection_setup(
 
     let from: String = message.to.clone().unwrap().first().unwrap().to_string();
     let to: String = message.from.clone().unwrap();
-    let new_bob = message
-        .body
-        .as_object()
-        .unwrap()
-        .get("channel_did")
-        .unwrap()
-        .as_str()
-        .unwrap();
+
+    let new_bob =
+        if let Ok(channel_did) = serde_json::from_value::<InviteChannel>(message.body.clone()) {
+            channel_did.channel_did
+        } else {
+            warn!("Failed to parse connection accepted message");
+            return;
+        };
     info!("New DID: {}", new_bob);
 
     let current_profile = {
@@ -313,6 +319,7 @@ pub async fn handle_message(
     match message.type_.as_str() {
         "https://affinidi.com/atm/client-actions/connection-setup" => {
             // Completes an inbound OOB Invitation flow (after sharing a QR Code)
+            info!("TIMTAM: Invite Connection Setup Received");
             _handle_connection_setup(atm, state, message, meta).await;
             return; // message was deleted in the function
         }
@@ -360,6 +367,7 @@ pub async fn handle_message(
                 };
 
             let Some(mut_chat) = state.chat_list.chats.get_mut(&chat.name) else {
+                error!("Chats = {:#?}", state.chat_list.chats);
                 warn!("Couldn't get mutable chat({})", &chat.name);
                 break 'label_break;
             };
@@ -400,8 +408,11 @@ pub async fn handle_message(
                         .await;
                 }
 
-                let mut_chat = state.chat_list.chats.get_mut(&chat.name).unwrap();
-                mut_chat.initialization = false;
+                if let Some(mut_chat) = state.chat_list.chats.get_mut(&chat.name) {
+                    mut_chat.initialization = false;
+                } else {
+                    warn!("Couldn't get mutable chat({})", &chat.name);
+                }
             }
             return; // Ephemeral status message - no need to delete it
         }
@@ -518,6 +529,114 @@ pub async fn handle_message(
                 }
             }
             return; // ephemeral status message - no need to delete it
+        }
+        "https://affinidi.com/atm/client-actions/connection-accepted" => 'label_break: {
+            // OOB Invitation acceptance has been received
+
+            let remote_secure_did = if let Ok(channel_did) =
+                serde_json::from_value::<InviteChannel>(message.body.clone())
+            {
+                channel_did.channel_did
+            } else {
+                warn!("Failed to parse connection accepted message");
+                break 'label_break;
+            };
+
+            let mut new_chat_name = if let Some(attachment) = message.attachments.as_ref() {
+                if let Some(vcard) = attachment.first() {
+                    if let AttachmentData::Base64 { value } = &vcard.data {
+                        let vcard_decoded =
+                            BASE64_URL_SAFE_NO_PAD.decode(value.base64.clone()).unwrap();
+                        let vcard: VCard = serde_json::from_slice(&vcard_decoded).unwrap();
+                        let first = if let Some(first) = vcard.n.given.as_ref() {
+                            first
+                        } else {
+                            "UNKNOWN"
+                        };
+                        let surname = if let Some(surname) = vcard.n.surname.as_ref() {
+                            surname.to_string()
+                        } else {
+                            rand::thread_rng()
+                                .sample_iter(&Alphanumeric)
+                                .take(4)
+                                .map(char::from)
+                                .collect::<String>()
+                                .to_string()
+                        };
+
+                        format!("{} {}", first, surname)
+                    } else {
+                        format!(
+                            "UNKNOWN {}",
+                            rand::thread_rng()
+                                .sample_iter(&Alphanumeric)
+                                .take(4)
+                                .map(char::from)
+                                .collect::<String>()
+                        )
+                    }
+                } else {
+                    format!(
+                        "UNKNOWN {}",
+                        rand::thread_rng()
+                            .sample_iter(&Alphanumeric)
+                            .take(4)
+                            .map(char::from)
+                            .collect::<String>()
+                    )
+                }
+            } else {
+                format!(
+                    "UNKNOWN {}",
+                    rand::thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(4)
+                        .map(char::from)
+                        .collect::<String>()
+                )
+            };
+            new_chat_name = new_chat_name.trim().to_string();
+
+            let Some(secure_channel_did) = &chat.hidden else {
+                warn!("Expecting to see hidden chat details");
+                break 'label_break;
+            };
+
+            // We don't need the ephemeral chat anymore - delete it
+            state.remove_chat(&chat, atm).await;
+
+            // Update the secure chat with new details
+            let Some(secure_chat) = state.chat_list.find_chat_by_did(secure_channel_did) else {
+                warn!("Couldn't find secure chat by DID({})", &secure_channel_did);
+                break 'label_break;
+            };
+
+            // Modify the new_chat_name so it is unique if it already exists
+            if state.chat_list.chats.contains_key(&new_chat_name) {
+                let split_pos = secure_channel_did.char_indices().nth_back(4).unwrap().0;
+                let a = &secure_channel_did[split_pos..];
+                new_chat_name = format!("{} {}", new_chat_name, a);
+            }
+
+            let mut new_secure_chat =
+                if let Some(chat) = state.chat_list.chats.get(&secure_chat.name) {
+                    chat.clone()
+                } else {
+                    warn!("Couldn't get mutable secure chat({})", &secure_chat.name);
+                    break 'label_break;
+                };
+
+            new_secure_chat.remote_did = Some(remote_secure_did.clone());
+            new_secure_chat.status = ChatStatus::EstablishedChannel;
+            let old_chat_name = new_secure_chat.name.clone();
+            new_secure_chat.name = new_chat_name.clone();
+
+            // Remove the old chat from the list and add the new one
+            state.chat_list.chats.remove(&old_chat_name);
+            state
+                .chat_list
+                .chats
+                .insert(new_chat_name.clone(), new_secure_chat);
         }
         _ => {
             warn!("Unknown message type: {}", message.type_);

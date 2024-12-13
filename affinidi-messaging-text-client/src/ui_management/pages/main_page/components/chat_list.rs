@@ -48,6 +48,7 @@ impl From<&State> for Props {
                 invitation_link: chat_data.invitation_link.clone(),
                 status: chat_data.status.clone(),
                 initialization: chat_data.initialization,
+                hidden: None,
             })
             .collect::<Vec<Chat>>();
 

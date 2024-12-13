@@ -4,6 +4,7 @@ use super::actions::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{protocols::oob_discovery::OOBDiscovery, ATM};
+use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
@@ -104,6 +105,14 @@ impl CommonSettings {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct AcceptInvitePopupState {
+    pub show: bool,
+    pub invite_link: String,
+    pub invite_error: Option<String>,
+    pub messages: Vec<Line<'static>>,
+}
+
 /// State holds the state of the application
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct State {
@@ -114,6 +123,8 @@ pub struct State {
     pub invite_popup: InvitePopupState,
     #[serde(skip)]
     pub chat_details_popup: ChatDetailsPopupState,
+    #[serde(skip)]
+    pub accept_invite_popup: AcceptInvitePopupState,
     #[serde(skip)]
     pub initialization: bool,
 }

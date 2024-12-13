@@ -1,7 +1,8 @@
 use super::{actions::Action, State};
 use crate::{
     state_store::{
-        actions::invitation::create_invitation, inbound_messages::handle_message,
+        actions::invitation::{create_invitation, send_invitation_accept},
+        inbound_messages::handle_message,
         outbound_messages::send_message,
     },
     termination::{Interrupted, Terminator},
@@ -164,6 +165,17 @@ impl StateStore {
                         state.invite_popup.show_invite_popup = false;
                         state.invite_popup.invite = None;
                     },
+                    Action::AcceptInvitePopupStart => {
+                        state.accept_invite_popup.show = true;
+                    }
+                    Action::AcceptInvite { invite_link } => {
+                        state.accept_invite_popup.invite_link = invite_link;
+                        let _ = send_invitation_accept(&mut state, &self.state_tx, &atm).await;
+                    }
+                    Action::AcceptInvitePopupStop => {
+                        state.accept_invite_popup.show = false;
+                        state.accept_invite_popup.invite_link = String::new();
+                    }
                 },
                 // Tick to terminate the select every N milliseconds
                 _ = ticker.tick() => {

@@ -3,12 +3,15 @@ use std::{
     sync::Arc,
 };
 
+use affinidi_messaging_didcomm::{Attachment, Message, MessageBuilder};
 use affinidi_messaging_sdk::{
+    messages::SuccessResponse,
     profiles::Profile,
     protocols::Protocols,
     secrets::{Secret, SecretMaterial, SecretType},
     ATM,
 };
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use image::Luma;
 use qrcode::QrCode;
 use ratatui::{
@@ -18,9 +21,13 @@ use ratatui::{
 use serde_json::json;
 use ssi::{dids::DIDKey, jwk::Params, JWK};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
+use tracing::{info, warn};
+use uuid::Uuid;
 
-use crate::state_store::State;
+use crate::state_store::{
+    inbound_messages::{Name, VCard, VcardType},
+    State,
+};
 
 use super::chat_list::ChatStatus;
 
@@ -90,7 +97,7 @@ pub async fn create_new_profile(
         alias
     } else {
         format!(
-            "Invite-{}",
+            "Invite {}",
             &did_key.to_string()[did_key.to_string().char_indices().nth_back(3).unwrap().0..]
         )
     };
@@ -117,6 +124,243 @@ pub async fn create_new_profile(
             Err(e.into())
         }
     }
+}
+
+/// Given an OOB Invitation link, this will send an accept message to the inviter
+pub async fn send_invitation_accept(
+    state: &mut State,
+    state_tx: &UnboundedSender<State>,
+    atm: &ATM,
+) -> anyhow::Result<()> {
+    // Fetch the Invite message
+    let body = reqwest::get(&state.accept_invite_popup.invite_link)
+        .await?
+        .text()
+        .await?;
+
+    // Parse the message
+    let parsed_body: SuccessResponse<String> = match serde_json::from_str(&body) {
+        Ok(parsed_body) => parsed_body,
+        Err(e) => {
+            warn!("Failed to parse OOB Invite: {}", e);
+            return Ok(());
+        }
+    };
+
+    let Some(base64_invite) = parsed_body.data else {
+        warn!("Failed to parse OOB Invite: No data found");
+        return Ok(());
+    };
+
+    let invite = if let Ok(invite) = BASE64_URL_SAFE_NO_PAD.decode(base64_invite) {
+        String::from_utf8(invite).unwrap()
+    } else {
+        warn!("Bas64 decoding failed on invite!");
+        return Ok(());
+    };
+
+    let invite_message = match serde_json::from_str::<Message>(&invite) {
+        Ok(invite_message) => invite_message,
+        Err(e) => {
+            warn!("Failed to parse OOB Invite message: {}", e);
+            return Ok(());
+        }
+    };
+
+    let Some(mediator_did) = state.settings.mediator_did.clone() else {
+        warn!("Mediator DID is not set");
+        return Ok(());
+    };
+
+    let Some(invite_did) = invite_message.from else {
+        warn!("Invite message is missing 'from' field");
+        return Ok(());
+    };
+    let invite_did_suffix = invite_did.split_at(invite_did.len() - 4).1;
+
+    state
+        .accept_invite_popup
+        .messages
+        .push(Line::from(Span::styled(
+            format!(
+                "Remote DID ({}) to send connection-setup messages.",
+                invite_did
+            ),
+            Style::default().fg(Color::LightBlue),
+        )));
+    state_tx.send(state.clone())?;
+
+    // Create a new temporary profile for the invitation
+    let accept_temp_profile = create_new_profile(
+        atm,
+        &mediator_did,
+        Some(format!("Ephemeral Accept {}", invite_did_suffix)),
+        true,
+    )
+    .await?;
+    let accept_temp_profile = atm.profile_add(&accept_temp_profile, true).await?;
+
+    state
+        .chat_list
+        .create_chat(
+            &format!(
+                "Ephemeral OOB Accept {} {}",
+                invite_did_suffix,
+                accept_temp_profile
+                    .inner
+                    .did
+                    .split_at(accept_temp_profile.inner.did.len() - 4)
+                    .1
+            ),
+            &format!(
+                "Ephemeral DID used to setup Secure Chat: {}",
+                accept_temp_profile.inner.did
+            ),
+            &accept_temp_profile,
+            Some(invite_did.clone()),
+            Some(state.accept_invite_popup.invite_link.clone()),
+            ChatStatus::EphemeralAcceptInvite,
+        )
+        .await;
+
+    state
+        .accept_invite_popup
+        .messages
+        .push(Line::from(Span::styled(
+            format!(
+                "Our Ephemeral invite DID ({}) to accept invite.",
+                &accept_temp_profile.inner.did
+            ),
+            Style::default().fg(Color::LightBlue),
+        )));
+    state_tx.send(state.clone())?;
+
+    // Create a new secure profile for the established chat channel
+    let accept_secure_profile = create_new_profile(
+        atm,
+        &mediator_did,
+        Some(format!("Secure Accept {}", invite_did_suffix)),
+        true,
+    )
+    .await?;
+    let accept_secure_profile = atm.profile_add(&accept_secure_profile, true).await?;
+
+    state
+        .chat_list
+        .create_chat(
+            &format!(
+                "Secure Channel OOB Accept {} {}",
+                invite_did_suffix,
+                accept_secure_profile
+                    .inner
+                    .did
+                    .split_at(accept_secure_profile.inner.did.len() - 4)
+                    .1
+            ),
+            &format!(
+                "Secure Channel DID used for Secure Chat: {}",
+                accept_secure_profile.inner.did
+            ),
+            &accept_secure_profile,
+            None,
+            Some(state.accept_invite_popup.invite_link.clone()),
+            ChatStatus::AwaitingInvitationAcceptance,
+        )
+        .await;
+    state
+        .accept_invite_popup
+        .messages
+        .push(Line::from(Span::styled(
+            format!(
+                "Our Secure future Chat DID ({}) to use when invite process is completed.",
+                &accept_secure_profile.inner.did
+            ),
+            Style::default().fg(Color::LightBlue),
+        )));
+    state_tx.send(state.clone())?;
+
+    let Some(c) = state
+        .chat_list
+        .find_chat_by_did(&accept_temp_profile.inner.did)
+    else {
+        warn!(
+            "Failed to find chat by DID: {}",
+            &accept_temp_profile.inner.did
+        );
+        return Ok(());
+    };
+
+    if let Some(mut_chat) = state.chat_list.chats.get_mut(&c.name) {
+        mut_chat.hidden = Some(accept_secure_profile.inner.did.clone());
+    }
+
+    // Create the vcard
+    let vcard = VCard {
+        n: Name {
+            given: state.settings.our_name.clone(),
+            surname: None,
+        },
+        email: None,
+        tel: None,
+    };
+
+    let attachment =
+        Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_string(&vcard).unwrap()))
+            .id(Uuid::new_v4().to_string())
+            .description("vCard Info".into())
+            .media_type("text/x-vcard".into())
+            .format("https://affinidi.com/atm/client-attachment/contact-card".into())
+            .finalize();
+
+    // Create response message
+    let accept_message_id = Uuid::new_v4();
+    let accept_message = MessageBuilder::new(
+        accept_message_id.to_string(),
+        "https://affinidi.com/atm/client-actions/connection-setup".to_string(),
+        json!({"channel_did": accept_secure_profile.inner.did.clone()}),
+    )
+    .from(accept_temp_profile.inner.did.clone())
+    .to(invite_did.clone())
+    .attachment(attachment)
+    .thid(accept_message_id.to_string())
+    .pthid(invite_message.id)
+    .finalize();
+
+    let packed = atm
+        .pack_encrypted(
+            &accept_message,
+            &invite_did,
+            Some(&accept_temp_profile.inner.did.clone()),
+            Some(&accept_temp_profile.inner.did.clone()),
+        )
+        .await?;
+
+    // Send the response message
+    atm.forward_and_send_message(
+        &accept_temp_profile,
+        &packed.0,
+        None,
+        &mediator_did,
+        &accept_temp_profile.inner.did,
+        None,
+        None,
+        false,
+    )
+    .await?;
+
+    state
+        .accept_invite_popup
+        .messages
+        .push(Line::from(Span::styled(
+            format!(
+                "Successfully sent connection-setup message to remote DID: {}",
+                &invite_did
+            ),
+            Style::default().fg(Color::LightBlue),
+        )));
+    state_tx.send(state.clone())?;
+
+    Ok(())
 }
 
 pub async fn create_invitation(

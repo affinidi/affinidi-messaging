@@ -53,6 +53,7 @@ impl SettingsPopup {
     fn _reset_inputs(&mut self) {
         self.mediator_did = Input::new(self.props.mediator_did.clone());
         self.avatar_path = Input::new(self.props.avatar_path.clone());
+        self.our_name = Input::new(self.props.our_name.clone().unwrap_or_default());
         self.active_field = InputType::MediatorDID;
     }
 }
@@ -311,7 +312,7 @@ impl ComponentRender<()> for SettingsPopup {
             Span::styled("<ESCAPE> ", Style::default().fg(Color::LightRed).bold()),
             Span::styled("to quit, ", Style::default()),
         ]);
-        let help = Paragraph::new(help_line).left_aligned();
+        let help = Paragraph::new(help_line).centered();
         help.render(vertical[5], frame.buffer_mut());
 
         // set the cursor position

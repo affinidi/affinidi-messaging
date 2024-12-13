@@ -12,6 +12,10 @@ pub enum Action {
     // OOB Invitation Create
     InvitePopupStart,
     InvitePopupStop,
+    // OOB Accept
+    AcceptInvitePopupStart,
+    AcceptInvitePopupStop,
+    AcceptInvite { invite_link: String },
     // Chat information
     ShowChatDetails { chat: String },
     CloseChatDetails,

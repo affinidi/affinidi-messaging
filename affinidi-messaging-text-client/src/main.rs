@@ -70,4 +70,5 @@ pub enum InputType {
     AvatarPath,
     OurName,
     ChatMessage,
+    AcceptInvite,
 }
