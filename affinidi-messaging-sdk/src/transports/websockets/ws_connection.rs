@@ -21,7 +21,7 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_tungstenite::{
     connect_async_tls_with_config,
-    tungstenite::{client::IntoClientRequest, Message},
+    tungstenite::{client::IntoClientRequest, protocol::frame::Utf8Payload, Message},
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, span, Instrument};
@@ -167,7 +167,7 @@ impl WsConnection {
                             match cmd {
                                 WsConnectionCommands::Send(msg) => {
                                     debug!("Sending message ({}) to websocket", msg);
-                                    match web_socket.send(Message::Text(msg)).await {
+                                    match web_socket.send(Message::Text(Utf8Payload::from(msg))).await {
                                         Ok(_) => {
                                             debug!("Message sent");
                                         }
