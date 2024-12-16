@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use redis::Value;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
@@ -18,7 +19,7 @@ pub struct SessionClaims {
     pub exp: u64,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum SessionState {
     #[default]
     Unknown,
@@ -113,7 +114,7 @@ impl DatabaseHandler {
 
         let sid = format!("SESSION:{}", session.session_id);
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HSET")
             .arg(&sid)
@@ -162,17 +163,19 @@ impl DatabaseHandler {
 
     /// Updates a session in the database to become authenticated
     /// Updates the state, and the expiry time
+    /// Also ensures that the DID is recorded in the KNOWN_DIDS Set
     pub async fn update_session_authenticated(
         &self,
         old_session_id: &str,
         new_session_id: &str,
+        did_hash: &str,
     ) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
         let old_sid = format!("SESSION:{}", old_session_id);
         let new_sid = format!("SESSION:{}", new_session_id);
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("RENAME")
             .arg(&old_sid)
@@ -185,6 +188,9 @@ impl DatabaseHandler {
             .arg("GLOBAL")
             .arg("SESSIONS_SUCCESS")
             .arg(1)
+            .cmd("SADD")
+            .arg("KNOWN_DIDS")
+            .arg(did_hash)
             .expire(&new_sid, 86400)
             .query_async(&mut con)
             .await

@@ -1,47 +1,55 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_didcomm::secrets::Secret;
+use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_didcomm::UnpackMetadata;
 use config::Config;
 use errors::ATMError;
-use messages::AuthorizationResponse;
+use profiles::Profiles;
 use reqwest::{Certificate, Client};
 use resolvers::secrets_resolver::AffinidiSecrets;
-use rustls::{ClientConfig, RootCertStore};
+use rustls::ClientConfig as TlsClientConfig;
+use rustls_platform_verifier::ConfigVerifierExt;
+use secrets::Secret;
 use ssi::dids::Document;
 use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
-use tokio::task::JoinHandle;
+use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio_tungstenite::Connector;
-use tracing::{debug, span, warn};
-use websockets::ws_handler::WSCommand;
+use tracing::{debug, span};
+use transports::websockets::ws_handler::WsHandlerCommands;
+use transports::websockets::ws_handler::WsHandlerMode;
 
-mod authentication;
+pub mod authentication;
 pub mod config;
 pub mod conversions;
 pub mod errors;
 pub mod messages;
+pub mod profiles;
 pub mod protocols;
 pub mod public;
 mod resolvers;
+pub mod secrets;
 pub mod transports;
 
-pub mod websockets {
-    #[doc(inline)]
-    pub use crate::transports::websockets::*;
+pub struct ATM {
+    pub(crate) inner: Arc<SharedState>,
 }
 
-pub struct ATM<'c> {
-    pub(crate) config: Config<'c>,
-    did_resolver: DIDCacheClient,
-    secrets_resolver: AffinidiSecrets,
+/// Private SharedState struct for the ATM to be used across tasks
+pub(crate) struct SharedState {
+    pub(crate) config: Config,
+    pub(crate) did_resolver: DIDCacheClient,
+    pub(crate) secrets_resolver: AffinidiSecrets,
     pub(crate) client: Client,
-    authenticated: bool,
-    jwt_tokens: Option<AuthorizationResponse>,
-    ws_connector: Connector,
-    pub(crate) ws_enabled: bool,
-    ws_handler: Option<JoinHandle<()>>,
-    ws_send_stream: Option<Sender<WSCommand>>,
-    ws_recv_stream: Option<Receiver<WSCommand>>,
+    pub(crate) ws_connector: Connector,
+    pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the WebSocket handler
+    pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>, // Receives MPSC messages from the WebSocket handler
+    pub(crate) sdk_send_stream: Sender<WsHandlerCommands>, // Sends messages to the SDK
+    pub(crate) profiles: Arc<RwLock<Profiles>>,
+    pub(crate) direct_stream_sender: Option<broadcast::Sender<(Message, UnpackMetadata)>>, // Used if a client outside of ATM wants to direct stream from websocket
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -60,17 +68,18 @@ pub struct ATM<'c> {
 ///
 /// let response = atm.ping("did:example:123", true);
 /// ```
-impl<'c> ATM<'c> {
+impl ATM {
     /// Creates a new instance of the SDK with a given configuration
     /// You need to add at least the DID Method for the SDK DID to work
-    pub async fn new(config: Config<'c>) -> Result<ATM<'c>, ATMError> {
+    pub async fn new(config: Config) -> Result<ATM, ATMError> {
         // Set a process wide default crypto provider.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+        let tls_config = TlsClientConfig::with_platform_verifier();
 
         // Set up the HTTP/HTTPS client
         let mut client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
-            .https_only(config.ssl_only)
+            .use_preconfigured_tls(tls_config.clone())
             .user_agent("Affinidi Trusted Messaging");
 
         for cert in config.get_ssl_certificates() {
@@ -91,34 +100,7 @@ impl<'c> ATM<'c> {
             }
         };
 
-        // Set up the WebSocket Client
-        let mut root_store = RootCertStore::empty();
-        if config.get_ssl_certificates().is_empty() {
-            debug!("Use native SSL Certs");
-
-            for cert in
-                rustls_native_certs::load_native_certs().expect("Could not load platform certs")
-            {
-                root_store.add(cert).map_err(|e| {
-                    warn!("Couldn't add cert: {:?}", e);
-                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
-                })?;
-            }
-        } else {
-            debug!("Use custom SSL Certs");
-            for cert in config.get_ssl_certificates() {
-                root_store.add(cert.to_owned()).map_err(|e| {
-                    warn!("Couldn't add cert: {:?}", e);
-                    ATMError::SSLError(format!("Couldn't add cert. Reason: {}", e))
-                })?;
-            }
-        }
-
-        let ws_config = ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
-
-        let ws_connector = Connector::Rustls(Arc::new(ws_config));
+        let ws_connector = Connector::Rustls(Arc::new(tls_config));
 
         // Set up the DID Resolver
         let did_resolver = if let Some(did_resolver) = &config.did_resolver {
@@ -139,37 +121,45 @@ impl<'c> ATM<'c> {
             }
         };
 
-        let mut atm = ATM {
+        // Set up the channels for the WebSocket handler
+        // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
+        let (sdk_tx, ws_handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
+
+        // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
+        let (ws_handler_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
+
+        let direct_stream_sender = if let WsHandlerMode::DirectChannel = config.ws_handler_mode {
+            let (direct_stream_sender, _) = broadcast::channel(32);
+            Some(direct_stream_sender)
+        } else {
+            None
+        };
+
+        let shared_state = SharedState {
             config: config.clone(),
             did_resolver,
             secrets_resolver: AffinidiSecrets::new(vec![]),
             client,
-            authenticated: false,
-            jwt_tokens: None,
             ws_connector,
-            ws_enabled: config.ws_enabled,
-            ws_handler: None,
-            ws_send_stream: None,
-            ws_recv_stream: None,
+            ws_handler_send_stream: sdk_tx,
+            ws_handler_recv_stream: Mutex::new(sdk_rx),
+            sdk_send_stream: ws_handler_tx.clone(),
+            profiles: Arc::new(RwLock::new(Profiles::default())),
+            direct_stream_sender,
         };
 
-        // Add our own DID to the DID_RESOLVER
-        if let Some(my_did) = &config.my_did {
-            atm.add_did(my_did).await?;
-        }
-        if let Some(my_did) = &config.my_did {
-            atm.add_did(my_did).await?;
-        }
+        let atm = ATM {
+            inner: Arc::new(shared_state),
+        };
 
         // Add any pre-loaded secrets
-        for secret in config.secrets {
+        for secret in &config.secrets {
             atm.add_secret(secret);
         }
 
-        // Start the websocket connection if enabled
-        if atm.ws_enabled {
-            atm.start_websocket_task().await?;
-        }
+        // Start the websocket handler
+        atm.start_websocket_handler(ws_handler_rx, ws_handler_tx)
+            .await?;
         debug!("ATM SDK initialized");
 
         Ok(atm)
@@ -178,11 +168,11 @@ impl<'c> ATM<'c> {
     /// Adds a DID to the resolver
     /// This resolves the DID to the DID Document, and adds it to the list of known DIDs
     /// Returns the DIDDoc itself if successful, or an SDK Error
-    pub async fn add_did(&mut self, did: &str) -> Result<Document, ATMError> {
+    pub async fn add_did(&self, did: &str) -> Result<Document, ATMError> {
         let _span = span!(tracing::Level::DEBUG, "add_did", did = did).entered();
         debug!("Adding DID to resolver");
 
-        match self.did_resolver.resolve(did).await {
+        match self.inner.did_resolver.resolve(did).await {
             Ok(results) => Ok(results.doc),
             Err(err) => Err(ATMError::DIDError(format!(
                 "Couldn't resolve did ({}). Reason: {}",
@@ -191,29 +181,25 @@ impl<'c> ATM<'c> {
         }
     }
 
-    /// Adds required secrets to the secrets resolver
+    /// Adds secret to the secrets resolver
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
-    pub fn add_secret(&mut self, secret: Secret) {
-        self.secrets_resolver.insert(secret);
+    pub fn add_secret(&self, secret: &Secret) {
+        self.inner.secrets_resolver.insert(secret.to_owned());
     }
 
-    pub(crate) fn dids(&self) -> Result<(&String, &String), ATMError> {
-        let my_did = if let Some(my_did) = &self.config.my_did {
-            my_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide a DID for the SDK, used for authentication!".to_owned(),
-            ));
-        };
+    /// Adds a Vec of secrets to the secrets resolver
+    pub async fn add_secrets(&self, secrets: &Vec<Secret>) {
+        for secret in secrets {
+            self.inner.secrets_resolver.insert(secret.clone());
+        }
+    }
 
-        let atm_did = if let Some(atm_did) = &self.config.atm_did {
-            atm_did
-        } else {
-            return Err(ATMError::ConfigError(
-                "You must provide the DID for the ATM service!".to_owned(),
-            ));
-        };
-
-        Ok((my_did, atm_did))
+    /// If you have set the ATM SDK to be in DirectChannel mode, you can get the inbound channel here
+    /// This allows you to directly stream messages from the WebSocket Handler to your own client code
+    pub fn get_inbound_channel(&self) -> Option<broadcast::Receiver<(Message, UnpackMetadata)>> {
+        self.inner
+            .direct_stream_sender
+            .as_ref()
+            .map(|sender| sender.subscribe())
     }
 }

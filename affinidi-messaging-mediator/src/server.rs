@@ -1,15 +1,13 @@
 use crate::{
+    common::config::init,
     database::DatabaseHandler,
     handlers::{application_routes, health_checker_handler},
-    init,
-    tasks::statistics::statistics,
-    tasks::websocket_streaming::StreamingTask,
+    tasks::{statistics::statistics, websocket_streaming::StreamingTask},
     SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
-use http::Method;
 use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
@@ -27,6 +25,7 @@ pub async fn start() {
         .init();
 
     if ansi {
+        event!(Level::INFO, "");
         event!(
             Level::INFO,
             r#"        db          ad88     ad88  88               88           88  88     88b           d88                       88  88"#
@@ -67,7 +66,7 @@ pub async fn start() {
         "[Loading Affinidi Secure Messaging Mediator configuration]"
     );
 
-    let config = init(Some(reload_handle))
+    let config = init("conf/mediator.toml", Some(reload_handle))
         .await
         .expect("Couldn't initialize mediator!");
 
@@ -80,6 +79,12 @@ pub async fn start() {
             std::process::exit(1);
         }
     };
+
+    // Set up the administration account if it doesn't exist
+    database
+        .setup_admin_account(&config.admin_did)
+        .await
+        .expect("Could not setup admin account! exiting...");
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread
@@ -121,31 +126,20 @@ pub async fn start() {
     // Add middleware to all routes
     let app = Router::new()
         .merge(app)
-        .layer(
-            config
-                .cors_allow_origin
-                .allow_headers([http::header::CONTENT_TYPE])
-                .allow_methods([
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::DELETE,
-                    Method::PATCH,
-                ]),
-        )
+        .layer(config.security.cors_allow_origin)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         )
-        .layer(RequestBodyLimitLayer::new(config.http_size_limit as usize))
+        .layer(RequestBodyLimitLayer::new(config.limits.http_size as usize))
         // Add the healthcheck route after the tracing so we don't fill up logs with healthchecks
         .route(
             format!("{}healthchecker", &config.api_prefix).as_str(),
             get(health_checker_handler).with_state(shared_state),
         );
 
-    if config.use_ssl {
+    if config.security.use_ssl {
         event!(
             Level::INFO,
             "This mediator is using SSL/TLS for secure communication."
@@ -153,10 +147,12 @@ pub async fn start() {
         // configure certificate and private key used by https
         // TODO: Build a proper TLS Config
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-        let ssl_config =
-            RustlsConfig::from_pem_file(config.ssl_certificate_file, config.ssl_key_file)
-                .await
-                .expect("bad certificate/key");
+        let ssl_config = RustlsConfig::from_pem_file(
+            config.security.ssl_certificate_file,
+            config.security.ssl_key_file,
+        )
+        .await
+        .expect("bad certificate/key");
 
         axum_server::bind_rustls(config.listen_address.parse().unwrap(), ssl_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())

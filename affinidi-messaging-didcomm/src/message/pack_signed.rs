@@ -112,7 +112,7 @@ impl Message {
             }
             _ => Err(err_msg(ErrorKind::Unsupported, "Unsupported signature alg"))?,
         }
-        .context("Unable produce signatire")?;
+        .context("Unable produce signature")?;
 
         let metadata = PackSignedMetadata {
             sign_by_kid: key_id.to_owned(),

@@ -1,0 +1,48 @@
+[package]
+name = "affinidi-messaging-helpers"
+version.workspace = true
+description = "Affinidi Messaging Helpers"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[[bin]]
+name = "setup_environment"
+path = "src/setup_environment/main.rs"
+
+[[bin]]
+name = "mediator_administration"
+path = "src/mediator_administration/main.rs"
+
+[dependencies]
+affinidi-did-resolver-cache-sdk.workspace = true
+affinidi-messaging-didcomm.workspace = true
+affinidi-messaging-mediator.workspace = true
+affinidi-messaging-sdk.workspace = true
+clap.workspace = true
+did-peer.workspace = true
+base64.workspace = true
+console.workspace = true
+dialoguer.workspace = true
+rcgen.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+ring.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha256.workspace = true
+ssi.workspace = true
+time.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+#num-bigint = "0.4.6"
+askar-crypto.workspace = true
+#p256 = { version = "0.13.2", features = ["jwk", "ecdh"] }
+uuid.workspace = true

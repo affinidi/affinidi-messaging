@@ -1,6 +1,7 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use itertools::Itertools;
+use num_format::{Locale, ToFormattedString};
 use redis::{from_redis_value, Value};
 use std::fmt::{self, Display, Formatter};
 use tracing::{debug, event, Level};
@@ -8,16 +9,18 @@ use tracing::{debug, event, Level};
 /// Statistics for the mediator
 #[derive(Default, Debug)]
 pub struct MetadataStats {
-    pub received_bytes: i64,   // Total number of bytes processed
-    pub sent_bytes: i64,       // Total number of bytes sent
-    pub deleted_bytes: i64,    // Total number of bytes deleted
-    pub received_count: i64,   // Total number of messages received
-    pub sent_count: i64,       // Total number of messages sent
-    pub deleted_count: i64,    // Total number of messages deleted
-    pub websocket_open: i64,   // Total number of websocket connections opened
-    pub websocket_close: i64,  // Total number of websocket connections closed
-    pub sessions_created: i64, // Total number of sessions created
-    pub sessions_success: i64, // Total number of sessions successfully authenticated
+    pub received_bytes: i64,      // Total number of bytes processed
+    pub sent_bytes: i64,          // Total number of bytes sent
+    pub deleted_bytes: i64,       // Total number of bytes deleted
+    pub received_count: i64,      // Total number of messages received
+    pub sent_count: i64,          // Total number of messages sent
+    pub deleted_count: i64,       // Total number of messages deleted
+    pub websocket_open: i64,      // Total number of websocket connections opened
+    pub websocket_close: i64,     // Total number of websocket connections closed
+    pub sessions_created: i64,    // Total number of sessions created
+    pub sessions_success: i64,    // Total number of sessions successfully authenticated
+    pub oob_invites_created: i64, // Total number of out-of-band invites created
+    pub oob_invites_claimed: i64, // Total number of out-of-band invites claimed
 }
 
 impl Display for MetadataStats {
@@ -28,20 +31,23 @@ impl Display for MetadataStats {
     Message counts: recv({}) sent({}) deleted({}) queued({})
     Storage: received({}), sent({}), deleted({}), current_queued({})
     Connections: ws_open({}) ws_close({}) ws_current({}) :: sessions_created({}), sessions_authenticated({})
+    OOB Invites: created({}) claimed({})
             "#,
-            self.received_count,
-            self.sent_count,
-            self.deleted_count,
-            self.received_count - self.deleted_count,
-            self.received_bytes,
-            self.sent_bytes,
-            self.deleted_bytes,
-            self.received_bytes - self.deleted_bytes,
-            self.websocket_open,
-            self.websocket_close,
-            self.websocket_open - self.websocket_close,
-            self.sessions_created,
-            self.sessions_success
+            self.received_count.to_formatted_string(&Locale::en),
+            self.sent_count.to_formatted_string(&Locale::en),
+            self.deleted_count.to_formatted_string(&Locale::en),
+            (self.received_count - self.deleted_count).to_formatted_string(&Locale::en),
+            self.received_bytes.to_formatted_string(&Locale::en),
+            self.sent_bytes.to_formatted_string(&Locale::en),
+            self.deleted_bytes.to_formatted_string(&Locale::en),
+            (self.received_bytes - self.deleted_bytes).to_formatted_string(&Locale::en),
+            self.websocket_open.to_formatted_string(&Locale::en),
+            self.websocket_close.to_formatted_string(&Locale::en),
+            (self.websocket_open - self.websocket_close).to_formatted_string(&Locale::en),
+            self.sessions_created.to_formatted_string(&Locale::en),
+            self.sessions_success.to_formatted_string(&Locale::en),
+            self.oob_invites_created.to_formatted_string(&Locale::en),
+            self.oob_invites_claimed.to_formatted_string(&Locale::en)
         )
     }
 }
@@ -60,8 +66,19 @@ impl MetadataStats {
             websocket_close: self.websocket_close - previous.websocket_close,
             sessions_created: self.sessions_created - previous.sessions_created,
             sessions_success: self.sessions_success - previous.sessions_success,
+            oob_invites_created: self.oob_invites_created - previous.oob_invites_created,
+            oob_invites_claimed: self.oob_invites_claimed - previous.oob_invites_claimed,
         }
     }
+}
+
+/// Statistics for a given DID
+#[derive(Default, Debug)]
+pub struct DidStats {
+    pub send_queue_bytes: u64,
+    pub send_queue_count: u64,
+    pub receive_queue_bytes: u64,
+    pub receive_queue_count: u64,
 }
 
 impl DatabaseHandler {
@@ -108,6 +125,8 @@ impl DatabaseHandler {
                 "WEBSOCKET_CLOSE" => stats.websocket_close = v.parse().unwrap_or(0),
                 "SESSIONS_CREATED" => stats.sessions_created = v.parse().unwrap_or(0),
                 "SESSIONS_SUCCESS" => stats.sessions_success = v.parse().unwrap_or(0),
+                "OOB_INVITES_CREATED" => stats.oob_invites_created = v.parse().unwrap_or(0),
+                "OOB_INVITES_CLAIMED" => stats.oob_invites_claimed = v.parse().unwrap_or(0),
                 _ => {}
             }
         }
@@ -119,7 +138,7 @@ impl DatabaseHandler {
     pub async fn update_send_stats(&self, sent_bytes: i64) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        deadpool_redis::redis::pipe()
+        let _result: Value = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HINCRBY")
             .arg("GLOBAL")
@@ -144,7 +163,7 @@ impl DatabaseHandler {
     pub async fn global_stats_increment_websocket_open(&self) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        deadpool_redis::redis::cmd("HINCRBY")
+        let _result: Value = deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("WEBSOCKET_OPEN")
             .arg(1)
@@ -167,7 +186,7 @@ impl DatabaseHandler {
     pub async fn global_stats_increment_websocket_close(&self) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        deadpool_redis::redis::cmd("HINCRBY")
+        let _result: Value = deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("WEBSOCKET_CLOSE")
             .arg(1)
@@ -184,5 +203,62 @@ impl DatabaseHandler {
             })?;
 
         Ok(())
+    }
+
+    /// Get stats relating to a DID
+    /// - `did_hash` - The hash of the DID to get stats for
+    pub async fn get_did_stats(&self, did_hash: &str) -> Result<DidStats, MediatorError> {
+        let mut con = self.get_async_connection().await?;
+
+        let result: Value = deadpool_redis::redis::cmd("HGETALL")
+            .arg(["DID", did_hash].join(":"))
+            .query_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "INTERNAL".into(),
+                    format!(
+                        "Couldn't retrieve DID ({}) stats. Reason: {}",
+                        did_hash, err
+                    ),
+                )
+            })?;
+
+        let mut stats = DidStats::default();
+        let result: Vec<String> = from_redis_value(&result).map_err(|e| {
+            MediatorError::DatabaseError(
+                "NA".into(),
+                format!("Couldn't parse GLOBAL metadata from database: {}", e),
+            )
+        })?;
+
+        for (k, v) in result.iter().tuples() {
+            match k.as_str() {
+                "SEND_QUEUE_BYTES" => stats.send_queue_bytes = v.parse().unwrap_or(0),
+                "SEND_QUEUE_COUNT" => stats.send_queue_count = v.parse().unwrap_or(0),
+                "RECEIVE_QUEUE_BYTES" => stats.receive_queue_bytes = v.parse().unwrap_or(0),
+                "RECEIVE_QUEUE_COUNT" => stats.receive_queue_count = v.parse().unwrap_or(0),
+                _ => {}
+            }
+        }
+        Ok(stats)
+    }
+
+    /// Forward Task Queue length
+    pub async fn get_forward_tasks_len(&self) -> Result<usize, MediatorError> {
+        let mut con = self.get_async_connection().await?;
+
+        let result: usize = deadpool_redis::redis::cmd("XLEN")
+            .arg("FORWARD_TASKS")
+            .query_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "INTERNAL".into(),
+                    format!("Couldn't retrieve forward_tasks length. Reason: {}", err),
+                )
+            })?;
+
+        Ok(result)
     }
 }

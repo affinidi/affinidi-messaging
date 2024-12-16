@@ -1,8 +1,13 @@
+//! All Redis related database methods are handled by `DatabaseHandler` module
+
+pub mod accounts;
+pub mod admin_accounts;
 pub mod delete;
 pub mod fetch;
 pub mod get;
 pub mod handlers;
 pub mod list;
+pub(crate) mod oob_discovery;
 pub mod session;
 pub mod stats;
 pub mod store;

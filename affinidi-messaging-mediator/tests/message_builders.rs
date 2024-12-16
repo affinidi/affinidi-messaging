@@ -7,7 +7,9 @@ use affinidi_messaging_didcomm::{
 use affinidi_messaging_sdk::{
     messages::AuthenticationChallenge,
     protocols::{message_pickup::MessagePickupDeliveryRequest, trust_ping::TrustPingSent},
+    transports::SendMessageResponse,
 };
+use base64::prelude::*;
 use serde_json::{json, Value};
 use sha256::digest;
 use uuid::Uuid;
@@ -60,7 +62,7 @@ pub async fn build_ping_message<'sr>(
         message_id: msg.id.clone(),
         message_hash: "".to_string(),
         bytes: 0,
-        response: None,
+        response: SendMessageResponse::EmptyResponse,
     };
     let (msg, _) = msg
         .pack_encrypted(
@@ -99,15 +101,15 @@ pub async fn build_status_request_message<'sr>(
 
     msg = msg.to(to_did.to_owned());
 
-    msg = msg.from(recipient_did.clone().into());
+    msg = msg.from(recipient_did.clone());
     let now = _get_time_now();
     let msg = msg.created_time(now).expires_time(now + 300).finalize();
     let (msg, _) = msg
         .pack_encrypted(
-            &to_did,
+            to_did,
             Some(&recipient_did),
             Some(&recipient_did),
-            &did_resolver,
+            did_resolver,
             secrets_resolver,
             &PackEncryptedOptions::default(),
         )
@@ -145,10 +147,10 @@ pub async fn build_delivery_request_message<'sr>(
     // Pack the message
     let (msg, _) = msg
         .pack_encrypted(
-            &to_did,
+            to_did,
             Some(&recipient_did),
             Some(&recipient_did),
-            &did_resolver,
+            did_resolver,
             secrets_resolver,
             &PackEncryptedOptions::default(),
         )
@@ -175,7 +177,7 @@ pub async fn build_message_received_message<'sr>(
     let to_did = mediator_did;
     msg = msg.to(to_did.to_owned());
 
-    msg = msg.from(recipient_did.clone().into());
+    msg = msg.from(recipient_did.clone());
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -185,10 +187,10 @@ pub async fn build_message_received_message<'sr>(
     // Pack the message
     let (msg, _) = msg
         .pack_encrypted(
-            &to_did,
+            to_did,
             Some(&recipient_did),
             Some(&recipient_did),
-            &did_resolver,
+            did_resolver,
             secrets_resolver,
             &PackEncryptedOptions::default(),
         )
@@ -207,8 +209,6 @@ pub async fn build_forward_request_message<'sr>(
 ) -> String {
     let now = _get_time_now();
 
-    let recipient_did = recipient_did;
-
     let msg = Message::build(
         Uuid::new_v4().into(),
         "https://didcomm.org/routing/2.0/forward".to_owned(),
@@ -217,13 +217,10 @@ pub async fn build_forward_request_message<'sr>(
     .to(mediator_did.to_owned())
     .from(actor_did.clone())
     .attachment(
-        Attachment::json(json!({ "message": "plaintext attachment, mediator can read this" }))
-            .finalize(),
-    )
-    .attachment(
-        Attachment::base64(String::from(
-            "ciphertext and iv which is encrypted by the recipient public key",
-        ))
+        Attachment::base64(
+            BASE64_URL_SAFE_NO_PAD
+                .encode("ciphertext and iv which is encrypted by the recipient public key"),
+        )
         .finalize(),
     );
 
@@ -232,10 +229,10 @@ pub async fn build_forward_request_message<'sr>(
     // Pack the message
     let (msg, _) = msg
         .pack_encrypted(
-            &mediator_did.to_owned(),
+            mediator_did,
             Some(&actor_did.clone()),
             Some(&actor_did.clone()),
-            &did_resolver,
+            did_resolver,
             secrets_resolver,
             &PackEncryptedOptions::default(),
         )

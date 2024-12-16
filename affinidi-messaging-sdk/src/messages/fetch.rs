@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use tracing::{debug, span, Level};
 
 use crate::{
     errors::ATMError,
     messages::{DeleteMessageRequest, SuccessResponse},
+    profiles::Profile,
     ATM,
 };
 
@@ -30,7 +33,7 @@ impl Default for FetchOptions {
     }
 }
 
-impl<'c> ATM<'c> {
+impl ATM {
     /// Fetches any available messages from your ATM inbox
     /// This differs from the `get_messages()` function in that you don't need to know the message_id in advance
     ///
@@ -51,7 +54,8 @@ impl<'c> ATM<'c> {
     /// let messages = atm.fetch_messages(&FetchOptions {start_id: Some("12345689-0".to_string()), ..FetchOptions::default()}).await?;
     /// ```
     pub async fn fetch_messages(
-        &mut self,
+        &self,
+        profile: &Arc<Profile>,
         options: &FetchOptions,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(
@@ -72,7 +76,7 @@ impl<'c> ATM<'c> {
         }
 
         // Check if authenticated
-        let tokens = self.authenticate().await?;
+        let tokens = profile.authenticate(&self.inner).await?;
 
         let body = serde_json::to_string(options).map_err(|e| {
             ATMError::TransportError(format!(
@@ -81,9 +85,15 @@ impl<'c> ATM<'c> {
             ))
         })?;
 
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::TransportError(
+                "No mediator URL found".to_string(),
+            ));
+        };
         let res = self
+            .inner
             .client
-            .post(format!("{}/fetch", self.config.atm_api,))
+            .post([&mediator_url, "/fetch"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))
             .body(body)
@@ -120,9 +130,12 @@ impl<'c> ATM<'c> {
 
         if let FetchDeletePolicy::OnReceive = options.delete_policy {
             match self
-                .delete_messages(&DeleteMessageRequest {
-                    message_ids: list.success.iter().map(|m| m.msg_id.clone()).collect(),
-                })
+                .delete_messages(
+                    profile,
+                    &DeleteMessageRequest {
+                        message_ids: list.success.iter().map(|m| m.msg_id.clone()).collect(),
+                    },
+                )
                 .await
             {
                 Ok(r) => {

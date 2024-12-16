@@ -34,7 +34,7 @@ pub async fn message_delete_handler(
     );
     async move {
         debug!("Deleting ({}) messages", body.message_ids.len());
-        if body.message_ids.len() > state.config.max_deleted_messages.try_into().unwrap() {
+        if body.message_ids.len() > state.config.limits.deleted_messages {
             return Err(MediatorError::RequestDataError(
                 session.session_id.clone(),
                 format!(
@@ -56,7 +56,7 @@ pub async fn message_delete_handler(
             match result {
                 Ok(_) => deleted.success.push(message.into()),
                 Err(err) => {
-                    warn!("failed to delete msg({}). Reason: {}", message, err);
+                    warn!("{}: failed to delete msg({}). Reason: {}", session.session_id, message, err);
                     deleted.errors.push((message.into(), err.to_string()));
                 }
             }

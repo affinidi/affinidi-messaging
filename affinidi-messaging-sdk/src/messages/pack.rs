@@ -3,14 +3,29 @@ use affinidi_messaging_didcomm::{
 };
 use tracing::{span, Instrument, Level};
 
-use crate::{errors::ATMError, ATM};
+use crate::{errors::ATMError, SharedState, ATM};
 
-impl<'c> ATM<'c> {
+impl ATM {
     /// Pack a message for sending to a recipient
     /// from: if None, then will use anonymous encryption
     /// sign_by: If None, then will not sign the message
     pub async fn pack_encrypted(
-        &mut self,
+        &self,
+        message: &Message,
+        to: &str,
+        from: Option<&str>,
+        sign_by: Option<&str>,
+    ) -> Result<(String, PackEncryptedMetadata), ATMError> {
+        self.inner.pack_encrypted(message, to, from, sign_by).await
+    }
+}
+
+impl SharedState {
+    /// Pack a message for sending to a recipient
+    /// from: if None, then will use anonymous encryption
+    /// sign_by: If None, then will not sign the message
+    pub async fn pack_encrypted(
+        &self,
         message: &Message,
         to: &str,
         from: Option<&str>,
@@ -43,7 +58,7 @@ impl<'c> ATM<'c> {
     /// Rare case of creating an unencrypted message, but you want to prove who sent the message
     /// Signs the unencrypted message with the sign_by key
     pub async fn pack_signed(
-        &mut self,
+        &self,
         message: &Message,
         sign_by: &str,
     ) -> Result<(String, PackSignedMetadata), ATMError> {
@@ -65,7 +80,7 @@ impl<'c> ATM<'c> {
     }
 
     /// creates a plaintext (unencrypted and unsigned) message
-    pub async fn pack_plaintext(&mut self, message: &Message) -> Result<String, ATMError> {
+    pub async fn pack_plaintext(&self, message: &Message) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "pack_plaintext",);
 
         async move { message.pack_plaintext(&self.did_resolver).await }

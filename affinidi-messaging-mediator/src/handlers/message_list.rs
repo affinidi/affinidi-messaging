@@ -50,7 +50,12 @@ pub async fn message_list_handler(
 
         let messages = state
             .database
-            .list_messages(&did_hash, folder, None, state.config.max_listed_messages)
+            .list_messages(
+                &did_hash,
+                folder,
+                None,
+                state.config.limits.listed_messages as u32,
+            )
             .await?;
 
         debug!("List contains ({}) messages", messages.len());

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, Session, SuccessResponse},
     messages::inbound::handle_inbound,
     SharedData,
 };
@@ -41,7 +41,18 @@ pub async fn message_inbound_handler(
         session = session.session_id
     );
     async move {
-        let s = serde_json::to_string(&body).unwrap();
+        let s = match serde_json::to_string(&body) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(MediatorError::ParseError(
+                    session.session_id.clone(),
+                    "InboundMessage".into(),
+                    e.to_string(),
+                )
+                .into());
+            }
+        };
+
         let response = handle_inbound(&state, &session, &s).await?;
 
         Ok((

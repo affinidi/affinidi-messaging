@@ -1,18 +1,24 @@
-use crate::{errors::ATMError, messages::SuccessResponse, ATM};
+use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
 use tracing::{debug, span, Level};
 
-impl<'c> ATM<'c> {
-    /// Returns a list of messages that are stored in the ATM
-    /// - messages : List of message IDs to retrieve
-    pub async fn well_known_did(&mut self) -> Result<String, ATMError> {
+impl ATM {
+    /// Helper method to get the Mediators well-known DID
+    pub async fn well_known_did(&mut self, profile: &Profile) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did").entered();
 
         debug!("Sending well_known_did request");
 
-        let well_known_did_atm_api = format!("{}/.well-known/did", self.config.clone().atm_api);
+        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+            return Err(ATMError::TransportError(
+                "No mediator url found".to_string(),
+            ));
+        };
+
+        let well_known_did_atm_api = [&mediator_url, "/.well-known/did"].concat();
         debug!("API well_known_did_api({})", well_known_did_atm_api);
 
         let res = self
+            .inner
             .client
             .get(well_known_did_atm_api)
             .header("Content-Type", "application/json")

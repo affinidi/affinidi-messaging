@@ -14,8 +14,6 @@ readme = "README.md"
 affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
-ssi.workspace = true
-tracing.workspace = true
 async-convert.workspace = true
 async-trait.workspace = true
 aws-config.workspace = true
@@ -33,6 +31,7 @@ hostname.workspace = true
 http.workspace = true
 jsonwebtoken.workspace = true
 itertools.workspace = true
+num-format.workspace = true
 rand.workspace = true
 redis.workspace = true
 regex.workspace = true
@@ -41,20 +40,18 @@ rustls.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha256.workspace = true
+ssi.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 toml.workspace = true
 tower-http.workspace = true
+tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-did-peer.workspace = true
+console.workspace = true
+dialoguer.workspace = true
+lazy_static.workspace = true
 reqwest.workspace = true
-rcgen = { version = "0.13", default-features = false, features = [
-    "aws_lc_rs",
-    "pem",
-] }
-lazy_static = "1.4.0"
-time = "0.3"

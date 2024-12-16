@@ -8,6 +8,7 @@ use crate::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use serde::Deserialize;
+use sha256::digest;
 use ssi::dids::Document;
 
 use crate::{
@@ -80,6 +81,7 @@ pub struct MetaEnvelope {
     pub to_kid: Option<String>,
     pub to_did: Option<String>,
     pub to_kids_found: Vec<String>,
+    pub sha256_hash: String,
 }
 
 impl MetaEnvelope {
@@ -92,6 +94,7 @@ impl MetaEnvelope {
         S: SecretsResolver + Send,
     {
         let mut envelope = Self::default();
+        envelope.sha256_hash = digest(msg);
         envelope.envelope = Some(Envelope::from_str(msg)?);
         envelope.parsed_envelope = Some(
             envelope

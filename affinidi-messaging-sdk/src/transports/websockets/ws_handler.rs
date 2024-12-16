@@ -1,315 +1,206 @@
-use crate::{errors::ATMError, ATM};
+/*!
+ * WebSocket handler - responsible for managing multiple WebSocket connections
+ */
+use super::SharedState;
+use crate::{
+    errors::ATMError,
+    profiles::Profile,
+    transports::{
+        websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
+        WsConnectionCommands,
+    },
+    ATM,
+};
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use futures_util::sink::SinkExt;
-use http::header::AUTHORIZATION;
 use std::{
-    collections::{HashMap, HashSet},
-    mem::size_of_val,
+    collections::HashMap,
+    fmt::{self, Debug, Formatter},
+    sync::Arc,
 };
 use tokio::{
-    net::TcpStream,
     select,
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{self, Receiver, Sender},
 };
-use tokio_stream::StreamExt;
-use tokio_tungstenite::{
-    connect_async_tls_with_config, tungstenite::client::IntoClientRequest, MaybeTlsStream,
-    WebSocketStream,
-};
-use tracing::{debug, error, info, span, warn, Instrument, Level};
+use tracing::{debug, info, span, warn, Instrument, Level};
 
-/// Message cache struct
-/// Holds live-stream messages in a cache so we can get the first available or by a specific message ID
-#[derive(Default)]
-struct MessageCache {
-    messages: HashMap<String, (Message, UnpackMetadata)>, // Cache of message data, key is the message ID
-    thid_lookup: HashMap<String, String>, // Lookup table for thread ID to message ID
-    search_list: HashSet<String>, // Search list of message IDs key = ID to look up (could be ID or THID)
-    ordered_list: Vec<String>,    // Ordered list of message IDs in order as they are received
-    total_count: u32,             // Number of messages in cache
-    total_bytes: u64, // Total size of messages in cache (approx as based on object size)
-    cache_full: bool, // Flag to state that the cache is full
-    fetch_cache_limit_count: u32, // Cache limit on # of messages
-    fetch_cache_limit_bytes: u64, // Cache limit on total size of messages
-    next_flag: bool,  // Used to state that next() was called on an empty cache
+/// The mode in which the handler should operate
+/// Cached: Messages are cached and sent to the SDK when requested
+/// DirectChannel: Messages are sent directly to the SDK without caching
+#[derive(Clone)]
+pub enum WsHandlerMode {
+    Cached,
+    DirectChannel,
 }
 
-impl MessageCache {
-    fn insert(&mut self, message: Message, meta: UnpackMetadata) {
-        self.messages
-            .insert(message.id.clone(), (message.clone(), meta));
-        self.ordered_list.push(message.id.clone());
-        self.total_count += 1;
-        self.total_bytes += size_of_val(&message) as u64;
-        if self.total_count > self.fetch_cache_limit_count
-            || self.total_bytes > self.fetch_cache_limit_bytes
-        {
-            self.cache_full = true;
+impl Debug for WsHandlerMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WsHandlerMode::Cached => write!(f, "Cached"),
+            WsHandlerMode::DirectChannel => write!(f, "DirectChannel"),
         }
-        if let Some(thid) = message.thid {
-            self.thid_lookup.insert(thid, message.id.clone());
-        }
-        debug!(
-            "Message inserted into cache: id({}) cached_count({})",
-            message.id, self.total_count
-        );
-    }
-
-    /// Get the next message from the cache
-    fn next(&mut self) -> Option<(Message, UnpackMetadata)> {
-        if self.ordered_list.is_empty() {
-            self.next_flag = true;
-            return None;
-        }
-
-        // Get the message ID of the first next message
-        let id = self.ordered_list.remove(0);
-
-        self.remove(&id)
-    }
-
-    /// Can we find a specific message in the cache?
-    /// If not, then we add it to the search list to look up later as messages come in (within the duration of the original get request)
-    fn get(&mut self, msg_id: &str) -> Option<(Message, UnpackMetadata)> {
-        let r = if let Some((message, meta)) = self.messages.get(msg_id) {
-            Some((message.clone(), meta.clone()))
-        } else if let Some(id) = self.thid_lookup.get(msg_id) {
-            if let Some((message, meta)) = self.messages.get(id) {
-                Some((message.clone(), meta.clone()))
-            } else {
-                warn!(
-                    "thid_lookup found message ID ({}) but message id ({}) not found in cache",
-                    msg_id, id
-                );
-                None
-            }
-        } else {
-            debug!(
-                "Message ID ({}) not found in cache, adding to search list",
-                msg_id
-            );
-            self.search_list.insert(msg_id.to_string());
-            None
-        };
-
-        // Remove the message from cache if it was found
-        if let Some((message, _)) = &r {
-            self.remove(&message.id);
-        }
-        r
-    }
-
-    fn remove(&mut self, msg_id: &str) -> Option<(Message, UnpackMetadata)> {
-        // remove the message from thh ordered list
-        if let Some(pos) = self.ordered_list.iter().position(|r| r == msg_id) {
-            self.ordered_list.remove(pos);
-        }
-
-        // Remove from search list
-        self.search_list.remove(msg_id);
-
-        // Get the message and metadata from the cache
-        let (message, meta) = if let Some((message, meta)) = self.messages.remove(msg_id) {
-            // Remove this from thid_lookup if it exists
-            if let Some(thid) = &message.thid {
-                self.thid_lookup.remove(thid);
-            }
-
-            (message, meta)
-        } else {
-            return None;
-        };
-
-        self.total_count -= 1;
-        self.total_bytes -= size_of_val(&message) as u64;
-
-        // reset cache_full flag
-        if self.cache_full
-            && (self.total_count <= self.fetch_cache_limit_count
-                && self.total_bytes <= self.fetch_cache_limit_bytes)
-        {
-            self.cache_full = false;
-        }
-
-        Some((message, meta))
-    }
-
-    /// Is the cache full based on limits?
-    fn is_full(&self) -> bool {
-        self.cache_full
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum WSCommand {
-    Started,      // Signals that the websocket handler has started
-    Exit,         // Exits the websocket handler
-    Send(String), // Sends the message string to the websocket
-    Next,         // Gets the next message from the cache
-    Get(String),  // Gets the message with the specified ID from the cache
+/// Possible messages that can be sent to the websocket handler
+#[derive(Clone, Debug)]
+pub enum WsHandlerCommands {
+    // Messages sent from SDK to the Handler
+    Exit,
+    Activate(Arc<Profile>),
+    Deactivate(Arc<Profile>),
+    Next,                                   // Gets the next message from the cache
+    Get(String, Sender<WsHandlerCommands>), // Gets the message with the specified ID from the cache
+    TimeOut(Arc<Profile>, String), // SDK request timed out, contains msg_id we were looking for
+    // Messages sent from Handler to the SDK
+    Started, // WsHandler has started and is ready to work
     MessageReceived(Message, Box<UnpackMetadata>), // Message received from the websocket
-    NotFound,     // Message not found in the cache
-    TimeOut(String), // SDK request timed out, contains msg_id we were looking for
+    NotFound, // Message not found in the cache
+    // Messages sent from the Handler to a specific Profile
+    Activated(String), // Profile WebSocket connection is active (status_message to get)
+    InDirectChannelModeError, // WsHandler is in DirectChannelMode and is not caching messages
 }
 
-impl<'c> ATM<'c> {
-    pub(crate) async fn _create_socket(
-        &mut self,
-        //atm: &mut ATM<'_>,
-    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
-        // Check if authenticated
-        let tokens = self.authenticate().await?;
-
-        debug!("Creating websocket connection");
-        // Create a custom websocket request, turn this into a client_request
-        // Allows adding custom headers later
-        let mut request = self
-            .config
-            .atm_api_ws
-            .clone()
-            .into_client_request()
-            .map_err(|e| {
-                ATMError::TransportError(format!(
-                    "Could not create websocket request. Reason: {}",
-                    e
-                ))
-            })?;
-
-        // Add the Authorization header to the request
-        let headers = request.headers_mut();
-        headers.insert(
-            AUTHORIZATION,
-            format!("Bearer {}", tokens.access_token)
-                .parse()
-                .map_err(|e| {
-                    ATMError::TransportError(format!("Could not set Authorization header: {:?}", e))
-                })?,
-        );
-
-        // Connect to the websocket
-        let (ws_stream, _) =
-            connect_async_tls_with_config(request, None, false, Some(self.ws_connector.clone()))
-                .await
-                .expect("Failed to connect");
-
-        debug!("Completed websocket connection");
-
-        Ok(ws_stream)
-    }
-
+impl ATM {
     /// WebSocket streaming handler
     /// from_sdk is an MPSC channel used to receive messages from the main thread that will be sent to the websocket
     /// to_sdk is an MPSC channel used to send messages to the main thread that were received from the websocket
-    /// web_socket is the websocket stream itself which can be used to send and receive messages
     pub(crate) async fn ws_handler(
-        atm: &mut ATM<'_>,
-        from_sdk: &mut Receiver<WSCommand>,
-        to_sdk: &Sender<WSCommand>,
-        // web_socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+        shared_state: Arc<SharedState>,
+        from_sdk: &mut Receiver<WsHandlerCommands>,
+        to_sdk: Sender<WsHandlerCommands>,
     ) -> Result<(), ATMError> {
         let _span = span!(Level::INFO, "ws_handler");
         async move {
-            debug!("Starting websocket handler");
+            let ws_handler_mode = shared_state.config.ws_handler_mode.clone();
+            debug!("Starting websocket handler. Mode: {:?}", ws_handler_mode);
 
             // Set up a message cache
             let mut cache = MessageCache {
-                fetch_cache_limit_count: atm.config.fetch_cache_limit_count,
-                fetch_cache_limit_bytes: atm.config.fetch_cache_limit_bytes,
-                ..Default::default()
-            };
+                fetch_cache_limit_count: shared_state.config.fetch_cache_limit_count,
+                fetch_cache_limit_bytes: shared_state.config.fetch_cache_limit_bytes,
+                ..Default::default()};
 
-            let mut web_socket = atm._create_socket().await?;
-            to_sdk.send(WSCommand::Started).await.map_err(|err| {
+            // A list of all the active connections
+            let mut connections: HashMap<String, Arc<Profile>> = HashMap::new();
+
+            // Set up the channel for WS_Connections to communicate to the handler
+            // Create a new channel with a capacity of at most 32. This communicates from WS_Connections to the WS_Handler
+            let ( handler_tx, mut handler_rx) = mpsc::channel::<WsConnectionCommands>(32);
+
+            to_sdk.send(WsHandlerCommands::Started).await.map_err(|err| {
                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
             })?;
+
             loop {
                 select! {
-                    value = web_socket.next(), if !cache.is_full() => {
-                        if let Some(msg) = value {
-                            if let Ok(payload) = msg {
-                                if payload.is_text() {
-                                    if let Ok(msg) = payload.to_text() {
-                                        debug!("Received text message ({})", msg);
-                                        let (message, meta) = match atm.unpack(msg).await {
-                                            Ok((msg, meta)) => (msg, meta),
-                                            Err(err) => {
-                                                error!("Error unpacking message: {:?}", err);
-                                                continue;
-                                            }
-                                        };
-                                        // Check if we are searching for this message via a get request
-                                        if let Some(thid) = &message.thid {
-                                            if cache.search_list.contains(thid) {
-                                                cache.remove(thid);
-                                                to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                                })?;
-                                            }
-                                        } else if cache.search_list.contains(&message.id) {
-                                            to_sdk.send(WSCommand::MessageReceived(message.clone(), Box::new(meta.clone()))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
-                                            cache.remove(&message.id);
-                                        }
-
-                                        // Send the message to the SDK if next_flag is set
-                                        if cache.next_flag {
-                                            cache.next_flag = false;
-                                            to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                            })?;
+                    value = handler_rx.recv(), if !cache.is_full() => {
+                        // These are inbound messages from the WS_Connections
+                        if let Some(message) = value {
+                            match message {
+                                WsConnectionCommands::Connected(profile, status_msg_id) => {
+                                    debug!("Profile({}): Connected", profile.inner.alias);
+                                    // Send a message to the SDK that the profile has connected
+                                    let _ = profile.inner.channel_tx.lock().await.send(WsHandlerCommands::Activated(status_msg_id)).await;
+                                }
+                                WsConnectionCommands::MessageReceived(data) => {
+                                    let (message, meta) = *data;
+                                    debug!("Message received from WS_Connection");
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        // If we are in cached mode, we need to cache the message
+                                        if let Some(channel) = cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) {
+                                            debug!("Message found in cache");
+                                            // notify the SDK that a message has been found
+                                            let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
+                                            debug!("Message delivered to receive channel");
                                         } else {
-                                            // Add to cache
                                             cache.insert(message, meta);
                                         }
                                     } else {
-                                        error!("Error getting text from message")
+                                        // Send the message directly to the broadcast channel
+                                        if let Some(broadcast) = &shared_state.direct_stream_sender {
+                                            let _ = broadcast.send((message, meta));
+                                        }
                                     }
-                                } else {
-                                    error!("Received non-text message");
                                 }
-                            } else {
-                                error!("Error getting payload from message");
-                                continue;
+                                _ => {
+                                    warn!("Received unknown message from WS_Connection");
+                                }
                             }
                         } else {
-
-                            error!("Error getting message");
-                            break;
+                            warn!("Channel to_handler closed");
                         }
                     }
                     value = from_sdk.recv() => {
                         if let Some(cmd) = value {
                             match cmd {
-                                WSCommand::Send(msg) => {
-                                    debug!("Sending message: {}", msg);
-                                    web_socket.send(msg.into()).await.map_err(|err| {
-                                        ATMError::TransportError(format!("Could not send websocket message: {:?}", err))
-                                    })?;
-                                }
-                                WSCommand::Next => {
-                                    if let Some((message, meta)) = cache.next() {
-                                        to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                            ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                        })?;
+                                WsHandlerCommands::Activate(profile) => {
+                                    debug!("Profile({}): Activating", profile.inner.alias);
+                                    let ( connection_tx, connection_rx) = mpsc::channel::<WsConnectionCommands>(32);
+                                    match WsConnection::activate(shared_state.clone(), &profile, handler_tx.clone(), connection_rx, connection_tx.clone()).await {
+                                        Ok(_) => {
+                                            connections.insert(profile.inner.alias.clone(), profile.clone());
+                                            debug!("Profile({}): Activated", profile.inner.alias);
+                                        }
+                                        Err(err) => {
+                                            warn!("Profile({}): Could not activate: {:?}", profile.inner.alias, err);
+                                        }
                                     }
                                 }
-                                WSCommand::Get(id) => {
-                                    if let Some((message, meta)) = cache.get(&id) {
-                                        to_sdk.send(WSCommand::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
-                                            ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
-                                        })?;
+                                WsHandlerCommands::Deactivate(profile) => {
+                                    debug!("Profile({}): Shutting Down", profile.inner.alias);
+                                    if let Some(profile) = connections.remove(&profile.inner.alias) {
+                                        if let Some(mediator) = &*profile.inner.mediator {
+                                            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                                                let _ = channel.send(WsConnectionCommands::Stop).await;
+                                            }
+                                        }
+                                    }
+                                }
+                                WsHandlerCommands::Next => {
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        if let Some((message, meta)) = cache.next() {
+                                            to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        }
                                     } else {
-                                        to_sdk.send(WSCommand::NotFound).await.map_err(|err| {
+                                        to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }
                                 }
-                                WSCommand::Exit => {
-                                    debug!("Received EXIT message, closing channel");
+                                WsHandlerCommands::Get(id, channel) => {
+                                    if let WsHandlerMode::Cached = ws_handler_mode {
+                                        if let Some((message, meta)) = cache.get(&id, &channel) {
+                                            channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        } else {
+                                            channel.send(WsHandlerCommands::NotFound).await.map_err(|err| {
+                                                ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                            })?;
+                                        }
+                                    } else {
+                                        to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
+                                            ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                        })?;
+                                    }
+                                }
+                                WsHandlerCommands::Exit => {
+                                    debug!("Received EXIT message, closing channels");
+                                    for (alias, profile) in connections.iter() {
+                                        debug!("Profile({}): Sent Stop Command", alias);
+                                        {
+                                            if let Some(mediator) = &*profile.inner.mediator {
+                                                if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                                                    let _ = channel.send(WsConnectionCommands::Stop).await;
+                                                }
+                                            }
+                                        }
+                                    }
                                     break;
                                 }
-                                WSCommand::TimeOut(id) => {
+                                WsHandlerCommands::TimeOut(_, id) => {
                                     cache.search_list.remove(&id);
                                 }
                                 _ => {
@@ -324,7 +215,6 @@ impl<'c> ATM<'c> {
                 }
             }
 
-            let _ = web_socket.close(None).await;
             from_sdk.close();
 
             debug!("Channel closed, stopping websocket handler");

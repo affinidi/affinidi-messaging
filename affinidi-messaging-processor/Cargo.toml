@@ -10,4 +10,5 @@ publish.workspace = true
 license.workspace = true
 readme = "README.md"
 
-[dependencies]
+[dev-dependencies]
+tokio.workspace = true

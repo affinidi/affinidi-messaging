@@ -205,6 +205,7 @@ async fn generate_status_reply(
             store_message: false,
             force_live_delivery,
             message: Some(status_msg),
+            forward_message: false,
         })
     }
     .instrument(_span)
@@ -321,7 +322,7 @@ pub(crate) async fn delivery_request(
 
         // Pull recipient_did and limit from message body
         let (recipient_did, limit): (String, usize) =
-            _parse_and_validate_delivery_request_body(&session, msg)?;
+            _parse_and_validate_delivery_request_body(session, msg)?;
 
         let recipient_did_hash = digest(recipient_did.clone());
 
@@ -385,6 +386,7 @@ pub(crate) async fn delivery_request(
                 store_message: false,
                 force_live_delivery: false,
                 message: Some(response_msg),
+                forward_message: false,
             })
         } else {
             generate_status_reply(state, session, &recipient_did_hash, &thid, false, None).await
@@ -436,7 +438,7 @@ pub(crate) async fn messages_received(
                     }
                 }
                 Err(err) => {
-                    info!("Error getting message: {:?}", err);
+                    warn!("Error getting message: {:?}", err);
                 }
             }
         }
@@ -494,15 +496,14 @@ fn _parse_and_validate_delivery_request_body(
         ));
     }
 
-    if limit < MIN_RETRIEVED_MSGS || limit > MAX_RETRIEVED_MSGS {
+    if !(MIN_RETRIEVED_MSGS..=MAX_RETRIEVED_MSGS).contains(&limit) {
         return Err(MediatorError::RequestDataError(
             session.session_id.clone(),
             format!(
                 "limit must be between 1 and 100 inclusive. Received limit({})",
                 limit
             ),
-        )
-        .into());
+        ));
     }
 
     Ok((recipient_did, limit))

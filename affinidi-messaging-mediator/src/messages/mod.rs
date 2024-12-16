@@ -7,52 +7,21 @@ use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
     secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
-use protocols::message_pickup;
-use protocols::routing;
-use std::{default, str::FromStr, time::SystemTime};
+use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
+use protocols::{mediator_administration, mediator_local_acls, routing};
+use protocols::{mediator_global_acls, message_pickup};
+use std::time::SystemTime;
 
+pub mod error_response;
 pub mod inbound;
 pub mod protocols;
+pub(crate) mod store;
 
-pub enum MessageType {
-    AffinidiAuthenticate,            // Affinidi Authentication Response
-    ForwardRequest,                  // DidComm Routing 2.0 Forward Request
-    MessagePickupStatusRequest,      // Message Pickup 3.0 Status Request
-    MessagePickupDeliveryRequest,    // Message Pickup 3.0 Delivery Request
-    MessagePickupMessagesReceived,   // Message Pickup 3.0 Messages Received (ok to delete)
-    MessagePickupLiveDeliveryChange, // Message Pickup 3.0 Live-delivery-change (Streaming enabled)
-    TrustPing,                       // Trust Ping Protocol
-}
+struct MessageType(SDKMessageType);
 
-impl FromStr for MessageType {
-    type Err = MediatorError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "https://didcomm.org/trust-ping/2.0/ping" => Ok(Self::TrustPing),
-            "https://affinidi.com/atm/1.0/authenticate" => Ok(Self::AffinidiAuthenticate),
-            "https://didcomm.org/messagepickup/3.0/status-request" => {
-                Ok(Self::MessagePickupStatusRequest)
-            }
-            "https://didcomm.org/messagepickup/3.0/live-delivery-change" => {
-                Ok(Self::MessagePickupLiveDeliveryChange)
-            }
-            "https://didcomm.org/messagepickup/3.0/delivery-request" => {
-                Ok(Self::MessagePickupDeliveryRequest)
-            }
-            "https://didcomm.org/messagepickup/3.0/messages-received" => {
-                Ok(Self::MessagePickupMessagesReceived)
-            }
-            "https://didcomm.org/routing/2.0/forward" => Ok(Self::ForwardRequest),
-            _ => Err(MediatorError::ParseError(
-                "-1".into(),
-                s.into(),
-                "Couldn't match on MessageType".into(),
-            )),
-        }
-    }
-}
-
+/// Helps with parsing the message type and handling higher level protocols.
+/// NOTE:
+///   Not all Message Types need to be handled as a protocol.
 impl MessageType {
     pub(crate) async fn process(
         &self,
@@ -60,25 +29,46 @@ impl MessageType {
         state: &SharedData,
         session: &Session,
     ) -> Result<ProcessMessageResponse, MediatorError> {
-        match self {
-            Self::TrustPing => ping::process(message, session),
-            Self::MessagePickupStatusRequest => {
+        match self.0 {
+            SDKMessageType::MediatorAdministration => {
+                mediator_administration::process(message, state, session).await
+            }
+            SDKMessageType::MediatorGlobalACLManagement => {
+                mediator_global_acls::process(message, state, session).await
+            }
+            SDKMessageType::MediatorLocalACLManagement => {
+                mediator_local_acls::process(message, state, session).await
+            }
+            SDKMessageType::TrustPing => ping::process(message, session),
+            SDKMessageType::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await
             }
-            Self::MessagePickupDeliveryRequest => {
+            SDKMessageType::MessagePickupDeliveryRequest => {
                 message_pickup::delivery_request(message, state, session).await
             }
-            Self::MessagePickupMessagesReceived => {
+            SDKMessageType::MessagePickupMessagesReceived => {
                 message_pickup::messages_received(message, state, session).await
             }
-            Self::MessagePickupLiveDeliveryChange => {
+            SDKMessageType::MessagePickupLiveDeliveryChange => {
                 message_pickup::toggle_live_delivery(message, state, session).await
             }
-            Self::AffinidiAuthenticate => Err(MediatorError::NotImplemented(
+            SDKMessageType::AffinidiAuthenticate => Err(MediatorError::NotImplemented(
                 session.session_id.clone(),
                 "Affinidi Authentication is only handled by the Authorization handler".into(),
             )),
-            Self::ForwardRequest => routing::process(message, session),
+            SDKMessageType::AffinidiAuthenticateRefresh => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Affinidi Authentication is only handled by the Authorization handler".into(),
+            )),
+            SDKMessageType::ForwardRequest => routing::process(message, state, session).await,
+            SDKMessageType::ProblemReport => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Problem Report is only handled by the Error handler".into(),
+            )),
+            SDKMessageType::Other(_) => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Unknown message type".into(),
+            )),
         }
     }
 }
@@ -87,6 +77,7 @@ impl MessageType {
 pub(crate) struct ProcessMessageResponse {
     pub store_message: bool,
     pub force_live_delivery: bool, // Will force a live delivery attempt.
+    pub forward_message: bool, // Set to true if the message was forwarded. Means we don't need to store it.
     pub message: Option<Message>,
 }
 
@@ -132,7 +123,15 @@ impl MessageHandler for Message {
         state: &SharedData,
         session: &Session,
     ) -> Result<ProcessMessageResponse, MediatorError> {
-        let msg_type = self.type_.as_str().parse::<MessageType>()?;
+        let msg_type = MessageType(self.type_.as_str().parse::<SDKMessageType>().map_err(
+            |err| {
+                MediatorError::ParseError(
+                    session.session_id.clone(),
+                    "msg.type".into(),
+                    err.to_string(),
+                )
+            },
+        )?);
 
         // Check if message expired
         let now = SystemTime::now()

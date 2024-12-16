@@ -127,7 +127,9 @@ impl Message {
 
             break;
         }
+
         let parsed_jwe = anoncrypted.clone().unwrap_or(parsed_jwe);
+
         debug!("metadata = {:#?}", envelope.metadata);
 
         let authcrypted = _try_unpack_authcrypt(
@@ -153,6 +155,8 @@ impl Message {
                     "Message is not a valid JWE, JWS or JWM",
                 )
             })?;
+
+        envelope.metadata.sha256_hash = envelope.sha256_hash.clone();
 
         Ok((msg, envelope.metadata.to_owned()))
     }
@@ -231,6 +235,9 @@ pub struct UnpackMetadata {
 
     /// Whether the plaintext was re-wrapped in a forward message by a mediator
     pub re_wrapped_in_forward: bool,
+
+    /// Sha256 hash of the original message, used by mediators when they can't see message.id's
+    pub sha256_hash: String,
 
     /// Key ID of the sender used for authentication encryption if the plaintext has been authenticated and encrypted
     pub encrypted_from_kid: Option<String>,

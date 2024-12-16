@@ -34,7 +34,7 @@ pub(crate) fn did_or_url(did_or_url: &str) -> (&str, Option<&str>) {
 
 pub(crate) fn is_did(did: &str) -> bool {
     let parts: Vec<_> = did.split(':').collect();
-    return parts.len() >= 3 && parts.first().unwrap() == &"did";
+    parts.len() >= 3 && parts.first().unwrap() == &"did"
 }
 
 pub(crate) trait DIDCommVerificationMethodExt {
@@ -44,38 +44,56 @@ pub(crate) trait DIDCommVerificationMethodExt {
 
 impl DIDCommVerificationMethodExt for DIDVerificationMethod {
     fn get_jwk(&self) -> Option<JWK> {
-        if self.type_ == "Multikey" {
-            let key = if let Some(key) = self.properties.get("publicKeyMultibase") {
-                if let Some(key) = key.as_str() {
-                    key.to_string()
+        match self.type_.as_str() {
+            "Multikey" => {
+                let key = if let Some(key) = self.properties.get("publicKeyMultibase") {
+                    if let Some(key) = key.as_str() {
+                        key.to_string()
+                    } else {
+                        return None;
+                    }
                 } else {
                     return None;
+                };
+
+                let decoded = if let Ok((_, decoded)) = MultibaseBuf::new(key.clone()).decode() {
+                    decoded
+                } else {
+                    return None;
+                };
+
+                let multi_encoded = if let Ok(m) = MultiEncodedBuf::new(decoded) {
+                    m
+                } else {
+                    return None;
+                };
+
+                match JWK::from_multicodec(&multi_encoded) {
+                    Ok(jwk) => Some(jwk),
+                    Err(_) => {
+                        warn!("Failed to parse JWK from multicodec ({})", key);
+                        None
+                    }
                 }
-            } else {
-                return None;
-            };
-
-            let decoded = if let Ok((_, decoded)) = MultibaseBuf::new(key.clone()).decode() {
-                decoded
-            } else {
-                return None;
-            };
-
-            let multi_encoded = if let Ok(m) = MultiEncodedBuf::new(decoded) {
-                m
-            } else {
-                return None;
-            };
-
-            match JWK::from_multicodec(&multi_encoded) {
-                Ok(jwk) => Some(jwk),
-                Err(_) => {
-                    warn!("Failed to parse JWK from multicodec ({})", key);
+            }
+            "JsonWebKey2020" => {
+                if let Some(key) = self.properties.get("publicKeyJwk") {
+                    match serde_json::from_value(key.clone()) {
+                        Ok(jwk) => Some(jwk),
+                        Err(_) => {
+                            warn!("Failed to parse JWK from JsonWebKey2020 ({})", key);
+                            None
+                        }
+                    }
+                } else {
+                    warn!("JsonWebKey2020 missing publicKeyJwk");
                     None
                 }
             }
-        } else {
-            None
+            _ => {
+                warn!("Unsupported verification method type: {}", self.type_);
+                None
+            }
         }
     }
 }
@@ -427,5 +445,5 @@ fn _from_multicodec(value: &[u8]) -> Result<(Codec, &[u8])> {
         .write_unsigned_varint_32(prefix_int)
         .kind(ErrorKind::InvalidState, "Cannot write varint")?;
 
-    return Ok((codec, value.split_at(prefix.into_inner().len()).1));
+    Ok((codec, value.split_at(prefix.into_inner().len()).1))
 }

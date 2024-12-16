@@ -116,6 +116,7 @@ pub(crate) fn process(
             store_message: true,
             force_live_delivery: false,
             message: Some(response_msg),
+            forward_message: false,
         })
     } else {
         debug!("No response requested");

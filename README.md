@@ -17,6 +17,7 @@ This messaging framework is built using [Rust](https://www.rust-lang.org/) langu
 
 - **affinidi-messaging-sdk** - a Software Development Kit (SDK) to simplify the implementation of Affinidi Messaging into your application.
 - **affinidi-messaging-mediator** - Affinidi Messaging Mediator Service is used for message handling and relaying.
+- **affinidi-messaging-helpers** - Tools to help with setting up, managing and running examples against Affinidi Messaging
 - **affinidi-messaging-processor** - Affinidi Messaging Processor and Management Service.
 - **affinidi-messaging-didcomm** - Affinidi Messaging DIDComm implementation, a modified version of [didcomm-rust](https://github.com/sicpa-dlab/didcomm-rust) project.
 

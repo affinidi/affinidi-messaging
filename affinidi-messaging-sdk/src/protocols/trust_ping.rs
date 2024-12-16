@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{sync::Arc, time::SystemTime};
 
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde_json::json;
@@ -6,12 +6,7 @@ use sha256::digest;
 use tracing::{debug, span, Level};
 use uuid::Uuid;
 
-use crate::{
-    errors::ATMError,
-    messages::{sending::InboundMessageResponse, EmptyResponse},
-    transports::SendMessageResponse,
-    ATM,
-};
+use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
 
 #[derive(Default)]
 pub struct TrustPing {}
@@ -20,41 +15,46 @@ pub struct TrustPing {}
 /// - `message_id` - The ID of the message sent
 /// - `message_hash` - The sha256 hash of the message sent
 /// - `bytes` - The number of bytes sent
+/// - `response` - The response from the endpoint
 pub struct TrustPingSent {
     pub message_id: String,
     pub message_hash: String,
     pub bytes: u32,
-    pub response: Option<String>,
+    pub response: SendMessageResponse,
 }
 
 impl TrustPing {
     /// Sends a DIDComm Trust-Ping message
     /// - `to_did` - The DID to send the ping to
     /// - `signed` - Whether the ping should signed or anonymous?
-    /// - `expect_response` - Whether a response is expected[^note]
+    /// - `expect_pong` - whether a ping response from endpoint is expected[^note]
+    /// - `wait_response` - whether to wait for a response from the endpoint
     ///
     /// Returns: The message ID and sha256 hash of the ping message
     /// [^note]: Anonymous pings cannot expect a response, the SDK will automatically set this to false if anonymous is true
-    pub async fn send_ping<'c>(
+    pub async fn send_ping(
         &self,
-        atm: &'c mut ATM<'_>,
+        atm: &ATM,
+        profile: &Arc<Profile>,
         to_did: &str,
         signed: bool,
-        expect_response: bool,
+        expect_pong: bool,
+        wait_response: bool,
     ) -> Result<TrustPingSent, ATMError> {
         let _span = span!(Level::DEBUG, "create_ping_message",).entered();
         debug!(
-            "Pinging {}, signed?({}) response_expected?({})",
-            to_did, signed, expect_response
+            "Pinging {}, signed?({}) pong_response_expected?({}) wait_response({})",
+            to_did, signed, expect_pong, wait_response
         );
-        let (my_did, _) = atm.dids()?;
+
+        let (profile_did, _) = profile.dids()?;
 
         // If an anonymous ping is being sent, we should ensure that expect_response is false
-        let expect_response = if !signed && expect_response {
+        let expect_response = if !signed && expect_pong {
             debug!("Anonymous pings cannot expect a response, changing to false...");
             false
         } else {
-            expect_response
+            expect_pong
         };
 
         let now = SystemTime::now()
@@ -73,55 +73,41 @@ impl TrustPing {
             // Can support anonymous pings
             None
         } else {
-            msg = msg.from(my_did.clone());
-            Some(my_did.clone())
+            msg = msg.from(profile_did.to_string());
+            Some(profile_did)
         };
         let msg = msg.created_time(now).expires_time(now + 300).finalize();
         let mut msg_info = TrustPingSent {
             message_id: msg.id.clone(),
             message_hash: "".to_string(),
             bytes: 0,
-            response: None,
+            response: SendMessageResponse::EmptyResponse,
         };
 
-        debug!("Ping message: {:?}", msg);
+        debug!("Ping message: {:#?}", msg);
 
         // Pack the message
         let (msg, _) = msg
             .pack_encrypted(
                 to_did,
-                from_did.as_deref(),
-                from_did.as_deref(),
-                &atm.did_resolver,
-                &atm.secrets_resolver,
+                from_did,
+                from_did,
+                &atm.inner.did_resolver,
+                &atm.inner.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
+        debug!("Packed message: {:#?}", msg);
+
         msg_info.message_hash = digest(&msg).to_string();
         msg_info.bytes = msg.len() as u32;
 
-        if atm.ws_send_stream.is_some() {
-            atm.ws_send_didcomm_message::<EmptyResponse>(&msg, &msg_info.message_id)
-                .await?;
-        } else {
-            let response = atm
-                .send_didcomm_message::<InboundMessageResponse>(&msg, true)
-                .await?;
-            msg_info.response =
-                if let SendMessageResponse::RestAPI(Some(InboundMessageResponse::Stored(m))) =
-                    response
-                {
-                    if let Some((_, msg_id)) = m.messages.first() {
-                        Some(msg_id.to_owned())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-        }
+        msg_info.response = atm
+            .send_message(profile, &msg, &msg_info.message_id, wait_response)
+            .await?;
+
         Ok(msg_info)
     }
 }
