@@ -84,7 +84,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a019017a59e73b6106bfc90d067a936752d43a44d76730abf48c355148fab8aa"
 dependencies = [
  "blake2",
- "did-peer 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "did-peer",
  "futures-util",
  "moka",
  "rand",
@@ -141,7 +141,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer 0.2.2",
+ "did-peer",
  "rcgen",
  "regex",
  "reqwest 0.12.9",
@@ -221,7 +221,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer 0.2.2",
+ "did-peer",
  "futures-util",
  "http 1.2.0",
  "jsonwebtoken",
@@ -2508,21 +2508,6 @@ dependencies = [
  "ssi-multicodec",
  "static-iref",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "did-peer"
-version = "0.2.2"
-dependencies = [
- "base64 0.22.1",
- "iref",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "ssi",
- "thiserror 2.0.6",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]

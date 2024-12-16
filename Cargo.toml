@@ -49,7 +49,7 @@ criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2", path = "../affinidi-did-resolver/affinidi-did-resolver-methods/did-peer" }
+did-peer = { version = "0.2" }
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"
