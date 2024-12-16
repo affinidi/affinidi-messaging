@@ -33,13 +33,14 @@ To build and run this project, you need to set up the following:
    You must run the following from the top-level directory of `affinidi-messaging`
 
    ```bash
-   cargo run --example setup_environment
+   cargo run --bin setup_environment
    ```
 
    This will generate:
-      - Mediator DID and secrets
-      - Administration DID and secrets
-      - SSL Certificates for local development/testing
+
+   - Mediator DID and secrets
+   - Administration DID and secrets
+   - SSL Certificates for local development/testing
 
 3. Start `affinidi-messaging-mediator` service via:
 
@@ -57,11 +58,11 @@ _**NOTE:**_ _Ensure Mediator is configured and running before using the followin
 
 1. Mediator Administration
 
-  You can add/remove/list administration accounts easily using the mediator_administration example
-  
-  ```bash
-  cargo run --bin mediator_administration
-  ```
+You can add/remove/list administration accounts easily using the mediator_administration example
+
+```bash
+cargo run --bin mediator_administration
+```
 
 ### Affinidi Messaging Examples
 

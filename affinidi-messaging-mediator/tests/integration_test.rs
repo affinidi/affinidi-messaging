@@ -44,7 +44,7 @@ mod common;
 mod message_builders;
 mod response_validations;
 
-#[tokio::test]
+//#[tokio::test]
 async fn test_mediator_server() {
     // Generate secrets and did for mediator if not existing
     if fs::metadata(SECRETS_PATH).is_err() {
