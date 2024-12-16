@@ -209,6 +209,9 @@ dependencies = [
 [[package]]
 name = "affinidi-messaging-processor"
 version = "0.8.0"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "affinidi-messaging-sdk"
