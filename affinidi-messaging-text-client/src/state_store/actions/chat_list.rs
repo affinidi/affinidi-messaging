@@ -60,6 +60,7 @@ pub enum ChatStatus {
     AwaitingInvitationAcceptance,
     EstablishedChannel,
     EphemeralAcceptInvite,
+    DoesntExist,
 }
 
 impl fmt::Display for ChatStatus {
@@ -68,6 +69,7 @@ impl fmt::Display for ChatStatus {
             ChatStatus::AwaitingInvitationAcceptance => write!(f, "Awaiting Invitation Acceptance"),
             ChatStatus::EstablishedChannel => write!(f, "Established Secure Channel"),
             ChatStatus::EphemeralAcceptInvite => write!(f, "Ephemeral Accept Invite Channel"),
+            ChatStatus::DoesntExist => write!(f, "Chat Does Not Exist"),
         }
     }
 }

@@ -20,6 +20,7 @@ This messaging framework is built using [Rust](https://www.rust-lang.org/) langu
 - **affinidi-messaging-helpers** - Tools to help with setting up, managing and running examples against Affinidi Messaging
 - **affinidi-messaging-processor** - Affinidi Messaging Processor and Management Service.
 - **affinidi-messaging-didcomm** - Affinidi Messaging DIDComm implementation, a modified version of [didcomm-rust](https://github.com/sicpa-dlab/didcomm-rust) project.
+- **affinidi-messaging-text-client** - A terminal based DIDComm chat client that can be useful for interacting with Mediators.
 
 It also depends on external Affinidi crates:
 
@@ -38,7 +39,7 @@ Refer to [affinidi-messaging-mediator - Running affinidi-messaging-mediator serv
 
 ## Examples
 
-Go to the [affinidi-messaging-sdk example](./affinidi-messaging-sdk/examples/) crate to run the available sample codes and learn more about Affinidi Messaging.
+Go to the [affinidi-messaging-helpers example](./affinidi-messaging-helpers/examples/) crate to run the available sample codes and learn more about Affinidi Messaging.
 
 ## Support & Feedback
 
