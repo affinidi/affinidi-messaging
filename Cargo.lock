@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-helpers"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-mediator"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -208,14 +208,14 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processor"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -253,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-text-client"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
