@@ -1,10 +1,14 @@
 use crate::{
     state_store::{
-        actions::{chat_list::Chat, Action},
+        actions::{
+            chat_list::{Chat, ChatStatus},
+            Action,
+        },
         ChatDetailsPopupState, State,
     },
     ui_management::components::{Component, ComponentRender},
 };
+use circular_queue::CircularQueue;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Flex, Layout},
@@ -24,11 +28,24 @@ pub struct Props {
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
         Props {
-            chat: state
-                .chat_details_popup
-                .chat_name
-                .as_ref()
-                .map(|c| state.chat_list.chats.get(c).unwrap().clone()),
+            chat: state.chat_details_popup.chat_name.as_ref().map(|c| {
+                if let Some(chat) = state.chat_list.chats.get(c) {
+                    chat.to_owned()
+                } else {
+                    Chat {
+                        name: "No longer exists".into(),
+                        description: "Chat no longer exists".to_owned(),
+                        status: ChatStatus::DoesntExist,
+                        our_profile: Default::default(),
+                        remote_did: None,
+                        invitation_link: None,
+                        has_unread: false,
+                        hidden: None,
+                        initialization: false,
+                        messages: CircularQueue::with_capacity(1),
+                    }
+                }
+            }),
             chat_details_popup_state: state.chat_details_popup.clone(),
         }
     }

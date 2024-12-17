@@ -2,7 +2,20 @@
 
 ## Changelog history
 
-## 22nd September 2024 (0.8.0)
+## 16th December 2024 (0.8.1)
+
+### All (0.8.1)
+
+* Updating of required crates.
+* Added affinidi-text-client to README
+
+### Affinidi Text Client
+
+* Fixed bug where the OOB invitation process would fail due to incorrect forward_and_send next address
+* Fixed bug when displaying chat details, but the chat has been deleted
+* Fixed bug when selecting next/previous chat when there are no chats
+
+## 16th December 2024 (0.8.0)
 
 ### All
 

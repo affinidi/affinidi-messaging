@@ -1,8 +1,5 @@
 use crate::{
-    state_store::{
-        actions::{chat_list::Chat, Action},
-        ChatDetailsPopupState, State,
-    },
+    state_store::{actions::Action, State},
     ui_management::components::{Component, ComponentRender},
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
@@ -14,7 +11,6 @@ use ratatui::{
     Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{error, info};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 pub struct Props {
@@ -114,8 +110,8 @@ impl ComponentRender<()> for AcceptInvitePopup {
                 //Span::styled(&chat.name, Style::default().fg(Color::Blue)),
             ])
             .style(Style::default().bg(Color::White).fg(Color::Black).bold());
-        let vertical = Layout::vertical([Constraint::Percentage(25)]).flex(Flex::Center);
-        let horizontal = Layout::horizontal([Constraint::Percentage(70)]).flex(Flex::Center);
+        let vertical = Layout::vertical([Constraint::Percentage(30)]).flex(Flex::Center);
+        let horizontal = Layout::horizontal([Constraint::Percentage(80)]).flex(Flex::Center);
         let [outer_area] = vertical.areas(frame.area());
         let [outer_area] = horizontal.areas(outer_area);
         let inner_area = outer_block.inner(outer_area);
@@ -157,10 +153,7 @@ impl ComponentRender<()> for AcceptInvitePopup {
         )
             .into();
 
-        let mut lines = vec![
-            Line::default(),
-            Line::styled("Fetching OOB Invitation...", Style::default().bold()),
-        ];
+        let mut lines = vec![Line::default()];
         for m in self.props.messages.iter() {
             lines.push(m.to_owned());
         }

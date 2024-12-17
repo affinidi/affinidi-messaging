@@ -68,32 +68,36 @@ pub struct ChatListComponent {
 
 impl ChatListComponent {
     pub fn next(&mut self) {
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i >= self.props.chat_list.chats.len() - 1 {
-                    0
-                } else {
-                    i + 1
+        if !self.props.chat_list.chats.is_empty() {
+            let i = match self.list_state.selected() {
+                Some(i) => {
+                    if i >= self.props.chat_list.chats.len() - 1 {
+                        0
+                    } else {
+                        i + 1
+                    }
                 }
-            }
-            None => 0,
-        };
-        self.list_state.select(Some(i));
+                None => 0,
+            };
+            self.list_state.select(Some(i));
+        }
     }
 
     pub fn previous(&mut self) {
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.props.chat_list.chats.len() - 1
-                } else {
-                    i - 1
+        if !self.props.chat_list.chats.is_empty() {
+            let i = match self.list_state.selected() {
+                Some(i) => {
+                    if i == 0 {
+                        self.props.chat_list.chats.len() - 1
+                    } else {
+                        i - 1
+                    }
                 }
-            }
-            None => 0,
-        };
+                None => 0,
+            };
 
-        self.list_state.select(Some(i));
+            self.list_state.select(Some(i));
+        }
     }
 
     pub fn chats(&self) -> &Vec<Chat> {
