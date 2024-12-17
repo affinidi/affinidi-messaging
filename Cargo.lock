@@ -79,9 +79,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a019017a59e73b6106bfc90d067a936752d43a44d76730abf48c355148fab8aa"
+checksum = "321ff581c4f8a5116facb94f8b0b30fc5e9f02193008bc1dace7ae3030421971"
 dependencies = [
  "blake2",
  "did-peer",
