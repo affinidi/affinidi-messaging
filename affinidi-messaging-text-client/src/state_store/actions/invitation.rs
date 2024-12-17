@@ -21,11 +21,11 @@ use ratatui::{
 use serde_json::json;
 use ssi::{dids::DIDKey, jwk::Params, JWK};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::state_store::{
-    inbound_messages::{Name, VCard, VcardType},
+    inbound_messages::{Name, VCard},
     State,
 };
 
@@ -138,6 +138,18 @@ pub async fn send_invitation_accept(
         .text()
         .await?;
 
+    state
+        .accept_invite_popup
+        .messages
+        .push(Line::from(Span::styled(
+            format!(
+                "Fetched OOB Invite from remote link: {}",
+                &state.accept_invite_popup.invite_link
+            ),
+            Style::default().fg(Color::LightBlue),
+        )));
+    state_tx.send(state.clone())?;
+
     // Parse the message
     let parsed_body: SuccessResponse<String> = match serde_json::from_str(&body) {
         Ok(parsed_body) => parsed_body,
@@ -182,10 +194,7 @@ pub async fn send_invitation_accept(
         .accept_invite_popup
         .messages
         .push(Line::from(Span::styled(
-            format!(
-                "Remote DID ({}) to send connection-setup messages.",
-                invite_did
-            ),
+            format!("Invitation originated from Remote DID ({}).", invite_did),
             Style::default().fg(Color::LightBlue),
         )));
     state_tx.send(state.clone())?;
@@ -222,6 +231,18 @@ pub async fn send_invitation_accept(
             ChatStatus::EphemeralAcceptInvite,
         )
         .await;
+
+    /*let our_ephemeral_chat = state
+        .chat_list
+        .find_chat_by_did(&accept_temp_profile.inner.did)
+        .unwrap();
+    let mut_our_ephemeral_chat = state
+        .chat_list
+        .chats
+        .get_mut(&our_ephemeral_chat.name)
+        .unwrap();
+    //mut_our_ephemeral_chat.messages.push(Line::from())
+    */
 
     state
         .accept_invite_popup
@@ -341,7 +362,7 @@ pub async fn send_invitation_accept(
         &packed.0,
         None,
         &mediator_did,
-        &accept_temp_profile.inner.did,
+        &invite_did,
         None,
         None,
         false,
