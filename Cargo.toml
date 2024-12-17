@@ -27,7 +27,7 @@ affinidi-messaging-didcomm = { version = "0.8", path = "./affinidi-messaging-did
 affinidi-messaging-mediator = { version = "0.8", path = "./affinidi-messaging-mediator" }
 affinidi-did-resolver-cache-sdk = { version = "0.2", features = ["network"] }
 anyhow = '1.0'
-askar-crypto = "0.3.1"
+askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
@@ -49,7 +49,7 @@ criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2" }
+did-peer = { version = "0.2.3" }
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"
