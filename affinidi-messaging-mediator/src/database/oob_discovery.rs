@@ -18,7 +18,8 @@ use sha256::digest;
 use std::time::SystemTime;
 use tracing::{debug, error, info, span, Instrument, Level};
 
-const HASH_KEY: &str = "OOB_INVITES";
+// const HASH_KEY: &str = "OOB_INVITES";
+const HASH_KEY_PREFIX: &str = "OOB_INVITES";
 
 impl DatabaseHandler {
     /// Stores an OOB Discovery Invitation
@@ -76,19 +77,26 @@ impl DatabaseHandler {
             };
 
             let invite_hash = digest(&base64_invite);
+            let key = DatabaseHandler::to_cache_key(invite_hash.to_owned());
 
             match deadpool_redis::redis::pipe()
                 .atomic()
-                .cmd("HSET")
-                .arg(HASH_KEY)
-                .arg(&invite_hash)
+                // .cmd("HSET")
+                // .arg(HASH_KEY)
+                // .arg(&invite_hash)
+                // .arg(&base64_invite)
+                // .cmd("HEXPIREAT")
+                // .arg(HASH_KEY)
+                // .arg(expire_at)
+                // .arg("FIELDS")
+                // .arg(1)
+                // .arg(&invite_hash)
+                .cmd("SET")
+                .arg(key.to_owned())
                 .arg(&base64_invite)
-                .cmd("HEXPIREAT")
-                .arg(HASH_KEY)
+                .cmd("EXPIREAT")
+                .arg(key)
                 .arg(expire_at)
-                .arg("FIELDS")
-                .arg(1)
-                .arg(&invite_hash)
                 .cmd("HINCRBY")
                 .arg("GLOBAL")
                 .arg("OOB_INVITES_CREATED")
@@ -120,11 +128,14 @@ impl DatabaseHandler {
         async move {
             let mut conn = self.get_async_connection().await?;
 
+            let key = DatabaseHandler::to_cache_key(oob_id.to_owned());
             let invitation: Option<String> = match deadpool_redis::redis::pipe()
                 .atomic()
-                .cmd("HGET")
-                .arg(HASH_KEY)
-                .arg(oob_id)
+                // .cmd("HGET")
+                // .arg(HASH_KEY)
+                // .arg(oob_id)
+                .cmd("GET")
+                .arg(key)
                 .cmd("HINCRBY")
                 .arg("GLOBAL")
                 .arg("OOB_INVITES_CLAIMED")
@@ -157,9 +168,12 @@ impl DatabaseHandler {
         async move {
             let mut conn = self.get_async_connection().await?;
 
-            let result: bool = match deadpool_redis::redis::cmd("HDEL")
-                .arg(HASH_KEY)
-                .arg(oob_id)
+            let key = DatabaseHandler::to_cache_key(oob_id.to_owned());
+            // let result: bool = match deadpool_redis::redis::cmd("HDEL")
+            //     .arg(HASH_KEY)
+            //     .arg(oob_id)
+            let result: bool = match deadpool_redis::redis::cmd("DEL")
+                .arg(key)
                 .query_async::<bool>(&mut conn)
                 .await
             {
@@ -179,5 +193,9 @@ impl DatabaseHandler {
         }
         .instrument(_span)
         .await
+    }
+
+    fn to_cache_key(id: String) -> String {
+        return format!("{HASH_KEY_PREFIX}{id}");
     }
 }

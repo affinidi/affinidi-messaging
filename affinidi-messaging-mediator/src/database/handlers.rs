@@ -5,7 +5,7 @@ use redis::aio::PubSub;
 use std::{fs::read_to_string, thread::sleep, time::Duration};
 use tracing::{error, event, info, Level};
 
-const REDIS_VERSION: &str = "7.4"; // Minimum Redis version required
+const REDIS_VERSION: &str = "7.1"; // Minimum Redis version required
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
