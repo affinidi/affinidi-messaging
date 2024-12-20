@@ -5,10 +5,12 @@ use redis::aio::PubSub;
 use std::{fs::read_to_string, thread::sleep, time::Duration};
 use tracing::{error, event, info, Level};
 
-const REDIS_VERSION: &str = "7.1"; // Minimum Redis version required
+const REDIS_VERSION: &str = "7.2"; // required Redis version
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         // Creates initial pool Configuration from the redis database URL
         let pool = deadpool_redis::Config::from_url(&config.database.database_url)
             .builder()
@@ -159,13 +161,13 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
             Ok(version.to_owned())
         } else {
             error!(
-                "Redis version ({}) must be equal or higher than minimum ({})",
+                "Redis version ({}) must be equal to major.minor: ({})",
                 version, REDIS_VERSION
             );
             Err(MediatorError::DatabaseError(
                 "NA".into(),
                 format!(
-                    "Redis version ({}) must be equal or higher than minimum ({})",
+                    "Redis version ({}) must be equal to major.minor: ({})",
                     version, REDIS_VERSION
                 ),
             ))
