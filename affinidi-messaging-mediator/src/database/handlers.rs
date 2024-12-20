@@ -154,7 +154,30 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
         .next();
 
     if let Some(version) = server_version {
-        if version.starts_with(REDIS_VERSION) {
+        // Split redis four-place numbering scheme release version (Major1.Major2.Minor-Build)
+        // strings into components (e.g. "7.4.1" → [7, 4, 1]) and compare.
+        let server_version_parts: Vec<u8> = version
+            .split('.')
+            .filter_map(|part| part.parse::<u8>().ok())
+            .collect();
+        let required_version_parts: Vec<u8> = REDIS_VERSION
+            .split('.')
+            .filter_map(|part| part.parse::<u8>().ok())
+            .collect();
+        let mut is_higher = false;
+        let is_compatible = server_version_parts
+            .iter()
+            .zip(required_version_parts.iter())
+            .all(|(server, required)| {
+                if is_higher {
+                    true
+                } else {
+                    is_higher = *server >= *required;
+                    is_higher
+                }
+            });
+
+        if is_compatible {
             info!("Redis version is compatible: {}", version);
             Ok(version.to_owned())
         } else {
