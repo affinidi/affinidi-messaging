@@ -156,9 +156,28 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
         })
         .next();
 
+    let redis_version_req: VersionReq = match VersionReq::parse(REDIS_VERSION_REQ) {
+        Ok(result) => result,
+        Err(err) => {
+            error!("Couldn't process required Redis version. Reason: {}", err);
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                format!("Couldn't process required Redis version. Reason: {}", err),
+            ));
+        }
+    };
+
     if let Some(version) = server_version {
-        let semver_version = Version::parse(&version).unwrap();
-        let redis_version_req: VersionReq = VersionReq::parse(REDIS_VERSION_REQ).unwrap();
+        let semver_version: Version = match Version::parse(&version) {
+            Ok(result) => result,
+            Err(err) => {
+                error!("Cannot parse Redis version ({}). Reason: {}", version, err);
+                return Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!("Cannot parse Redis version ({}). Reason: {}", version, err),
+                ));
+            }
+        };
         if redis_version_req.matches(&semver_version) {
             info!("Redis version is compatible: {}", version);
             Ok(version.to_owned())
