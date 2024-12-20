@@ -125,6 +125,11 @@ impl DatabaseHandler {
 
 /// Helper function to check the version of the Redis Server
 async fn _check_server_version(database: &DatabaseHandler) -> Result<String, MediatorError> {
+    let redis_version_req: VersionReq = match VersionReq::parse(REDIS_VERSION_REQ) {
+        Ok(result) => result,
+        Err(err) => panic!("Couldn't process required Redis version. Reason: {}", err),
+    };
+
     let mut conn = database.get_async_connection().await?;
     let server_info: String = match deadpool_redis::redis::cmd("INFO")
         .arg("SERVER")
@@ -155,17 +160,6 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
             }
         })
         .next();
-
-    let redis_version_req: VersionReq = match VersionReq::parse(REDIS_VERSION_REQ) {
-        Ok(result) => result,
-        Err(err) => {
-            error!("Couldn't process required Redis version. Reason: {}", err);
-            return Err(MediatorError::ConfigError(
-                "NA".into(),
-                format!("Couldn't process required Redis version. Reason: {}", err),
-            ));
-        }
-    };
 
     if let Some(version) = server_version {
         let semver_version: Version = match Version::parse(&version) {
