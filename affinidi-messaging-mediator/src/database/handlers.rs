@@ -170,10 +170,14 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
             .zip(required_version_parts.iter())
             .all(|(server, required)| {
                 if is_higher {
+                    // if major is higher, no need to check for next
                     true
                 } else {
-                    is_higher = *server >= *required;
-                    is_higher
+                    if *server > *required {
+                        is_higher = true
+                    }
+                    let result = *server >= *required;
+                    result
                 }
             });
 
