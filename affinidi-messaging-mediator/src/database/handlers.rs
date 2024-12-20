@@ -2,10 +2,11 @@ use super::DatabaseHandler;
 use crate::common::{config::Config, errors::MediatorError};
 use deadpool_redis::Connection;
 use redis::aio::PubSub;
+use semver::{Version, VersionReq};
 use std::{fs::read_to_string, thread::sleep, time::Duration};
 use tracing::{error, event, info, Level};
 
-const REDIS_VERSION: &str = "7.2"; // required Redis version
+const REDIS_VERSION_REQ: &str = ">=7.1, <8.0";
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
@@ -124,6 +125,11 @@ impl DatabaseHandler {
 
 /// Helper function to check the version of the Redis Server
 async fn _check_server_version(database: &DatabaseHandler) -> Result<String, MediatorError> {
+    let redis_version_req: VersionReq = match VersionReq::parse(REDIS_VERSION_REQ) {
+        Ok(result) => result,
+        Err(err) => panic!("Couldn't process required Redis version. Reason: {}", err),
+    };
+
     let mut conn = database.get_async_connection().await?;
     let server_info: String = match deadpool_redis::redis::cmd("INFO")
         .arg("SERVER")
@@ -156,19 +162,29 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
         .next();
 
     if let Some(version) = server_version {
-        if version.starts_with(REDIS_VERSION) {
+        let semver_version: Version = match Version::parse(&version) {
+            Ok(result) => result,
+            Err(err) => {
+                error!("Cannot parse Redis version ({}). Reason: {}", version, err);
+                return Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!("Cannot parse Redis version ({}). Reason: {}", version, err),
+                ));
+            }
+        };
+        if redis_version_req.matches(&semver_version) {
             info!("Redis version is compatible: {}", version);
             Ok(version.to_owned())
         } else {
             error!(
-                "Redis version ({}) must be equal to major.minor: ({})",
-                version, REDIS_VERSION
+                "Redis version ({}) must match ({})",
+                version, REDIS_VERSION_REQ
             );
             Err(MediatorError::DatabaseError(
                 "NA".into(),
                 format!(
-                    "Redis version ({}) must be equal to major.minor: ({})",
-                    version, REDIS_VERSION
+                    "Redis version ({}) must match ({})",
+                    version, REDIS_VERSION_REQ
                 ),
             ))
         }

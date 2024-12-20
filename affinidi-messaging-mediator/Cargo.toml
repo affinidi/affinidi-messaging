@@ -49,6 +49,7 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
+semver.workspace = true
 
 [dev-dependencies]
 console.workspace = true
