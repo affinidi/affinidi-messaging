@@ -2,10 +2,11 @@ use super::DatabaseHandler;
 use crate::common::{config::Config, errors::MediatorError};
 use deadpool_redis::Connection;
 use redis::aio::PubSub;
+use semver::{Version, VersionReq};
 use std::{fs::read_to_string, thread::sleep, time::Duration};
 use tracing::{error, event, info, Level};
 
-const REDIS_VERSION: &str = "7.2"; // required Redis version
+const REDIS_VERSION_REQ: &str = ">=7.2, <8.0";
 
 impl DatabaseHandler {
     pub async fn new(config: &Config) -> Result<Self, MediatorError> {
@@ -156,19 +157,21 @@ async fn _check_server_version(database: &DatabaseHandler) -> Result<String, Med
         .next();
 
     if let Some(version) = server_version {
-        if version.starts_with(REDIS_VERSION) {
+        let semver_version = Version::parse(&version).unwrap();
+        let redis_version_req: VersionReq = VersionReq::parse(REDIS_VERSION_REQ).unwrap();
+        if redis_version_req.matches(&semver_version) {
             info!("Redis version is compatible: {}", version);
             Ok(version.to_owned())
         } else {
             error!(
-                "Redis version ({}) must be equal to major.minor: ({})",
-                version, REDIS_VERSION
+                "Redis version ({}) must match ({})",
+                version, REDIS_VERSION_REQ
             );
             Err(MediatorError::DatabaseError(
                 "NA".into(),
                 format!(
-                    "Redis version ({}) must be equal to major.minor: ({})",
-                    version, REDIS_VERSION
+                    "Redis version ({}) must match ({})",
+                    version, REDIS_VERSION_REQ
                 ),
             ))
         }
