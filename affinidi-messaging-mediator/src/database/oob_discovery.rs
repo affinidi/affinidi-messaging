@@ -196,6 +196,6 @@ impl DatabaseHandler {
     }
 
     fn to_cache_key(id: String) -> String {
-        return format!("{HASH_KEY_PREFIX}{id}");
+        format!("{HASH_KEY_PREFIX}{id}")
     }
 }
