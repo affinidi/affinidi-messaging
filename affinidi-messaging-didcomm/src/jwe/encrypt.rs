@@ -362,7 +362,7 @@ mod tests {
             Algorithm::Other("otherAlg".to_owned()),
             EncAlgorithm::A256Gcm,
         );
-        /// TODO: P-384 and P-521 support after solving https://github.com/hyperledger/aries-askar/issues/10
+        // TODO: P-384 and P-521 support after solving https://github.com/hyperledger/aries-askar/issues/10
 
         fn _encrypt_works<CE, KDF, KE, KW>(
             alice: Option<(&str, &str, &str)>,

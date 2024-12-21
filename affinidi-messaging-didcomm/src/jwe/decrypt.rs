@@ -303,7 +303,7 @@ mod tests {
             PAYLOAD,
         );
 
-        /// TODO: P-384 and P-521 support after solving https://github.com/hyperledger/aries-askar/issues/10
+        // TODO: P-384 and P-521 support after solving https://github.com/hyperledger/aries-askar/issues/10
 
         fn _decrypt_works<CE, KDF, KE, KW>(
             sender: Option<(&str, &str)>,

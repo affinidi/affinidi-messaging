@@ -31,10 +31,10 @@ askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.55"
-aws-sdk-memorydb = "1.52"
-aws-sdk-secretsmanager = "1.54"
-aws-sdk-ssm = "1.56"
+aws-sdk-dynamodb = "1.56"
+aws-sdk-memorydb = "1.53"
+aws-sdk-secretsmanager = "1.55"
+aws-sdk-ssm = "1.57"
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
@@ -80,7 +80,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 rustls-pemfile = "2"
-rustls-platform-verifier = "0.4"
+rustls-platform-verifier = "0.5"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-enum-str = '0.4'
 serde_json = "1.0"
@@ -91,7 +91,7 @@ thiserror = "2.0"
 time = "0.3"
 tokio = { version = "1.42", features = ["full"] }
 tokio-stream = "0.1"
-tokio-tungstenite = { version = "0.25", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
 toml = "0.8"
 tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 tracing = { version = "0.1", features = [

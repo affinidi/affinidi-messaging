@@ -365,7 +365,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_DID,
+            ALICE_DID,
         )
         .await;
 
@@ -398,7 +398,7 @@ mod tests {
             let alice_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
             let from_key = alice_did_doc.verification_method.first().unwrap();
@@ -536,7 +536,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_DID,
+            ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -557,7 +557,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_DID,
+            ALICE_DID,
             AnonCryptAlg::A256gcmEcdhEsA256kw,
             jwe::EncAlgorithm::A256Gcm,
         )
@@ -578,7 +578,7 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_DID,
+            ALICE_DID,
             AnonCryptAlg::Xc20pEcdhEsA256kw,
             jwe::EncAlgorithm::Xc20P,
         )
@@ -596,7 +596,7 @@ mod tests {
         >(
             &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_P256_2],
-            &ALICE_DID,
+            ALICE_DID,
             AnonCryptAlg::A256cbcHs512EcdhEsA256kw,
             jwe::EncAlgorithm::A256cbcHs512,
         )
@@ -633,7 +633,7 @@ mod tests {
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
 
@@ -789,7 +789,7 @@ mod tests {
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
             let from_key = from_did_doc.verification_method.first().unwrap();
@@ -797,7 +797,7 @@ mod tests {
             let sign_by_did_doc = match did_resolver.resolve(sign_by).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
             let sign_by_key = sign_by_did_doc.verification_method.first().unwrap();
@@ -883,7 +883,7 @@ mod tests {
             &BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2.id,
             vec![&BOB_SECRET_KEY_AGREEMENT_KEY_X25519_2],
             ALICE_DID,
-            &ALICE_DID,
+            ALICE_DID,
             jws::Algorithm::Es256,
         )
         .await;
@@ -900,8 +900,8 @@ mod tests {
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
                 &BOB_SECRET_KEY_AGREEMENT_KEY_P256_2,
             ],
-            &ALICE_DID,
-            &ALICE_DID,
+            ALICE_DID,
+            ALICE_DID,
             jws::Algorithm::Es256K,
         )
         .await;
@@ -928,7 +928,7 @@ mod tests {
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
             let from_key = from_did_doc.verification_method.first().unwrap();
@@ -936,7 +936,7 @@ mod tests {
             let sign_by_did_doc = match did_resolver.resolve(sign_by).await {
                 Ok(response) => response.doc,
                 Err(_) => {
-                    return ();
+                    return;
                 }
             };
             let sign_by_key = sign_by_did_doc.verification_method.first().unwrap();
@@ -2765,7 +2765,7 @@ mod tests {
         for to_key in to_keys {
             let from_kid = &from_key.id;
             let to_kid = &to_key.id;
-            let jwk_string = serde_json::to_value(&from_key.get_jwk()).unwrap();
+            let jwk_string = serde_json::to_value(from_key.get_jwk()).unwrap();
 
             let from_key = KE::from_jwk_value(&jwk_string).expect("Unable from_jwk_value");
 
@@ -2876,7 +2876,7 @@ mod tests {
         );
 
         let sign_key_id = &sign_key.id.to_string();
-        let jwk_string = serde_json::to_value(&sign_key.get_jwk()).unwrap();
+        let jwk_string = serde_json::to_value(sign_key.get_jwk()).unwrap();
 
         let sign_key = Key::from_jwk_value(&jwk_string).expect("Unable from_jwk_value");
 

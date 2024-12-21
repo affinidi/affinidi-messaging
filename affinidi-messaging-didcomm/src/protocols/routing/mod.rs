@@ -168,10 +168,7 @@ fn find_did_comm_service(
             let service = did_doc
                 .service
                 .iter()
-                .find_map(|service| match check_service(service) {
-                    Ok(service) => service,
-                    Err(_) => None,
-                });
+                .find_map(|service| check_service(service).unwrap_or_default());
 
             Ok(service)
         }

@@ -57,6 +57,7 @@ impl SharedState {
 
     /// Rare case of creating an unencrypted message, but you want to prove who sent the message
     /// Signs the unencrypted message with the sign_by key
+    #[allow(dead_code)]
     pub async fn pack_signed(
         &self,
         message: &Message,
@@ -80,6 +81,7 @@ impl SharedState {
     }
 
     /// creates a plaintext (unencrypted and unsigned) message
+    #[allow(dead_code)]
     pub async fn pack_plaintext(&self, message: &Message) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "pack_plaintext",);
 

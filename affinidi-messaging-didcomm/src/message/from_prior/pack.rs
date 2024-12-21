@@ -72,7 +72,7 @@ impl FromPrior {
                 .verification_relationships
                 .authentication
                 .iter()
-                .find(|a| a.id().resolve(&did_doc.id.as_did()).to_string() == kid)
+                .find(|a| a.id().resolve(did_doc.id.as_did()).to_string() == kid)
                 .ok_or_else(|| {
                     err_msg(
                         ErrorKind::DIDUrlNotFound,
