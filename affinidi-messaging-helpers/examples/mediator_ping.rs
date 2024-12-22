@@ -156,7 +156,7 @@ async fn main() -> Result<(), ATMError> {
     info!(" ***************************************************** ");
 
     // Send a WebSocket message
-    info!("  *****************************************************  ");
+    info!(" *****************************************************  ");
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
     atm.profile_enable_websocket(&alice).await?;

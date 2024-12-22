@@ -386,6 +386,7 @@ impl Mediator {
     /// # Returns
     /// A list of DID Accounts in the mediator
     /// NOTE: This will also include the admin accounts
+    /// NOTE: `limit` may return more than `limit`
     pub async fn list_accounts(
         &self,
         atm: &ATM,

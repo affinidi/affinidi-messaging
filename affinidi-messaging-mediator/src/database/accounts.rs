@@ -84,7 +84,8 @@ impl DatabaseHandler {
 
     /// Retrieves up to 100 accounts from the mediator
     /// - `cursor` - The offset to start from (0 is the start)
-    /// - `limit` - The maximum number of accounts to return
+    /// - `limit` - The maximum number of accounts to return (max 100)
+    /// NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
     pub(crate) async fn list_accounts(
         &self,
         cursor: u32,
@@ -114,7 +115,7 @@ impl DatabaseHandler {
                 .arg("KNOWN_DIDS")
                 .arg(cursor)
                 .arg("COUNT")
-                .arg(100)
+                .arg(limit)
                 .query_async(&mut con)
                 .await
                 .map_err(|err| {
