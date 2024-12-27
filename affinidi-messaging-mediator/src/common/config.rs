@@ -1,6 +1,7 @@
 use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::config::{ClientConfig, ClientConfigBuilder};
+use affinidi_messaging_sdk::protocols::mediator::acls::{ACLMode, GlobalACLSet};
 use async_convert::{async_trait, TryFrom};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -75,37 +76,11 @@ impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
     }
 }
 
-/// What ACL logic mode is the mediator running in?
-/// - ExplicitAllow - no one can connect, unless explicitly allowed
-/// - ExplicitDeny - everyone can connect, unless explicitly denied
-#[derive(Clone, Deserialize, Serialize)]
-pub enum ACLMode {
-    ExplicitAllow,
-    ExplicitDeny,
-}
-
-impl fmt::Debug for ACLMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
-        }
-    }
-}
-
-impl fmt::Display for ACLMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
-        }
-    }
-}
-
 /// SecurityConfig Struct contains security related configuration details
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SecurityConfigRaw {
     pub acl_mode: String,
+    pub default_acl: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
     pub ssl_certificate_file: String,
@@ -119,6 +94,7 @@ pub struct SecurityConfigRaw {
 #[derive(Clone, Serialize)]
 pub struct SecurityConfig {
     pub acl_mode: ACLMode,
+    pub default_acl: GlobalACLSet,
     #[serde(skip_serializing)]
     pub mediator_secrets: AffinidiSecrets,
     pub use_ssl: bool,
@@ -139,6 +115,7 @@ impl Debug for SecurityConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecurityConfig")
             .field("acl_mode", &self.acl_mode)
+            .field("default_acl", &self.default_acl)
             .field(
                 "mediator_secrets",
                 &format!("({}) secrets loaded", self.mediator_secrets.len()),
@@ -159,6 +136,15 @@ impl Default for SecurityConfig {
     fn default() -> Self {
         SecurityConfig {
             acl_mode: ACLMode::ExplicitDeny,
+            default_acl: GlobalACLSet::new()
+                .with_forward_from(false)
+                .with_forward_to(false)
+                .with_inbound(false)
+                .with_outbound(false)
+                .with_local(false)
+                .with_blocked(true)
+                .with_create_invites(false)
+                .with_self_admin(false),
             mediator_secrets: AffinidiSecrets::new(vec![]),
             use_ssl: true,
             ssl_certificate_file: "".into(),
@@ -210,6 +196,25 @@ impl SecurityConfigRaw {
             jwt_refresh_expiry: self.jwt_refresh_expiry.parse().unwrap_or(86_400),
             ..Default::default()
         };
+
+        // Convert the default ACL Set into a GlobalACLSet
+        config.default_acl =
+            GlobalACLSet::from_acl_string(&self.default_acl, config.acl_mode.clone()).map_err(
+                |err| {
+                    event!(
+                        Level::ERROR,
+                        "Couldn't parse default_acl config parameter. Reason: {}",
+                        err
+                    );
+                    MediatorError::ConfigError(
+                        "NA".into(),
+                        format!(
+                            "Couldn't parse default_acl config parameter. Reason: {}",
+                            err
+                        ),
+                    )
+                },
+            )?;
 
         if let Some(cors_allow_origin) = &self.cors_allow_origin {
             config.cors_allow_origin =

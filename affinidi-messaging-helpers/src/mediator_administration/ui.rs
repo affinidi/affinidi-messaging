@@ -168,11 +168,7 @@ pub(crate) async fn remove_admins(
                     .iter()
                     .map(|&idx| admins[idx].clone())
                     .collect::<Vec<_>>();
-                match protocols
-                    .mediator
-                    .remove_admins(atm, profile, &admins)
-                    .await
-                {
+                match protocols.mediator.strip_admins(atm, profile, &admins).await {
                     Ok(result) => {
                         println!("{}", style(format!("Removed {} DIDs", result)).green());
                     }

@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{theme::ColorfulTheme, Input, Select};
+use sha256::digest;
 
 use crate::BasicMediatorConfig;
 
@@ -58,6 +59,11 @@ pub(crate) async fn global_acls_menu(
             }
             1 => {
                 println!("Set ACLs");
+                let r = protocols
+                    .mediator
+                    .global_acls_get(atm, profile, &vec![selected_did.clone().unwrap()])
+                    .await?;
+                println!("{:#?}", r);
             }
             2 => {
                 return Ok(());
@@ -95,15 +101,46 @@ async fn select_did(
 
             Ok(_select_from_existing_dids(atm, profile, protocols, theme, None).await?)
         }
-        1 => {
-            println!("Manually enter DID or DID Hash");
-            Ok(None)
-        }
+        1 => Ok(_manually_enter_did_or_hash(theme)),
         2 => Ok(None),
         _ => {
             println!("Invalid selection");
             Ok(None)
         }
+    }
+}
+
+fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
+    println!();
+    println!(
+        "{}",
+        style("Limited checks are done on the DID or Hash - be careful!").yellow()
+    );
+    println!("DID or SHA256 Hash of a DID to work with? (type exit to quit this dialog)");
+
+    let input: String = Input::with_theme(theme)
+        .with_prompt("DID or SHA256 Hash")
+        .interact_text()
+        .unwrap();
+
+    if input == "exit" {
+        return None;
+    }
+
+    if input.starts_with("did:") {
+        Some(digest(input))
+    } else if input.len() != 32 {
+        println!(
+            "{}",
+            style(format!(
+                "Invalid SHA256 Hash length. length({}) when expected(32)",
+                input.len()
+            ))
+            .red()
+        );
+        None
+    } else {
+        Some(input.to_ascii_lowercase())
     }
 }
 

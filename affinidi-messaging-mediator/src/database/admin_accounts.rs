@@ -1,5 +1,5 @@
 //! Database routines to add/remove/list admin accounts
-use affinidi_messaging_sdk::protocols::mediator::MediatorAdminList;
+use affinidi_messaging_sdk::protocols::mediator::mediator::MediatorAdminList;
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
 
@@ -125,9 +125,9 @@ impl DatabaseHandler {
         .await
     }
 
-    /// Removes up to 100 admin accounts from the mediator
-    /// - `accounts` - The list of accounts to remove
-    pub(crate) async fn remove_admin_accounts(
+    /// Strips up to 100 admin accounts from the mediator
+    /// - `accounts` - The list of accounts to strip admin rights from
+    pub(crate) async fn strip_admin_accounts(
         &self,
         accounts: Vec<String>,
     ) -> Result<i32, MediatorError> {

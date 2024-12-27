@@ -4,12 +4,15 @@ use affinidi_messaging_helpers::common::{
     check_path,
     profiles::{Profile, Profiles},
 };
-use affinidi_messaging_mediator::common::config::ACLMode;
-use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{
+    config::Config,
+    protocols::{mediator::acls::ACLMode, Protocols},
+    ATM,
+};
 use clap::Parser;
 use console::{style, Style, Term};
 use dialoguer::theme::ColorfulTheme;
-use global_acls::global_acls_menu;
+use global_acl_management::global_acls::global_acls_menu;
 use serde::Deserialize;
 use serde_json::Value;
 use sha256::digest;
@@ -18,7 +21,8 @@ use std::{collections::HashMap, env};
 use tracing_subscriber::filter;
 use ui::{add_admin, list_admins, main_menu, remove_admins};
 
-mod global_acls;
+mod acl_management;
+mod global_acl_management;
 mod ui;
 
 #[derive(Parser, Debug)]

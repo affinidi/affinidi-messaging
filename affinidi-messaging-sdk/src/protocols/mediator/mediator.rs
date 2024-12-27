@@ -17,7 +17,7 @@ pub struct Mediator {}
 #[derive(Serialize, Deserialize)]
 pub enum MediatorAdminRequest {
     AdminAdd(Vec<String>),
-    AdminRemove(Vec<String>),
+    AdminStrip(Vec<String>),
     AdminList { cursor: u32, limit: u32 },
     AccountList { cursor: u32, limit: u32 },
     AccountAdd(String),
@@ -190,40 +190,40 @@ impl Mediator {
         .await
     }
 
-    /// Parses the response from the mediator for Removing admins
-    fn _parse_remove_admins_response(&self, message: &Message) -> Result<i32, ATMError> {
+    /// Parses the response from the mediator for Stripping admins
+    fn _parse_strip_admins_response(&self, message: &Message) -> Result<i32, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
-                "Mediator Admin Remove response could not be parsed. Reason: {}",
+                "Mediator Admin Strip response could not be parsed. Reason: {}",
                 err
             ))
         })
     }
 
-    /// Removes a number of admins from the mediator
+    /// Strips admin rights from a number of accounts from the mediator
     /// - `atm` - The ATM client to use
-    /// - `admins` - Array of Strings representing the SHA256 Hashed DIDs of the admins to remove
+    /// - `admins` - Array of Strings representing the SHA256 Hashed DIDs of the admins to strip
     ///   NOTE: `admins` is limited to 100 elements
     /// # Returns
-    /// Success: Number of admins removed from the mediator
+    /// Success: Number of admins stripped from the mediator
     /// Error: An error message
-    pub async fn remove_admins(
+    pub async fn strip_admins(
         &self,
         atm: &ATM,
         profile: &Arc<Profile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
-        let _span = span!(Level::DEBUG, "remove_admins");
+        let _span = span!(Level::DEBUG, "strip_admins");
 
         async move {
             debug!(
-                "Removing admin accounts from mediator: count {:?}",
+                "Stripping admin accounts from mediator: count {:?}",
                 admins.len()
             );
 
             if admins.len() > 100 {
                 return Err(ATMError::ConfigError(
-                    "You can only remove up to 100 admins at a time!".to_owned(),
+                    "You can only strip up to 100 admins at a time!".to_owned(),
                 ));
             }
 
@@ -247,7 +247,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
-                json!({"AdminRemove": admins}),
+                json!({"AdminStrip": admins}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -273,7 +273,7 @@ impl Mediator {
             if let SendMessageResponse::Message(message) =
                 atm.send_message(profile, &msg, &msg_id, true).await?
             {
-                self._parse_remove_admins_response(&message)
+                self._parse_strip_admins_response(&message)
             } else {
                 Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),

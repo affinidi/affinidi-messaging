@@ -70,6 +70,38 @@ database_timeout = "${DATABASE_TIMEOUT:2}"
 ###    - explicit_allow: Mediator will deny all DIDs except for what has been explicitly allowed
 acl_mode = "${ACL_MODE:explicit_deny}"
 
+### default_acl: Default ACL that is applied to new/unknown DIDs that connect to the mediator
+### Default: (explicit_deny) ALLOW_ALL
+### Default: (explicit_allow) DENY_ALL
+### Options:
+###    - ALLOW_ALL: Allow all operations
+###    - DENY_ALL: Deny all operations
+###    - ALLOW_LOCAL: Will store messages for a DID locally
+###    - DENY_LOCAL: Will not store messages for a DID locally
+###    - ALLOW_FORWARD_FROM: DID can forward messages 
+###    - DENY_FORWARD_FROM: DID cannot forward messages
+###    - ALLOW_FORWARD_TO: DID can receive forwarded messages
+###    - DENY_FORWARD_TO: DID cannot receive forwarded messages
+###    - ALLOW_INBOUND: DID can receive a message (if LOCAL)
+###    - DENY_INBOUND: DID cannot receive a message (if LOCAL)
+###    - ALLOW_OUTBOUND: DID can send messages
+###    - DENY_OUTBOUND: DID cannot send messages
+###    - ALLOW_CREATE_INVITES: DID can create OOB invites
+###    - DENY_CREATE_INVITES: DID cannot create OOB invites
+###    - ALLOW_SELF_ADMIN: DID can administer itself (i.e set their own local ACL's)
+###    - DENY_SELF_ADMIN: DID cannot administer itself
+###  NOTE: Can be comma seperated to allow multiple options
+default_acl = "${DEFAULT_ACL:ALLOW_ALL}"
+
+### To configure a private mediator, that allows anyone to forward/send a message to you but blocks any other action
+### Set acl_mode to `explicit_allow`
+### Set default_acl to `ALLOW_FORWARD_FROM,ALLOW_SEND`
+
+### To configure a mediator, that acts as a public relay only (i.e. will not store any messages locally)
+### Set acl_mode to `explicit_deny`
+### Set default_acl to `DENY_LOCAL,DENY_CREATE_INVITES,DENY_SELF_ADMIN`
+
+
 ### mediator_secrets: Secrets of the mediator
 ### REQUIRED: Location of secrets
 ### Supported formats:
@@ -219,6 +251,9 @@ ws_size = "${LIMIT_WS_SIZE:10485760}"
 ### ****************************************************************************************************************************
 ### Configuration specific to the forwarding processor
 ### ****************************************************************************************************************************
+### NOTE: While you can send a message directly to a DID, ideally you are forwarding messages through the mediator, even if
+###       if the ultimate recipient is local to the mediator. This allows the mediator to handle message delivery, retries, etc.
+
 [processors.forwarding]
 ### enabled: If true, the forwarding processor is enabled within the mediator locally
 ### Default: true
@@ -228,3 +263,13 @@ enabled = "${PROCESSOR_FORWARDING_ENABLED:true}"
 ### future_time_limit: Maximum time in seconds that a message can be scheduled in the future
 ### Default: 86400 (1 day)
 future_time_limit = "${PROCESSOR_FORWARDING_FUTURE_TIME_LIMIT:86400}"
+
+### external_forwarding: If true, the mediator will forward messages to another mediator/endpoint when required
+### Default: true
+### NOTE: If you are running a private network, you may want to disable the ability to forward messages externally
+external_forwarding = "${PROCESSOR_FORWARDING_EXTERNAL:true}"
+
+### report_errors: If true, the mediator will generate problem reports to the sender of the message
+### Default: true
+### NOTE: You may want to disable this in production to prevent leaking information about the mediator
+report_errors = "${PROCESSOR_FORWARDING_REPORT_ERRORS:true}"

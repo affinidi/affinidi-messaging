@@ -2,6 +2,22 @@
 
 ## Changelog history
 
+## xxx January 2025 (0.8.8)
+
+### All (0.8.8)
+
+* Added Global-ACL Support
+
+### Mediator (0.8.8)
+
+* Added Global ACL Support
+* Added default_acl to `security` block in configuration
+  * Allows to set the default ACL to apply
+
+### Affinidi Text Client (0.8.8)
+
+* Updated ratatui-image from 3.x to 4.x
+
 ## 16th December 2024 (0.8.1)
 
 ### All (0.8.1)
