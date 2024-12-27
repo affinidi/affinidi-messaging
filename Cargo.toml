@@ -39,6 +39,7 @@ axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9.6", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
+bitfield-struct = "0.10"
 bs58 = "0.5"
 chrono = "0.4"
 circular-queue = { version = "0.2", features = ["serde_support"] }
@@ -63,7 +64,7 @@ num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.8"
 ratatui = "0.29"
-ratatui-image = { version = "3", features = ["crossterm", "image-defaults"] }
+ratatui-image = { version = "4", features = ["crossterm", "image-defaults"] }
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",

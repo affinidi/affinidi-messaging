@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Clear, Paragraph, StatefulWidget, Widget, Wrap},
     Frame,
 };
-use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize, StatefulImage};
+use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -56,7 +56,7 @@ impl Component for InvitePopup {
     where
         Self: Sized,
     {
-        let mut picker = Picker::from_query_stdio().unwrap();
+        let picker = Picker::from_query_stdio().unwrap();
         let dyn_img = ImageReader::open("./affinidi_logo.jpg")
             .expect("Couldn't open image")
             .decode()
@@ -196,16 +196,18 @@ impl ComponentRender<()> for InvitePopup {
 
         if let Some(qr_code) = &self.props.qr_code {
             // Render QR Code
-            let image =
-                StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+            //let image =
+            //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+            let image = StatefulImage::default();
             //println!("Inner Block {}", inner_blocks[0]);
-            let mut picker = self.picker.lock().unwrap();
+            let picker = self.picker.lock().unwrap();
             let mut a = picker.new_resize_protocol(DynamicImage::ImageLuma8(qr_code.clone()));
             StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut a);
         } else {
             // Render Affinidi Logo
-            let image =
-                StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+            //let image =
+            //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+            let image = StatefulImage::default();
             //println!("Inner Block {}", inner_blocks[0]);
             let mut image2 = self.image.lock().unwrap();
             StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut *image2);
