@@ -62,6 +62,8 @@ pub enum MediatorError {
     ForwardMessageError(SessId, String),
     #[error("Authentication error: {0}")]
     AuthenticationError(String),
+    #[error("ACL Denied: {0}")]
+    ACLDenied(String),
 }
 
 impl IntoResponse for AppError {
@@ -260,6 +262,17 @@ impl IntoResponse for AppError {
                     sessionId: "NO-SESSION".to_string(),
                     errorCode: 18,
                     errorCodeStr: "AuthenticationError".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::ACLDenied(message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::UNAUTHORIZED.as_u16(),
+                    sessionId: "NO-SESSION".to_string(),
+                    errorCode: 19,
+                    errorCodeStr: "ACLDenied".to_string(),
                     message,
                 };
                 event!(Level::WARN, "{}", response.to_string());

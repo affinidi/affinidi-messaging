@@ -14,7 +14,7 @@ impl DatabaseHandler {
     /// - Returns a list of ACLs for the given DIDs
     pub(crate) async fn get_global_acls(
         &self,
-        dids: &Vec<String>,
+        dids: &[String],
         mediator_acl_mode: ACLMode,
     ) -> Result<MediatorGlobalACLResponse, MediatorError> {
         let _span = span!(Level::DEBUG, "get_global_acls");

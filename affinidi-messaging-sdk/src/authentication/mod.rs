@@ -39,6 +39,9 @@ impl Profile {
         loop {
             match self._authenticate(shared_state).await {
                 Ok(response) => return Ok(response),
+                Err(ATMError::ACLDenied(_)) => {
+                    return Err(ATMError::ACLDenied("Authentication Denied".into()));
+                }
                 Err(err) => {
                     retry_count += 1;
                     error!(
@@ -323,10 +326,14 @@ async fn _http_post<T: GenericDataStruct>(
         .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
 
     if !response_status.is_success() {
-        return Err(ATMError::AuthenticationError(format!(
-            "Failed to get authentication response. url: {}, status: {}",
-            url, response_status
-        )));
+        if response_status.as_u16() == 401 {
+            return Err(ATMError::ACLDenied("Authentication Denied".into()));
+        } else {
+            return Err(ATMError::AuthenticationError(format!(
+                "Failed to get authentication response. url: {}, status: {}",
+                url, response_status
+            )));
+        }
     }
 
     debug!("response body: {}", response_body);

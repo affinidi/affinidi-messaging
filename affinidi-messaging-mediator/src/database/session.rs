@@ -5,6 +5,7 @@ use std::{
 
 use redis::Value;
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 use tracing::{debug, warn};
 
 use crate::common::errors::MediatorError;
@@ -59,6 +60,7 @@ pub struct Session {
     pub challenge: String,
     pub state: SessionState,
     pub did: String,
+    pub did_hash: String,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {
@@ -94,6 +96,7 @@ impl TryFrom<(&str, HashMap<String, String>)> for Session {
 
         if let Some(did) = hash.get("did") {
             session.did = did.into();
+            session.did_hash = digest(did);
         } else {
             warn!("{}: No DID found when retrieving session({})!", sid, sid);
             return Err(MediatorError::SessionError(

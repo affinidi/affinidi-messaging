@@ -8,7 +8,10 @@
 
 use super::message_inbound::InboundMessage;
 use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
+    common::{
+        acl_checks::acl_authentication_check,
+        errors::{AppError, MediatorError, SuccessResponse},
+    },
     database::session::{Session as DBSession, SessionClaims, SessionState},
     SharedData,
 };
@@ -44,7 +47,6 @@ pub struct ChallengeBody {
 /// This is the first step in the authentication process
 /// Creates a new sessionID and a random challenge string to the client
 pub async fn authentication_challenge(
-    // ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
     State(state): State<SharedData>,
     Json(body): Json<ChallengeBody>,
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
@@ -53,14 +55,20 @@ pub async fn authentication_challenge(
         challenge: create_random_string(32),
         state: SessionState::ChallengeSent,
         did: body.did.clone(),
+        did_hash: digest(body.did),
     };
     let _span = span!(
         Level::DEBUG,
         "authentication_challenge",
         session_id = session.session_id,
-        did_hash = digest(&session.did)
+        did_hash = session.did_hash.clone()
     );
     async move {
+        // Check if DID is allowed to connect
+        if !acl_authentication_check(&state, &session.did_hash).await? {
+            info!("DID({}) is blocked from connecting", session.did);
+            return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+        }
         state.database.create_session(&session).await?;
 
         debug!(
@@ -118,6 +126,14 @@ pub async fn authentication_response(
                 .into());
             }
         };
+
+        if let Some(from_did) = &envelope.from_did {
+            // Check if DID is allowed to connect
+            if !acl_authentication_check(&state, &digest(from_did)).await? {
+                info!("DID({}) is blocked from connecting", from_did);
+                return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+            }
+        }
 
         // Unpack the message
         let (msg, _) = match Message::unpack(

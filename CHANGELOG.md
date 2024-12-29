@@ -13,6 +13,11 @@
 * Added Global ACL Support
 * Added default_acl to `security` block in configuration
   * Allows to set the default ACL to apply
+* New error type ACLDenied added
+
+### SDK (0.8.8)
+
+* Authentication will now fail due to ACL Errors and not retry.
 
 ### Affinidi Text Client (0.8.8)
 
