@@ -1,4 +1,5 @@
-use super::{acl_checks::acl_authentication_check, errors::ErrorResponse};
+use super::errors::ErrorResponse;
+use crate::common::acl_checks::ACLCheck;
 use crate::{
     database::session::{Session, SessionClaims},
     SharedData,
@@ -156,18 +157,10 @@ where
         })?;
 
         // Check if ACL is satisfied
-        if !acl_authentication_check(&state, &did_hash, Some(&saved_session))
-            .await
-            .map_err(|e| {
-                error!(
-                    "{}: acl_authentication_check() failed: Reason: {}",
-                    session_id, e
-                );
-                AuthError::InternalServerError(format!(
-                    "Couldn't process global_acl set. Reason: {}",
-                    e
-                ))
-            })?
+
+        if !saved_session
+            .global_acls
+            .check_blocked(&state.config.security.acl_mode)
         {
             info!("DID({}) is blocked from connecting", did);
             return Err(AuthError::Blocked);

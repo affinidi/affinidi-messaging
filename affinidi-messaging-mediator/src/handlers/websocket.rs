@@ -2,7 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     common::{
-        acl_checks::acl_check_local,
+        acl_checks::ACLCheck,
         errors::{AppError, MediatorError},
     },
     database::session::Session,
@@ -42,7 +42,10 @@ pub async fn websocket_handler(
         session = session.session_id
     );
     // ACL Check (websockets only work on local DID's)
-    if acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+    if session
+        .global_acls
+        .check_local(&state.config.security.acl_mode)
+    {
         async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
             .instrument(_span)
             .await

@@ -6,7 +6,7 @@ use tracing::{span, Instrument, Level};
 
 use crate::{
     common::{
-        acl_checks::acl_check_inbound,
+        acl_checks::ACLCheck,
         errors::{AppError, MediatorError, SuccessResponse},
     },
     database::session::Session,
@@ -49,7 +49,10 @@ pub async fn message_inbound_handler(
     );
     async move {
         // ACL Check
-        if !acl_check_inbound(&session.global_acls, &state.config.security.acl_mode) {
+        if !session
+            .global_acls
+            .check_inbound(&state.config.security.acl_mode)
+        {
             return Err(
                 MediatorError::ACLDenied("DID does not have send/inbound access".into()).into(),
             );

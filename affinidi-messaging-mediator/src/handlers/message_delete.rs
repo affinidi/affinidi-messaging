@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, span, warn, Instrument, Level};
 
 use crate::{
-    common::{acl_checks::acl_check_local, errors::{AppError, MediatorError, SuccessResponse}},
+    common::{acl_checks::ACLCheck, errors::{AppError, MediatorError, SuccessResponse}},
     database::session::Session,
     SharedData,
 };
@@ -36,7 +36,7 @@ pub async fn message_delete_handler(
     );
     async move {
         // ACL Check
-        if !acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+        if !session.global_acls.check_local( &state.config.security.acl_mode) {
             return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
         }
         

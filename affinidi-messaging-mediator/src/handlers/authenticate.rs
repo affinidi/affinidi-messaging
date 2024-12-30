@@ -9,7 +9,7 @@
 use super::message_inbound::InboundMessage;
 use crate::{
     common::{
-        acl_checks::acl_authentication_check,
+        acl_checks::ACLCheck,
         errors::{AppError, MediatorError, SuccessResponse},
     },
     database::session::{Session, SessionClaims, SessionState},
@@ -19,6 +19,7 @@ use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions}
 use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
+    protocols::mediator::acls::GlobalACLSet,
 };
 use axum::{extract::State, Json};
 use http::StatusCode;
@@ -67,7 +68,10 @@ pub async fn authentication_challenge(
     );
     async move {
         // Check if DID is allowed to connect
-        if !acl_authentication_check(&state, &session.did_hash, Some(&session)).await? {
+        if !session
+            .global_acls
+            .check_blocked(&state.config.security.acl_mode)
+        {
             info!("DID({}) is blocked from connecting", session.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }
@@ -131,7 +135,7 @@ pub async fn authentication_response(
 
         if let Some(from_did) = &envelope.from_did {
             // Check if DID is allowed to connect
-            if !acl_authentication_check(&state, &digest(from_did), None).await? {
+            if !GlobalACLSet::authentication_check(&state, &digest(from_did), None).await? {
                 info!("DID({}) is blocked from connecting", from_did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             }
@@ -435,7 +439,10 @@ pub async fn authentication_refresh(
         }
 
         // Does the Global ACL still allow them to connect?
-        if !acl_authentication_check(&state, &session_check.did_hash, Some(&session_check)).await? {
+        if !session_check
+            .global_acls
+            .check_blocked(&state.config.security.acl_mode)
+        {
             info!("DID({}) is blocked from connecting", session_check.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }

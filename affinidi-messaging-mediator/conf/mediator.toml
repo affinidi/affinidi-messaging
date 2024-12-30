@@ -91,7 +91,7 @@ acl_mode = "${ACL_MODE:explicit_deny}"
 ###    - ALLOW_SELF_ADMIN: DID can administer itself (i.e set their own local ACL's)
 ###    - DENY_SELF_ADMIN: DID cannot administer itself
 ###  NOTE: Can be comma seperated to allow multiple options
-default_acl = "${DEFAULT_ACL:allow_ALL}"
+default_acl = "${DEFAULT_ACL:allow_ALL, DENY_FORWARD_TO}"
 
 ### To configure a private mediator, that allows anyone to forward/send a message to you but blocks any other action
 ### Set acl_mode to `explicit_allow`
