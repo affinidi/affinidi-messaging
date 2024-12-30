@@ -434,6 +434,12 @@ pub async fn authentication_refresh(
             .into());
         }
 
+        // Does the Global ACL still allow them to connect?
+        if !acl_authentication_check(&state, &session_check.did_hash, Some(&session_check)).await? {
+            info!("DID({}) is blocked from connecting", session_check.did);
+            return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+        }
+
         // Generate a new access token
         let (access_token, access_expires_at) = _create_access_token(
             &session_check.did,
