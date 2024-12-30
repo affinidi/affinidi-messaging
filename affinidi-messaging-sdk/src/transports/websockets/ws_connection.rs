@@ -96,7 +96,13 @@ impl WsConnection {
             debug!("Starting websocket connection");
 
             self.state = State::Connecting;
-            let mut web_socket = self._create_socket().await.unwrap();
+            let mut web_socket = match self._create_socket().await {
+                Ok(ws) => ws,
+                Err(e) => {
+                    error!("Error creating websocket connection: {:?}", e);
+                    return;
+                }
+            };
             // TODO: Need to implement a recovery here
             debug!("Websocket connected");
             {
@@ -236,15 +242,22 @@ impl WsConnection {
         );
 
         // Connect to the websocket
-        let ws_stream = connect_async_tls_with_config(
+        let ws_stream = match connect_async_tls_with_config(
             request,
             None,
             false,
             Some(self.shared.ws_connector.clone()),
         )
         .await
-        .expect("Failed to connect")
-        .0;
+        {
+            Ok((ws_stream, _)) => ws_stream,
+            Err(e) => {
+                return Err(ATMError::TransportError(format!(
+                    "Could not connect to websocket. Reason: {}",
+                    e
+                )))
+            }
+        };
 
         debug!("Completed websocket connection");
 
