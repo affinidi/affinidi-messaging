@@ -4,11 +4,17 @@ use http::StatusCode;
 use tracing::{debug, span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, SuccessResponse},
+    common::{
+        acl_checks::acl_check_local,
+        errors::{AppError, MediatorError, SuccessResponse},
+    },
     database::session::Session,
     SharedData,
 };
 
+/// Delivers messages to the client for given message_ids
+/// outbound refers to outbound from the mediator perspective
+/// ACL_MODE: Rquires LOCAL access
 pub async fn message_outbound_handler(
     session: Session,
     State(state): State<SharedData>,
@@ -21,6 +27,11 @@ pub async fn message_outbound_handler(
         delete = body.delete,
     );
     async move {
+        // ACL Check
+        if !acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+            return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
+        }
+
         debug!(
             "Client has asked to get ({}) messages",
             body.message_ids.len()

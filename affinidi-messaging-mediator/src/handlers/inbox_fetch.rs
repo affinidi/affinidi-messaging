@@ -1,5 +1,8 @@
 use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
+    common::{
+        acl_checks::acl_check_local,
+        errors::{AppError, MediatorError, SuccessResponse},
+    },
     database::session::Session,
     SharedData,
 };
@@ -10,6 +13,7 @@ use regex::Regex;
 use tracing::{span, Instrument, Level};
 
 /// Fetches available messages from the inbox
+/// ACL_MODE: Rquires LOCAL access
 ///
 /// # Parameters
 /// - `session`: Session information
@@ -30,6 +34,10 @@ pub async fn inbox_fetch_handler(
         fetch.delete_policy = body.delete_policy.to_string()
     );
     async move {
+        // ACL Check
+        if !acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+            return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
+        }
 
         // Check options
         if body.limit< 1 || body.limit > 100 {

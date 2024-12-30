@@ -6,7 +6,7 @@
 
 use super::errors::MediatorError;
 use crate::{database::session::Session, SharedData};
-use affinidi_messaging_sdk::protocols::mediator::acls::ACLMode;
+use affinidi_messaging_sdk::protocols::mediator::acls::{ACLMode, GlobalACLSet};
 use tracing::debug;
 
 /// Pre-authenticated ACL check to see if DID is blocked from connecting to the mediator
@@ -52,5 +52,38 @@ pub async fn acl_authentication_check(
         Ok(!acls.blocked())
     } else {
         Ok(acls.blocked())
+    }
+}
+
+/// Check if session is allowed locally
+/// returns true if allowed
+/// returns false if blocked
+pub fn acl_check_local(acls: &GlobalACLSet, mediator_mode: &ACLMode) -> bool {
+    if mediator_mode == &ACLMode::ExplicitDeny {
+        !acls.local()
+    } else {
+        acls.local()
+    }
+}
+
+/// Is the DID allowed to send messages to/through the mediator?
+/// returns true if allowed
+/// returns false if blocked
+pub fn acl_check_inbound(acls: &GlobalACLSet, mediator_mode: &ACLMode) -> bool {
+    if mediator_mode == &ACLMode::ExplicitDeny {
+        !acls.inbound()
+    } else {
+        acls.inbound()
+    }
+}
+
+/// Is the DID allowed to create/delete OOB Invitations?
+/// returns true if allowed
+/// returns false if blocked
+pub fn acl_check_invites(acls: &GlobalACLSet, mediator_mode: &ACLMode) -> bool {
+    if mediator_mode == &ACLMode::ExplicitDeny {
+        !acls.create_invites()
+    } else {
+        acls.create_invites()
     }
 }

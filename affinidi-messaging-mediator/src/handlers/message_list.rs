@@ -1,5 +1,8 @@
 use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
+    common::{
+        acl_checks::acl_check_local,
+        errors::{AppError, MediatorError, SuccessResponse},
+    },
     database::session::Session,
     SharedData,
 };
@@ -21,6 +24,7 @@ pub struct ResponseData {
 impl GenericDataStruct for ResponseData {}
 
 /// Retrieves lists of messages either from the send or receive queue
+/// ACL_MODE: Rquires LOCAL access
 /// # Parameters
 /// - `session`: Session information
 /// - `folder`: Folder to retrieve messages from
@@ -39,6 +43,11 @@ pub async fn message_list_handler(
         folder = folder.to_string()
     );
     async move {
+        // ACL Check
+        if !acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+            return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
+        }
+
         // Check that the DID hash matches the session DID
         // TODO: In the future, add support for lists of DID's owned by the session owner
         if session.did_hash != did_hash {

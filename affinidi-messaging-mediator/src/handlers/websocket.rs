@@ -1,7 +1,10 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    common::errors::MediatorError,
+    common::{
+        acl_checks::acl_check_local,
+        errors::{AppError, MediatorError},
+    },
     database::session::Session,
     messages::inbound::handle_inbound,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
@@ -26,7 +29,8 @@ use tokio::{
 use tracing::{debug, info, span, warn, Instrument};
 use uuid::Uuid;
 
-// Handles the switching of the protocol to a websocket connection
+/// Handles the switching of the protocol to a websocket connection
+/// ACL_MODE: Rquires LOCAL access
 pub async fn websocket_handler(
     session: Session,
     ws: WebSocketUpgrade,
@@ -37,9 +41,16 @@ pub async fn websocket_handler(
         "websocket_handler",
         session = session.session_id
     );
-    async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
-        .instrument(_span)
-        .await
+    // ACL Check (websockets only work on local DID's)
+    if acl_check_local(&session.global_acls, &state.config.security.acl_mode) {
+        async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
+            .instrument(_span)
+            .await
+    } else {
+        let app_error: AppError =
+            MediatorError::ACLDenied("DID does not have LOCAL access".into()).into();
+        app_error.into_response()
+    }
 }
 
 /// WebSocket state machine. This is spawned per connection.
