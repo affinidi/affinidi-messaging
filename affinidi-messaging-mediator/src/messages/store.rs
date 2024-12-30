@@ -1,9 +1,7 @@
+use crate::database::session::Session;
 use crate::messages::MessageHandler;
 use crate::{
-    common::errors::{MediatorError, Session},
-    database::DatabaseHandler,
-    messages::PackOptions,
-    SharedData,
+    common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions, SharedData,
 };
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};

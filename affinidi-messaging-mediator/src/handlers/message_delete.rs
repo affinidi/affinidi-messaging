@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, span, warn, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::Session,
     SharedData,
 };
 

@@ -1,7 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::inbound::handle_inbound,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
     SharedData,

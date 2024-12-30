@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-helpers"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-mediator"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -209,14 +209,14 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processor"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -255,7 +255,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-text-client"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -1867,9 +1867,9 @@ dependencies = [
 
 [[package]]
 name = "compact_str"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6050c3a16ddab2e412160b31f2c871015704239bca62f72f6e5f0be631d3f644"
+checksum = "3b79c4069c6cad78e2e0cdfcbd26275770669fb39fd308a752dc110e83b9af32"
 dependencies = [
  "castaway",
  "cfg-if",
@@ -5554,9 +5554,9 @@ dependencies = [
 
 [[package]]
 name = "ratatui-image"
-version = "4.1.0"
+version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9b3fddb4a7287b7a2dd3833c709d2dbb2d57b96034759f6900b95b3c6ffa46f"
+checksum = "a58a8653f67cc64f364304302028358a1c1a12e82c9770e71ab7b79546df511b"
 dependencies = [
  "base64 0.21.7",
  "icy_sixel",

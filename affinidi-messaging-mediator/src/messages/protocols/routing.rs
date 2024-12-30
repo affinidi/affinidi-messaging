@@ -1,5 +1,6 @@
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::{store::store_forwarded_message, ProcessMessageResponse},
     SharedData,
 };

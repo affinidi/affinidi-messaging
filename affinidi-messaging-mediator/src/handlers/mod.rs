@@ -1,7 +1,4 @@
-use crate::{
-    common::errors::{AppError, Session},
-    SharedData,
-};
+use crate::{common::errors::AppError, database::session::Session, SharedData};
 use affinidi_messaging_sdk::messages::SuccessResponse;
 use axum::{
     extract::State,

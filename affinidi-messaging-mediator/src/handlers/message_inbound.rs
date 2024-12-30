@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::Session,
     messages::inbound::handle_inbound,
     SharedData,
 };

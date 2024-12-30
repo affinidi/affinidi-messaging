@@ -16,7 +16,8 @@ use tracing::{debug, error, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::ProcessMessageResponse,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
     SharedData,

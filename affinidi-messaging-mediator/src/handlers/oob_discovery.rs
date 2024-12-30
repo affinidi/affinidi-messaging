@@ -14,7 +14,8 @@
 */
 
 use crate::{
-    common::errors::{AppError, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::Session,
     SharedData,
 };
 use affinidi_messaging_didcomm::Message;

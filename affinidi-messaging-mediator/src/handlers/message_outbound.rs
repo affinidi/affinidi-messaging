@@ -4,7 +4,8 @@ use http::StatusCode;
 use tracing::{debug, span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, Session, SuccessResponse},
+    common::errors::{AppError, SuccessResponse},
+    database::session::Session,
     SharedData,
 };
 

@@ -61,6 +61,7 @@ pub struct Session {
     pub state: SessionState,
     pub did: String,
     pub did_hash: String,
+    pub authenticated: bool,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {

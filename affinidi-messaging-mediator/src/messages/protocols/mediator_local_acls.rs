@@ -1,8 +1,7 @@
 use affinidi_messaging_didcomm::Message;
 
 use crate::{
-    common::errors::{MediatorError, Session},
-    messages::ProcessMessageResponse,
+    common::errors::MediatorError, database::session::Session, messages::ProcessMessageResponse,
     SharedData,
 };
 

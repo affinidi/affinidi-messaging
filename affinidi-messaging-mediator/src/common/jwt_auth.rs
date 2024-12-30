@@ -1,5 +1,8 @@
-use super::errors::{ErrorResponse, Session};
-use crate::{database::session::SessionClaims, SharedData};
+use super::errors::ErrorResponse;
+use crate::{
+    database::session::{Session, SessionClaims},
+    SharedData,
+};
 use axum::{
     async_trait,
     extract::{FromRef, FromRequestParts},
@@ -137,19 +140,20 @@ where
         let did = token_data.claims.sub.clone();
         let did_hash = digest(&did);
 
+        // Everything has passed token wise - expensive database operations happen here
+        let saved_session = state.database.get_session(&session_id).await.map_err(|e| {
+            error!("Couldn't get session from database! Reason: {}", e);
+            AuthError::InternalServerError(format!(
+                "Couldn't get session from database! Reason: {}",
+                e
+            ))
+        })?;
+
         info!(
             "{}: Protected connection accepted from did_hash({})",
             &session_id, &did_hash
         );
 
-        let session = Session {
-            session_id,
-            authenticated: true,
-            challenge_sent: None,
-            did,
-            did_hash,
-        };
-
-        Ok(session)
+        Ok(saved_session)
     }
 }

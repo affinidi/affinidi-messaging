@@ -7,8 +7,7 @@ use tracing::{debug, info, span};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::{MediatorError, Session},
-    messages::ProcessMessageResponse,
+    common::errors::MediatorError, database::session::Session, messages::ProcessMessageResponse,
 };
 
 // Reads the body of an incoming trust-ping and whether to generate a return ping message

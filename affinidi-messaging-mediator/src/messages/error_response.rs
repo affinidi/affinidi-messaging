@@ -9,10 +9,7 @@ use affinidi_messaging_sdk::messages::problem_report::ProblemReport;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{
-    common::errors::{MediatorError, Session},
-    SharedData,
-};
+use crate::{common::errors::MediatorError, database::session::Session, SharedData};
 
 use super::ProcessMessageResponse;
 

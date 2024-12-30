@@ -1,7 +1,8 @@
 use std::time::SystemTime;
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
 };

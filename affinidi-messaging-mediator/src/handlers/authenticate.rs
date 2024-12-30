@@ -12,7 +12,7 @@ use crate::{
         acl_checks::acl_authentication_check,
         errors::{AppError, MediatorError, SuccessResponse},
     },
-    database::session::{Session as DBSession, SessionClaims, SessionState},
+    database::session::{Session, SessionClaims, SessionState},
     SharedData,
 };
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
@@ -50,12 +50,13 @@ pub async fn authentication_challenge(
     State(state): State<SharedData>,
     Json(body): Json<ChallengeBody>,
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
-    let session = DBSession {
+    let session = Session {
         session_id: create_random_string(12),
         challenge: create_random_string(32),
         state: SessionState::ChallengeSent,
         did: body.did.clone(),
         did_hash: digest(body.did),
+        authenticated: false,
     };
     let _span = span!(
         Level::DEBUG,
