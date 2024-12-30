@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use affinidi_messaging_sdk::protocols::mediator::acls::GlobalACLSet;
 use redis::Value;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
@@ -62,6 +63,7 @@ pub struct Session {
     pub did: String,
     pub did_hash: String,
     pub authenticated: bool,
+    pub global_acls: GlobalACLSet,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {
@@ -106,6 +108,28 @@ impl TryFrom<(&str, HashMap<String, String>)> for Session {
             ));
         }
 
+        if let Some(global_acl) = hash.get("global_acl") {
+            session.global_acls = match str::parse(global_acl) {
+                Ok(acl) => GlobalACLSet::from_bits(acl),
+                Err(err) => {
+                    warn!(
+                        "{}: Error parsing global_acl({})! Error: {}",
+                        sid, global_acl, err
+                    );
+                    return Err(MediatorError::SessionError(
+                        sid.into(),
+                        "No Global ACL found when retrieving session!".into(),
+                    ));
+                }
+            }
+        } else {
+            warn!("{}: Error parsing global_acl!", sid);
+            return Err(MediatorError::SessionError(
+                sid.into(),
+                "No Global ACL found when retrieving session!".into(),
+            ));
+        }
+
         Ok(session)
     }
 }
@@ -128,6 +152,8 @@ impl DatabaseHandler {
             .arg(session.state.to_string())
             .arg("did")
             .arg(&session.did)
+            .arg("global_acl")
+            .arg(session.global_acls.into_bits())
             .cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("SESSIONS_CREATED")

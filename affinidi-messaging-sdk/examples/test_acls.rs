@@ -18,7 +18,7 @@ async fn main() -> Result<(), ATMError> {
 
     println!("{:x}", test.into_bits());
 
-    let test2 = GlobalACLSet::from_bits(u32::from_str_radix("ff", 16).unwrap());
+    let test2 = GlobalACLSet::from_bits(test.into_bits());
     println!("{:x}", test2.into_bits());
     Ok(())
 }

@@ -57,6 +57,7 @@ pub async fn authentication_challenge(
         did: body.did.clone(),
         did_hash: digest(body.did),
         authenticated: false,
+        global_acls: state.config.security.default_acl,
     };
     let _span = span!(
         Level::DEBUG,
