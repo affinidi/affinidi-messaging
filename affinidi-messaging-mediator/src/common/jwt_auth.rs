@@ -1,4 +1,4 @@
-use super::errors::ErrorResponse;
+use super::{acl_checks::acl_authentication_check, errors::ErrorResponse};
 use crate::{
     database::session::{Session, SessionClaims},
     SharedData,
@@ -46,6 +46,7 @@ pub enum AuthError {
     InvalidToken,
     ExpiredToken,
     InternalServerError(String),
+    Blocked,
 }
 
 impl Display for AuthError {
@@ -58,6 +59,7 @@ impl Display for AuthError {
             AuthError::InternalServerError(message) => {
                 write!(f, "Internal Server Error: {}", message)
             }
+            AuthError::Blocked => write!(f, "ACL Blocked"),
         }
     }
 }
@@ -70,6 +72,7 @@ impl IntoResponse for AuthError {
             AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
             AuthError::ExpiredToken => StatusCode::UNAUTHORIZED,
             AuthError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::Blocked => StatusCode::UNAUTHORIZED,
         };
         let body = Json(json!(ErrorResponse {
             sessionId: "UNAUTHORIZED".into(),
@@ -142,12 +145,33 @@ where
 
         // Everything has passed token wise - expensive database operations happen here
         let saved_session = state.database.get_session(&session_id).await.map_err(|e| {
-            error!("Couldn't get session from database! Reason: {}", e);
+            error!(
+                "{}: Couldn't get session from database! Reason: {}",
+                session_id, e
+            );
             AuthError::InternalServerError(format!(
                 "Couldn't get session from database! Reason: {}",
                 e
             ))
         })?;
+
+        // Check if ACL is satisfied
+        if !acl_authentication_check(&state, &did_hash, Some(&saved_session))
+            .await
+            .map_err(|e| {
+                error!(
+                    "{}: acl_authentication_check() failed: Reason: {}",
+                    session_id, e
+                );
+                AuthError::InternalServerError(format!(
+                    "Couldn't process global_acl set. Reason: {}",
+                    e
+                ))
+            })?
+        {
+            info!("DID({}) is blocked from connecting", did);
+            return Err(AuthError::Blocked);
+        }
 
         info!(
             "{}: Protected connection accepted from did_hash({})",

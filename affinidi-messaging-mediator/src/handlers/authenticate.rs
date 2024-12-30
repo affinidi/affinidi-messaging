@@ -67,7 +67,7 @@ pub async fn authentication_challenge(
     );
     async move {
         // Check if DID is allowed to connect
-        if !acl_authentication_check(&state, &session.did_hash).await? {
+        if !acl_authentication_check(&state, &session.did_hash, Some(&session)).await? {
             info!("DID({}) is blocked from connecting", session.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }
@@ -131,7 +131,7 @@ pub async fn authentication_response(
 
         if let Some(from_did) = &envelope.from_did {
             // Check if DID is allowed to connect
-            if !acl_authentication_check(&state, &digest(from_did)).await? {
+            if !acl_authentication_check(&state, &digest(from_did), None).await? {
                 info!("DID({}) is blocked from connecting", from_did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             }
