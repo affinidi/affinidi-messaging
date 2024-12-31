@@ -218,7 +218,7 @@ async fn _load_scripts(
         .arg("LOAD")
         .arg("REPLACE")
         .arg(lua_scripts)
-        .query_async::<String>(&mut conn)
+        .exec_async(&mut conn)
         .await
     {
         Ok(_) => {

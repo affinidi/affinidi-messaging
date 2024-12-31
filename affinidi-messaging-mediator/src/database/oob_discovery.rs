@@ -13,7 +13,6 @@ use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_didcomm::Message;
 use base64::prelude::*;
-use redis::Value;
 use sha256::digest;
 use std::time::SystemTime;
 use tracing::{debug, error, info, span, Instrument, Level};
@@ -81,16 +80,6 @@ impl DatabaseHandler {
 
             match deadpool_redis::redis::pipe()
                 .atomic()
-                // .cmd("HSET")
-                // .arg(HASH_KEY)
-                // .arg(&invite_hash)
-                // .arg(&base64_invite)
-                // .cmd("HEXPIREAT")
-                // .arg(HASH_KEY)
-                // .arg(expire_at)
-                // .arg("FIELDS")
-                // .arg(1)
-                // .arg(&invite_hash)
                 .cmd("SET")
                 .arg(key.to_owned())
                 .arg(&base64_invite)
@@ -101,7 +90,7 @@ impl DatabaseHandler {
                 .arg("GLOBAL")
                 .arg("OOB_INVITES_CREATED")
                 .arg(1)
-                .query_async::<Value>(&mut conn)
+                .exec_async(&mut conn)
                 .await
             {
                 Ok(_) => {

@@ -4,7 +4,6 @@ use std::{
 };
 
 use affinidi_messaging_sdk::protocols::mediator::global_acls::GlobalACLSet;
-use redis::Value;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use tracing::{debug, warn};
@@ -142,7 +141,7 @@ impl DatabaseHandler {
 
         let sid = format!("SESSION:{}", session.session_id);
 
-        let _result: Value = deadpool_redis::redis::pipe()
+        deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HSET")
             .arg(&sid)
@@ -159,7 +158,7 @@ impl DatabaseHandler {
             .arg("SESSIONS_CREATED")
             .arg(1)
             .expire(&sid, 900)
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::SessionError(
@@ -205,7 +204,7 @@ impl DatabaseHandler {
         let old_sid = format!("SESSION:{}", old_session_id);
         let new_sid = format!("SESSION:{}", new_session_id);
 
-        let _result: Value = deadpool_redis::redis::pipe()
+        deadpool_redis::redis::pipe()
             .atomic()
             .cmd("RENAME")
             .arg(&old_sid)
@@ -222,7 +221,7 @@ impl DatabaseHandler {
             .arg("KNOWN_DIDS")
             .arg(did_hash)
             .expire(&new_sid, 86400)
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::SessionError(

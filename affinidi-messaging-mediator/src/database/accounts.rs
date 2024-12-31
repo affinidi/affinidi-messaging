@@ -1,16 +1,37 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
-use affinidi_messaging_sdk::protocols::mediator::mediator::MediatorAccountList;
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
+use affinidi_messaging_sdk::protocols::mediator::{
+    global_acls::GlobalACLSet, local_acls::LocalACLSet, mediator::MediatorAccountList,
+};
 use redis::{from_redis_value, Value};
 use tracing::{debug, span, Instrument, Level};
 
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
-
 impl DatabaseHandler {
+    /// Quick and efficient check if an account exists locally in the mediator
+    pub(crate) async fn account_exists(&self, did_hash: &str) -> Result<bool, MediatorError> {
+        let mut con = self.get_async_connection().await?;
+
+        deadpool_redis::redis::cmd("EXISTS")
+            .arg(["DID:", did_hash].concat())
+            .query_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("Add failed. Reason: {}", err),
+                )
+            })
+    }
+
     /// Add a DID account to the mediator
     /// - `did_hash` - SHA256 hash of the DID
-    pub(crate) async fn add_account(&self, did_hash: &str) -> Result<bool, MediatorError> {
+    pub(crate) async fn account_add(
+        &self,
+        did_hash: &str,
+        global_acl: GlobalACLSet,
+        local_acl: LocalACLSet,
+    ) -> Result<bool, MediatorError> {
         let _span = span!(Level::DEBUG, "add_account", "did_hash" = did_hash,);
 
         async move {
@@ -18,20 +39,36 @@ impl DatabaseHandler {
 
             let mut con = self.get_async_connection().await?;
 
-            let result: i32 = deadpool_redis::redis::pipe()
+            deadpool_redis::redis::pipe()
                 .atomic()
                 .cmd("SADD")
                 .arg("KNOWN_DIDS")
                 .arg(did_hash)
-                .query_async(&mut con)
+                .cmd("HSET")
+                .arg(["DID:", did_hash].concat())
+                .arg("SEND_QUEUE_BYTES")
+                .arg(0)
+                .arg("SEND_QUEUE_COUNT")
+                .arg(0)
+                .arg("RECEIVE_QUEUE_BYTES")
+                .arg(0)
+                .arg("RECEIVE_QUEUE_COUNT")
+                .arg(0)
+                .arg("ROLE_TYPE")
+                .arg(0)
+                .arg("GLOBAL_ACL")
+                .arg(global_acl.into_bits())
+                .arg("LOCAL_ACL")
+                .arg(local_acl.into_bits())
+                .exec_async(&mut con)
                 .await
                 .map_err(|err| {
                     MediatorError::DatabaseError(
                         "NA".to_string(),
-                        format!("Add failed. Reason: {}", err),
+                        format!("account_add() failed. Reason: {}", err),
                     )
                 })?;
-            debug!("Account added successfully: {:?}", result);
+            debug!("Account added successfully");
 
             Ok(true)
         }
@@ -41,7 +78,7 @@ impl DatabaseHandler {
 
     /// Removes an account from the mediator
     /// - `did_hash` - SHA256 Hash of DID to remove
-    pub(crate) async fn remove_account(&self, did_hash: &str) -> Result<i32, MediatorError> {
+    pub(crate) async fn account_remove(&self, did_hash: &str) -> Result<i32, MediatorError> {
         let _span = span!(Level::DEBUG, "remove_account", "did_hash" = did_hash,);
 
         async move {
@@ -86,7 +123,7 @@ impl DatabaseHandler {
     /// - `cursor` - The offset to start from (0 is the start)
     /// - `limit` - The maximum number of accounts to return (max 100)
     ///    NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
-    pub(crate) async fn list_accounts(
+    pub(crate) async fn account_list(
         &self,
         cursor: u32,
         limit: u32,

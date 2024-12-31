@@ -17,7 +17,7 @@ impl DatabaseHandler {
         let did_hash = sha256::digest(admin_did);
         debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
 
-        let _result: Value = deadpool_redis::redis::pipe()
+        deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SADD")
             .arg("ADMINS")
@@ -28,7 +28,7 @@ impl DatabaseHandler {
             .arg("ADMIN")
             .arg(1)
             .ignore()
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::DatabaseError(

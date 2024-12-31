@@ -155,7 +155,7 @@ impl DatabaseHandler {
         match deadpool_redis::redis::cmd("PUBLISH")
             .arg(["CHANNEL:", stream_uuid].concat())
             .arg(record)
-            .query_async::<Value>(&mut conn)
+            .exec_async(&mut conn)
             .await
         {
             Ok(_) => {
@@ -203,7 +203,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":FALSE"].concat())
-            .query_async::<Value>(&mut conn)
+            .exec_async(&mut conn)
             .await
         {
             Ok(_) => {
@@ -244,7 +244,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":", "TRUE"].concat())
-            .query_async::<Value>(&mut conn)
+            .exec_async(&mut conn)
             .await
         {
             Ok(_) => {
@@ -288,7 +288,7 @@ impl DatabaseHandler {
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
             .arg([stream_uuid, ":", "FALSE"].concat())
-            .query_async::<Value>(&mut conn)
+            .exec_async(&mut conn)
             .await
         {
             Ok(_) => {
@@ -336,7 +336,7 @@ impl DatabaseHandler {
             .cmd("HDEL")
             .arg("GLOBAL_STREAMING")
             .arg(did_hash)
-            .query_async::<Value>(&mut conn)
+            .exec_async(&mut conn)
             .await
         {
             Ok(_) => {

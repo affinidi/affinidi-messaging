@@ -6,9 +6,9 @@ use crate::{
 };
 
 pub(crate) async fn process(
-    msg: &Message,
-    state: &SharedData,
-    session: &Session,
+    _msg: &Message,
+    _state: &SharedData,
+    _session: &Session,
 ) -> Result<ProcessMessageResponse, MediatorError> {
     Err(MediatorError::NotImplemented(
         "MediatorLocalACLManagement".into(),

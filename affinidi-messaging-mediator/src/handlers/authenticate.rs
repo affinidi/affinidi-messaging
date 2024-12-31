@@ -280,6 +280,9 @@ pub async fn authentication_response(
             .update_session_authenticated(&old_sid, &session.session_id, &digest(&session.did))
             .await?;
 
+        // Register the DID and initial setup
+        _register_did_and_setup(&state, &session.did_hash).await?;
+
         info!(
             "{}: Authentication successful for DID({})",
             session.session_id, session.did
@@ -299,6 +302,33 @@ pub async fn authentication_response(
     }
     .instrument(_span)
     .await
+}
+
+/// Check if the DID is already registered and set up (as needed)
+/// A DID is only registered if local accounts are enabled via ACL
+async fn _register_did_and_setup(state: &SharedData, did_hash: &str) -> Result<(), MediatorError> {
+    // Do we already know about this DID?
+    if state.database.account_exists(did_hash).await? {
+        debug!("DID({}) already registered", did_hash);
+        return Ok(());
+    } else if state
+        .config
+        .security
+        .global_acl_default
+        .check_local(&state.config.security.global_acl_mode)
+    {
+        // Register the DID as a local DID
+        state
+            .database
+            .account_add(
+                did_hash,
+                state.config.security.global_acl_default,
+                state.config.security.local_acl_default,
+            )
+            .await?;
+    }
+
+    Ok(())
 }
 
 /// POST /authenticate/refresh

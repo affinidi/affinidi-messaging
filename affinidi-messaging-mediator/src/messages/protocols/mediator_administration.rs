@@ -117,7 +117,7 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AccountList{cursor, limit} => {
-                match  state.database.list_accounts(cursor, limit).await {
+                match  state.database.account_list(cursor, limit).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }
@@ -134,7 +134,7 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AccountAdd(attr) => {
-                match  state.database.add_account(&attr).await {
+                match  state.database.account_add(&attr, state.config.security.global_acl_default, state.config.security.local_acl_default).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }
@@ -163,7 +163,7 @@ pub(crate) async fn process(
                         vec![], None
                     ), false);
                 }
-                match  state.database.remove_account(&attr).await {
+                match  state.database.account_remove(&attr).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }
