@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use affinidi_messaging_sdk::protocols::mediator::acls::GlobalACLSet;
+use affinidi_messaging_sdk::protocols::mediator::global_acls::GlobalACLSet;
 use redis::Value;
 use serde::{Deserialize, Serialize};
 use sha256::digest;

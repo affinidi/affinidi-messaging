@@ -51,7 +51,7 @@ pub async fn message_inbound_handler(
         // ACL Check
         if !session
             .global_acls
-            .check_inbound(&state.config.security.acl_mode)
+            .check_inbound(&state.config.security.global_acl_mode)
         {
             return Err(
                 MediatorError::ACLDenied("DID does not have send/inbound access".into()).into(),

@@ -2,7 +2,7 @@ use affinidi_messaging_sdk::{
     config::Config,
     errors::ATMError,
     protocols::{
-        mediator::acls::{ACLMode, GlobalACLSet},
+        mediator::global_acls::{GlobalACLMode, GlobalACLSet},
         Protocols,
     },
     ATM,
@@ -14,7 +14,7 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(Config::builder().build()?).await?;
     let protocols = Protocols::new();
 
-    let test = GlobalACLSet::from_acl_string("deny_all", ACLMode::ExplicitDeny)?;
+    let test = GlobalACLSet::from_acl_string("deny_all", GlobalACLMode::ExplicitDeny)?;
 
     println!("{:x}", test.into_bits());
 

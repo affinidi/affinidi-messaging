@@ -48,7 +48,7 @@ pub async fn oob_invite_handler(
     // ACL Check
     if !session
         .global_acls
-        .check_invites(&state.config.security.acl_mode)
+        .check_invites(&state.config.security.global_acl_mode)
     {
         return Err(
             MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),
@@ -125,7 +125,7 @@ pub async fn delete_oobid_handler(
     // ACL Check
     if !session
         .global_acls
-        .check_invites(&state.config.security.acl_mode)
+        .check_invites(&state.config.security.global_acl_mode)
     {
         return Err(
             MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),

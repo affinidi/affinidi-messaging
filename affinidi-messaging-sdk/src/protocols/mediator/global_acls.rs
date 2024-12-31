@@ -1,19 +1,16 @@
+use super::mediator::Mediator;
+use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
+use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
+use bitfield_struct::bitfield;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     fmt::{self, Display},
     sync::Arc,
     time::SystemTime,
 };
-
-use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
-use bitfield_struct::bitfield;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
-
-use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
-
-use super::mediator::Mediator;
 
 /// DIDComm message body for requesting a set of Global ACLs for a list of DID Hashes
 #[derive(Serialize, Deserialize)]
@@ -26,13 +23,13 @@ pub enum MediatorGlobalACLRequest {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename = "acl_response")]
 pub struct MediatorGlobalACLResponse {
-    pub acl_response: Vec<ACLConfig>,
-    pub mediator_acl_mode: ACLMode,
+    pub acl_response: Vec<GlobalACLConfig>,
+    pub mediator_acl_mode: GlobalACLMode,
 }
 
 /// ACL Configuration for a DID
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ACLConfig {
+pub struct GlobalACLConfig {
     pub did_hash: String,
     pub acl_value: u32,
     pub acls: GlobalACLSet,
@@ -60,7 +57,7 @@ pub struct GlobalACLSet {
 
 impl GlobalACLSet {
     /// Converts an ACL string set (ALLOW_ALL, DENY_ALL etc) to a GlobalACLSet
-    pub fn from_acl_string(acls: &str, acl_mode: ACLMode) -> Result<GlobalACLSet, ATMError> {
+    pub fn from_acl_string(acls: &str, acl_mode: GlobalACLMode) -> Result<GlobalACLSet, ATMError> {
         let acls = acls.to_ascii_lowercase();
 
         let mut acl_bits = GlobalACLSet::default();
@@ -69,7 +66,7 @@ impl GlobalACLSet {
 
             match acl {
                 "allow_all" => {
-                    if acl_mode == ACLMode::ExplicitDeny {
+                    if acl_mode == GlobalACLMode::ExplicitDeny {
                         // setting all to false
                         acl_bits.set_forward_from(false);
                         acl_bits.set_forward_to(false);
@@ -92,7 +89,7 @@ impl GlobalACLSet {
                     }
                 }
                 "deny_all" => {
-                    if acl_mode == ACLMode::ExplicitDeny {
+                    if acl_mode == GlobalACLMode::ExplicitDeny {
                         // setting all to true
                         acl_bits.set_forward_from(true);
                         acl_bits.set_forward_to(true);
@@ -115,46 +112,46 @@ impl GlobalACLSet {
                     }
                 }
                 "allow_local" => {
-                    acl_bits.set_local(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_local(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_local" => {
-                    acl_bits.set_local(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_local(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_forward_from" => {
-                    acl_bits.set_forward_from(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_forward_from(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_forward_from" => {
-                    acl_bits.set_forward_from(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_forward_from(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_forward_to" => {
-                    acl_bits.set_forward_to(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_forward_to(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_forward_to" => {
-                    acl_bits.set_forward_to(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_forward_to(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_inbound" => {
-                    acl_bits.set_inbound(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_inbound(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_inbound" => {
-                    acl_bits.set_inbound(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_inbound(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_outbound" => {
-                    acl_bits.set_outbound(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_outbound(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_outbound" => {
-                    acl_bits.set_outbound(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_outbound(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_create_invites" => {
-                    acl_bits.set_create_invites(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_create_invites(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_create_invites" => {
-                    acl_bits.set_create_invites(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_create_invites(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 "allow_self_admin" => {
-                    acl_bits.set_self_admin(acl_mode != ACLMode::ExplicitDeny);
+                    acl_bits.set_self_admin(acl_mode != GlobalACLMode::ExplicitDeny);
                 }
                 "deny_self_admin" => {
-                    acl_bits.set_self_admin(acl_mode == ACLMode::ExplicitDeny);
+                    acl_bits.set_self_admin(acl_mode == GlobalACLMode::ExplicitDeny);
                 }
                 _ => {
                     return Err(ATMError::ConfigError(format!(
@@ -170,7 +167,7 @@ impl GlobalACLSet {
 
 /// Strings that can be used to set ACL's
 #[derive(Serialize, Deserialize)]
-pub enum ACLStrings {
+pub enum GlobalACLStrings {
     AllowAll,
     DenyAll,
     AllowLocal,
@@ -189,25 +186,25 @@ pub enum ACLStrings {
     DenySelfAdmin,
 }
 
-impl Display for ACLStrings {
+impl Display for GlobalACLStrings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ACLStrings::AllowAll => write!(f, "allow_all"),
-            ACLStrings::DenyAll => write!(f, "deny_all"),
-            ACLStrings::AllowLocal => write!(f, "allow_local"),
-            ACLStrings::DenyLocal => write!(f, "deny_local"),
-            ACLStrings::AllowForwardFrom => write!(f, "allow_forward_from"),
-            ACLStrings::DenyForwardFrom => write!(f, "deny_forward_from"),
-            ACLStrings::AllowForwardTo => write!(f, "allow_forward_to"),
-            ACLStrings::DenyForwardTo => write!(f, "deny_forward_to"),
-            ACLStrings::AllowInbound => write!(f, "allow_inbound"),
-            ACLStrings::DenyInbound => write!(f, "deny_inbound"),
-            ACLStrings::AllowOutbound => write!(f, "allow_outbound"),
-            ACLStrings::DenyOutbound => write!(f, "deny_outbound"),
-            ACLStrings::AllowCreateInvites => write!(f, "allow_create_invites"),
-            ACLStrings::DenyCreateInvites => write!(f, "deny_create_invites"),
-            ACLStrings::AllowSelfAdmin => write!(f, "allow_self_admin"),
-            ACLStrings::DenySelfAdmin => write!(f, "deny_self_admin"),
+            GlobalACLStrings::AllowAll => write!(f, "allow_all"),
+            GlobalACLStrings::DenyAll => write!(f, "deny_all"),
+            GlobalACLStrings::AllowLocal => write!(f, "allow_local"),
+            GlobalACLStrings::DenyLocal => write!(f, "deny_local"),
+            GlobalACLStrings::AllowForwardFrom => write!(f, "allow_forward_from"),
+            GlobalACLStrings::DenyForwardFrom => write!(f, "deny_forward_from"),
+            GlobalACLStrings::AllowForwardTo => write!(f, "allow_forward_to"),
+            GlobalACLStrings::DenyForwardTo => write!(f, "deny_forward_to"),
+            GlobalACLStrings::AllowInbound => write!(f, "allow_inbound"),
+            GlobalACLStrings::DenyInbound => write!(f, "deny_inbound"),
+            GlobalACLStrings::AllowOutbound => write!(f, "allow_outbound"),
+            GlobalACLStrings::DenyOutbound => write!(f, "deny_outbound"),
+            GlobalACLStrings::AllowCreateInvites => write!(f, "allow_create_invites"),
+            GlobalACLStrings::DenyCreateInvites => write!(f, "deny_create_invites"),
+            GlobalACLStrings::AllowSelfAdmin => write!(f, "allow_self_admin"),
+            GlobalACLStrings::DenySelfAdmin => write!(f, "deny_self_admin"),
         }
     }
 }
@@ -216,25 +213,25 @@ impl Display for ACLStrings {
 /// - ExplicitAllow - no one can connect, unless explicitly allowed
 /// - ExplicitDeny - everyone can connect, unless explicitly denied
 #[derive(Clone, Deserialize, PartialEq, Serialize)]
-pub enum ACLMode {
+pub enum GlobalACLMode {
     ExplicitAllow,
     ExplicitDeny,
 }
 
-impl fmt::Debug for ACLMode {
+impl fmt::Debug for GlobalACLMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
+            GlobalACLMode::ExplicitAllow => write!(f, "explicit_allow"),
+            GlobalACLMode::ExplicitDeny => write!(f, "explicit_deny"),
         }
     }
 }
 
-impl fmt::Display for ACLMode {
+impl fmt::Display for GlobalACLMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
+            GlobalACLMode::ExplicitAllow => write!(f, "explicit_allow"),
+            GlobalACLMode::ExplicitDeny => write!(f, "explicit_deny"),
         }
     }
 }

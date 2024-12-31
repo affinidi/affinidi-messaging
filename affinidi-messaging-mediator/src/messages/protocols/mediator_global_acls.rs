@@ -9,7 +9,7 @@ use crate::{
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
-    protocols::mediator::acls::MediatorGlobalACLRequest,
+    protocols::mediator::global_acls::MediatorGlobalACLRequest,
 };
 use serde_json::{json, Value};
 use tracing::{span, warn, Instrument};
@@ -57,7 +57,7 @@ pub(crate) async fn process(
      // Process the request
      match request {
         MediatorGlobalACLRequest::GetACL(dids) => {
-            match  state.database.get_global_acls(&dids, state.config.security.acl_mode.clone()).await {
+            match  state.database.get_global_acls(&dids, state.config.security.global_acl_mode.clone()).await {
                 Ok(response) => {
                     _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                 }

@@ -35,7 +35,7 @@ pub async fn inbox_fetch_handler(
     );
     async move {
         // ACL Check
-        if !session.global_acls.check_local( &state.config.security.acl_mode) {
+        if !session.global_acls.check_local( &state.config.security.global_acl_mode) {
             return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
         }
 

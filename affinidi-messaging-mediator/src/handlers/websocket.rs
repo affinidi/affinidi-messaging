@@ -44,7 +44,7 @@ pub async fn websocket_handler(
     // ACL Check (websockets only work on local DID's)
     if session
         .global_acls
-        .check_local(&state.config.security.acl_mode)
+        .check_local(&state.config.security.global_acl_mode)
     {
         async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
             .instrument(_span)

@@ -160,7 +160,7 @@ where
 
         if !saved_session
             .global_acls
-            .check_blocked(&state.config.security.acl_mode)
+            .check_blocked(&state.config.security.global_acl_mode)
         {
             info!("DID({}) is blocked from connecting", did);
             return Err(AuthError::Blocked);

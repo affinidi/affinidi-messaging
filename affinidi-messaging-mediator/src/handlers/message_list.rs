@@ -46,7 +46,7 @@ pub async fn message_list_handler(
         // ACL Check
         if !session
             .global_acls
-            .check_local(&state.config.security.acl_mode)
+            .check_local(&state.config.security.global_acl_mode)
         {
             return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
         }

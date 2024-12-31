@@ -19,7 +19,7 @@ use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions}
 use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
-    protocols::mediator::acls::GlobalACLSet,
+    protocols::mediator::global_acls::GlobalACLSet,
 };
 use axum::{extract::State, Json};
 use http::StatusCode;
@@ -58,7 +58,7 @@ pub async fn authentication_challenge(
         did: body.did.clone(),
         did_hash: digest(body.did),
         authenticated: false,
-        global_acls: state.config.security.default_acl,
+        global_acls: state.config.security.global_acl_default,
     };
     let _span = span!(
         Level::DEBUG,
@@ -70,7 +70,7 @@ pub async fn authentication_challenge(
         // Check if DID is allowed to connect
         if !session
             .global_acls
-            .check_blocked(&state.config.security.acl_mode)
+            .check_blocked(&state.config.security.global_acl_mode)
         {
             info!("DID({}) is blocked from connecting", session.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
@@ -441,7 +441,7 @@ pub async fn authentication_refresh(
         // Does the Global ACL still allow them to connect?
         if !session_check
             .global_acls
-            .check_blocked(&state.config.security.acl_mode)
+            .check_blocked(&state.config.security.global_acl_mode)
         {
             info!("DID({}) is blocked from connecting", session_check.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());

@@ -54,17 +54,17 @@ pub(crate) async fn process(
             .database
             .get_global_acls(
                 &[next_did_hash.clone()],
-                state.config.security.acl_mode.clone(),
+                state.config.security.global_acl_mode.clone(),
             )
             .await?;
         let next_acls = if let Some(next_acls) = next_acls.acl_response.first() {
             next_acls.acls
         } else {
             // DID is not known, so use default ACL
-            state.config.security.default_acl
+            state.config.security.global_acl_default
         };
 
-        if !next_acls.check_forward_to(&state.config.security.acl_mode) {
+        if !next_acls.check_forward_to(&state.config.security.global_acl_mode) {
             return Err(MediatorError::ACLDenied(format!(
                 "Next DID({}) is blocked from receiving forwarded messages",
                 next_did_hash
@@ -101,24 +101,24 @@ pub(crate) async fn process(
                 .database
                 .get_global_acls(
                     &[digest(from.clone())],
-                    state.config.security.acl_mode.clone(),
+                    state.config.security.global_acl_mode.clone(),
                 )
                 .await?;
             let from_acls = if let Some(from_acls) = from_acls.acl_response.first() {
                 from_acls.acls
             } else {
                 // DID is not known, so use default ACL
-                state.config.security.default_acl
+                state.config.security.global_acl_default
             };
 
-            if !from_acls.check_forward_from(&state.config.security.acl_mode) {
+            if !from_acls.check_forward_from(&state.config.security.global_acl_mode) {
                 return Err(MediatorError::ACLDenied(
                     "DID is blocked from forwarded messages".into(),
                 ));
             }
         } else if !session
             .global_acls
-            .check_forward_from(&state.config.security.acl_mode)
+            .check_forward_from(&state.config.security.global_acl_mode)
         {
             return Err(MediatorError::ACLDenied(
                 "DID is blocked from forwarding messages".into(),

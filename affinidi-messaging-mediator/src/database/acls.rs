@@ -1,5 +1,5 @@
-use affinidi_messaging_sdk::protocols::mediator::acls::{
-    ACLConfig, ACLMode, GlobalACLSet, MediatorGlobalACLResponse,
+use affinidi_messaging_sdk::protocols::mediator::global_acls::{
+    GlobalACLConfig, GlobalACLMode, GlobalACLSet, MediatorGlobalACLResponse,
 };
 use redis::{from_redis_value, Cmd, Pipeline, Value};
 use tracing::{debug, span, Instrument, Level};
@@ -15,7 +15,7 @@ impl DatabaseHandler {
     pub(crate) async fn get_global_acls(
         &self,
         dids: &[String],
-        mediator_acl_mode: ACLMode,
+        mediator_acl_mode: GlobalACLMode,
     ) -> Result<MediatorGlobalACLResponse, MediatorError> {
         let _span = span!(Level::DEBUG, "get_global_acls");
 
@@ -52,7 +52,7 @@ impl DatabaseHandler {
             };
             for (index, item) in result.iter().enumerate() {
                 if let Ok(acls) = from_redis_value(item) {
-                    acl_response.acl_response.push(ACLConfig {
+                    acl_response.acl_response.push(GlobalACLConfig {
                         did_hash: dids[index].clone(),
                         acl_value: acls,
                         acls: GlobalACLSet::from_bits(acls),
