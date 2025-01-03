@@ -5,7 +5,6 @@ use crate::{
     SharedData,
 };
 use axum::{
-    async_trait,
     extract::{FromRef, FromRequestParts},
     response::{IntoResponse, Response},
     Json, RequestPartsExt,
@@ -86,7 +85,6 @@ impl IntoResponse for AuthError {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Session
 where
     SharedData: FromRef<S>,

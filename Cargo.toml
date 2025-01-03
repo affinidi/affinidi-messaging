@@ -35,8 +35,8 @@ aws-sdk-dynamodb = "1.57"
 aws-sdk-memorydb = "1.53"
 aws-sdk-secretsmanager = "1.55"
 aws-sdk-ssm = "1.57"
-axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9.6", features = ["typed-header"] }
+axum = { version = "0.8", features = ["ws"] }
+axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
 bitfield-struct = "0.10"
@@ -56,7 +56,7 @@ getrandom = "0.2"
 hostname = "0.4"
 http = "1"
 image = "0.25.5"
-itertools = "0.13"
+itertools = "0.14"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
 log = "0.4.22"

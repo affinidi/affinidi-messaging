@@ -30,7 +30,7 @@ pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router 
         .route("/fetch", post(inbox_fetch::inbox_fetch_handler))
         // Listing of messages for a DID
         .route(
-            "/list/:did_hash/:folder",
+            "/list/{did_hash}/{folder}",
             get(message_list::message_list_handler),
         )
         // Delete/remove messages stored in ATM

@@ -133,11 +133,11 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                         match msg {
                             WebSocketCommands::Message(msg) => {
                                 debug!("ws: Received message from streaming task: {:?}", msg);
-                                let _ = socket.send(Message::Text(msg)).await;
+                                let _ = socket.send(Message::Text(msg.into())).await;
                             },
                             WebSocketCommands::Close => {
                                 if let Ok(msg) =  _generate_duplicate_connection_problem_report(&state, &session).await {
-                                   let _ = socket.send(Message::Text(msg)).await;
+                                   let _ = socket.send(Message::Text(msg.into())).await;
                             }
                                 debug!("Received close message from streaming task, closing websocket connection");
                                 already_deregistered_flag = true;
