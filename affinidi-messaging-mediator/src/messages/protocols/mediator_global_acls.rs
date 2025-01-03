@@ -57,7 +57,7 @@ pub(crate) async fn process(
      // Process the request
      match request {
         MediatorGlobalACLRequest::GetACL(dids) => {
-            match  state.database.get_global_acls(&dids, state.config.security.global_acl_mode.clone()).await {
+            match  state.database.global_acls_get(&dids, state.config.security.global_acl_mode.clone()).await {
                 Ok(response) => {
                     _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                 }
@@ -109,7 +109,7 @@ fn _generate_response_message(
     Ok(ProcessMessageResponse {
         store_message: true,
         force_live_delivery: false,
-        message: Some(response),
+        data: crate::messages::WrapperType::Message(response),
         forward_message: false,
     })
 }

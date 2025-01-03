@@ -50,7 +50,7 @@ pub(crate) fn generate_error_response(
     Ok(ProcessMessageResponse {
         store_message,
         force_live_delivery: false,
-        message: Some(error_msg),
+        data: super::WrapperType::Message(error_msg),
         forward_message: false,
     })
 }

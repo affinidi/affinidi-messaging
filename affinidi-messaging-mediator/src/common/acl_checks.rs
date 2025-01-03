@@ -42,7 +42,7 @@ impl ACLCheck for GlobalACLSet {
             debug!("Fetching global_acls from database did_hash({})", did_hash);
             let acls = shared
                 .database
-                .get_global_acls(
+                .global_acls_get(
                     &[did_hash.to_string()],
                     shared.config.security.global_acl_mode.clone(),
                 )

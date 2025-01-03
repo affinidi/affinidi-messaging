@@ -18,6 +18,7 @@ use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 use ssi::dids::Document;
 use std::{
     env,
@@ -88,6 +89,7 @@ pub struct SecurityConfigRaw {
     pub local_acl_default_change_mode: String,
     pub local_acl_default_allow_anon_outbound: String,
     pub local_acl_default_change_allow_anon_outbound: String,
+    pub local_direct_delivery_allowed: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
     pub ssl_certificate_file: String,
@@ -103,6 +105,7 @@ pub struct SecurityConfig {
     pub global_acl_mode: GlobalACLMode,
     pub global_acl_default: GlobalACLSet,
     pub local_acl_default: LocalACLSet,
+    pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
     pub mediator_secrets: AffinidiSecrets,
     pub use_ssl: bool,
@@ -125,6 +128,10 @@ impl Debug for SecurityConfig {
             .field("global_acl_mode", &self.global_acl_mode)
             .field("global_acl_default", &self.global_acl_default)
             .field("local_acl_default", &self.local_acl_default)
+            .field(
+                "local_direct_delivery_allowed",
+                &self.local_direct_delivery_allowed,
+            )
             .field(
                 "mediator_secrets",
                 &format!("({}) secrets loaded", self.mediator_secrets.len()),
@@ -159,6 +166,7 @@ impl Default for SecurityConfig {
                 .with_anon_allowed(false)
                 .with_change_mode(true)
                 .with_change_anon_allowed(true),
+            local_direct_delivery_allowed: false,
             mediator_secrets: AffinidiSecrets::new(vec![]),
             use_ssl: true,
             ssl_certificate_file: "".into(),
@@ -203,6 +211,10 @@ impl SecurityConfigRaw {
                 "explicit_deny" => GlobalACLMode::ExplicitDeny,
                 _ => GlobalACLMode::ExplicitDeny,
             },
+            local_direct_delivery_allowed: self
+                .local_direct_delivery_allowed
+                .parse()
+                .unwrap_or(false),
             use_ssl: self.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: self.ssl_certificate_file.clone(),
             ssl_key_file: self.ssl_key_file.clone(),
@@ -460,6 +472,7 @@ pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
+    pub mediator_did_hash: String,
     pub mediator_did_doc: Option<Document>,
     pub admin_did: String,
     pub api_prefix: String,
@@ -479,6 +492,7 @@ impl fmt::Debug for Config {
             .field("log_level", &self.log_level)
             .field("listen_address", &self.listen_address)
             .field("mediator_did", &self.mediator_did)
+            .field("mediator_did_hash", &self.mediator_did_hash)
             .field("admin_did", &self.admin_did)
             .field("mediator_did_doc", &"Hidden")
             .field("database", &self.database)
@@ -506,6 +520,7 @@ impl Default for Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
             mediator_did: "".into(),
+            mediator_did_hash: "".into(),
             mediator_did_doc: None,
             admin_did: "".into(),
             database: DatabaseConfig::default(),
@@ -556,6 +571,8 @@ impl TryFrom<ConfigRaw> for Config {
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
+
+        config.mediator_did_hash = digest(&config.mediator_did);
 
         // Are we self-hosting our own did:web Document?
         if let Some(path) = raw.server.did_web_self_hosted {

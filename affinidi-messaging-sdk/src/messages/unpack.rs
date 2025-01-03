@@ -18,13 +18,7 @@ impl SharedState {
         let _span = span!(Level::DEBUG, "unpack",);
 
         async move {
-            let mut envelope = match MetaEnvelope::new(
-                message,
-                &self.did_resolver,
-                &self.secrets_resolver,
-            )
-            .await
-            {
+            let mut envelope = match MetaEnvelope::new(message, &self.did_resolver).await {
                 Ok(envelope) => envelope,
                 Err(e) => {
                     return Err(ATMError::DidcommError(

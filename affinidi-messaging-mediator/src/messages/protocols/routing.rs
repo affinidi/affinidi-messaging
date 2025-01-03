@@ -1,7 +1,7 @@
 use crate::{
     common::{acl_checks::ACLCheck, errors::MediatorError},
     database::session::Session,
-    messages::{store::store_forwarded_message, ProcessMessageResponse},
+    messages::{store::store_forwarded_message, ProcessMessageResponse, WrapperType},
     SharedData,
 };
 use affinidi_messaging_didcomm::{AttachmentData, Message};
@@ -52,7 +52,7 @@ pub(crate) async fn process(
         // Check if the next hop is allowed to receive forwarded messages
         let next_acls = state
             .database
-            .get_global_acls(
+            .global_acls_get(
                 &[next_did_hash.clone()],
                 state.config.security.global_acl_mode.clone(),
             )
@@ -99,7 +99,7 @@ pub(crate) async fn process(
         if let Some(from) = &msg.from {
             let from_acls = state
                 .database
-                .get_global_acls(
+                .global_acls_get(
                     &[digest(from.clone())],
                     state.config.security.global_acl_mode.clone(),
                 )
@@ -247,7 +247,7 @@ pub(crate) async fn process(
             store_message: false,
             force_live_delivery: false,
             forward_message: true,
-            message: None,
+            data: WrapperType::None,
         })
     }
     .instrument(_span)

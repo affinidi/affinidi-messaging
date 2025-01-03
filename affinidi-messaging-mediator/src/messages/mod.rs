@@ -71,12 +71,22 @@ impl MessageType {
     }
 }
 
+/// Type of message wrapper we are dealing with
+/// used when storing messages in the database
+#[derive(Debug, Default)]
+pub enum WrapperType {
+    /// to_did, message
+    Envelope(String, String),
+    Message(Message),
+    #[default]
+    None,
+}
 #[derive(Debug, Default)]
 pub(crate) struct ProcessMessageResponse {
     pub store_message: bool,
     pub force_live_delivery: bool, // Will force a live delivery attempt.
     pub forward_message: bool, // Set to true if the message was forwarded. Means we don't need to store it.
-    pub message: Option<Message>,
+    pub data: WrapperType,
 }
 
 #[derive(Debug)]

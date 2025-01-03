@@ -121,13 +121,12 @@ where
                             panic!("{:?}", e);
                         }
                     };
-                    let mut envelope =
-                        match MetaEnvelope::new(&decoded, did_resolver, secrets_resolver).await {
-                            Ok(envelope) => envelope,
-                            Err(e) => {
-                                panic!("{:?}", e);
-                            }
-                        };
+                    let mut envelope = match MetaEnvelope::new(&decoded, did_resolver).await {
+                        Ok(envelope) => envelope,
+                        Err(e) => {
+                            panic!("{:?}", e);
+                        }
+                    };
 
                     match Message::unpack(
                         &mut envelope,

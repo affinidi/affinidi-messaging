@@ -45,12 +45,22 @@ pub(crate) async fn _try_unpack_authcrypt(
 
     if jwe.apu.is_some() && envelope.from_kid.is_none() {
         debug!("Recalculating envelope meta-data from APU");
-        jwe.fill_envelope_from(envelope, did_resolver, secrets_resolver)
-            .await?;
+        jwe.fill_envelope_from(envelope, did_resolver).await?;
     }
 
     let mut payload: Option<Vec<u8>> = None;
     let mut crypto_operations_count = present_crypto_operations_count;
+
+    envelope.to_kids_found = secrets_resolver
+        .find_secrets(&envelope.metadata.encrypted_to_kids)
+        .await?;
+
+    if envelope.to_kids_found.is_empty() {
+        Err(err_msg(
+            ErrorKind::SecretNotFound,
+            "No recipient secrets found",
+        ))?;
+    }
 
     debug!("{} to_kids found", &envelope.to_kids_found.len());
     for to_kid in &envelope.to_kids_found {

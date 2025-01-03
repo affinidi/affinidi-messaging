@@ -53,7 +53,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
         ))?;
     }
 
-    envelope.metadata.encrypted_to_kids = Some(jwe.to_kids.iter().map(|k| k.to_owned()).collect());
+    envelope.metadata.encrypted_to_kids = jwe.to_kids.iter().map(|k| k.to_owned()).collect();
     envelope.metadata.encrypted = true;
     envelope.metadata.anonymous_sender = true;
 

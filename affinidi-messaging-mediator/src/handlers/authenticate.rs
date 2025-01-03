@@ -115,13 +115,7 @@ pub async fn authentication_response(
     async move {
         let s = serde_json::to_string(&body).unwrap();
 
-        let mut envelope = match MetaEnvelope::new(
-            &s,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-        )
-        .await
-        {
+        let mut envelope = match MetaEnvelope::new(&s, &state.did_resolver).await {
             Ok(envelope) => envelope,
             Err(e) => {
                 return Err(MediatorError::ParseError(
@@ -344,13 +338,7 @@ pub async fn authentication_refresh(
     async move {
         let s = serde_json::to_string(&body).unwrap();
 
-        let mut envelope = match MetaEnvelope::new(
-            &s,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-        )
-        .await
-        {
+        let mut envelope = match MetaEnvelope::new(&s, &state.did_resolver).await {
             Ok(envelope) => envelope,
             Err(e) => {
                 return Err(MediatorError::ParseError(

@@ -220,7 +220,7 @@ fn _generate_response_message(
     Ok(ProcessMessageResponse {
         store_message: true,
         force_live_delivery: false,
-        message: Some(response),
+        data: crate::messages::WrapperType::Message(response),
         forward_message: false,
     })
 }

@@ -4,9 +4,12 @@ use crate::{
     messages::{store::store_message, MessageHandler},
     SharedData,
 };
-use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
 use affinidi_messaging_sdk::messages::sending::InboundMessageResponse;
-use tracing::{debug, span, Instrument};
+use sha256::digest;
+use tracing::{debug, info, span, Instrument};
+
+use super::{ProcessMessageResponse, WrapperType};
 
 pub(crate) async fn handle_inbound(
     state: &SharedData,
@@ -16,13 +19,7 @@ pub(crate) async fn handle_inbound(
     let _span = span!(tracing::Level::DEBUG, "handle_inbound",);
 
     async move {
-        let mut envelope = match MetaEnvelope::new(
-            message,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-        )
-        .await
-        {
+        let mut envelope = match MetaEnvelope::new(message, &state.did_resolver).await {
             Ok(envelope) => envelope,
             Err(e) => {
                 return Err(MediatorError::ParseError(
@@ -33,37 +30,76 @@ pub(crate) async fn handle_inbound(
             }
         };
 
-        // Unpack the message
-        let (msg, metadata) = match Message::unpack(
-            &mut envelope,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-            &UnpackOptions {
-                crypto_operations_limit_per_message: state
-                    .config
-                    .limits
-                    .crypto_operations_per_message,
-                ..UnpackOptions::default()
-            },
-        )
-        .await
-        {
-            Ok(ok) => ok,
-            Err(e) => {
-                return Err(MediatorError::MessageUnpackError(
-                    session.session_id.clone(),
-                    format!("Couldn't unpack incoming message. Reason: {}", e),
-                ));
+        if let Some(to_did) = &envelope.to_did {
+            if to_did == &state.config.mediator_did {
+                // Message is to the mediator
+                let (msg, metadata) = match Message::unpack(
+                    &mut envelope,
+                    &state.did_resolver,
+                    &state.config.security.mediator_secrets,
+                    &UnpackOptions {
+                        crypto_operations_limit_per_message: state
+                            .config
+                            .limits
+                            .crypto_operations_per_message,
+                        ..UnpackOptions::default()
+                    },
+                )
+                .await
+                {
+                    Ok(ok) => ok,
+                    Err(e) => {
+                        return Err(MediatorError::MessageUnpackError(
+                            session.session_id.clone(),
+                            format!("Couldn't unpack incoming message. Reason: {}", e),
+                        ));
+                    }
+                };
+
+                debug!("message unpacked:\n{:#?}", msg);
+
+                // Process the message
+                let message_response = msg.process(state, session).await?;
+                debug!("message processed:\n{:#?}", message_response);
+
+                store_message(state, session, &message_response, &metadata).await
+            } else {
+                // Check if the message will pass ACL Checks
+
+                let from_hash = envelope.from_did.as_ref().map(digest);
+
+                if !state
+                    .database
+                    .local_acl_lookup(&digest(to_did), from_hash)
+                    .await?
+                {
+                    // Message is not allowed
+                    info!(
+                        "Message from {} to {} is not allowed",
+                        envelope.from_did.clone().as_deref().unwrap_or("Unknown"),
+                        to_did
+                    );
+                    return Err(MediatorError::ACLDenied(
+                        "Message blocked due to ACL".into(),
+                    ));
+                }
+
+                let data = ProcessMessageResponse {
+                    store_message: true,
+                    force_live_delivery: false,
+                    forward_message: false,
+                    data: WrapperType::Envelope(to_did.into(), message.into()),
+                };
+
+                store_message(state, session, &data, &UnpackMetadata::default()).await
             }
-        };
-
-        debug!("message unpacked:\n{:#?}", msg);
-
-        // Process the message
-        let message_response = msg.process(state, session).await?;
-        debug!("message processed:\n{:#?}", message_response);
-
-        store_message(state, session, &message_response, &metadata).await
+        } else {
+            Err(MediatorError::ParseError(
+                session.session_id.clone(),
+                "to_did".into(),
+                "Missing to_did in the envelope".into(),
+            ))
+        }
     }
     .instrument(_span)
     .await

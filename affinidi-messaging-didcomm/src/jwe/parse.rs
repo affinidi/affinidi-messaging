@@ -110,7 +110,6 @@ impl ParsedJWE {
         &self,
         envelope: &mut MetaEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &dyn crate::secrets::SecretsResolver,
     ) -> Result<&Self> {
         debug!("Checking if APU exists in JWE?");
         if let Some(apu) = &self.apu {
@@ -201,19 +200,9 @@ impl ParsedJWE {
             ))?;
         }
 
-        envelope.metadata.encrypted_to_kids =
-            Some(self.to_kids.iter().map(|k| k.to_owned()).collect());
+        envelope.metadata.encrypted_to_kids = self.to_kids.iter().map(|k| k.to_owned()).collect();
 
         debug!("envelope\n{:#?}", envelope);
-
-        envelope.to_kids_found = secrets_resolver.find_secrets(&self.to_kids).await?;
-
-        if envelope.to_kids_found.is_empty() {
-            Err(err_msg(
-                ErrorKind::SecretNotFound,
-                "No recipient secrets found",
-            ))?;
-        }
 
         Ok(self)
     }
