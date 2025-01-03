@@ -64,10 +64,24 @@ pub(crate) async fn handle_inbound(
 
                 store_message(state, session, &message_response, &metadata).await
             } else {
+                // this is a direct delivery method
+                if !state.config.security.local_direct_delivery_allowed {
+                    return Err(MediatorError::PermissionError(
+                        session.session_id.clone(),
+                        "Direct delivery is not allowed".into(),
+                    ));
+                }
+
+                // Check that the recipient account is local to the mediator
+                if !state.database.account_exists(&digest(to_did)).await? {
+                    return Err(MediatorError::PermissionError(
+                        session.session_id.clone(),
+                        "Recipient is not local to the mediator".into(),
+                    ));
+                }
+
                 // Check if the message will pass ACL Checks
-
                 let from_hash = envelope.from_did.as_ref().map(digest);
-
                 if !state
                     .database
                     .local_acl_lookup(&digest(to_did), from_hash)
