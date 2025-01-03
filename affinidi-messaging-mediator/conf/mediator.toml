@@ -105,7 +105,7 @@ global_acl_default = "${GLOBAL_DEFAULT_ACL:ALLOW_ALL}"
 ### Options:
 ###    - explicit_allow: A DID must be listed in the ACL to be allowed to send messages to the local DID
 ###    - explicit_deny: Any DID can send messages to the local DID unless explicitly denied
-local_acl_default_mode = "${LOCAL_ACL_DEFAULT_MODE:explicit_deny}"
+local_acl_default_mode = "${LOCAL_ACL_DEFAULT_MODE:explicit_allow}"
 
 ### local_acl_default_change_mode: If true, local DID's can change their ACL mode
 ### NOTE: Admins can always change this on a per DID level
@@ -126,7 +126,7 @@ local_acl_default_change_allow_anon_outbound = "${LOCAL_ACL_CHANGE_ALLOW_ANON_OU
 ### NOTE: This can be useful on private networks where you may not want to wrap every message in a forward envelope
 ###       If set to false, then all messages must be addressed to the mediator, and the mediator will handle delivery
 ###       If set to true, then you can either message the mediator or to a local DID directly
-local_direct_delivery_allowed = "${LOCAL_DIRECT_DELIVERY_ALLOWED:true}"
+local_direct_delivery_allowed = "${LOCAL_DIRECT_DELIVERY_ALLOWED:false}"
 
 ### mediator_secrets: Secrets of the mediator
 ### REQUIRED: Location of secrets
