@@ -27,7 +27,7 @@ async fn _store_message(
             &state.database,
             &session.did_hash,
             &stream_uuid,
-            &data,
+            data,
             response.force_live_delivery,
         )
         .await;
@@ -104,7 +104,7 @@ pub(crate) async fn store_message(
                             )
                             .await?;
 
-                        match _store_message(state, session, response, &packed, &recipient).await {
+                        match _store_message(state, session, response, &packed, recipient).await {
                             Ok(msg_id) => {
                                 debug!(
                                     "message id({}) stored successfully recipient({})",
@@ -125,7 +125,7 @@ pub(crate) async fn store_message(
                 }
                 WrapperType::Envelope(to_did, message) => {
                     // Message is already packed, likely a direct delivery from a client
-                    match _store_message(state, session, response, &message, &to_did).await {
+                    match _store_message(state, session, response, message, to_did).await {
                         Ok(msg_id) => {
                             debug!(
                                 "message id({}) stored successfully recipient({})",

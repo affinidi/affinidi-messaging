@@ -87,8 +87,8 @@ pub struct SecurityConfigRaw {
     pub global_acl_default: String,
     pub local_acl_default_mode: String,
     pub local_acl_default_change_mode: String,
-    pub local_acl_default_allow_anon_outbound: String,
-    pub local_acl_default_change_allow_anon_outbound: String,
+    pub local_acl_default_allow_anon_receive: String,
+    pub local_acl_default_change_allow_anon_receive: String,
     pub local_direct_delivery_allowed: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
@@ -249,12 +249,12 @@ impl SecurityConfigRaw {
                 _ => LocalACLMode::ExplicitAllow,
             })
             .with_anon_allowed(
-                self.local_acl_default_allow_anon_outbound
+                self.local_acl_default_allow_anon_receive
                     .parse::<bool>()
                     .unwrap_or(false),
             )
             .with_change_anon_allowed(
-                self.local_acl_default_change_allow_anon_outbound
+                self.local_acl_default_change_allow_anon_receive
                     .parse::<bool>()
                     .unwrap_or(true),
             )

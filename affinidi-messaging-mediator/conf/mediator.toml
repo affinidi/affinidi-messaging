@@ -112,14 +112,14 @@ local_acl_default_mode = "${LOCAL_ACL_DEFAULT_MODE:explicit_allow}"
 ### Default: true (allowed)
 local_acl_default_change_mode = "${LOCAL_ACL_CHANGE_MODE:true}"
 
-### local_acl_default_allow_anon_outbound: If true, local DID can receive messages from anonymous (unknown) DIDs
+### local_acl_default_allow_anon_receive: If true, local DID can receive messages from anonymous (unknown) DIDs
 ### Default: false (not allowed)
-local_acl_default_allow_anon_outbound = "${LOCAL_ACL_DEFAULT_ALLOW_ANON_OUTBOUND:false}"
+local_acl_default_allow_anon_receive = "${LOCAL_ACL_DEFAULT_ALLOW_ANON_RECEIVE:false}"
 
-### local_acl_default_change_allow_anon_outbound: If true, local DID's can change their ACL to allow anonymous (unknown) DIDs
+### local_acl_default_change_allow_anon_receive: If true, local DID's can change their ACL to allow anonymous (unknown) DIDs
 ### NOTE: Admins can always change this on a per DID level
 ### Default: true (allowed)
-local_acl_default_change_allow_anon_outbound = "${LOCAL_ACL_CHANGE_ALLOW_ANON_OUTBOUND:true}"
+local_acl_default_change_allow_anon_receive = "${LOCAL_ACL_CHANGE_ALLOW_ANON_RECEIVE:true}"
 
 ### local_direct_delivery_allowed: If true, messages that are addressed to a local DID directly will be delivered
 ### Default: false (all messages must be addressed to the mediator)
