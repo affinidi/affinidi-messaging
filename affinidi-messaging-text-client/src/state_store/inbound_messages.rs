@@ -67,7 +67,32 @@ async fn _handle_connection_setup(
         if let Some(vcard) = attachment.first() {
             if let AttachmentData::Base64 { value } = &vcard.data {
                 let vcard_decoded = BASE64_URL_SAFE_NO_PAD.decode(value.base64.clone()).unwrap();
-                let vcard: VCard = serde_json::from_slice(&vcard_decoded).unwrap();
+                let vcard: VCard = match serde_json::from_slice(&vcard_decoded) {
+                    Ok(vcard) => vcard,
+                    Err(e) => {
+                        warn!("Failed to parse vCard: {}", e);
+                        warn!("vCard: {:?}", vcard_decoded);
+                        VCard {
+                            n: Name {
+                                given: Some("UNKNOWN".to_string()),
+                                surname: Some(
+                                    rand::thread_rng()
+                                        .sample_iter(&Alphanumeric)
+                                        .take(4)
+                                        .map(char::from)
+                                        .collect::<String>(),
+                                ),
+                            },
+                            email: Some(VcardType {
+                                r#type: VcardTypes::Work(String::new()),
+                            }),
+                            tel: Some(VcardType {
+                                r#type: VcardTypes::Cell(String::new()),
+                            }),
+                        }
+                    }
+                };
+
                 let first = if let Some(first) = vcard.n.given.as_ref() {
                     first
                 } else {
