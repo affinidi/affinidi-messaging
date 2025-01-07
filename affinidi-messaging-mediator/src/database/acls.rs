@@ -1,6 +1,6 @@
 use affinidi_messaging_sdk::protocols::mediator::{
-    global_acls::{GlobalACLConfig, GlobalACLMode, GlobalACLSet, MediatorGlobalACLResponse},
-    local_acls::{LocalACLMode, LocalACLSet},
+    acls::{ACLModeType, MediatorACLSet},
+    acls_handler::{MediatorACLExpanded, MediatorACLResponse},
 };
 use redis::{from_redis_value, Cmd, Pipeline, Value};
 use tracing::{debug, span, Instrument, Level};
@@ -10,21 +10,53 @@ use crate::common::errors::MediatorError;
 use super::DatabaseHandler;
 
 impl DatabaseHandler {
-    /// Retrieves a list of global ACLs for given DIDS
-    /// - `dids` - List of DIDs (hashes) to retrieve ACLs for (limit 100)
-    /// - Returns a list of ACLs for the given DIDs
-    pub(crate) async fn global_acls_get(
+    /// Get ACL for a given DID
+    /// Returns the ACL for the given DID, or None if DID isn't found
+    pub(crate) async fn get_did_acl(
         &self,
-        dids: &[String],
-        mediator_acl_mode: GlobalACLMode,
-    ) -> Result<MediatorGlobalACLResponse, MediatorError> {
-        let _span = span!(Level::DEBUG, "global_acls_get");
+        did_hash: &str,
+    ) -> Result<Option<MediatorACLSet>, MediatorError> {
+        let _span = span!(Level::DEBUG, "get_did_acl");
 
         async move {
-            debug!(
-                "Requesting global ACLs for ({}) DIDs from mediator",
-                dids.len()
-            );
+            debug!("Requesting ACL for ({}) DID from mediator", did_hash);
+
+            let mut con = self.get_async_connection().await?;
+
+            let acl: Option<String> = Cmd::hget(format!("DID:{}", did_hash), "ACLS")
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("get_did_acls failed. Reason: {}", err),
+                    )
+                })?;
+
+            if let Some(acl) = acl {
+                Ok(Some(MediatorACLSet::from_hex_string(&acl).map_err(
+                    |e| MediatorError::InternalError(did_hash.into(), e.to_string()),
+                )?))
+            } else {
+                Ok(None)
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Retrieves a list of ACLs for given DIDS
+    /// - `dids` - List of DIDs (hashes) to retrieve ACLs for (limit 100)
+    /// - Returns a list of ACLs for the given DIDs
+    pub(crate) async fn get_did_acls(
+        &self,
+        dids: &[String],
+        mediator_acl_mode: ACLModeType,
+    ) -> Result<MediatorACLResponse, MediatorError> {
+        let _span = span!(Level::DEBUG, "get_did_acls");
+
+        async move {
+            debug!("Requesting ACLs for ({}) DIDs from mediator", dids.len());
             if dids.len() > 100 {
                 return Err(MediatorError::DatabaseError(
                     "NA".to_string(),
@@ -37,26 +69,29 @@ impl DatabaseHandler {
             let mut query = Pipeline::new();
 
             for did in dids {
-                query.add_command(Cmd::hget(format!("DID:{}", did), "GLOBAL_ACL"));
+                query.add_command(Cmd::hget(format!("DID:{}", did), "ACLS"));
             }
 
             let result: Vec<Value> = query.query_async(&mut con).await.map_err(|err| {
                 MediatorError::DatabaseError(
                     "NA".to_string(),
-                    format!("global_acls_get failed. Reason: {}", err),
+                    format!("get_did_acls failed. Reason: {}", err),
                 )
             })?;
 
-            let mut acl_response: MediatorGlobalACLResponse = MediatorGlobalACLResponse {
+            let mut acl_response: MediatorACLResponse = MediatorACLResponse {
                 acl_response: vec![],
                 mediator_acl_mode,
             };
             for (index, item) in result.iter().enumerate() {
-                if let Ok(acls) = from_redis_value(item) {
-                    acl_response.acl_response.push(GlobalACLConfig {
+                if let Ok(acls_hex) = from_redis_value::<String>(item) {
+                    let acls = MediatorACLSet::from_hex_string(&acls_hex).map_err(|e| {
+                        MediatorError::InternalError(dids[index].clone(), e.to_string())
+                    })?;
+                    acl_response.acl_response.push(MediatorACLExpanded {
                         did_hash: dids[index].clone(),
-                        acl_value: acls,
-                        acls: GlobalACLSet::from_bits(acls),
+                        acl_value: acls.to_hex_string(),
+                        acls,
                     });
                 }
             }
@@ -66,12 +101,12 @@ impl DatabaseHandler {
         .await
     }
 
-    /// Checks if the `value_hash` exists in the local ACL for the given `key_hash`
-    /// - `key_hash` - Hash of the DID we are checking against (typically the TO address)
-    /// - `value_hash` - Hash of the DID we are checking for (typically the FROM address)
+    /// Checks if the `to_hash` is allowed in the local ACL for the given `key_hash`
+    /// - `to_hash` - Hash of the DID we are checking against (typically the TO address)
+    /// - `from_hash` - Hash of the DID we are checking for (typically the FROM address)
     ///
     /// Returns true if it exists, false otherwise
-    pub async fn local_acl_lookup(
+    pub async fn local_acl_allowed(
         &self,
         to_hash: &str,
         from_hash: Option<String>,
@@ -79,14 +114,14 @@ impl DatabaseHandler {
         let mut con = self.get_async_connection().await?;
 
         if let Some(from_hash) = &from_hash {
-            let (exists, local_acl): (bool, Option<u16>) = deadpool_redis::redis::pipe()
+            let (exists, acl): (bool, Option<String>) = deadpool_redis::redis::pipe()
                 .atomic()
                 .cmd("SISMEMBER")
                 .arg(["LOCAL_ACL:", to_hash].concat())
                 .arg(from_hash)
                 .cmd("HGET")
                 .arg(["DID:", to_hash].concat())
-                .arg("LOCAL_ACL")
+                .arg("ACLS")
                 .query_async(&mut con)
                 .await
                 .map_err(|err| {
@@ -96,14 +131,15 @@ impl DatabaseHandler {
                     )
                 })?;
 
-            let local_acl = if let Some(local_acl) = local_acl {
-                LocalACLSet::from_bits(local_acl)
+            let acl = if let Some(acl) = acl {
+                MediatorACLSet::from_hex_string(&acl)
+                    .map_err(|e| MediatorError::InternalError(to_hash.into(), e.to_string()))?
             } else {
-                debug!("Local ACL not found for DID: {}", to_hash);
+                debug!("ACL not found for DID: {}", to_hash);
                 return Ok(false);
             };
 
-            if local_acl.acl_mode() == LocalACLMode::ExplicitAllow {
+            if acl.get_did_acl_mode().0 == ACLModeType::ExplicitAllow {
                 debug!(
                     "local_acl_lookup == true for to_hash({}), from_hash({})",
                     to_hash, from_hash
@@ -118,33 +154,11 @@ impl DatabaseHandler {
             }
         } else {
             // Anonymous Message
-            Ok(self.local_acl_get(to_hash).await?.anon_allowed())
-        }
-    }
-
-    pub async fn local_acl_get(&self, did_hash: &str) -> Result<LocalACLSet, MediatorError> {
-        let mut con = self.get_async_connection().await?;
-
-        let local_acl: Option<u16> = deadpool_redis::redis::cmd("HGET")
-            .arg(["DID:", did_hash].concat())
-            .arg("LOCAL_ACL")
-            .query_async(&mut con)
-            .await
-            .map_err(|err| {
-                MediatorError::DatabaseError(
-                    "NA".to_string(),
-                    format!("get_global_acls failed. Reason: {}", err),
-                )
-            })?;
-
-        if let Some(local_acl) = local_acl {
-            Ok(LocalACLSet::from_bits(local_acl))
-        } else {
-            debug!("Local ACL not found for DID: {}", did_hash);
-            Err(MediatorError::PermissionError(
-                "NA".into(),
-                "Local ACL non existent".into(),
-            ))
+            if let Some(acl) = self.get_did_acl(to_hash).await? {
+                Ok(acl.get_anon_receive().0)
+            } else {
+                Ok(false)
+            }
         }
     }
 }

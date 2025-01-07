@@ -1,10 +1,7 @@
 use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::config::{ClientConfig, ClientConfigBuilder};
-use affinidi_messaging_sdk::protocols::mediator::{
-    global_acls::{GlobalACLMode, GlobalACLSet},
-    local_acls::{LocalACLMode, LocalACLSet},
-};
+use affinidi_messaging_sdk::protocols::mediator::acls::{ACLModeType, MediatorACLSet};
 use async_convert::{async_trait, TryFrom};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -83,12 +80,8 @@ impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
 /// SecurityConfig Struct contains security related configuration details
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SecurityConfigRaw {
-    pub global_acl_mode: String,
+    pub mediator_acl_mode: String,
     pub global_acl_default: String,
-    pub local_acl_default_mode: String,
-    pub local_acl_default_change_mode: String,
-    pub local_acl_default_allow_anon_receive: String,
-    pub local_acl_default_change_allow_anon_receive: String,
     pub local_direct_delivery_allowed: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
@@ -102,9 +95,8 @@ pub struct SecurityConfigRaw {
 
 #[derive(Clone, Serialize)]
 pub struct SecurityConfig {
-    pub global_acl_mode: GlobalACLMode,
-    pub global_acl_default: GlobalACLSet,
-    pub local_acl_default: LocalACLSet,
+    pub mediator_acl_mode: ACLModeType,
+    pub global_acl_default: MediatorACLSet,
     pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
     pub mediator_secrets: AffinidiSecrets,
@@ -125,9 +117,8 @@ pub struct SecurityConfig {
 impl Debug for SecurityConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecurityConfig")
-            .field("global_acl_mode", &self.global_acl_mode)
+            .field("mediator_acl_mode", &self.mediator_acl_mode)
             .field("global_acl_default", &self.global_acl_default)
-            .field("local_acl_default", &self.local_acl_default)
             .field(
                 "local_direct_delivery_allowed",
                 &self.local_direct_delivery_allowed,
@@ -151,21 +142,8 @@ impl Debug for SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         SecurityConfig {
-            global_acl_mode: GlobalACLMode::ExplicitDeny,
-            global_acl_default: GlobalACLSet::new()
-                .with_forward_from(false)
-                .with_forward_to(false)
-                .with_inbound(false)
-                .with_outbound(false)
-                .with_local(false)
-                .with_blocked(true)
-                .with_create_invites(false)
-                .with_self_admin(false),
-            local_acl_default: LocalACLSet::new()
-                .with_acl_mode(LocalACLMode::ExplicitAllow)
-                .with_anon_allowed(false)
-                .with_change_mode(true)
-                .with_change_anon_allowed(true),
+            mediator_acl_mode: ACLModeType::ExplicitDeny,
+            global_acl_default: MediatorACLSet::default(),
             local_direct_delivery_allowed: false,
             mediator_secrets: AffinidiSecrets::new(vec![]),
             use_ssl: true,
@@ -206,10 +184,10 @@ impl SecurityConfigRaw {
 
     async fn convert(&self, aws_config: &SdkConfig) -> Result<SecurityConfig, MediatorError> {
         let mut config = SecurityConfig {
-            global_acl_mode: match self.global_acl_mode.as_str() {
-                "explicit_allow" => GlobalACLMode::ExplicitAllow,
-                "explicit_deny" => GlobalACLMode::ExplicitDeny,
-                _ => GlobalACLMode::ExplicitDeny,
+            mediator_acl_mode: match self.mediator_acl_mode.as_str() {
+                "explicit_allow" => ACLModeType::ExplicitAllow,
+                "explicit_deny" => ACLModeType::ExplicitDeny,
+                _ => ACLModeType::ExplicitDeny,
             },
             local_direct_delivery_allowed: self
                 .local_direct_delivery_allowed
@@ -224,45 +202,21 @@ impl SecurityConfigRaw {
         };
 
         // Convert the default ACL Set into a GlobalACLSet
-        config.global_acl_default =
-            GlobalACLSet::from_acl_string(&self.global_acl_default, config.global_acl_mode.clone())
-                .map_err(|err| {
-                    event!(
-                        Level::ERROR,
-                        "Couldn't parse global_acl_default config parameter. Reason: {}",
-                        err
-                    );
-                    MediatorError::ConfigError(
-                        "NA".into(),
-                        format!(
-                            "Couldn't parse global_acl_default config parameter. Reason: {}",
-                            err
-                        ),
-                    )
-                })?;
-
-        // Create the default Local ACL Permission set
-        config.local_acl_default = LocalACLSet::new()
-            .with_acl_mode(match self.local_acl_default_mode.as_str() {
-                "explicit_allow" => LocalACLMode::ExplicitAllow,
-                "explicit_deny" => LocalACLMode::ExplicitDeny,
-                _ => LocalACLMode::ExplicitAllow,
-            })
-            .with_anon_allowed(
-                self.local_acl_default_allow_anon_receive
-                    .parse::<bool>()
-                    .unwrap_or(false),
-            )
-            .with_change_anon_allowed(
-                self.local_acl_default_change_allow_anon_receive
-                    .parse::<bool>()
-                    .unwrap_or(true),
-            )
-            .with_change_mode(
-                self.local_acl_default_change_mode
-                    .parse::<bool>()
-                    .unwrap_or(true),
+        config.global_acl_default = MediatorACLSet::from_string_ruleset(&self.global_acl_default)
+            .map_err(|err| {
+            event!(
+                Level::ERROR,
+                "Couldn't parse global_acl_default config parameter. Reason: {}",
+                err
             );
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!(
+                    "Couldn't parse global_acl_default config parameter. Reason: {}",
+                    err
+                ),
+            )
+        })?;
 
         if let Some(cors_allow_origin) = &self.cors_allow_origin {
             config.cors_allow_origin =

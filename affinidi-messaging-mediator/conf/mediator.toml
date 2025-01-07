@@ -63,63 +63,38 @@ database_timeout = "${DATABASE_TIMEOUT:2}"
 ### Security configuration
 ### ****************************************************************************************************************************
 [security]
-### global_acl_mode: What ACL logic mode is the mediator running in?
+### mediator_acl_mode: What ACL logic mode is the mediator running in?
 ### Default: explicit_deny
 ### Options:
 ###    - explicit_deny: Mediator will allow any DID to connect and forward/deliver messages unless explicitly denied
 ###    - explicit_allow: Mediator will deny all DIDs except for what has been explicitly allowed
-global_acl_mode = "${GLOBAL_ACL_MODE:explicit_deny}"
+mediator_acl_mode = "${MEDIATOR_ACL_MODE:explicit_deny}"
 
 ### global_acl_default: Default ACL that is applied to new/unknown DIDs that connect to the mediator
 ### Default: ALLOW_ALL
+### NOTE: When building a default ACL, the starting point is all actions are denied unless explicitly allowed
 ### Options:
-###    - ALLOW_ALL: Allow all operations
-###    - DENY_ALL: Deny all operations
-###    - ALLOW_LOCAL: Will store messages for a DID locally
-###    - DENY_LOCAL: Will not store messages for a DID locally
-###    - ALLOW_FORWARD_FROM: DID can forward messages 
-###    - DENY_FORWARD_FROM: DID cannot forward messages
-###    - ALLOW_FORWARD_TO: DID can receive forwarded messages
-###    - DENY_FORWARD_TO: DID cannot receive forwarded messages
-###    - ALLOW_INBOUND: DID can send a message
-###    - DENY_INBOUND: DID cannot send a message
-###    - ALLOW_OUTBOUND: DID can receive messages (if LOCAL)
-###    - DENY_OUTBOUND: DID cannot receive messages (if LOCAL)
-###    - ALLOW_CREATE_INVITES: DID can create OOB invites
-###    - DENY_CREATE_INVITES: DID cannot create OOB invites
-###    - ALLOW_SELF_ADMIN: DID can administer itself (i.e set their own local ACL's)
-###    - DENY_SELF_ADMIN: DID cannot administer itself
+###    - ALLOW_ALL: Allow all operations (sets ACL mode to explicit_deny per DID, DID can self manage their own ACLs)
+###    - DENY_ALL: Deny all operations (sets ACL mode to explicit_allow per DID)
+###    - MODE_EXPLICIT_ALLOW: Per DID Access Control List (ACL) will only allow what is explicitly allowed
+###    - MODE_EXPLICIT_DENY: Per DID Access Control List (ACL) will only allow everyone except for those explicitly denied
+###    - MODE_SELF_CHANGE: Allows the DID owner to change the ACL Mode for their own DID Access Control List
+###    - LOCAL: Will store messages for a DID on the mediator
+###    - SEND_MESSAGES: DID Can send messages to others
+###    - SEND_MESSAGES_CHANGE: Allows the DID owner to change the send_messages ACL for their own DID
+###    - RECEIVE_MESSAGES: DID Can receive messages from others
+###    - RECEIVE_MESSAGES_CHANGE: Allows the DID owner to change the receive_messages ACL for their own DID
+###    - SEND_FORWARDED: DID can send forwarded messages
+###    - SEND_FORWARDED_CHANGE: Allows the DID owner to change the send_forwarded ACL for their own DID
+###    - RECEIVE_FORWARDED: DID can receive forwarded messages
+###    - RECEIVE_FORWARDED_CHANGE: Allows the DID owner to change the receive_forwarded ACL for their own DID
+###    - CREATE_INVITES: DID can create OOB invites
+###    - CREATE_INVITES_CHANGE: Allows the DID owner to change the create_invites ACL for their own DID
+###    - ANON_RECEIVE: DID can receive anonymous messages
+###    - ANON_RECEIVE_CHANGE: Allows the DID owner to change the anon_receive ACL for their own DID
+###    - SELF_MANAGE_LIST: DID can self manage their own ACL list (add/remove)
 ###  NOTE: Can be comma seperated to allow multiple options
 global_acl_default = "${GLOBAL_DEFAULT_ACL:ALLOW_ALL}"
-
-### To configure a private mediator, that allows anyone to forward/send a message to you but blocks any other action
-### Set acl_mode to `explicit_allow`
-### Set global_acl_default to `ALLOW_FORWARD_FROM,ALLOW_SEND`
-
-### To configure a mediator, that acts as a public relay only (i.e. will not store any messages locally)
-### Set acl_mode to `explicit_deny`
-### Set global_acl_default to `DENY_LOCAL,DENY_CREATE_INVITES,DENY_SELF_ADMIN`
-
-### local_acl_default_mode: What ACL logic mode is default for local DID's?
-### Default: explicit_allow
-### Options:
-###    - explicit_allow: A DID must be listed in the ACL to be allowed to send messages to the local DID
-###    - explicit_deny: Any DID can send messages to the local DID unless explicitly denied
-local_acl_default_mode = "${LOCAL_ACL_DEFAULT_MODE:explicit_allow}"
-
-### local_acl_default_change_mode: If true, local DID's can change their ACL mode
-### NOTE: Admins can always change this on a per DID level
-### Default: true (allowed)
-local_acl_default_change_mode = "${LOCAL_ACL_CHANGE_MODE:true}"
-
-### local_acl_default_allow_anon_receive: If true, local DID can receive messages from anonymous (unknown) DIDs
-### Default: false (not allowed)
-local_acl_default_allow_anon_receive = "${LOCAL_ACL_DEFAULT_ALLOW_ANON_RECEIVE:false}"
-
-### local_acl_default_change_allow_anon_receive: If true, local DID's can change their ACL to allow anonymous (unknown) DIDs
-### NOTE: Admins can always change this on a per DID level
-### Default: true (allowed)
-local_acl_default_change_allow_anon_receive = "${LOCAL_ACL_CHANGE_ALLOW_ANON_RECEIVE:true}"
 
 ### local_direct_delivery_allowed: If true, messages that are addressed to a local DID directly will be delivered
 ### Default: false (all messages must be addressed to the mediator)

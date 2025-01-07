@@ -8,10 +8,8 @@
 
 use super::message_inbound::InboundMessage;
 use crate::{
-    common::{
-        acl_checks::ACLCheck,
-        errors::{AppError, MediatorError, SuccessResponse},
-    },
+    common::acl_checks::ACLCheck,
+    common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::{Session, SessionClaims, SessionState},
     SharedData,
 };
@@ -19,7 +17,7 @@ use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions}
 use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
-    protocols::mediator::global_acls::GlobalACLSet,
+    protocols::mediator::acls::MediatorACLSet,
 };
 use axum::{extract::State, Json};
 use http::StatusCode;
@@ -58,7 +56,7 @@ pub async fn authentication_challenge(
         did: body.did.clone(),
         did_hash: digest(body.did),
         authenticated: false,
-        global_acls: state.config.security.global_acl_default,
+        acls: state.config.security.global_acl_default,
     };
     let _span = span!(
         Level::DEBUG,
@@ -68,10 +66,7 @@ pub async fn authentication_challenge(
     );
     async move {
         // Check if DID is allowed to connect
-        if !session
-            .global_acls
-            .check_blocked(&state.config.security.global_acl_mode)
-        {
+        if session.acls.get_blocked() {
             info!("DID({}) is blocked from connecting", session.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }
@@ -129,7 +124,7 @@ pub async fn authentication_response(
 
         if let Some(from_did) = &envelope.from_did {
             // Check if DID is allowed to connect
-            if !GlobalACLSet::authentication_check(&state, &digest(from_did), None).await? {
+            if !MediatorACLSet::authentication_check(&state, &digest(from_did), None).await? {
                 info!("DID({}) is blocked from connecting", from_did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             }
@@ -305,20 +300,11 @@ async fn _register_did_and_setup(state: &SharedData, did_hash: &str) -> Result<(
     if state.database.account_exists(did_hash).await? {
         debug!("DID({}) already registered", did_hash);
         return Ok(());
-    } else if state
-        .config
-        .security
-        .global_acl_default
-        .check_local(&state.config.security.global_acl_mode)
-    {
+    } else if state.config.security.global_acl_default.get_local() {
         // Register the DID as a local DID
         state
             .database
-            .account_add(
-                did_hash,
-                state.config.security.global_acl_default,
-                state.config.security.local_acl_default,
-            )
+            .account_add(did_hash, &state.config.security.global_acl_default)
             .await?;
     }
 
@@ -457,10 +443,7 @@ pub async fn authentication_refresh(
         }
 
         // Does the Global ACL still allow them to connect?
-        if !session_check
-            .global_acls
-            .check_blocked(&state.config.security.global_acl_mode)
-        {
+        if session_check.acls.get_blocked() {
             info!("DID({}) is blocked from connecting", session_check.did);
             return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }

@@ -1,5 +1,4 @@
 use super::errors::ErrorResponse;
-use crate::common::acl_checks::ACLCheck;
 use crate::{
     database::session::{Session, SessionClaims},
     SharedData,
@@ -155,11 +154,7 @@ where
         })?;
 
         // Check if ACL is satisfied
-
-        if !saved_session
-            .global_acls
-            .check_blocked(&state.config.security.global_acl_mode)
-        {
+        if saved_session.acls.get_blocked() {
             info!("DID({}) is blocked from connecting", did);
             return Err(AuthError::Blocked);
         }

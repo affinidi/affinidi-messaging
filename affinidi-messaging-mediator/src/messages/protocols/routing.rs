@@ -1,5 +1,5 @@
 use crate::{
-    common::{acl_checks::ACLCheck, errors::MediatorError},
+    common::errors::MediatorError,
     database::session::Session,
     messages::{store::store_forwarded_message, ProcessMessageResponse, WrapperType},
     SharedData,
@@ -50,21 +50,14 @@ pub(crate) async fn process(
 
         // ****************************************************
         // Check if the next hop is allowed to receive forwarded messages
-        let next_acls = state
-            .database
-            .global_acls_get(
-                &[next_did_hash.clone()],
-                state.config.security.global_acl_mode.clone(),
-            )
-            .await?;
-        let next_acls = if let Some(next_acls) = next_acls.acl_response.first() {
-            next_acls.acls
+        let next_acls = if let Some(next_acls) = state.database.get_did_acl(&next_did_hash).await? {
+            next_acls
         } else {
             // DID is not known, so use default ACL
-            state.config.security.global_acl_default
+            state.config.security.global_acl_default.clone()
         };
 
-        if !next_acls.check_forward_to(&state.config.security.global_acl_mode) {
+        if !next_acls.get_receive_forwarded().0 {
             return Err(MediatorError::ACLDenied(format!(
                 "Next DID({}) is blocked from receiving forwarded messages",
                 next_did_hash
@@ -97,31 +90,22 @@ pub(crate) async fn process(
         // If message is anonymous, then use the session DID
 
         if let Some(from) = &msg.from {
-            let from_acls = state
-                .database
-                .global_acls_get(
-                    &[digest(from.clone())],
-                    state.config.security.global_acl_mode.clone(),
-                )
-                .await?;
-            let from_acls = if let Some(from_acls) = from_acls.acl_response.first() {
-                from_acls.acls
-            } else {
-                // DID is not known, so use default ACL
-                state.config.security.global_acl_default
-            };
+            let from_acls =
+                if let Some(from_acls) = state.database.get_did_acl(&digest(from.clone())).await? {
+                    from_acls
+                } else {
+                    // DID is not known, so use default ACL
+                    state.config.security.global_acl_default.clone()
+                };
 
-            if !from_acls.check_forward_from(&state.config.security.global_acl_mode) {
+            if !from_acls.get_send_forwarded().0 {
                 return Err(MediatorError::ACLDenied(
-                    "DID is blocked from forwarded messages".into(),
+                    "DID is blocked from sending forwarded messages".into(),
                 ));
             }
-        } else if !session
-            .global_acls
-            .check_forward_from(&state.config.security.global_acl_mode)
-        {
+        } else if !session.acls.get_send_forwarded().0 {
             return Err(MediatorError::ACLDenied(
-                "DID is blocked from forwarding messages".into(),
+                "DID is blocked from sending forwarding messages".into(),
             ));
         }
 

@@ -14,10 +14,7 @@
 */
 
 use crate::{
-    common::{
-        acl_checks::ACLCheck,
-        errors::{AppError, MediatorError, SuccessResponse},
-    },
+    common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::Session,
     SharedData,
 };
@@ -46,10 +43,7 @@ pub async fn oob_invite_handler(
     Json(body): Json<Message>,
 ) -> Result<(StatusCode, Json<SuccessResponse<OOBInviteResponse>>), AppError> {
     // ACL Check
-    if !session
-        .global_acls
-        .check_invites(&state.config.security.global_acl_mode)
-    {
+    if !session.acls.get_create_invites().0 {
         return Err(
             MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),
         );
@@ -113,10 +107,7 @@ pub async fn delete_oobid_handler(
     oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
     // ACL Check
-    if !session
-        .global_acls
-        .check_invites(&state.config.security.global_acl_mode)
-    {
+    if !session.acls.get_create_invites().0 {
         return Err(
             MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),
         );

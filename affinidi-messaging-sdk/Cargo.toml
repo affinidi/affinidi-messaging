@@ -22,7 +22,6 @@ jsonwebtoken.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
-#rustls-native-certs.workspace = true
 rustls-platform-verifier.workspace = true
 rustls-pemfile.workspace = true
 serde.workspace = true

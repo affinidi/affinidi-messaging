@@ -6,7 +6,7 @@ use affinidi_messaging_helpers::common::{
 };
 use affinidi_messaging_sdk::{
     config::Config,
-    protocols::{mediator::global_acls::GlobalACLMode, Protocols},
+    protocols::{mediator::acls::ACLModeType, Protocols},
     ATM,
 };
 use clap::Parser;
@@ -37,7 +37,7 @@ struct Args {
 struct BasicMediatorConfig {
     pub version: String,
     pub root_admin_did: String,
-    pub acl_mode: GlobalACLMode,
+    pub acl_mode: ACLModeType,
 }
 
 impl BasicMediatorConfig {
@@ -76,7 +76,7 @@ impl BasicMediatorConfig {
             .get("security")
             .and_then(|security| security.get("acl_mode"))
         {
-            match serde_json::from_value::<GlobalACLMode>(acl_mode.to_owned()) {
+            match serde_json::from_value::<ACLModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
                 Err(_) => return Err("Couldn't find acl_mode in Mediator Configuration".into()),
             }

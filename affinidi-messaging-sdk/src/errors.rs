@@ -24,6 +24,8 @@ pub enum ATMError {
     AuthenticationError(String),
     #[error("ACL Denied error: {0}")]
     ACLDenied(String),
+    #[error("ACL config error: {0}")]
+    ACLConfigError(String),
     #[error("DIDComm message error: {0}. Reason: {1}")]
     DidcommError(String, String),
     #[error("SDK Error: {0}")]

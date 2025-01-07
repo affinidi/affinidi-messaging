@@ -2,7 +2,7 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
-    global_acls::GlobalACLSet, local_acls::LocalACLSet, mediator::MediatorAccountList,
+    acls::MediatorACLSet, mediator::MediatorAccountList,
 };
 use redis::{from_redis_value, Value};
 use tracing::{debug, span, Instrument, Level};
@@ -29,8 +29,7 @@ impl DatabaseHandler {
     pub(crate) async fn account_add(
         &self,
         did_hash: &str,
-        global_acl: GlobalACLSet,
-        local_acl: LocalACLSet,
+        acls: &MediatorACLSet,
     ) -> Result<bool, MediatorError> {
         let _span = span!(Level::DEBUG, "add_account", "did_hash" = did_hash,);
 
@@ -56,10 +55,8 @@ impl DatabaseHandler {
                 .arg(0)
                 .arg("ROLE_TYPE")
                 .arg(0)
-                .arg("GLOBAL_ACL")
-                .arg(global_acl.into_bits())
-                .arg("LOCAL_ACL")
-                .arg(local_acl.into_bits())
+                .arg("ACLS")
+                .arg(acls.to_hex_string())
                 .exec_async(&mut con)
                 .await
                 .map_err(|err| {

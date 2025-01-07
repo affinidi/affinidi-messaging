@@ -1,8 +1,5 @@
 use crate::{
-    common::{
-        acl_checks::ACLCheck,
-        errors::{AppError, MediatorError, SuccessResponse},
-    },
+    common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::Session,
     SharedData,
 };
@@ -35,7 +32,7 @@ pub async fn inbox_fetch_handler(
     );
     async move {
         // ACL Check
-        if !session.global_acls.check_local( &state.config.security.global_acl_mode) {
+        if !session.acls.get_local() {
             return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
         }
 

@@ -9,7 +9,7 @@ use crate::{
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
-    protocols::mediator::global_acls::MediatorGlobalACLRequest,
+    protocols::mediator::acls_handler::MediatorACLRequest,
 };
 use serde_json::{json, Value};
 use tracing::{span, warn, Instrument};
@@ -40,7 +40,7 @@ pub(crate) async fn process(
      }
 
      // Parse the message body
-     let request: MediatorGlobalACLRequest = match serde_json::from_value(msg.body.clone()) {
+     let request: MediatorACLRequest = match serde_json::from_value(msg.body.clone()) {
          Ok(request) => request,
          Err(err) => {
              warn!("Error parsing Mediator Administration request. Reason: {}", err);
@@ -56,8 +56,8 @@ pub(crate) async fn process(
 
      // Process the request
      match request {
-        MediatorGlobalACLRequest::GetACL(dids) => {
-            match  state.database.global_acls_get(&dids, state.config.security.global_acl_mode.clone()).await {
+        MediatorACLRequest::GetACL(dids) => {
+            match  state.database.get_did_acls(&dids, state.config.security.mediator_acl_mode.clone()).await {
                 Ok(response) => {
                     _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                 }

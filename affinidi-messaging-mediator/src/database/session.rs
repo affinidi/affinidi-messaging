@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use affinidi_messaging_sdk::protocols::mediator::global_acls::GlobalACLSet;
+use affinidi_messaging_sdk::protocols::mediator::acls::MediatorACLSet;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use tracing::{debug, warn};
@@ -62,7 +62,7 @@ pub struct Session {
     pub did: String,
     pub did_hash: String,
     pub authenticated: bool,
-    pub global_acls: GlobalACLSet,
+    pub acls: MediatorACLSet,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {
@@ -107,25 +107,22 @@ impl TryFrom<(&str, HashMap<String, String>)> for Session {
             ));
         }
 
-        if let Some(global_acl) = hash.get("global_acl") {
-            session.global_acls = match str::parse(global_acl) {
-                Ok(acl) => GlobalACLSet::from_bits(acl),
+        if let Some(acls) = hash.get("acls") {
+            session.acls = match u64::from_str_radix(acls, 16) {
+                Ok(acl) => MediatorACLSet::from_u64(acl),
                 Err(err) => {
-                    warn!(
-                        "{}: Error parsing global_acl({})! Error: {}",
-                        sid, global_acl, err
-                    );
+                    warn!("{}: Error parsing acls({})! Error: {}", sid, acls, err);
                     return Err(MediatorError::SessionError(
                         sid.into(),
-                        "No Global ACL found when retrieving session!".into(),
+                        "No ACL found when retrieving session!".into(),
                     ));
                 }
             }
         } else {
-            warn!("{}: Error parsing global_acl!", sid);
+            warn!("{}: Error parsing acls!", sid);
             return Err(MediatorError::SessionError(
                 sid.into(),
-                "No Global ACL found when retrieving session!".into(),
+                "No ACL found when retrieving session!".into(),
             ));
         }
 
@@ -151,8 +148,8 @@ impl DatabaseHandler {
             .arg(session.state.to_string())
             .arg("did")
             .arg(&session.did)
-            .arg("global_acl")
-            .arg(session.global_acls.into_bits())
+            .arg("acls")
+            .arg(session.acls.to_hex_string())
             .cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("SESSIONS_CREATED")

@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{span, Instrument, Level};
 
 use crate::{
-    common::{
-        acl_checks::ACLCheck,
-        errors::{AppError, MediatorError, SuccessResponse},
-    },
+    common::errors::{AppError, MediatorError, SuccessResponse},
     database::session::Session,
     messages::inbound::handle_inbound,
     SharedData,
@@ -49,10 +46,7 @@ pub async fn message_inbound_handler(
     );
     async move {
         // ACL Check
-        if !session
-            .global_acls
-            .check_inbound(&state.config.security.global_acl_mode)
-        {
+        if !session.acls.get_send_messages().0 {
             return Err(
                 MediatorError::ACLDenied("DID does not have send/inbound access".into()).into(),
             );
