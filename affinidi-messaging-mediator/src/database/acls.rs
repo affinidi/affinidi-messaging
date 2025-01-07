@@ -23,15 +23,16 @@ impl DatabaseHandler {
 
             let mut con = self.get_async_connection().await?;
 
-            let acl: Option<String> = Cmd::hget(format!("DID:{}", did_hash), "ACLS")
-                .query_async(&mut con)
-                .await
-                .map_err(|err| {
-                    MediatorError::DatabaseError(
-                        "NA".to_string(),
-                        format!("get_did_acls failed. Reason: {}", err),
-                    )
-                })?;
+            let acl: Option<String> =
+                deadpool_redis::redis::Cmd::hget(format!("DID:{}", did_hash), "ACLS")
+                    .query_async(&mut con)
+                    .await
+                    .map_err(|err| {
+                        MediatorError::DatabaseError(
+                            "NA".to_string(),
+                            format!("get_did_acls failed. Reason: {}", err),
+                        )
+                    })?;
 
             if let Some(acl) = acl {
                 Ok(Some(MediatorACLSet::from_hex_string(&acl).map_err(
@@ -67,6 +68,7 @@ impl DatabaseHandler {
             let mut con = self.get_async_connection().await?;
 
             let mut query = Pipeline::new();
+            query.atomic();
 
             for did in dids {
                 query.add_command(Cmd::hget(format!("DID:{}", did), "ACLS"));

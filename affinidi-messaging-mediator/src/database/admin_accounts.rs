@@ -25,7 +25,7 @@ impl DatabaseHandler {
             .ignore()
             .cmd("HSET")
             .arg(["DID:", &did_hash].concat())
-            .arg("ADMIN")
+            .arg("ROLE_TYPE")
             .arg(1)
             .ignore()
             .exec_async(&mut con)
@@ -54,7 +54,7 @@ impl DatabaseHandler {
             .arg(did_hash)
             .cmd("HGET")
             .arg(["DID:", did_hash].concat())
-            .arg("ADMIN")
+            .arg("ROLE_TYPE")
             .query_async(&mut con)
             .await
             .map_err(|err| {
@@ -67,7 +67,7 @@ impl DatabaseHandler {
                 )
             })?;
 
-        if result.iter().sum::<i32>() == 2 {
+        if result.iter().sum::<i32>() == 2 && result.last().unwrap() == &1 {
             Ok(true)
         } else {
             Ok(false)
@@ -159,7 +159,7 @@ impl DatabaseHandler {
 
             // Remove admin field on each DID
             for account in &accounts {
-                tx = tx.cmd("HDEL").arg(account).arg("ROLE_TYPE");
+                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg("0");
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {

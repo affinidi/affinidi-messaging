@@ -2,9 +2,10 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
-    acls::MediatorACLSet, mediator::MediatorAccountList,
+    acls::MediatorACLSet,
+    mediator::{Account, AccountType, MediatorAccountList},
 };
-use redis::{from_redis_value, Value};
+use redis::Pipeline;
 use tracing::{debug, span, Instrument, Level};
 
 impl DatabaseHandler {
@@ -125,12 +126,7 @@ impl DatabaseHandler {
         cursor: u32,
         limit: u32,
     ) -> Result<MediatorAccountList, MediatorError> {
-        let _span = span!(
-            Level::DEBUG,
-            "list_accounts",
-            cursor = cursor,
-            limit = limit
-        );
+        let _span = span!(Level::DEBUG, "account_list", cursor = cursor, limit = limit);
 
         async move {
             debug!("Requesting list of accounts from mediator");
@@ -143,9 +139,7 @@ impl DatabaseHandler {
 
             let mut con = self.get_async_connection().await?;
 
-            let result: Vec<Value> = deadpool_redis::redis::pipe()
-                .atomic()
-                .cmd("SSCAN")
+            let (new_cursor, dids): (u32, Vec<String>) = deadpool_redis::redis::cmd("SSCAN")
                 .arg("KNOWN_DIDS")
                 .arg(cursor)
                 .arg("COUNT")
@@ -159,36 +153,45 @@ impl DatabaseHandler {
                     )
                 })?;
 
-            let mut new_cursor: u32 = 0;
-            let mut accounts: Vec<String> = vec![];
-            for item in &result {
-                let value: Vec<Value> = from_redis_value(item).unwrap();
-                if value.len() != 2 {
-                    return Err(MediatorError::DatabaseError(
-                        "NA".to_string(),
-                        "SSCAN result is not a tuple".to_string(),
-                    ));
-                }
-                new_cursor = from_redis_value::<String>(value.first().unwrap())
-                    .map_err(|err| {
-                        MediatorError::DatabaseError(
-                            "NA".into(),
-                            format!("cursor could not be correctly parsed. Reason: {}", err),
-                        )
-                    })?
-                    .parse::<u32>()
-                    .unwrap();
+            // For each DID, fetch their details
+            let mut query = Pipeline::new();
+            query.atomic();
+            for did in &dids {
+                query.add_command(redis::Cmd::hget(
+                    ["DID:", did].concat(),
+                    &["ROLE_TYPE", "ACLS"],
+                ));
+            }
 
-                accounts = from_redis_value(value.last().unwrap()).map_err(|err| {
+            let results: Vec<(Option<String>, Option<String>)> =
+                query.query_async(&mut con).await.map_err(|err| {
                     MediatorError::DatabaseError(
                         "NA".to_string(),
-                        format!(
-                            "account list could not be correctly parsed. Reason: {}",
-                            err
-                        ),
+                        format!("HMGET  failed. Reason: {}", err),
                     )
                 })?;
+
+            let mut accounts = Vec::new();
+            for (i, (role_type, acls)) in results.iter().enumerate() {
+                let _type = if let Some(role_type) = role_type {
+                    role_type.as_str().into()
+                } else {
+                    AccountType::Unknown
+                };
+
+                let acls = if let Some(acls) = acls {
+                    u64::from_str_radix(acls, 16).unwrap_or(0_u64)
+                } else {
+                    0_u64
+                };
+
+                accounts.push(Account {
+                    did_hash: dids[i].clone(),
+                    _type,
+                    acls,
+                });
             }
+
             Ok(MediatorAccountList {
                 accounts,
                 cursor: new_cursor,

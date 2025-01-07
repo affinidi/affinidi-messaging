@@ -26,15 +26,53 @@ pub enum MediatorAdminRequest {
 }
 
 /// A list of admins in the mediator
-/// - `admins` - The list of admins (SHA256 Hashed DIDs)
-/// - `next` - The offset to use for the next request
+/// - `accounts` - The list of admins (SHA256 Hashed DIDs)
+/// - `cursor` - The offset to use for the next request
 #[derive(Serialize, Deserialize)]
 pub struct MediatorAdminList {
     pub accounts: Vec<String>,
     pub cursor: u32,
 }
 
-pub type MediatorAccountList = MediatorAdminList;
+/// Different levels of accounts in the mediator
+#[derive(Serialize, Deserialize)]
+pub enum AccountType {
+    RootAdmin,
+    Admin,
+    Standard,
+    Unknown,
+}
+
+impl From<&str> for AccountType {
+    fn from(role_type: &str) -> Self {
+        match role_type {
+            "0" => AccountType::Standard,
+            "1" => AccountType::Admin,
+            "2" => AccountType::RootAdmin,
+            _ => AccountType::Unknown,
+        }
+    }
+}
+
+impl From<String> for AccountType {
+    fn from(role_type: String) -> Self {
+        role_type.as_str().into()
+    }
+}
+
+/// An account in the mediator
+#[derive(Serialize, Deserialize)]
+pub struct Account {
+    pub did_hash: String,
+    pub acls: u64,
+    pub _type: AccountType,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct MediatorAccountList {
+    pub accounts: Vec<Account>,
+    pub cursor: u32,
+}
 
 impl Mediator {
     pub async fn get_config(&self, atm: &ATM, profile: &Arc<Profile>) -> Result<Value, ATMError> {
