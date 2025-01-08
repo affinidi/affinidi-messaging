@@ -1,5 +1,8 @@
 //! Database routines to add/remove/list admin accounts
-use affinidi_messaging_sdk::protocols::mediator::mediator::{AccountType, MediatorAdminList};
+use affinidi_messaging_sdk::protocols::mediator::{
+    acls::MediatorACLSet,
+    mediator::{AccountType, MediatorAdminList},
+};
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
 
@@ -15,10 +18,16 @@ impl DatabaseHandler {
         &self,
         admin_did: &str,
         admin_type: AccountType,
+        acls: &MediatorACLSet,
     ) -> Result<(), MediatorError> {
+        let did_hash = sha256::digest(admin_did);
+        // Check if the admin account already exists
+        if !self.account_exists(&did_hash).await? {
+            debug!("Admin account doesn't exist, creating: {}", admin_did);
+            self.account_add(&did_hash, acls).await?;
+        }
         let mut con = self.get_async_connection().await?;
 
-        let did_hash = sha256::digest(admin_did);
         debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
 
         deadpool_redis::redis::pipe()
@@ -89,7 +98,8 @@ impl DatabaseHandler {
     pub(crate) async fn add_admin_accounts(
         &self,
         accounts: Vec<String>,
-    ) -> Result<i32, MediatorError> {
+        acls: &MediatorACLSet,
+    ) -> Result<usize, MediatorError> {
         let _span = span!(
             Level::DEBUG,
             "add_admin_accounts",
@@ -105,31 +115,13 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
-
-            let mut tx = deadpool_redis::redis::pipe();
-            let mut tx = tx.atomic().cmd("SADD").arg("ADMINS");
-
-            // Add to the ADMINS Set
             for account in &accounts {
                 debug!("Adding Admin account: {}", account);
-                tx = tx.arg(account);
+                self.setup_admin_account(account, AccountType::Admin, acls)
+                    .await?;
             }
 
-            // Set the role type for each DID
-            for account in &accounts {
-                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg(1);
-            }
-
-            let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
-                MediatorError::DatabaseError(
-                    "NA".to_string(),
-                    format!("Add failed. Reason: {}", err),
-                )
-            })?;
-            debug!("Admin accounts added successfully: {:?}", result);
-
-            Ok(result.first().unwrap_or(&0).to_owned())
+            Ok(accounts.len())
         }
         .instrument(_span)
         .await

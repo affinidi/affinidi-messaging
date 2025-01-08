@@ -9,29 +9,34 @@ use console::style;
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 use sha256::digest;
 
-use crate::BasicMediatorConfig;
+use crate::SharedConfig;
 
-pub(crate) async fn global_acls_menu(
+pub(crate) async fn account_management_menu(
     atm: &ATM,
     profile: &Arc<Profile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
-    mediator_config: &BasicMediatorConfig,
+    mediator_config: &SharedConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let selections = &["Select and Set Active DID", "Set ACLs", "Back"];
 
     let mut selected_did: Option<String> = None;
+    let mut selected_did_acls: MediatorACLSet = MediatorACLSet::default();
     loop {
         println!();
         print!("{}", style("Currently selected DID: ").yellow());
         if let Some(did) = &selected_did {
-            println!("{}", style(did).blue());
+            println!(
+                "{} {:064b}",
+                style(did).color256(208),
+                style(selected_did_acls.to_u64()).blue().bold()
+            );
         } else {
             println!("{}", style("None").red());
         }
 
         println!(
-            "{} {}\t{} {}",
+            "{} {}                                            {} {}",
             style("Mediator ACL Mode:").yellow(),
             style(&mediator_config.acl_mode).blue().bold(),
             style("Default ACL:").yellow(),
@@ -55,8 +60,9 @@ pub(crate) async fn global_acls_menu(
             0 => {
                 selected_did =
                     match select_did(atm, profile, protocols, theme, mediator_config).await {
-                        Ok(did) => {
+                        Ok((did, acls)) => {
                             if let Some(did) = did {
+                                selected_did_acls = acls;
                                 Some(did)
                             } else {
                                 // No DID was selected
@@ -90,13 +96,13 @@ pub(crate) async fn global_acls_menu(
 /// Picks the target DID
 /// returns the selected DID Hash
 /// returns None if the user cancels the selection
-async fn select_did(
+pub(crate) async fn select_did(
     atm: &ATM,
     profile: &Arc<Profile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
-    mediator_config: &BasicMediatorConfig,
-) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    mediator_config: &SharedConfig,
+) -> Result<(Option<String>, MediatorACLSet), Box<dyn std::error::Error>> {
     let selection = Select::with_theme(theme)
         .with_prompt("Select an action?")
         .default(0)
@@ -118,15 +124,15 @@ async fn select_did(
             )
         }
         1 => Ok(_manually_enter_did_or_hash(theme)),
-        2 => Ok(None),
+        2 => Ok((None, MediatorACLSet::default())),
         _ => {
             println!("Invalid selection");
-            Ok(None)
+            Ok((None, MediatorACLSet::default()))
         }
     }
 }
 
-fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
+fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> (Option<String>, MediatorACLSet) {
     println!();
     println!(
         "{}",
@@ -140,11 +146,11 @@ fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
         .unwrap();
 
     if input == "exit" {
-        return None;
+        return (None, MediatorACLSet::default());
     }
 
     if input.starts_with("did:") {
-        Some(digest(input))
+        (Some(digest(input)), MediatorACLSet::default())
     } else if input.len() != 32 {
         println!(
             "{}",
@@ -154,9 +160,9 @@ fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
             ))
             .red()
         );
-        None
+        (None, MediatorACLSet::default())
     } else {
-        Some(input.to_ascii_lowercase())
+        (Some(input.to_ascii_lowercase()), MediatorACLSet::default())
     }
 }
 
@@ -166,8 +172,8 @@ async fn _select_from_existing_dids(
     protocols: &Protocols,
     theme: &ColorfulTheme,
     cursor: Option<u32>,
-    mediator_config: &BasicMediatorConfig,
-) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    mediator_config: &SharedConfig,
+) -> Result<(Option<String>, MediatorACLSet), Box<dyn std::error::Error>> {
     let dids = protocols
         .mediator
         .list_accounts(atm, profile, cursor, Some(2))
@@ -176,7 +182,7 @@ async fn _select_from_existing_dids(
     if dids.accounts.is_empty() {
         println!("{}", style("No DIDs found").red());
         println!();
-        return Ok(None);
+        return Ok((None, MediatorACLSet::default()));
     }
 
     let mut did_list: Vec<String> = Vec::new();
@@ -236,6 +242,9 @@ async fn _select_from_existing_dids(
         ))
         .await
     } else {
-        Ok(Some(dids.accounts[selected].did_hash.clone()))
+        Ok((
+            Some(dids.accounts[selected].did_hash.clone()),
+            MediatorACLSet::from_u64(dids.accounts[selected].acls),
+        ))
     }
 }

@@ -83,7 +83,11 @@ pub async fn start() {
 
     // Set up the administration account if it doesn't exist
     database
-        .setup_admin_account(&config.admin_did, AccountType::RootAdmin)
+        .setup_admin_account(
+            &config.admin_did,
+            AccountType::RootAdmin,
+            &config.security.global_acl_default,
+        )
         .await
         .expect("Could not setup admin account! exiting...");
 

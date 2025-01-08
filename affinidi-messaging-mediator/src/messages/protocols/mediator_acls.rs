@@ -20,9 +20,24 @@ pub(crate) async fn process(
     state: &SharedData,
     session: &Session,
 ) -> Result<ProcessMessageResponse, MediatorError> {
-    let _span = span!(tracing::Level::DEBUG, "global_acls");
+    let _span = span!(tracing::Level::DEBUG, "mediator_acls");
 
     async move {
+        // Parse the message body
+     let request: MediatorACLRequest = match serde_json::from_value(msg.body.clone()) {
+        Ok(request) => request,
+        Err(err) => {
+            warn!("Error parsing Mediator ACL request. Reason: {}", err);
+            return generate_error_response(state, session, &msg.id, ProblemReport::new(
+                ProblemReportSorter::Error,
+                ProblemReportScope::Protocol,
+                "invalid_request".into(),
+                "Error parsing Mediator ACL request. Reason: {1}".into(),
+                vec![err.to_string()], None
+            ), false);
+        }
+    };
+
          // Check to ensure this account is an admin account
          if !state
          .database
@@ -39,24 +54,12 @@ pub(crate) async fn process(
          ), false);
      }
 
-     // Parse the message body
-     let request: MediatorACLRequest = match serde_json::from_value(msg.body.clone()) {
-         Ok(request) => request,
-         Err(err) => {
-             warn!("Error parsing Mediator Administration request. Reason: {}", err);
-             return generate_error_response(state, session, &msg.id, ProblemReport::new(
-                 ProblemReportSorter::Error,
-                 ProblemReportScope::Protocol,
-                 "invalid_request".into(),
-                 "Error parsing Mediator Administration request. Reason: {1}".into(),
-                 vec![err.to_string()], None
-             ), false);
-         }
-     };
 
      // Process the request
      match request {
         MediatorACLRequest::GetACL(dids) => {
+            // Check permissions and ACLs
+
             match  state.database.get_did_acls(&dids, state.config.security.mediator_acl_mode.clone()).await {
                 Ok(response) => {
                     _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
@@ -75,6 +78,15 @@ pub(crate) async fn process(
         }
      }
     }.instrument(_span).await
+}
+
+// Helper method that determines if an ACL Request can be processed
+// Checks if the account is an admin account (blanket allow/approval)
+// If not admin, then ensures we are only operating on the account's own DID
+// Returns true if the request can be processed, false otherwise
+fn _check_permissions(session: &Session, dids: &Vec<String>) -> Result<bool, MediatorError> {
+    //if session.
+    Ok(true)
 }
 
 /// Helper method that generates a response message

@@ -39,10 +39,11 @@ pub struct MediatorAdminList {
 }
 
 /// Different levels of accounts in the mediator
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub enum AccountType {
     RootAdmin,
     Admin,
+    #[default]
     Standard,
     Unknown,
 }

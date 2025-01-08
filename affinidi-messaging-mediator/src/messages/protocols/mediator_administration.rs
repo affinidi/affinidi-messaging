@@ -79,7 +79,7 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AdminAdd(attr) => {
-                match  state.database.add_admin_accounts(attr).await {
+                match  state.database.add_admin_accounts(attr, &state.config.security.global_acl_default).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }

@@ -142,16 +142,20 @@ where
         let did_hash = digest(&did);
 
         // Everything has passed token wise - expensive database operations happen here
-        let saved_session = state.database.get_session(&session_id).await.map_err(|e| {
-            error!(
-                "{}: Couldn't get session from database! Reason: {}",
-                session_id, e
-            );
-            AuthError::InternalServerError(format!(
-                "Couldn't get session from database! Reason: {}",
-                e
-            ))
-        })?;
+        let saved_session = state
+            .database
+            .get_session(&session_id, &did)
+            .await
+            .map_err(|e| {
+                error!(
+                    "{}: Couldn't get session from database! Reason: {}",
+                    session_id, e
+                );
+                AuthError::InternalServerError(format!(
+                    "Couldn't get session from database! Reason: {}",
+                    e
+                ))
+            })?;
 
         // Check if ACL is satisfied
         if saved_session.acls.get_blocked() {

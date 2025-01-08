@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use affinidi_messaging_sdk::protocols::mediator::acls::MediatorACLSet;
+use affinidi_messaging_sdk::protocols::mediator::{acls::MediatorACLSet, mediator::AccountType};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use tracing::{debug, warn};
@@ -63,6 +63,7 @@ pub struct Session {
     pub did_hash: String,
     pub authenticated: bool,
     pub acls: MediatorACLSet,
+    pub account_type: AccountType,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {
@@ -148,8 +149,8 @@ impl DatabaseHandler {
             .arg(session.state.to_string())
             .arg("did")
             .arg(&session.did)
-            .arg("acls")
-            .arg(session.acls.to_hex_string())
+            // .arg("acls")
+            // .arg(session.acls.to_hex_string())
             .cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("SESSIONS_CREATED")
@@ -169,22 +170,116 @@ impl DatabaseHandler {
         Ok(())
     }
 
-    /// Retrieves a session from the database
-    pub async fn get_session(&self, session_id: &str) -> Result<Session, MediatorError> {
+    /// Retrieves a session and associated other info from the database
+    ///
+    pub async fn get_session(&self, session_id: &str, did: &str) -> Result<Session, MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let result: HashMap<String, String> = deadpool_redis::redis::cmd("HGETALL")
-            .arg(format!("SESSION:{}", session_id))
-            .query_async(&mut con)
-            .await
-            .map_err(|err| {
-                MediatorError::SessionError(
-                    session_id.into(),
-                    format!("tried to retrieve session({}). Error: {}", session_id, err),
-                )
-            })?;
+        let (session_db, did_db): (HashMap<String, String>, Vec<Option<String>>) =
+            deadpool_redis::redis::pipe()
+                .atomic()
+                .cmd("HGETALL")
+                .arg(format!("SESSION:{}", session_id))
+                .cmd("HMGET")
+                .arg(["DID:", &digest(did)].concat())
+                .arg("ROLE_TYPE")
+                .arg("ACLS")
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::SessionError(
+                        session_id.into(),
+                        format!("tried to retrieve session({}). Error: {}", session_id, err),
+                    )
+                })?;
 
-        (session_id, result).try_into()
+        let mut session: Session = Session {
+            session_id: session_id.into(),
+            ..Default::default()
+        };
+
+        // Process Session info from database
+        if let Some(challenge) = session_db.get("challenge") {
+            session.challenge.clone_from(challenge);
+        } else {
+            warn!(
+                "{}: No challenge found when retrieving session({})!",
+                session_id, session_id
+            );
+            return Err(MediatorError::SessionError(
+                session_id.into(),
+                "No challenge found when retrieving session!".into(),
+            ));
+        }
+
+        if let Some(state) = session_db.get("state") {
+            session.state = state.try_into()?;
+        } else {
+            warn!(
+                "{}: No state found when retrieving session({})!",
+                session_id, session_id
+            );
+            return Err(MediatorError::SessionError(
+                session_id.into(),
+                "No state found when retrieving session!".into(),
+            ));
+        }
+
+        if let Some(did) = session_db.get("did") {
+            session.did = did.into();
+            session.did_hash = digest(did);
+        } else {
+            warn!(
+                "{}: No DID found when retrieving session({})!",
+                session_id, session_id
+            );
+            return Err(MediatorError::SessionError(
+                session_id.into(),
+                "No DID found when retrieving session!".into(),
+            ));
+        }
+
+        // Process DID info from database
+        if let Some(Some(role_type)) = did_db.first() {
+            session.account_type = AccountType::from(role_type.as_str());
+        } else {
+            warn!("{}: Error parsing role_type!", session_id);
+            return Err(MediatorError::SessionError(
+                session_id.into(),
+                "No role_type found when retrieving session!".into(),
+            ));
+        }
+        if let Some(acls) = did_db.get(1) {
+            if let Some(acls) = acls {
+                session.acls = match u64::from_str_radix(acls, 16) {
+                    Ok(acl) => MediatorACLSet::from_u64(acl),
+                    Err(err) => {
+                        warn!(
+                            "{}: Error parsing acls({})! Error: {}",
+                            session_id, acls, err
+                        );
+                        return Err(MediatorError::SessionError(
+                            session_id.into(),
+                            "No ACL found when retrieving session!".into(),
+                        ));
+                    }
+                }
+            } else {
+                warn!("{}: Error parsing acls!", session_id);
+                return Err(MediatorError::SessionError(
+                    session_id.into(),
+                    "No ACL found when retrieving session!".into(),
+                ));
+            }
+        } else {
+            warn!("{}: Error parsing acls!", session_id);
+            return Err(MediatorError::SessionError(
+                session_id.into(),
+                "No ACL found when retrieving session!".into(),
+            ));
+        }
+
+        Ok(session)
     }
 
     /// Updates a session in the database to become authenticated
