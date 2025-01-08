@@ -8,7 +8,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha256::digest;
-use std::{sync::Arc, time::SystemTime};
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+    time::SystemTime,
+};
 use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
 #[derive(Default)]
@@ -43,6 +47,17 @@ pub enum AccountType {
     Unknown,
 }
 
+impl Display for AccountType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            AccountType::RootAdmin => write!(f, "Root Admin"),
+            AccountType::Admin => write!(f, "Admin"),
+            AccountType::Standard => write!(f, "Standard"),
+            AccountType::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
 impl From<&str> for AccountType {
     fn from(role_type: &str) -> Self {
         match role_type {
@@ -54,9 +69,31 @@ impl From<&str> for AccountType {
     }
 }
 
+impl From<u32> for AccountType {
+    fn from(role_type: u32) -> Self {
+        match role_type {
+            0 => AccountType::Standard,
+            1 => AccountType::Admin,
+            2 => AccountType::RootAdmin,
+            _ => AccountType::Unknown,
+        }
+    }
+}
+
 impl From<String> for AccountType {
     fn from(role_type: String) -> Self {
         role_type.as_str().into()
+    }
+}
+
+impl From<AccountType> for String {
+    fn from(role_type: AccountType) -> Self {
+        match role_type {
+            AccountType::RootAdmin => "2".to_owned(),
+            AccountType::Admin => "1".to_owned(),
+            AccountType::Standard => "0".to_owned(),
+            AccountType::Unknown => "-1".to_owned(),
+        }
     }
 }
 

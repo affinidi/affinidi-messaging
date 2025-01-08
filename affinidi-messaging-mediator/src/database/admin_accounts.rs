@@ -1,5 +1,5 @@
 //! Database routines to add/remove/list admin accounts
-use affinidi_messaging_sdk::protocols::mediator::mediator::MediatorAdminList;
+use affinidi_messaging_sdk::protocols::mediator::mediator::{AccountType, MediatorAdminList};
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
 
@@ -11,7 +11,11 @@ impl DatabaseHandler {
     /// Ensures that the mediator admin account is correctly configured and set up.
     /// It does not do any cleanup or maintenance of other admin accounts.
     /// Updates both the DID role type and the global ADMIN Set in Redis.
-    pub(crate) async fn setup_admin_account(&self, admin_did: &str) -> Result<(), MediatorError> {
+    pub(crate) async fn setup_admin_account(
+        &self,
+        admin_did: &str,
+        admin_type: AccountType,
+    ) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
         let did_hash = sha256::digest(admin_did);
@@ -26,7 +30,7 @@ impl DatabaseHandler {
             .cmd("HSET")
             .arg(["DID:", &did_hash].concat())
             .arg("ROLE_TYPE")
-            .arg(1)
+            .arg::<String>(admin_type.into())
             .ignore()
             .exec_async(&mut con)
             .await
@@ -44,10 +48,12 @@ impl DatabaseHandler {
         Ok(())
     }
 
+    /// Checks if the provided DID is an admin level account
+    /// Returns true if the DID is an admin account, false otherwise
     pub(crate) async fn check_admin_account(&self, did_hash: &str) -> Result<bool, MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let result: Vec<i32> = deadpool_redis::redis::pipe()
+        let (exists, role_type): (u32, u32) = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SISMEMBER")
             .arg("ADMINS")
@@ -67,8 +73,12 @@ impl DatabaseHandler {
                 )
             })?;
 
-        if result.iter().sum::<i32>() == 2 && result.last().unwrap() == &1 {
-            Ok(true)
+        if exists == 1 {
+            match role_type.into() {
+                AccountType::RootAdmin => Ok(true),
+                AccountType::Admin => Ok(true),
+                _ => Ok(false),
+            }
         } else {
             Ok(false)
         }

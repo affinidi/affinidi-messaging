@@ -6,7 +6,10 @@ use affinidi_messaging_helpers::common::{
 };
 use affinidi_messaging_sdk::{
     config::Config,
-    protocols::{mediator::acls::ACLModeType, Protocols},
+    protocols::{
+        mediator::acls::{ACLModeType, MediatorACLSet},
+        Protocols,
+    },
     ATM,
 };
 use clap::Parser;
@@ -21,7 +24,6 @@ use std::{collections::HashMap, env};
 use tracing_subscriber::filter;
 use ui::{add_admin, list_admins, main_menu, remove_admins};
 
-mod acl_management;
 mod global_acl_management;
 mod ui;
 
@@ -38,6 +40,7 @@ struct BasicMediatorConfig {
     pub version: String,
     pub root_admin_did: String,
     pub acl_mode: ACLModeType,
+    pub global_acl_default: MediatorACLSet,
 }
 
 impl BasicMediatorConfig {
@@ -74,20 +77,37 @@ impl BasicMediatorConfig {
 
         let acl_mode = if let Some(acl_mode) = config
             .get("security")
-            .and_then(|security| security.get("acl_mode"))
+            .and_then(|security| security.get("mediator_acl_mode"))
         {
             match serde_json::from_value::<ACLModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
-                Err(_) => return Err("Couldn't find acl_mode in Mediator Configuration".into()),
+                Err(_) => {
+                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())
+                }
             }
         } else {
-            return Err("Couldn't find admin_did in Mediator Configuration".into());
+            return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into());
+        };
+
+        let global_acl_default = if let Some(global_acl_default) = config
+            .get("security")
+            .and_then(|security| security.get("global_acl_default"))
+            .and_then(|acls| acls.get("acl"))
+        {
+            if let Some(global_acl_default) = global_acl_default.as_u64() {
+                MediatorACLSet::from_u64(global_acl_default)
+            } else {
+                return Err("Couldn't find global_acl_default in Mediator Configuration".into());
+            }
+        } else {
+            return Err("Couldn't find global_acl_default in Mediator Configuration".into());
         };
 
         Ok(BasicMediatorConfig {
             version,
             root_admin_did,
             acl_mode,
+            global_acl_default,
         })
     }
 }

@@ -13,7 +13,6 @@
 * Added Global ACL Support
 * Added default_acl to `security` block in configuration
   * Allows to set the default ACL to apply
-  * Default ACL for both global and local ACL
 * New error type ACLDenied added
 * Local Direct Delivery added
   * Allows for known recipient DIDs to receive messages directly sent to the

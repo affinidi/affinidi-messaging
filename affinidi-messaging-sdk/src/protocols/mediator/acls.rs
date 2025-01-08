@@ -73,7 +73,6 @@ pub struct MediatorACLSet {
     anon_receive_self_change: bool,
     self_manage_list: bool,
     /// Internal use only
-    #[serde(skip)]
     acl: u64,
 }
 
