@@ -514,29 +514,19 @@ impl TryFrom<ConfigRaw> for Config {
 
         // Are we self-hosting our own did:web Document?
         if let Some(path) = raw.server.did_web_self_hosted {
-            match fs::read_to_string(path) {
-                Ok(content) => {
-                    let doc: Document = serde_json::from_str(&content).map_err(|err| {
-                        event!(
-                            Level::ERROR,
-                            "Could not parse DID Document. Reason: {}",
-                            err
-                        );
-                        MediatorError::ConfigError(
-                            "NA".into(),
-                            format!("Could not parse DID Document. Reason: {}", err),
-                        )
-                    })?;
-                    config.mediator_did_doc = Some(doc);
-                }
-                Err(err) => {
-                    event!(Level::ERROR, "Could not read DID Document. Reason: {}", err);
-                    return Err(MediatorError::ConfigError(
-                        "NA".into(),
-                        format!("Could not read DID Document. Reason: {}", err),
-                    ));
-                }
-            }
+            let content = read_document(&path, &aws_config).await?;
+            let doc: Document = serde_json::from_str(&content).map_err(|err| {
+                event!(
+                    Level::ERROR,
+                    "Could not parse DID Document. Reason: {}",
+                    err
+                );
+                MediatorError::ConfigError(
+                    "NA".into(),
+                    format!("Could not parse DID Document. Reason: {}", err),
+                )
+            })?;
+            config.mediator_did_doc = Some(doc);
         }
 
         // Ensure that the security JWT expiry times are valid
@@ -722,62 +712,12 @@ async fn read_did_config(
     }
     let content: String = match parts[0] {
         "did" => parts[1].to_string(),
-        "aws_parameter_store" => {
-            let ssm = aws_sdk_ssm::Client::new(aws_config);
-
-            let response = ssm
-                .get_parameter()
-                .set_name(Some(parts[1].to_string()))
-                .send()
-                .await
-                .map_err(|e| {
-                    event!(Level::ERROR, "Could not get mediator_did parameter. {}", e);
-                    MediatorError::ConfigError(
-                        "NA".into(),
-                        format!("Could not get mediator_did parameter. {}", e),
-                    )
-                })?;
-            let parameter = response.parameter.ok_or_else(|| {
-                event!(Level::ERROR, "No parameter string found in response");
-                MediatorError::ConfigError(
-                    "NA".into(),
-                    "No parameter string found in response".into(),
-                )
-            })?;
-
-            if let Some(_type) = parameter.r#type {
-                if _type != ParameterType::String {
-                    return Err(MediatorError::ConfigError(
-                        "NA".into(),
-                        "Expected String parameter type".into(),
-                    ));
-                }
-            } else {
-                return Err(MediatorError::ConfigError(
-                    "NA".into(),
-                    "Unknown parameter type".into(),
-                ));
-            }
-
-            parameter.value.ok_or_else(|| {
-                event!(
-                    Level::ERROR,
-                    "Parameter ({:?}) found, but no parameter value found in response",
-                    parameter.name
-                );
-                MediatorError::ConfigError(
-                    "NA".into(),
-                    format!(
-                        "Parameter ({:?}) found, but no parameter value found in response",
-                        parameter.name
-                    ),
-                )
-            })?
-        }
+        "aws_parameter_store" => aws_parameter_store(parts[1], aws_config).await?,
         _ => {
             return Err(MediatorError::ConfigError(
                 "NA".into(),
-                "Invalid mediator_did format! Expecting file:// or aws_secrets:// ...".into(),
+                "Invalid mediator_did format! Expecting file:// or aws_parameter_store:// ..."
+                    .into(),
             ))
         }
     };
@@ -861,6 +801,92 @@ fn get_hostname(host_name: &str) -> Result<String, MediatorError> {
             "Invalid hostname format!".into(),
         ))
     }
+}
+
+async fn aws_parameter_store(
+    parameter_name: &str,
+    aws_config: &SdkConfig,
+) -> Result<String, MediatorError> {
+    let ssm = aws_sdk_ssm::Client::new(aws_config);
+
+    let response = ssm
+        .get_parameter()
+        // .set_name(Some(parts[1].to_string()))
+        .set_name(Some(parameter_name.to_string()))
+        .send()
+        .await
+        .map_err(|e| {
+            event!(
+                Level::ERROR,
+                "Could not get ({:?}) parameter. {}",
+                parameter_name,
+                e
+            );
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not get ({:?}) parameter. {}", parameter_name, e),
+            )
+        })?;
+    let parameter = response.parameter.ok_or_else(|| {
+        event!(Level::ERROR, "No parameter string found in response");
+        MediatorError::ConfigError("NA".into(), "No parameter string found in response".into())
+    })?;
+
+    if let Some(_type) = parameter.r#type {
+        if _type != ParameterType::String {
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "Expected String parameter type".into(),
+            ));
+        }
+    } else {
+        return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Unknown parameter type".into(),
+        ));
+    }
+
+    return parameter.value.ok_or_else(|| {
+        event!(
+            Level::ERROR,
+            "Parameter ({:?}) found, but no parameter value found in response",
+            parameter.name
+        );
+        MediatorError::ConfigError(
+            "NA".into(),
+            format!(
+                "Parameter ({:?}) found, but no parameter value found in response",
+                parameter.name
+            ),
+        )
+    });
+}
+
+/// Reads document from file or aws_parameter_store
+async fn read_document(
+    document_path: &str,
+    aws_config: &SdkConfig,
+) -> Result<String, MediatorError> {
+    let parts: Vec<&str> = document_path.split("://").collect();
+    if parts.len() != 2 {
+        return Err(MediatorError::ConfigError(
+            "NA".into(),
+            "Invalid `document_path` format".into(),
+        ));
+    }
+    let content: String = match parts[0] {
+        "file" => read_file_lines(parts[1])?.concat(),
+        "aws_parameter_store" => aws_parameter_store(parts[1], aws_config).await?,
+        _ => {
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                "Invalid document_path format! Expecting file:// or aws_parameter_store:// ..."
+                    .into(),
+            ))
+        }
+    };
+
+    Ok(content)
 }
 
 pub async fn init(
