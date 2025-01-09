@@ -27,17 +27,20 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### - did://did:method:...
 ### - aws_parameter_store://<parameter_name> - Load DID from AWS Systems Manager Parameter Store
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
-###       This causes more use cases where the secrets of the mediator itself can be exposed in adminstration tasks.
+###       This causes more use cases where the secrets of the mediator itself can be exposed in administration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
 admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkhTiMG5qhSDGj7mnsBh1ENgpV11nmXSYZyiE8EVk3ZWM5.EzQ3shXy6V6WRQgWBMLaPRqbzvj6Bn4u2mxfFap6oD1EQWKuQh}"
 
 ### did_web_self_hosted: <DID Document Path> Path to the self-hosted DID Document
 ### Default: None
+### Supported formats:
+### - file://<path> - Load secrets from a file
+### - aws_parameter_store://<parameter_name> - Load DID Document from AWS Systems Manager Parameter Store
 ### NOTE: If you are using a self-hosted DID Document, you can specify the path here
 ### This is a convenience feature to allow you to host a did:web DID Document on the same server as the mediator
 ### When this option is enabled, a did:web valid route will be added /.well-known/did.json
 ### NOTE: You can put port names in the did:web identifier, i.e. did:web:localhost%3A7037
-did_web_self_hosted = "${DID_WEB_SELF_HOSTED:conf/mediator_did.json}"
+did_web_self_hosted = "${DID_WEB_SELF_HOSTED:file://./conf/mediator_did.json}"
 
 ### ****************************************************************************************************************************
 ### Database configuration
@@ -47,7 +50,7 @@ did_web_self_hosted = "${DID_WEB_SELF_HOSTED:conf/mediator_did.json}"
 ### Default: ./conf/atm-functions.lua
 functions_file = "${DATABASE_FUNCTIONS_FILE:./conf/atm-functions.lua}"
 
-### database_url: URL of the Redis compatable database
+### database_url: URL of the Redis compatible database
 ### Default: redis://127.0.0.1/
 database_url = "${DATABASE_URL:redis://127.0.0.1/}"
 
@@ -195,11 +198,11 @@ network_limit = "${DID_RESOLVER_NETWORK_LIMIT:100}"
 attachments_max_count = "${LIMIT_ATTACHMENTS_MAX_COUNT:20}"
 
 ### approximate maximum amount of crypto operations per one message
-### it is used to protect the mediator from DoS type attacts.
+### it is used to protect the mediator from DoS type attacks.
 ### Default: 1000
 crypto_operations_per_message = "${LIMIT_CRYPTO_OPERATIONS_PER_MESSAGE:1000}"
 
-### deleted_messages: Maxx number of messages that can be deleted at once
+### deleted_messages: Maximum number of messages that can be deleted at once
 ### Default: 100
 deleted_messages = "${LIMIT_DELETED_MESSAGES:100}"
 
@@ -212,7 +215,7 @@ forward_task_queue = "${LIMIT_FORWARD_TASK_QUEUE:50000}"
 ### It is recommended to use infrastructure level limitation instead of application level limitations
 http_size = "${LIMIT_HTTP_SIZE:10485760}"
 
-### listed_messages: Maxx number of messages that can be listed at a time
+### listed_messages: Maximum number of messages that can be listed at a time
 ### Default: 100
 listed_messages = "${LIMIT_LISTED_MESSAGES:100}"
 
