@@ -6,8 +6,10 @@ use affinidi_messaging_didcomm::{
     secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
 use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
-use protocols::{mediator_acls, message_pickup};
-use protocols::{mediator_administration, routing};
+use protocols::{
+    mediator::{accounts, acls, administration},
+    message_pickup, routing,
+};
 use std::time::SystemTime;
 
 pub mod error_response;
@@ -29,11 +31,12 @@ impl MessageType {
     ) -> Result<ProcessMessageResponse, MediatorError> {
         match self.0 {
             SDKMessageType::MediatorAdministration => {
-                mediator_administration::process(message, state, session).await
+                administration::process(message, state, session).await
             }
-            SDKMessageType::MediatorACLManagement => {
-                mediator_acls::process(message, state, session).await
+            SDKMessageType::MediatorAccountManagement => {
+                accounts::process(message, state, session).await
             }
+            SDKMessageType::MediatorACLManagement => acls::process(message, state, session).await,
             SDKMessageType::TrustPing => ping::process(message, session),
             SDKMessageType::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await

@@ -1,7 +1,7 @@
 //! This module contains the implementation of the DIDComm protocols supported by the SDK.
 
 use crate::messages::GenericDataStruct;
-use mediator::mediator::Mediator;
+use mediator::administration::Mediator;
 
 #[derive(Default)]
 pub struct Protocols {

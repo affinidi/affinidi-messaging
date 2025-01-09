@@ -6,7 +6,7 @@ use crate::{
     SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_sdk::protocols::mediator::mediator::AccountType;
+use affinidi_messaging_sdk::protocols::mediator::accounts::AccountType;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{env, net::SocketAddr};

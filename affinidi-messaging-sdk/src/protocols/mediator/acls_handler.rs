@@ -14,7 +14,7 @@ use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse
 
 use super::{
     acls::{ACLModeType, MediatorACLSet},
-    mediator::Mediator,
+    administration::Mediator,
 };
 
 /// Used in lists to show DID Hash and ACLs
@@ -40,30 +40,27 @@ pub struct MediatorACLResponse {
 }
 
 impl Mediator {
-    /// Parses the response from the mediator for Global ACL Get
-    fn _parse_global_acls_get_response(
-        &self,
-        message: &Message,
-    ) -> Result<MediatorACLResponse, ATMError> {
+    /// Parses the response from the mediator for ACL Get
+    fn _parse_acls_get_response(&self, message: &Message) -> Result<MediatorACLResponse, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
-                "Mediator Gloabl ACL get response could not be parsed. Reason: {}",
+                "Mediator ACL get response could not be parsed. Reason: {}",
                 err
             ))
         })
     }
 
-    /// Get the Global ACL's set for a list of DIDs
-    pub async fn global_acls_get(
+    /// Get the ACL's set for a list of DIDs
+    pub async fn acls_get(
         &self,
         atm: &ATM,
         profile: &Arc<Profile>,
         dids: &Vec<String>,
     ) -> Result<MediatorACLResponse, ATMError> {
-        let _span = span!(Level::DEBUG, "global_acls_get");
+        let _span = span!(Level::DEBUG, "acls_get");
 
         async move {
-            debug!("Requesting Global ACLs for DIDs: {:?}", dids);
+            debug!("Requesting ACLs for DIDs: {:?}", dids);
 
             let (profile_did, mediator_did) = profile.dids()?;
 
@@ -74,7 +71,7 @@ impl Mediator {
 
             let msg = Message::build(
                 Uuid::new_v4().into(),
-                "https://didcomm.org/mediator/1.0/global-acl-management".to_owned(),
+                "https://didcomm.org/mediator/1.0/acl-management".to_owned(),
                 json!({"acl_get": dids}),
             )
             .to(mediator_did.into())
@@ -101,7 +98,7 @@ impl Mediator {
             if let SendMessageResponse::Message(message) =
                 atm.send_message(profile, &msg, &msg_id, true).await?
             {
-                self._parse_global_acls_get_response(&message)
+                self._parse_acls_get_response(&message)
             } else {
                 Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),

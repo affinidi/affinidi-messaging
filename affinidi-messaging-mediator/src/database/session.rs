@@ -1,16 +1,13 @@
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
+use affinidi_messaging_sdk::protocols::mediator::{accounts::AccountType, acls::MediatorACLSet};
+use serde::{Deserialize, Serialize};
+use sha256::digest;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
-
-use affinidi_messaging_sdk::protocols::mediator::{acls::MediatorACLSet, mediator::AccountType};
-use serde::{Deserialize, Serialize};
-use sha256::digest;
 use tracing::{debug, warn};
-
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionClaims {

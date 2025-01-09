@@ -18,8 +18,8 @@ use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
     protocols::mediator::{
+        accounts::AccountType,
         acls::{ACLModeType, MediatorACLSet},
-        mediator::AccountType,
     },
 };
 use axum::{extract::State, Json};

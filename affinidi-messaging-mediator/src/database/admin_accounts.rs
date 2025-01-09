@@ -1,14 +1,11 @@
 //! Database routines to add/remove/list admin accounts
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
-    acls::MediatorACLSet,
-    mediator::{AccountType, MediatorAdminList},
+    accounts::AccountType, acls::MediatorACLSet, administration::MediatorAdminList,
 };
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
-
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
 
 impl DatabaseHandler {
     /// Ensures that the mediator admin account is correctly configured and set up.

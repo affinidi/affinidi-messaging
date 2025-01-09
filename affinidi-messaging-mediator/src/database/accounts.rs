@@ -1,12 +1,14 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
+use std::collections::HashMap;
+
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
+    accounts::{Account, AccountType, MediatorAccountList},
     acls::MediatorACLSet,
-    mediator::{Account, AccountType, MediatorAccountList},
 };
 use redis::Pipeline;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{debug, span, warn, Instrument, Level};
 
 impl DatabaseHandler {
     /// Quick and efficient check if an account exists locally in the mediator
@@ -25,13 +27,63 @@ impl DatabaseHandler {
             })
     }
 
+    /// Grab Account information
+    pub(crate) async fn account_get(
+        &self,
+        did_hash: &str,
+    ) -> Result<Option<Account>, MediatorError> {
+        let mut con = self.get_async_connection().await?;
+
+        let response: HashMap<String, String> = deadpool_redis::redis::cmd("HGETALL")
+            .arg(["DID:", did_hash].concat())
+            .query_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("Add failed. Reason: {}", err),
+                )
+            })?;
+
+        if response.is_empty() {
+            debug!("Account {} does not exist", did_hash);
+            return Ok(None);
+        }
+
+        let _type = if let Some(_type) = response.get("ROLE_TYPE") {
+            AccountType::from(_type.as_str())
+        } else {
+            warn!("Account {} does not have a role type", did_hash);
+            return Err(MediatorError::InternalError(
+                "NA".to_string(),
+                "DID is missing a role_type".to_string(),
+            ));
+        };
+
+        let acls = if let Some(acls) = response.get("ACLS") {
+            u64::from_str_radix(acls, 16).unwrap_or(0_u64)
+        } else {
+            warn!("Account {} does not have ACLs", did_hash);
+            return Err(MediatorError::InternalError(
+                "NA".to_string(),
+                "DID is missing ACLs".to_string(),
+            ));
+        };
+
+        Ok(Some(Account {
+            did_hash: did_hash.to_string(),
+            _type,
+            acls,
+        }))
+    }
+
     /// Add a DID account to the mediator
     /// - `did_hash` - SHA256 hash of the DID
     pub(crate) async fn account_add(
         &self,
         did_hash: &str,
         acls: &MediatorACLSet,
-    ) -> Result<bool, MediatorError> {
+    ) -> Result<Account, MediatorError> {
         let _span = span!(Level::DEBUG, "add_account", "did_hash" = did_hash,);
 
         async move {
@@ -55,7 +107,7 @@ impl DatabaseHandler {
                 .arg("RECEIVE_QUEUE_COUNT")
                 .arg(0)
                 .arg("ROLE_TYPE")
-                .arg(0)
+                .arg::<String>(AccountType::Standard.into())
                 .arg("ACLS")
                 .arg(acls.to_hex_string())
                 .exec_async(&mut con)
@@ -68,7 +120,11 @@ impl DatabaseHandler {
                 })?;
             debug!("Account added successfully");
 
-            Ok(true)
+            Ok(Account {
+                did_hash: did_hash.to_string(),
+                _type: AccountType::Standard,
+                acls: acls.to_u64(),
+            })
         }
         .instrument(_span)
         .await

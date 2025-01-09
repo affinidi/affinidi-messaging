@@ -1,4 +1,5 @@
 //! Example of how to manage administration accounts for the mediator
+use account_management::account_management::account_management_menu;
 use affinidi_messaging_helpers::common::{
     affinidi_logo::print_logo,
     check_path,
@@ -15,7 +16,6 @@ use affinidi_messaging_sdk::{
 use clap::Parser;
 use console::{style, Style, Term};
 use dialoguer::{theme::ColorfulTheme, Select};
-use global_acl_management::global_acls::account_management_menu;
 use serde::Deserialize;
 use serde_json::Value;
 use sha256::digest;
@@ -24,7 +24,7 @@ use std::{collections::HashMap, env};
 use tracing_subscriber::filter;
 use ui::administration_accounts_menu;
 
-mod global_acl_management;
+mod account_management;
 mod ui;
 
 #[derive(Parser, Debug)]
@@ -187,8 +187,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         serde_json::from_value(protocols.mediator.get_config(&atm, &admin).await?)?;
     let mut mediator_config = SharedConfig::new(shared_config)?;
     println!(
-        "{}{}{}",
-        style("Mediator version(").green(),
+        "{}{}{}{}{}",
+        style("Mediator server(").green(),
+        style(admin_profile.dids()?.1).color256(208),
+        style(") version(").green(),
         style(&mediator_config.version).color256(208),
         style("). Configuration loaded successfully").green()
     );
@@ -227,18 +229,3 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-/*0 => {
-     list_admins(
-         &atm,
-         &admin,
-         &protocols,
-         &admin_hash,
-         &digest(&mediator_config.root_admin_did),
-     )
-     .await
- }
- 1 => add_admin(&atm, &admin, &protocols, &theme).await,
- 2 => remove_admins(&atm, &admin, &protocols, &admin_hash, &theme).await,
-3 => global_acls_menu(&atm, &admin, &protocols, &theme, &mediator_config).await?,
-*/
