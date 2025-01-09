@@ -132,8 +132,8 @@ impl DatabaseHandler {
 
     /// Removes an account from the mediator
     /// - `did_hash` - SHA256 Hash of DID to remove
-    pub(crate) async fn account_remove(&self, did_hash: &str) -> Result<i32, MediatorError> {
-        let _span = span!(Level::DEBUG, "remove_account", "did_hash" = did_hash,);
+    pub(crate) async fn account_remove(&self, did_hash: &str) -> Result<bool, MediatorError> {
+        let _span = span!(Level::DEBUG, "account_remove", "did_hash" = did_hash,);
 
         async move {
             debug!("Removing account from the mediator");
@@ -167,7 +167,7 @@ impl DatabaseHandler {
 
             Ok(result.first().unwrap_or(&0).to_owned())
             */
-            Ok(0)
+            Ok(true)
         }
         .instrument(_span)
         .await

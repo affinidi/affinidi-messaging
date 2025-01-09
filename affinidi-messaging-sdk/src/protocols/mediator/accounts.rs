@@ -238,11 +238,84 @@ impl Mediator {
         .await
     }
 
-    /// Parses the response from the mediator for account_get
+    /// Parses the response from the mediator for account_add
     fn _parse_account_add_response(&self, message: &Message) -> Result<Account, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
-                "Mediator Account Get response could not be parsed. Reason: {}",
+                "Mediator Account Add response could not be parsed. Reason: {}",
+                err
+            ))
+        })
+    }
+
+    /// Removes an account from the mediator
+    /// - `atm` - The ATM client to use
+    /// - `profile` - The profile to use
+    /// - `did_hash` - The DID hash to remove (Defaults to the profile DID hash if not provided)
+    pub async fn account_remove(
+        &self,
+        atm: &ATM,
+        profile: &Arc<Profile>,
+        did_hash: Option<String>,
+    ) -> Result<bool, ATMError> {
+        let _span = span!(Level::DEBUG, "account_remove");
+
+        async move {
+            let did_hash = did_hash.unwrap_or_else(|| digest(&profile.inner.did));
+            debug!("Removing account ({}) from mediator.", did_hash);
+
+            let (profile_did, mediator_did) = profile.dids()?;
+
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let msg = Message::build(
+                Uuid::new_v4().into(),
+                "https://didcomm.org/mediator/1.0/account-management".to_owned(),
+                json!({"AccountRemove":  did_hash}),
+            )
+            .to(mediator_did.into())
+            .from(profile_did.into())
+            .created_time(now)
+            .expires_time(now + 10)
+            .finalize();
+
+            let msg_id = msg.id.clone();
+
+            // Pack the message
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+            if let SendMessageResponse::Message(message) =
+                atm.send_message(profile, &msg, &msg_id, true).await?
+            {
+                self._parse_account_remove_response(&message)
+            } else {
+                Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                ))
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Parses the response from the mediator for account_remove
+    fn _parse_account_remove_response(&self, message: &Message) -> Result<bool, ATMError> {
+        serde_json::from_value(message.body.clone()).map_err(|err| {
+            ATMError::MsgReceiveError(format!(
+                "Mediator Account Remove response could not be parsed. Reason: {}",
                 err
             ))
         })

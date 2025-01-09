@@ -210,11 +210,30 @@ pub(crate) async fn process(
                     }
                 }
             }
-            MediatorAccountRequest::AccountRemove(attr) => {
-                // Remove root admin DID in case it is in the list
+            MediatorAccountRequest::AccountRemove(did_hash) => {
+               // Check permissions and ACLs
+               if !check_permissions(session, &[did_hash.clone()]) {
+                warn!("ACL Request from DID ({}) failed. ", session.did_hash);
+                return generate_error_response(
+                    state,
+                    session,
+                    &msg.id,
+                    ProblemReport::new(
+                        ProblemReportSorter::Error,
+                        ProblemReportScope::Protocol,
+                        "permission_error".into(),
+                        "Error getting ACLs {1}".into(),
+                        vec!["Permission denied".to_string()],
+                        None,
+                    ),
+                    false,
+                );
+            }
+
+                // Check if the root admin DID is being removed
                 // Protects accidentally deleting the only admin account
                 let root_admin = digest(&state.config.admin_did);
-                if root_admin == attr {
+                if root_admin == did_hash {
                     return generate_error_response(
                         state,
                         session,
@@ -230,7 +249,7 @@ pub(crate) async fn process(
                         false,
                     );
                 }
-                match state.database.account_remove(&attr).await {
+                match state.database.account_remove(&did_hash).await {
                     Ok(response) => _generate_response_message(
                         &msg.id,
                         &session.did,
