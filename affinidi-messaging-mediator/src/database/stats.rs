@@ -5,50 +5,115 @@ use num_format::{Locale, ToFormattedString};
 use redis::{from_redis_value, Value};
 use std::fmt::{self, Display, Formatter};
 use tracing::{debug, event, Level};
+use serde::{Serialize};
+use serde_json::{to_string};
 
 /// Statistics for the mediator
 #[derive(Default, Debug)]
 pub struct MetadataStats {
-    pub received_bytes: i64,      // Total number of bytes processed
-    pub sent_bytes: i64,          // Total number of bytes sent
-    pub deleted_bytes: i64,       // Total number of bytes deleted
-    pub received_count: i64,      // Total number of messages received
-    pub sent_count: i64,          // Total number of messages sent
-    pub deleted_count: i64,       // Total number of messages deleted
-    pub websocket_open: i64,      // Total number of websocket connections opened
-    pub websocket_close: i64,     // Total number of websocket connections closed
-    pub sessions_created: i64,    // Total number of sessions created
-    pub sessions_success: i64,    // Total number of sessions successfully authenticated
-    pub oob_invites_created: i64, // Total number of out-of-band invites created
-    pub oob_invites_claimed: i64, // Total number of out-of-band invites claimed
+    pub received_bytes: u64,      // Total number of bytes processed
+    pub sent_bytes: u64,          // Total number of bytes sent
+    pub deleted_bytes: u64,       // Total number of bytes deleted
+    pub received_count: u64,      // Total number of messages received
+    pub sent_count: u64,          // Total number of messages sent
+    pub deleted_count: u64,       // Total number of messages deleted
+    pub websocket_open: u64,      // Total number of websocket connections opened
+    pub websocket_close: u64,     // Total number of websocket connections closed
+    pub sessions_created: u64,    // Total number of sessions created
+    pub sessions_success: u64,    // Total number of sessions successfully authenticated
+    pub oob_invites_created: u64, // Total number of out-of-band invites created
+    pub oob_invites_claimed: u64, // Total number of out-of-band invites claimed
+    pub event_type: Option<String>, // event_type for analytics
+}
+
+
+#[derive(Serialize)]
+struct LogData {
+    event_type: String,
+    source_project_id: String,
+    time_stamp: String,
+    payload: Payload,
+}
+
+#[derive(Serialize)]
+struct Payload {
+    message_counts: MessageCounts,
+    storage: Storage,
+    connections: Connections,
+    oob_invites: OobInvites,
+}
+
+#[derive(Serialize)]
+struct MessageCounts {
+    recv: u64,
+    sent: u64,
+    deleted: u64,
+    queued: u64,
+}
+
+#[derive(Serialize)]
+struct Storage {
+    received: u64,
+    sent: u64,
+    deleted: u64,
+    current_queued: u64,
+}
+
+#[derive(Serialize)]
+struct Connections {
+    ws_open: u64,
+    ws_close: u64,
+    ws_current: u64,
+    sessions_created: u64,
+    sessions_authenticated: u64,
+}
+
+#[derive(Serialize)]
+struct OobInvites {
+    created: u64,
+    claimed: u64,
 }
 
 impl Display for MetadataStats {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            r#"
-    Message counts: recv({}) sent({}) deleted({}) queued({})
-    Storage: received({}), sent({}), deleted({}), current_queued({})
-    Connections: ws_open({}) ws_close({}) ws_current({}) :: sessions_created({}), sessions_authenticated({})
-    OOB Invites: created({}) claimed({})
-            "#,
-            self.received_count.to_formatted_string(&Locale::en),
-            self.sent_count.to_formatted_string(&Locale::en),
-            self.deleted_count.to_formatted_string(&Locale::en),
-            (self.received_count - self.deleted_count).to_formatted_string(&Locale::en),
-            self.received_bytes.to_formatted_string(&Locale::en),
-            self.sent_bytes.to_formatted_string(&Locale::en),
-            self.deleted_bytes.to_formatted_string(&Locale::en),
-            (self.received_bytes - self.deleted_bytes).to_formatted_string(&Locale::en),
-            self.websocket_open.to_formatted_string(&Locale::en),
-            self.websocket_close.to_formatted_string(&Locale::en),
-            (self.websocket_open - self.websocket_close).to_formatted_string(&Locale::en),
-            self.sessions_created.to_formatted_string(&Locale::en),
-            self.sessions_success.to_formatted_string(&Locale::en),
-            self.oob_invites_created.to_formatted_string(&Locale::en),
-            self.oob_invites_claimed.to_formatted_string(&Locale::en)
-        )
+        // If event_type is Some, use it; otherwise, default to "totalStatistics"
+        let event_type = self.event_type.as_deref().unwrap_or("totalStatistics");
+
+        let log_data = LogData {
+            event_type: event_type.to_string(),
+            source_project_id: "1234-12314-134124455-124414".to_string(), //TODO: Retrieve the projectId dynamically and eliminate the hardcoded string
+            time_stamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+            payload: Payload {
+                message_counts: MessageCounts {
+                    recv: self.received_count,
+                    sent: self.sent_count,
+                    deleted: self.deleted_count,
+                    queued: self.received_count - self.deleted_count,
+                },
+                storage: Storage {
+                    received: self.received_bytes,
+                    sent: self.sent_bytes,
+                    deleted: self.deleted_bytes,
+                    current_queued: self.received_bytes - self.deleted_bytes,
+                },
+                connections: Connections {
+                    ws_open: self.websocket_open,
+                    ws_close: self.websocket_close,
+                    ws_current: (self.websocket_open - self.websocket_close),
+                    sessions_created: self.sessions_created,
+                    sessions_authenticated: self.sessions_success,
+                },
+                oob_invites: OobInvites {
+                    created: self.oob_invites_created,
+                    claimed: self.oob_invites_claimed,
+                }
+            },
+        };
+        // Convert the log_data to a JSON string
+        let json_output = to_string(&log_data).unwrap();
+
+        // Output the JSON string
+        write!(f, "{}", json_output)
     }
 }
 
@@ -56,6 +121,7 @@ impl MetadataStats {
     /// Calculate the delta between two MetadataStats
     pub fn delta(&self, previous: &MetadataStats) -> MetadataStats {
         MetadataStats {
+            event_type: Some("deltaStatistics".to_string()),
             received_bytes: self.received_bytes - previous.received_bytes,
             sent_bytes: self.sent_bytes - previous.sent_bytes,
             deleted_bytes: self.deleted_bytes - previous.deleted_bytes,
