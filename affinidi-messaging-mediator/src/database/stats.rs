@@ -1,31 +1,29 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use itertools::Itertools;
-use num_format::{Locale, ToFormattedString};
 use redis::{from_redis_value, Value};
+use serde::Serialize;
+use serde_json::to_string;
 use std::fmt::{self, Display, Formatter};
-use tracing::{debug, event, Level};
-use serde::{Serialize};
-use serde_json::{to_string};
+use tracing::{debug, error, event, Level};
 
 /// Statistics for the mediator
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct MetadataStats {
-    pub received_bytes: u64,      // Total number of bytes processed
-    pub sent_bytes: u64,          // Total number of bytes sent
-    pub deleted_bytes: u64,       // Total number of bytes deleted
-    pub received_count: u64,      // Total number of messages received
-    pub sent_count: u64,          // Total number of messages sent
-    pub deleted_count: u64,       // Total number of messages deleted
-    pub websocket_open: u64,      // Total number of websocket connections opened
-    pub websocket_close: u64,     // Total number of websocket connections closed
-    pub sessions_created: u64,    // Total number of sessions created
-    pub sessions_success: u64,    // Total number of sessions successfully authenticated
-    pub oob_invites_created: u64, // Total number of out-of-band invites created
-    pub oob_invites_claimed: u64, // Total number of out-of-band invites claimed
+    pub received_bytes: u64,        // Total number of bytes processed
+    pub sent_bytes: u64,            // Total number of bytes sent
+    pub deleted_bytes: u64,         // Total number of bytes deleted
+    pub received_count: u64,        // Total number of messages received
+    pub sent_count: u64,            // Total number of messages sent
+    pub deleted_count: u64,         // Total number of messages deleted
+    pub websocket_open: u64,        // Total number of websocket connections opened
+    pub websocket_close: u64,       // Total number of websocket connections closed
+    pub sessions_created: u64,      // Total number of sessions created
+    pub sessions_success: u64,      // Total number of sessions successfully authenticated
+    pub oob_invites_created: u64,   // Total number of out-of-band invites created
+    pub oob_invites_claimed: u64,   // Total number of out-of-band invites claimed
     pub event_type: Option<String>, // event_type for analytics
 }
-
 
 #[derive(Serialize)]
 struct LogData {
@@ -106,11 +104,17 @@ impl Display for MetadataStats {
                 oob_invites: OobInvites {
                     created: self.oob_invites_created,
                     claimed: self.oob_invites_claimed,
-                }
+                },
             },
         };
         // Convert the log_data to a JSON string
-        let json_output = to_string(&log_data).unwrap();
+        let json_output = match to_string(&log_data) {
+            Ok(json) => json,
+            Err(e) => {
+                error!("Error serializing log data: {}", e);
+                return Err(fmt::Error);
+            }
+        };
 
         // Output the JSON string
         write!(f, "{}", json_output)
