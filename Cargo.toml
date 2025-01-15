@@ -98,7 +98,7 @@ tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_info",
 ] }
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 tracing-test = "0.2"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14", features = ["tracing-support"] }
