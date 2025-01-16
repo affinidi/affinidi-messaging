@@ -258,7 +258,7 @@ pub(crate) async fn process(
     }]
 }
 */
-fn service_local(
+fn _service_local(
     session: &Session,
     state: &SharedData,
     next: &str,
