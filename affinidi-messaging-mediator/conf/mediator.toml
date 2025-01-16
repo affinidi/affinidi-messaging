@@ -19,7 +19,7 @@ listen_address = "${LISTEN_ADDRESS:0.0.0.0:7037}"
 
 ### api_prefix: API prefix
 ### Default: /mediator/v1/
-api_prefix = "${API_PREFIX:/mediator/v1/}"
+api_prefix = "${API_PREFIX:/}"
 
 ### admin_did: DID of the admin
 ### REQUIRED: DID of the admin

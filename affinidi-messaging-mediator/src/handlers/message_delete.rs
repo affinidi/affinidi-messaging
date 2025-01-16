@@ -22,7 +22,7 @@ impl GenericDataStruct for ResponseData {}
 
 /// Deletes a specific message from ATM
 /// Returns a list of messages that were deleted
-/// ACL_MODE: Rquires LOCAL access
+/// ACL_MODE: Requires LOCAL access
 pub async fn message_delete_handler(
     session: Session,
     State(state): State<SharedData>,
@@ -39,7 +39,7 @@ pub async fn message_delete_handler(
         if !session.acls.get_local() {
             return Err(MediatorError::ACLDenied("DID does not have LOCAL access".into()).into());
         }
-        
+
         debug!("Deleting ({}) messages", body.message_ids.len());
         if body.message_ids.len() > state.config.limits.deleted_messages {
             return Err(MediatorError::RequestDataError(
