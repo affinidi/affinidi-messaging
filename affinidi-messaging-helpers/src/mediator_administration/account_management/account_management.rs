@@ -103,10 +103,10 @@ pub(crate) async fn manage_account_menu(
     loop {
         println!();
         println!(
-            "{} {} {} {:064b}",
+            "{} {}  {} {:064b}",
             style("Selected DID: ").yellow(),
             style(&account.did_hash).color256(208),
-            style("ACL: ").yellow(),
+            style("ACL:").yellow(),
             style(account.acls).blue().bold()
         );
 
@@ -136,7 +136,14 @@ pub(crate) async fn manage_account_menu(
         match selection {
             0 => {}
             1 => {}
-            2 => {}
+            2 => {
+                protocols
+                    .mediator
+                    .account_remove(atm, profile, Some(account.did_hash.clone()))
+                    .await?;
+                println!("{}", style("Account deleted successfully").green());
+                return Ok(());
+            }
             3 => {
                 return Ok(());
             }
@@ -309,10 +316,10 @@ async fn _select_from_existing_dids(
 
     println!(
         "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags");
+    println!("{:#?}", did_list);
     let selected = Select::with_theme(theme)
         .with_prompt("Select DID (space to select, enter to continue)?")
         .items(&did_list)
-        .report(false)
         .interact()
         .unwrap();
 

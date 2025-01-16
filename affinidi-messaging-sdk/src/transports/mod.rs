@@ -56,6 +56,8 @@ impl ATM {
     /// - message: The message to send (already packed as a DIDComm message)
     /// - msg_id: The ID of the message (used for message response pickup)
     /// - wait_for_response: Whether to wait for a message response from the mediator
+    /// - auto_delete: Whether to delete the message response after receiving it
+    ///                NOTE: If set to false, then you must delete the message elsewhere
     ///
     /// Returns: If wait_for_response is true, the response message from the mediator
     ///          Else Ok(None) - Message sent Successfully
@@ -67,6 +69,7 @@ impl ATM {
         message: &str,
         msg_id: &str,
         wait_for_response: bool,
+        auto_delete: bool,
     ) -> Result<SendMessageResponse, ATMError> {
         let Some(mediator) = &*profile.inner.mediator else {
             return Err(ATMError::ConfigError(
@@ -103,7 +106,7 @@ impl ATM {
 
             if wait_for_response {
                 let response = MessagePickup::default()
-                    .live_stream_get(self, profile, true, msg_id, Duration::from_secs(10))
+                    .live_stream_get(self, profile, true, msg_id, Duration::from_secs(10), true)
                     .await?;
 
                 if let Some((message, _)) = response {
@@ -132,7 +135,7 @@ impl ATM {
                         profile,
                         &GetMessagesRequest {
                             message_ids: vec![digest(message)],
-                            delete: true,
+                            delete: auto_delete,
                         },
                     )
                     .await?;
@@ -201,8 +204,14 @@ impl ATM {
             forwarded_message.0.as_str()
         };
 
-        self.send_message(profile, &forwarded_message.1, msg_id, wait_for_response)
-            .await
+        self.send_message(
+            profile,
+            &forwarded_message.1,
+            msg_id,
+            wait_for_response,
+            true,
+        )
+        .await
     }
 
     /// send_didcomm_message

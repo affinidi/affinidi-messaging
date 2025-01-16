@@ -146,7 +146,7 @@ async fn main() -> Result<(), ATMError> {
     println!();
 
     // Send the message
-    atm.send_message(&alice, &forward_msg, &forward_id, false)
+    atm.send_message(&alice, &forward_msg, &forward_id, false, false)
         .await?;
 
     println!("Alice sent message to Bob");
@@ -156,7 +156,7 @@ async fn main() -> Result<(), ATMError> {
     println!("Bob receiving messages");
     match protocols
         .message_pickup
-        .live_stream_get(&atm, &bob, true, &msg_id, Duration::from_secs(5))
+        .live_stream_get(&atm, &bob, true, &msg_id, Duration::from_secs(5), true)
         .await?
     {
         Some(msg) => {

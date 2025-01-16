@@ -253,6 +253,7 @@ async fn _handle_connection_setup(
             &forwarded.as_ref().unwrap().1,
             &forwarded.as_ref().unwrap().0,
             false,
+            true,
         )
         .await;
 

@@ -419,7 +419,14 @@ impl ATM {
         // If we are running in cached mode, then we should wait for the live-pickup status message and clear it
         if let WsHandlerMode::Cached = self.inner.config.ws_handler_mode {
             let _ = MessagePickup::default()
-                .live_stream_get(self, profile, true, &status_msg_id, Duration::from_secs(10))
+                .live_stream_get(
+                    self,
+                    profile,
+                    true,
+                    &status_msg_id,
+                    Duration::from_secs(10),
+                    false,
+                )
                 .await;
         }
 

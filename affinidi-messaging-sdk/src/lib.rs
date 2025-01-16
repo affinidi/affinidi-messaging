@@ -2,6 +2,7 @@ use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_didcomm::UnpackMetadata;
 use config::Config;
+use delete_handler::DeletionHandlerCommands;
 use errors::ATMError;
 use profiles::Profiles;
 use reqwest::{Certificate, Client};
@@ -25,6 +26,7 @@ use transports::websockets::ws_handler::WsHandlerMode;
 pub mod authentication;
 pub mod config;
 pub mod conversions;
+pub mod delete_handler;
 pub mod errors;
 pub mod messages;
 pub mod profiles;
@@ -50,6 +52,9 @@ pub(crate) struct SharedState {
     pub(crate) sdk_send_stream: Sender<WsHandlerCommands>, // Sends messages to the SDK
     pub(crate) profiles: Arc<RwLock<Profiles>>,
     pub(crate) direct_stream_sender: Option<broadcast::Sender<(Message, UnpackMetadata)>>, // Used if a client outside of ATM wants to direct stream from websocket
+    pub(crate) deletion_handler_send_stream: Sender<delete_handler::DeletionHandlerCommands>, // Sends MPSC messages to the Deletion Handler
+    pub(crate) deletion_handler_recv_stream:
+        Mutex<Receiver<delete_handler::DeletionHandlerCommands>>, // Receives MPSC messages from the Deletion Handler
 }
 
 /// Affinidi Trusted Messaging SDK
@@ -128,6 +133,12 @@ impl ATM {
         // Create a new channel with a capacity of at most 32. This communicates from websocket handler to SDK
         let (ws_handler_tx, sdk_rx) = mpsc::channel::<WsHandlerCommands>(32);
 
+        // Create a new channel with a capacity of at most 32. This communicates from SDK to the deletion handler
+        let (sdk_deletion_tx, deletion_sdk_rx) = mpsc::channel::<DeletionHandlerCommands>(32);
+
+        // Create a new channel with a capacity of at most 32. This communicates from deletion handler to the SDK
+        let (deletion_sdk_tx, sdk_deletion_rx) = mpsc::channel::<DeletionHandlerCommands>(32);
+
         let direct_stream_sender = if let WsHandlerMode::DirectChannel = config.ws_handler_mode {
             let (direct_stream_sender, _) = broadcast::channel(32);
             Some(direct_stream_sender)
@@ -146,6 +157,8 @@ impl ATM {
             sdk_send_stream: ws_handler_tx.clone(),
             profiles: Arc::new(RwLock::new(Profiles::default())),
             direct_stream_sender,
+            deletion_handler_send_stream: sdk_deletion_tx,
+            deletion_handler_recv_stream: Mutex::new(sdk_deletion_rx),
         };
 
         let atm = ATM {
@@ -160,9 +173,33 @@ impl ATM {
         // Start the websocket handler
         atm.start_websocket_handler(ws_handler_rx, ws_handler_tx)
             .await?;
+
+        // Start the deletion handler
+        atm.start_deletion_handler(deletion_sdk_rx, deletion_sdk_tx)
+            .await?;
+
         debug!("ATM SDK initialized");
 
         Ok(atm)
+    }
+
+    pub async fn graceful_shutdown(&self) {
+        debug!("Shutting down ATM SDK");
+
+        // turn off incoming messages on websockets
+
+        // Send a shutdown message to the Deletion Handler
+        let _ = self.abort_deletion_handler().await;
+        {
+            let mut guard = self.inner.deletion_handler_recv_stream.lock().await;
+            let _ = guard.recv().await;
+            // Only ever send back a closing command
+            // safe to exit now
+            debug!("Deletion Handler stopped");
+        }
+
+        // Send a shutdown message to the WebSocket handler
+        let _ = self.abort_websocket_task().await;
     }
 
     /// Adds a DID to the resolver

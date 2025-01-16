@@ -20,7 +20,7 @@ use ssi::dids::Document;
 use std::{
     env,
     fmt::{self, Debug},
-    fs::{self, File},
+    fs::File,
     io::{self, BufRead},
     path::Path,
 };
@@ -862,7 +862,7 @@ async fn aws_parameter_store(
         ));
     }
 
-    return parameter.value.ok_or_else(|| {
+    parameter.value.ok_or_else(|| {
         event!(
             Level::ERROR,
             "Parameter ({:?}) found, but no parameter value found in response",
@@ -875,7 +875,7 @@ async fn aws_parameter_store(
                 parameter.name
             ),
         )
-    });
+    })
 }
 
 /// Reads document from file or aws_parameter_store

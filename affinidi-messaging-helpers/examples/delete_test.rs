@@ -159,7 +159,7 @@ async fn main() -> Result<(), ATMError> {
         msg_id, forward.0,
     );
 
-    atm.send_message(&bob, &forward.1, &forward.0, false)
+    atm.send_message(&bob, &forward.1, &forward.0, false, false)
         .await?;
 
     println!("Bob sent Alice a message");
@@ -184,7 +184,7 @@ async fn main() -> Result<(), ATMError> {
 
     // Try to delete a fake message
     let response = atm
-        .delete_messages(
+        .delete_messages_direct(
             &alice,
             &DeleteMessageRequest {
                 message_ids: vec!["fake".to_string()],
@@ -196,7 +196,7 @@ async fn main() -> Result<(), ATMError> {
 
     // Try to delete a real message
     let response = atm
-        .delete_messages(
+        .delete_messages_direct(
             &alice,
             &DeleteMessageRequest {
                 message_ids: vec![new_msg_id],

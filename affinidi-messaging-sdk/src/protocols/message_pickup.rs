@@ -137,7 +137,7 @@ impl MessagePickup {
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
         if let SendMessageResponse::Message(message) = atm
-            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .send_message(profile, &msg, &msg_id, wait_for_response, false)
             .await?
         {
             if wait_for_response {
@@ -207,7 +207,8 @@ impl MessagePickup {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            atm.send_message(profile, &msg, &msg_id, false).await?;
+            atm.send_message(profile, &msg, &msg_id, false, false)
+                .await?;
             Ok(msg_id)
         }
         .instrument(_span)
@@ -277,6 +278,7 @@ impl MessagePickup {
     /// msg_id              : The ID of the message to retrieve (matches on either `id` or `pthid`)
     /// wait                : How long to wait (in milliseconds) for a message before returning None
     ///                       If 0, will not block
+    /// auto_delete         : If true, will delete the message after receiving it
     /// Returns a tuple of the message and metadata, or None if no message was received
     /// NOTE: You still need to delete the message from the server after receiving it
     pub async fn live_stream_get(
@@ -286,6 +288,7 @@ impl MessagePickup {
         use_profile_channel: bool,
         msg_id: &str,
         wait: Duration,
+        auto_delete: bool,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_get");
 
@@ -332,6 +335,10 @@ impl MessagePickup {
                     if let Some(msg) = value {
                         match msg {
                             WsHandlerCommands::MessageReceived(message, meta) => {
+                                // If auto_delete is true, delete the message
+                                if auto_delete {
+                                    atm.delete_message_background(profile, &meta.sha256_hash).await?;
+                                }
                                 return Ok(Some((message, meta)));
                             }
                             WsHandlerCommands::NotFound => {
@@ -413,7 +420,7 @@ impl MessagePickup {
         };
 
         if let SendMessageResponse::Message(message) = atm
-            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .send_message(profile, &msg, &msg_id, wait_for_response, false)
             .await?
         {
             self._handle_delivery(atm, &message).await
@@ -535,7 +542,7 @@ impl MessagePickup {
             .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
         match atm
-            .send_message(profile, &msg, &msg_id, wait_for_response)
+            .send_message(profile, &msg, &msg_id, wait_for_response, false)
             .await
         {
             Ok(SendMessageResponse::Message(message)) => {

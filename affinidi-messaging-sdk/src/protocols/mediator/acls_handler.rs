@@ -96,7 +96,7 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
             if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true).await?
+                atm.send_message(profile, &msg, &msg_id, true, true).await?
             {
                 self._parse_acls_get_response(&message)
             } else {

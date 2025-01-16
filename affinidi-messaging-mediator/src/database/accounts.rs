@@ -1,11 +1,14 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
 use std::collections::HashMap;
 
-use super::DatabaseHandler;
+use super::{session::Session, DatabaseHandler};
 use crate::common::errors::MediatorError;
-use affinidi_messaging_sdk::protocols::mediator::{
-    accounts::{Account, AccountType, MediatorAccountList},
-    acls::MediatorACLSet,
+use affinidi_messaging_sdk::{
+    messages::Folder,
+    protocols::mediator::{
+        accounts::{Account, AccountType, MediatorAccountList},
+        acls::MediatorACLSet,
+    },
 };
 use redis::Pipeline;
 use tracing::{debug, span, warn, Instrument, Level};
@@ -132,41 +135,47 @@ impl DatabaseHandler {
 
     /// Removes an account from the mediator
     /// - `did_hash` - SHA256 Hash of DID to remove
-    pub(crate) async fn account_remove(&self, did_hash: &str) -> Result<bool, MediatorError> {
+    /// - `remove_outbox` - This will remove messages that have not been delivered from this DID to others
+    ///                     NOTE: This should only be used as last resort. It is better to let the messages be delivered
+    /// - `remove_forwards` - This will remove messages that are queued to be delivered from this DID via forwarding
+    pub(crate) async fn account_remove(
+        &self,
+        session: &Session,
+        did_hash: &str,
+        remove_outbox: bool,
+        remove_forwards: bool,
+    ) -> Result<bool, MediatorError> {
         let _span = span!(Level::DEBUG, "account_remove", "did_hash" = did_hash,);
 
         async move {
             debug!("Removing account from the mediator");
 
-            /*
-            let mut con = self.get_async_connection().await?;
+            // Step 1 - block access to this account
+            let mut blocked_acl = MediatorACLSet::from_u64(0);
+            blocked_acl.set_blocked(true);
+            self.set_did_acl(did_hash, &blocked_acl).await?;
 
-            let result = deadpool_redis::redis::pipe()
-                .atomic()
-                .cmd("SREM")
-                .arg("KNOWN_DIDS");
-
-            // Remove from the ADMINS Set
-            for account in &accounts {
-                debug!("Removing Admin account: {}", account);
-                tx = tx.arg(account);
+            // Step 2 - Remove forwarded messages as required
+            if remove_forwards {
+                // TODO: Implement a way to clear future forward tasks as needed
             }
 
-            // Remove admin field on each DID
-            for account in &accounts {
-                tx = tx.cmd("HDEL").arg(account).arg("ROLE_TYPE");
+            // Step 3 - Remove messages from the outbox
+            // This will remove any messages that are queued and still to be delivered to other DIDs
+            if remove_outbox {
+                self.purge_messages(session, did_hash, Folder::Outbox)
+                    .await?;
+            } else {
+                // Just remove the stream key, not the messages in other accounts
+                self.delete_folder_stream(session, did_hash, &Folder::Outbox)
+                    .await?;
             }
 
-            let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
-                MediatorError::DatabaseError(
-                    "NA".to_string(),
-                    format!("Remove failed. Reason: {}", err),
-                )
-            })?;
-            debug!("Admin accounts removed successfully: {:?}", result);
+            // Step 4 - Remove messages from the inbox
+            // This will remove any messages that are queued and still to be delivered to this DID
+            self.purge_messages(session, did_hash, Folder::Inbox)
+                .await?;
 
-            Ok(result.first().unwrap_or(&0).to_owned())
-            */
             Ok(true)
         }
         .instrument(_span)

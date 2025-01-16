@@ -10,6 +10,39 @@ use crate::common::errors::MediatorError;
 use super::DatabaseHandler;
 
 impl DatabaseHandler {
+    /// Replace the ACL for a given DID
+    pub(crate) async fn set_did_acl(
+        &self,
+        did_hash: &str,
+        acls: &MediatorACLSet,
+    ) -> Result<(), MediatorError> {
+        let _span = span!(Level::DEBUG, "set_acl");
+
+        async move {
+            debug!("Setting ACL for ({}) DID in mediator", did_hash);
+
+            let mut con = self.get_async_connection().await?;
+
+            deadpool_redis::redis::Cmd::hset(
+                format!("DID:{}", did_hash),
+                "ACLS",
+                acls.to_hex_string(),
+            )
+            .exec_async(&mut con)
+            .await
+            .map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("set_acl failed. Reason: {}", err),
+                )
+            })?;
+
+            Ok(())
+        }
+        .instrument(_span)
+        .await
+    }
+
     /// Get ACL for a given DID
     /// Returns the ACL for the given DID, or None if DID isn't found
     pub(crate) async fn get_did_acl(

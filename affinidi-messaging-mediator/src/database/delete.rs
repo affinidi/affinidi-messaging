@@ -6,7 +6,7 @@ impl DatabaseHandler {
     /// Deletes a message in the database
     /// - session_id: authentication session ID
     /// - did: DID of the delete requestor
-    /// - message_hash: sha257 hash of the message to delete
+    /// - message_hash: sha256 hash of the message to delete
     pub async fn delete_message(
         &self,
         session_id: &str,
@@ -47,7 +47,7 @@ impl DatabaseHandler {
             if response != "OK" {
                 Err(MediatorError::DatabaseError(session_id.into(), response))
             } else {
-                info!("Successfully deleted");
+                info!("Successfully deleted",);
                 Ok(())
             }
         }

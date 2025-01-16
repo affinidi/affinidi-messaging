@@ -21,6 +21,9 @@
 ### SDK (0.8.8)
 
 * Authentication will now fail due to ACL Errors and not retry.
+* Deleting Messages has been split between direct and background
+  * Direct: immediate deletion and the main thread will block
+  * Background: requests are handled via a background task
 
 ### Affinidi Text Client (0.8.8)
 

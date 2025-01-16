@@ -249,7 +249,7 @@ pub(crate) async fn process(
                         false,
                     );
                 }
-                match state.database.account_remove(&did_hash).await {
+                match state.database.account_remove(session,&did_hash, false, false).await {
                     Ok(response) => _generate_response_message(
                         &msg.id,
                         &session.did,

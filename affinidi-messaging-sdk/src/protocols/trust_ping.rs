@@ -105,7 +105,7 @@ impl TrustPing {
         msg_info.bytes = msg.len() as u32;
 
         msg_info.response = atm
-            .send_message(profile, &msg, &msg_info.message_id, wait_response)
+            .send_message(profile, &msg, &msg_info.message_id, wait_response, true)
             .await?;
 
         Ok(msg_info)

@@ -4,17 +4,13 @@
 -- keys = message_hash
 -- args = [1] message
 --        [2] message length in bytes
---        [3] to_did
---        [4] to_did_hash
---        [5] from_did
---        [6] from_did_hash
+--        [3] to_did_hash
+--        [4] from_did_hash
 local function store_message(keys, args)
     -- Do we have the correct number of arguments?
     -- from_did_hash can be optional!!!
-    if #args < 5 then
-        return redis.error_reply('store_message: not enough arguments')
-    elseif #args > 6 then
-        return redis.error_reply('store_message: too many arguments')
+    if #args ~= 4 then
+        return redis.error_reply('store_message: expected 4 arguments')
     end
 
     -- set response type to Version 3
@@ -39,25 +35,25 @@ local function store_message(keys, args)
     redis.call('RPUSH', 'MSG_EXPIRY', keys[1] .. ':' .. time)
 
     -- Update the receiver records
-    redis.call('HINCRBY', 'DID:' .. args[4], 'RECEIVE_QUEUE_BYTES', bytes)
-    redis.call('HINCRBY', 'DID:' .. args[4], 'RECEIVE_QUEUE_COUNT', 1)
+    redis.call('HINCRBY', 'DID:' .. args[3], 'RECEIVE_QUEUE_BYTES', bytes)
+    redis.call('HINCRBY', 'DID:' .. args[3], 'RECEIVE_QUEUE_COUNT', 1)
     -- If changing the fields in the future, update the fetch_messages function
-    local RQ = redis.call('XADD', 'RECEIVE_Q:' .. args[4], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM',
-        args[5])
+    local RQ = redis.call('XADD', 'RECEIVE_Q:' .. args[3], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM',
+        args[4])
 
     -- Update the sender records
     local SQ = nil
     if table.getn(args) == 6 then
         -- Update the sender records
-        redis.call('HINCRBY', 'DID:' .. args[6], 'SEND_QUEUE_BYTES', bytes)
-        redis.call('HINCRBY', 'DID:' .. args[6], 'SEND_QUEUE_COUNT', 1)
-        SQ = redis.call('XADD', 'SEND_Q:' .. args[6], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'TO', args[3])
+        redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_BYTES', bytes)
+        redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_COUNT', 1)
+        SQ = redis.call('XADD', 'SEND_Q:' .. args[4], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'TO', args[3])
     end
 
     -- Update message MetaData
-    redis.call('HMSET', 'MSG:META:' .. keys[1], 'BYTES', bytes, 'TO', args[4], 'TIMESTAMP', time, 'RECEIVE_ID', RQ)
+    redis.call('HMSET', 'MSG:META:' .. keys[1], 'BYTES', bytes, 'TO', args[3], 'TIMESTAMP', time, 'RECEIVE_ID', RQ)
     if SQ ~= nil then
-        redis.call('HMSET', 'MSG:META:' .. keys[1], 'FROM', args[6], 'SEND_ID', SQ)
+        redis.call('HMSET', 'MSG:META:' .. keys[1], 'FROM', args[4], 'SEND_ID', SQ)
     end
 
     return redis.status_reply('OK')
@@ -275,110 +271,8 @@ local function get_status_reply(keys, args)
     return response
 end
 
--- remove_account
--- keys = DID Hash that we are removing everything for
--- args[1] = remove_outgoing = true/false - if true, then remove queued outgoing messages
--- args[2] = remove_forward_tasks = true/false - if true, then remove forward tasks
---
--- returns OK or Error
---
--- Steps:
--- Determine list of messages to delete
---    - incoming that are stored
---    - outgoing that are in other queues
---    - forward tasks
--- Delete SEND_Q:hash
--- Delete RECEIVE_Q:hash
--- Remove FORWARD_TASKS Messages
--- Delete MSG:hash for each message
--- Delete MSG:META:hash for each message
--- Delete DID:hash 
--- Remove from KNOWN_DIDS Set
--- 
-local function remove_account(keys, args)
-    -- Correct number of keys?
-    if #keys ~= 1 then
-        return redis.error_reply('remove_account: only accepts one key (did_hash)')
-    end
-
-    -- Correct number of args?
-    if #args ~= 2 then
-        return redis.error_reply('remove_account: must specify remove_outgoing and remove_forward_tasks arguments')
-    end
-
-    -- set response type to Version 3
-    redis.setresp(3)
-
-    local response = {}
-    response.map = {}
-    response.map.recipient_did = keys[1]
-
-    -- Get the Inbound Queue
-    local r = redis.call('XRANGE', 'RECEIVE_Q:' .. keys[1], '-', '+')
-    local inbound_messages = {}
-
-    -- unpack the XRANGE list
-    for x, element in ipairs(r) do
-        -- element[1] = stream_id
-        -- element[2] = array of Stream Fields
-        for i, sub_element in ipairs(element) do
-            if i == 1 then
-                -- This is the stream ID
-                -- Ignore
-            else
-                -- [1] = MSG_ID
-                -- [2] = message_id
-                -- [3] = BYTES
-                -- [4] = bytes
-                -- [5] = FROM
-                -- [6] = from_did
-                table.insert(fetched_messages[x], sub_element[1])
-                table.insert(fetched_messages[x], sub_element[2])
-                table.insert(fetched_messages[x], 'FROM_DID')
-                table.insert(fetched_messages[x], sub_element[6])
-
-                -- fetch the message
-                table.insert(fetched_messages[x], 'MSG')
-                local msg = redis.call('GET', 'MSG:' .. sub_element[2])
-                table.insert(fetched_messages[x], msg)
-
-                -- fetch the message metadata
-                local meta = redis.call('HGETALL', 'MSG:META:' .. sub_element[2])
-                for k, v in pairs(meta.map) do
-                    table.insert(fetched_messages[x], 'META_' .. k)
-                    table.insert(fetched_messages[x], v)
-                end
-            end
-        end
-    end -- end of XRANGE list
-
-
-    response.map.message_count = tonumber(r[1])
-    response.map.total_bytes = tonumber(r[2])
-
-    -- Get the oldest and newest message information
-    local r = redis.pcall('XINFO', 'STREAM', 'RECEIVE_Q:' .. keys[1])
-    if r['err'] == nil and r.map then
-        response.map.oldest_received = r.map['first-entry'] and r.map['first-entry'][1] or 0
-        response.map.newest_received = r.map['last-entry'] and r.map['last-entry'][1] or 0
-        response.map.queue_count = r.map['length']
-    end
-
-    -- Get live streaming status
-    local r = redis.call("HEXISTS", "GLOBAL_STREAMING", keys[1])
-    if r == 0 then
-        response.map.live_delivery = false
-    else
-        response.map.live_delivery = true
-    end
-
-    return response
-end
-
-
 redis.register_function('store_message', store_message)
 redis.register_function('delete_message', delete_message)
 redis.register_function('fetch_messages', fetch_messages)
 redis.register_function('clean_start_streaming', clean_start_streaming)
 redis.register_function('get_status_reply', get_status_reply)
-redis.register_function('remove_account', remove_account)

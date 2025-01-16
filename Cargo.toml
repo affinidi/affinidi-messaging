@@ -59,7 +59,7 @@ image = "0.25.5"
 itertools = "0.14"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
-log = "0.4.22"
+log = "0.4.25"
 num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.8"
@@ -104,6 +104,6 @@ tracing-test = "0.2"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
-uuid = { version = "1.11", features = ["v4", "fast-rng"] }
+uuid = { version = "1.12", features = ["v4", "fast-rng"] }
 varint = "0.9"
 semver = "1.0.24"

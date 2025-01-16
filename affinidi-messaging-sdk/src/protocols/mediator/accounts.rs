@@ -145,8 +145,9 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
+            // send the message
             if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true).await?
+                atm.send_message(profile, &msg, &msg_id, true, true).await?
             {
                 self._parse_account_get_response(&message)
             } else {
@@ -225,7 +226,7 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
             if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true).await?
+                atm.send_message(profile, &msg, &msg_id, true, true).await?
             {
                 self._parse_account_add_response(&message)
             } else {
@@ -298,7 +299,7 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
             if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true).await?
+                atm.send_message(profile, &msg, &msg_id, true, true).await?
             {
                 self._parse_account_remove_response(&message)
             } else {
@@ -379,7 +380,7 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
                 if let SendMessageResponse::Message(message) = atm
-                .send_message(profile, &msg, &msg_id, true)
+                .send_message(profile, &msg, &msg_id, true, true)
                 .await? {
                 self._parse_accounts_list_response(&message)
                 } else {

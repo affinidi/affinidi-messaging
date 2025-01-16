@@ -1,3 +1,9 @@
+/*!
+ * Message Pickup Protocol 3.0 implementation
+ *
+ * NOTE: All messages generated from this protocol are ephemeral and are not stored in the database
+ * They are fire and forget messages
+ */
 use affinidi_messaging_didcomm::{Attachment, Message};
 use affinidi_messaging_sdk::{
     messages::fetch::FetchOptions,

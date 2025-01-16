@@ -12,6 +12,9 @@ pub mod problem_report;
 pub mod sending;
 pub mod unpack;
 
+pub trait MessageDelete<T> {
+    fn delete_message(response: &T) -> Result<&T, String>;
+}
 /// Generic response structure for all responses from the ATM API
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
@@ -90,8 +93,8 @@ impl GenericDataStruct for MessageList {}
 
 /// enum of ATM folder types
 /// inbox = messages inbound to the caller
-/// outbox = messages outbound to the caller
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// outbox = messages outbound from the caller
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Folder {
     Inbox,
