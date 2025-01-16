@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-helpers"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-mediator"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -209,14 +209,14 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processor"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -255,7 +255,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-text-client"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -667,9 +667,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-memorydb"
-version = "1.55.0"
+version = "1.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eb9fcef49fbdc4ffaf7f7ac9a788d154a5a4aa5ffd3113acb3e9e8a042b1fb8"
+checksum = "6ad26b00a0097d6dc6ba198a05479905efb5bbf037b039f09e2361bd93abc311"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -689,9 +689,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.57.0"
+version = "1.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac29664d633525cbf4c4de4d0351b0dc0cec7d0d903255ee05d3b0f512a3e97f"
+checksum = "bdc7908d175501c59616048f93fbcb5a909766e6e04f4cf13e4a0f7c88e9d007"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -712,9 +712,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssm"
-version = "1.59.0"
+version = "1.60.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "935f454e645bcb5d6dfdda0bdf1f2c65cac06c57e876038a2ccf584cb5ef403c"
+checksum = "617c2ccc67e4830a83a43a6c00ab9dd93dffb35ac380fe6e0b0ba92b26d2d409"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
