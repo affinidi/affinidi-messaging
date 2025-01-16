@@ -69,9 +69,13 @@ pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router 
         );
     }
 
-    Router::new()
-        .nest(api_prefix, app)
-        .with_state(shared_data.to_owned())
+    let mut router = Router::new();
+    router = if api_prefix.is_empty() || api_prefix == "/" {
+        router.merge(app)
+    } else {
+        router.nest(api_prefix, app)
+    };
+    router.with_state(shared_data.to_owned())
 }
 
 pub async fn health_checker_handler(State(state): State<SharedData>) -> impl IntoResponse {
