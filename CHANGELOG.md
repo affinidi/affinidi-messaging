@@ -2,6 +2,10 @@
 
 ## Changelog history
 
+## 17th January 2025 (0.8.10)
+
+* Fix Axum Path routes for new version. Internal only.
+
 ## 16th January 2025 (0.8.9)
 
 ### All (0.8.9)
