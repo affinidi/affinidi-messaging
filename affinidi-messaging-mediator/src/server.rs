@@ -22,7 +22,7 @@ pub async fn start() {
     let ansi = env::var("LOCAL").is_ok();
     tracing_subscriber::registry()
         .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_ansi(ansi))
+        .with(tracing_subscriber::fmt::layer().with_ansi(ansi).json())
         .init();
 
     if ansi {
