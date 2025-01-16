@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
-    protocols::mediator::MediatorAdminRequest,
+    protocols::mediator::administration::MediatorAdminRequest,
 };
 use serde_json::{json, Value};
 use sha256::digest;
@@ -13,7 +13,8 @@ use tracing::{span, warn, Instrument};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
 };
@@ -78,7 +79,7 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AdminAdd(attr) => {
-                match  state.database.add_admin_accounts(attr).await {
+                match  state.database.add_admin_accounts(attr, &state.config.security.global_acl_default).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }
@@ -94,12 +95,12 @@ pub(crate) async fn process(
                     }
                 }
             }
-            MediatorAdminRequest::AdminRemove(attr) => {
+            MediatorAdminRequest::AdminStrip(attr) => {
                 // Remove root admin DID in case it is in the list
                 // Protects accidentally deleting the only admin account
                 let root_admin = digest(&state.config.admin_did);
                 let attr = attr.iter().filter_map(|a| if a == &root_admin { None } else { Some(a.to_owned()) }).collect();
-                match  state.database.remove_admin_accounts(attr).await {
+                match  state.database.strip_admin_accounts(attr).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
                     }
@@ -110,69 +111,6 @@ pub(crate) async fn process(
                             ProblemReportScope::Protocol,
                             "database_error".into(),
                             "Error removing admin accounts {1}".into(),
-                            vec![err.to_string()], None
-                        ), false)
-                    }
-                }
-            }
-            MediatorAdminRequest::AccountList{cursor, limit} => {
-                match  state.database.list_accounts(cursor, limit).await {
-                    Ok(response) => {
-                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
-                    }
-                    Err(err) => {
-                        warn!("Error listing accounts. Reason: {}", err);
-                        generate_error_response(state, session, &msg.id, ProblemReport::new(
-                            ProblemReportSorter::Error,
-                            ProblemReportScope::Protocol,
-                            "database_error".into(),
-                            "Error listing accounts {1}".into(),
-                            vec![err.to_string()], None
-                        ), false)
-                    }
-                }
-            }
-            MediatorAdminRequest::AccountAdd(attr) => {
-                match  state.database.add_account(&attr).await {
-                    Ok(response) => {
-                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
-                    }
-                    Err(err) => {
-                        warn!("Error adding account. Reason: {}", err);
-                        generate_error_response(state, session, &msg.id, ProblemReport::new(
-                            ProblemReportSorter::Error,
-                            ProblemReportScope::Protocol,
-                            "database_error".into(),
-                            "Error adding account {1}".into(),
-                            vec![err.to_string()], None
-                        ), false)
-                    }
-                }
-            }
-            MediatorAdminRequest::AccountRemove(attr) => {
-                // Remove root admin DID in case it is in the list
-                // Protects accidentally deleting the only admin account
-                let root_admin = digest(&state.config.admin_did);
-                if root_admin == attr {
-                    return generate_error_response(state, session, &msg.id, ProblemReport::new(
-                        ProblemReportSorter::Error,
-                        ProblemReportScope::Protocol,
-                        "invalid_request".into(),
-                        "Error removing account. Cannot remove root admin account".into(),
-                        vec![], None
-                    ), false);
-                }
-                match  state.database.remove_account(&attr).await {
-                    Ok(response) => {
-                        _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))
-                    }
-                    Err(err) => {
-                        warn!("Error removing account. Reason: {}", err);
-                        generate_error_response(state, session, &msg.id, ProblemReport::new(
-                            ProblemReportSorter::Error,
-                            ProblemReportScope::Protocol,
-                            "database_error".into(),
-                            "Error removing account {1}".into(),
                             vec![err.to_string()], None
                         ), false)
                     }
@@ -219,7 +157,7 @@ fn _generate_response_message(
     Ok(ProcessMessageResponse {
         store_message: true,
         force_live_delivery: false,
-        message: Some(response),
+        data: crate::messages::WrapperType::Message(response),
         forward_message: false,
     })
 }

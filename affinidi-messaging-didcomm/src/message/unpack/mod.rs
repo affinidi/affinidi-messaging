@@ -34,7 +34,7 @@ impl Message {
     where
         S: SecretsResolver,
     {
-        let mut envelope = MetaEnvelope::new(msg, did_resolver, secrets_resolver).await?;
+        let mut envelope = MetaEnvelope::new(msg, did_resolver).await?;
 
         Self::unpack(&mut envelope, did_resolver, secrets_resolver, options).await
     }
@@ -77,7 +77,6 @@ impl Message {
     where
         S: SecretsResolver,
     {
-        //let mut msg = msg;
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
 
@@ -243,7 +242,7 @@ pub struct UnpackMetadata {
     pub encrypted_from_kid: Option<String>,
 
     /// Target key IDS for encryption if the plaintext has been encrypted
-    pub encrypted_to_kids: Option<Vec<String>>,
+    pub encrypted_to_kids: Vec<String>,
 
     /// Key ID used for signature if the plaintext has been signed
     pub sign_from: Option<String>,

@@ -1,7 +1,9 @@
-use super::errors::{ErrorResponse, Session};
-use crate::{database::session::SessionClaims, SharedData};
+use super::errors::ErrorResponse;
+use crate::{
+    database::session::{Session, SessionClaims},
+    SharedData,
+};
 use axum::{
-    async_trait,
     extract::{FromRef, FromRequestParts},
     response::{IntoResponse, Response},
     Json, RequestPartsExt,
@@ -43,6 +45,7 @@ pub enum AuthError {
     InvalidToken,
     ExpiredToken,
     InternalServerError(String),
+    Blocked,
 }
 
 impl Display for AuthError {
@@ -55,6 +58,7 @@ impl Display for AuthError {
             AuthError::InternalServerError(message) => {
                 write!(f, "Internal Server Error: {}", message)
             }
+            AuthError::Blocked => write!(f, "ACL Blocked"),
         }
     }
 }
@@ -67,6 +71,7 @@ impl IntoResponse for AuthError {
             AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
             AuthError::ExpiredToken => StatusCode::UNAUTHORIZED,
             AuthError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AuthError::Blocked => StatusCode::UNAUTHORIZED,
         };
         let body = Json(json!(ErrorResponse {
             sessionId: "UNAUTHORIZED".into(),
@@ -79,7 +84,6 @@ impl IntoResponse for AuthError {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Session
 where
     SharedData: FromRef<S>,
@@ -137,19 +141,33 @@ where
         let did = token_data.claims.sub.clone();
         let did_hash = digest(&did);
 
+        // Everything has passed token wise - expensive database operations happen here
+        let saved_session = state
+            .database
+            .get_session(&session_id, &did)
+            .await
+            .map_err(|e| {
+                error!(
+                    "{}: Couldn't get session from database! Reason: {}",
+                    session_id, e
+                );
+                AuthError::InternalServerError(format!(
+                    "Couldn't get session from database! Reason: {}",
+                    e
+                ))
+            })?;
+
+        // Check if ACL is satisfied
+        if saved_session.acls.get_blocked() {
+            info!("DID({}) is blocked from connecting", did);
+            return Err(AuthError::Blocked);
+        }
+
         info!(
             "{}: Protected connection accepted from did_hash({})",
             &session_id, &did_hash
         );
 
-        let session = Session {
-            session_id,
-            authenticated: true,
-            challenge_sent: None,
-            did,
-            did_hash,
-        };
-
-        Ok(session)
+        Ok(saved_session)
     }
 }

@@ -1,11 +1,13 @@
 use crate::{
-    common::errors::{MediatorError, Session},
-    messages::{store::store_forwarded_message, ProcessMessageResponse},
+    common::errors::MediatorError,
+    database::session::Session,
+    messages::{store::store_forwarded_message, ProcessMessageResponse, WrapperType},
     SharedData,
 };
 use affinidi_messaging_didcomm::{AttachmentData, Message};
 use base64::prelude::*;
 use serde::Deserialize;
+use sha256::digest;
 use ssi::dids::{document::service::Endpoint, Document};
 use tracing::{debug, error, span, warn, Instrument};
 
@@ -46,6 +48,25 @@ pub(crate) async fn process(
             };
         let next_did_hash = sha256::digest(next.as_bytes());
 
+        // ****************************************************
+        // Check if the next hop is allowed to receive forwarded messages
+        let next_acls = if let Some(next_acls) = state.database.get_did_acl(&next_did_hash).await? {
+            next_acls
+        } else {
+            // DID is not known, so use default ACL
+            state.config.security.global_acl_default.clone()
+        };
+
+        if !next_acls.get_receive_forwarded().0 {
+            return Err(MediatorError::ACLDenied(format!(
+                "Next DID({}) is blocked from receiving forwarded messages",
+                next_did_hash
+            )));
+        }
+
+        // End of ACL Check for forward_to
+        // ****************************************************
+
         let attachments = if let Some(attachments) = &msg.attachments {
             attachments.to_owned()
         } else {
@@ -64,6 +85,48 @@ pub(crate) async fn process(
             attachments_bytes
         );
 
+        // ****************************************************
+        // Determine who the from did is
+        // If message is anonymous, then use the session DID
+
+        if let Some(from) = &msg.from {
+            let from_acls =
+                if let Some(from_acls) = state.database.get_did_acl(&digest(from.clone())).await? {
+                    from_acls
+                } else {
+                    // DID is not known, so use default ACL
+                    state.config.security.global_acl_default.clone()
+                };
+
+            if !from_acls.get_send_forwarded().0 {
+                return Err(MediatorError::ACLDenied(
+                    "DID is blocked from sending forwarded messages".into(),
+                ));
+            }
+        } else if !session.acls.get_send_forwarded().0 {
+            return Err(MediatorError::ACLDenied(
+                "DID is blocked from sending forwarding messages".into(),
+            ));
+        }
+
+        // ****************************************************
+
+        // forwarded messages are typically anonymous, so we don't know the sender
+        // Hence we will check against the session DID for sending checks
+        let from_stats = state.database.get_did_stats(&session.did_hash).await?;
+        if from_stats.send_queue_count as usize + attachments.len()
+            >= state.config.limits.queued_messages
+        {
+            warn!(
+                "Sender DID ({}) has too many messages waiting to be delivered",
+                session.did_hash
+            );
+            return Err(MediatorError::ServiceLimitError(
+                session.session_id.clone(),
+                "Sender DID has too many messages waiting to be delivered. Try again later".into(),
+            ));
+        }
+
         // Check limits and if this forward is accepted?
         // Does next (receiver) have too many messages in queue?
         // Does the sender have too many messages in queue?
@@ -80,22 +143,6 @@ pub(crate) async fn process(
             return Err(MediatorError::ServiceLimitError(
                 session.session_id.clone(),
                 "Next DID has too many messages waiting to be delivered. Try again later".into(),
-            ));
-        }
-
-        // forwarded messages are typically anonymous, so we don't know the sender
-        // Hence we will check against the session DID for sending checks
-        let from_stats = state.database.get_did_stats(&session.did_hash).await?;
-        if from_stats.send_queue_count as usize + attachments.len()
-            >= state.config.limits.queued_messages
-        {
-            warn!(
-                "Sender DID ({}) has too many messages waiting to be delivered",
-                session.did_hash
-            );
-            return Err(MediatorError::ServiceLimitError(
-                session.session_id.clone(),
-                "Sender DID has too many messages waiting to be delivered. Try again later".into(),
             ));
         }
 
@@ -184,7 +231,7 @@ pub(crate) async fn process(
             store_message: false,
             force_live_delivery: false,
             forward_message: true,
-            message: None,
+            data: WrapperType::None,
         })
     }
     .instrument(_span)

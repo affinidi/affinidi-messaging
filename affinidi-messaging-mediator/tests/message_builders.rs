@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 use sha256::digest;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub fn create_auth_challenge_response(
     body: &AuthenticationChallenge,
     actor_did: &str,
@@ -33,6 +34,7 @@ pub fn create_auth_challenge_response(
     .finalize()
 }
 
+#[allow(dead_code)]
 pub async fn build_ping_message<'sr>(
     to_did: &str,
     actor_did: String,
@@ -82,6 +84,7 @@ pub async fn build_ping_message<'sr>(
     (msg, msg_info)
 }
 
+#[allow(dead_code)]
 pub async fn build_status_request_message<'sr>(
     mediator_did: &str,
     recipient_did: String,
@@ -119,6 +122,7 @@ pub async fn build_status_request_message<'sr>(
     msg
 }
 
+#[allow(dead_code)]
 pub async fn build_delivery_request_message<'sr>(
     mediator_did: &str,
     recipient_did: String,
@@ -160,6 +164,7 @@ pub async fn build_delivery_request_message<'sr>(
     msg
 }
 
+#[allow(dead_code)]
 pub async fn build_message_received_message<'sr>(
     mediator_did: &str,
     recipient_did: String,
@@ -200,6 +205,7 @@ pub async fn build_message_received_message<'sr>(
     msg
 }
 
+#[allow(dead_code)]
 pub async fn build_forward_request_message<'sr>(
     mediator_did: &str,
     recipient_did: String,

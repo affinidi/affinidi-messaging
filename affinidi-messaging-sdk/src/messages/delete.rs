@@ -1,23 +1,52 @@
 use std::sync::Arc;
 
-use tracing::{debug, span, Level};
+use tracing::{debug, span, Instrument, Level};
 
-use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
+use crate::{
+    delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
+    profiles::Profile, ATM,
+};
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
 
 const MAX_DELETED_MESSAGES: usize = 100;
 
 impl ATM {
-    /// Delete messages from ATM
+    /// Deletes a message from ATM in the background
+    /// There is no guarantee as to when the message will be deleted
+    /// You can choose to use `delete_message_direct` for a more immediate deletion
+    pub async fn delete_message_background(
+        &self,
+        profile: &Arc<Profile>,
+        message_id: &str,
+    ) -> Result<(), ATMError> {
+        self.inner
+            .deletion_handler_send_stream
+            .send(DeletionHandlerCommands::DeleteMessage(
+                profile.clone(),
+                message_id.to_string(),
+            ))
+            .await
+            .map_err(|e| {
+                ATMError::SDKError(format!(
+                    "Couldn't send deletion request to Deletion Handler: {}",
+                    e
+                ))
+            })
+    }
+
+    /// Delete messages from ATM directly
+    /// This will delete messages from the mediator through a direct message
+    /// NOTE: Use `delete_message_background` as a more efficient way to delete messages
     /// - messages: List of message_ids to delete
-    pub async fn delete_messages(
+    pub async fn delete_messages_direct(
         &self,
         profile: &Arc<Profile>,
         messages: &DeleteMessageRequest,
     ) -> Result<DeleteMessageResponse, ATMError> {
-        let _span = span!(Level::DEBUG, "delete_messages").entered();
+        let _span = span!(Level::DEBUG, "delete_messages");
 
+        async move {
         // Check if authenticated
         let tokens = profile.authenticate(&self.inner).await?;
         if messages.message_ids.len() > MAX_DELETED_MESSAGES {
@@ -90,5 +119,6 @@ impl ATM {
         }
 
         Ok(list)
+    }.instrument(_span).await
     }
 }

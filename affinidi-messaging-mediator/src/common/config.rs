@@ -1,6 +1,7 @@
 use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::config::{ClientConfig, ClientConfigBuilder};
+use affinidi_messaging_sdk::protocols::mediator::acls::{ACLModeType, MediatorACLSet};
 use async_convert::{async_trait, TryFrom};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -14,11 +15,12 @@ use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 use ssi::dids::Document;
 use std::{
     env,
     fmt::{self, Debug},
-    fs::{self, File},
+    fs::File,
     io::{self, BufRead},
     path::Path,
 };
@@ -75,37 +77,12 @@ impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
     }
 }
 
-/// What ACL logic mode is the mediator running in?
-/// - ExplicitAllow - no one can connect, unless explicitly allowed
-/// - ExplicitDeny - everyone can connect, unless explicitly denied
-#[derive(Clone, Deserialize, Serialize)]
-pub enum ACLMode {
-    ExplicitAllow,
-    ExplicitDeny,
-}
-
-impl fmt::Debug for ACLMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
-        }
-    }
-}
-
-impl fmt::Display for ACLMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            ACLMode::ExplicitAllow => write!(f, "explicit_allow"),
-            ACLMode::ExplicitDeny => write!(f, "explicit_deny"),
-        }
-    }
-}
-
 /// SecurityConfig Struct contains security related configuration details
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SecurityConfigRaw {
-    pub acl_mode: String,
+    pub mediator_acl_mode: String,
+    pub global_acl_default: String,
+    pub local_direct_delivery_allowed: String,
     pub mediator_secrets: String,
     pub use_ssl: String,
     pub ssl_certificate_file: String,
@@ -118,7 +95,9 @@ pub struct SecurityConfigRaw {
 
 #[derive(Clone, Serialize)]
 pub struct SecurityConfig {
-    pub acl_mode: ACLMode,
+    pub mediator_acl_mode: ACLModeType,
+    pub global_acl_default: MediatorACLSet,
+    pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
     pub mediator_secrets: AffinidiSecrets,
     pub use_ssl: bool,
@@ -138,7 +117,12 @@ pub struct SecurityConfig {
 impl Debug for SecurityConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecurityConfig")
-            .field("acl_mode", &self.acl_mode)
+            .field("mediator_acl_mode", &self.mediator_acl_mode)
+            .field("global_acl_default", &self.global_acl_default)
+            .field(
+                "local_direct_delivery_allowed",
+                &self.local_direct_delivery_allowed,
+            )
             .field(
                 "mediator_secrets",
                 &format!("({}) secrets loaded", self.mediator_secrets.len()),
@@ -158,7 +142,9 @@ impl Debug for SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         SecurityConfig {
-            acl_mode: ACLMode::ExplicitDeny,
+            mediator_acl_mode: ACLModeType::ExplicitDeny,
+            global_acl_default: MediatorACLSet::default(),
+            local_direct_delivery_allowed: false,
             mediator_secrets: AffinidiSecrets::new(vec![]),
             use_ssl: true,
             ssl_certificate_file: "".into(),
@@ -198,11 +184,15 @@ impl SecurityConfigRaw {
 
     async fn convert(&self, aws_config: &SdkConfig) -> Result<SecurityConfig, MediatorError> {
         let mut config = SecurityConfig {
-            acl_mode: match self.acl_mode.as_str() {
-                "explicit_allow" => ACLMode::ExplicitAllow,
-                "explicit_deny" => ACLMode::ExplicitDeny,
-                _ => ACLMode::ExplicitDeny,
+            mediator_acl_mode: match self.mediator_acl_mode.as_str() {
+                "explicit_allow" => ACLModeType::ExplicitAllow,
+                "explicit_deny" => ACLModeType::ExplicitDeny,
+                _ => ACLModeType::ExplicitDeny,
             },
+            local_direct_delivery_allowed: self
+                .local_direct_delivery_allowed
+                .parse()
+                .unwrap_or(false),
             use_ssl: self.use_ssl.parse().unwrap_or(true),
             ssl_certificate_file: self.ssl_certificate_file.clone(),
             ssl_key_file: self.ssl_key_file.clone(),
@@ -210,6 +200,23 @@ impl SecurityConfigRaw {
             jwt_refresh_expiry: self.jwt_refresh_expiry.parse().unwrap_or(86_400),
             ..Default::default()
         };
+
+        // Convert the default ACL Set into a GlobalACLSet
+        config.global_acl_default = MediatorACLSet::from_string_ruleset(&self.global_acl_default)
+            .map_err(|err| {
+            event!(
+                Level::ERROR,
+                "Couldn't parse global_acl_default config parameter. Reason: {}",
+                err
+            );
+            MediatorError::ConfigError(
+                "NA".into(),
+                format!(
+                    "Couldn't parse global_acl_default config parameter. Reason: {}",
+                    err
+                ),
+            )
+        })?;
 
         if let Some(cors_allow_origin) = &self.cors_allow_origin {
             config.cors_allow_origin =
@@ -270,6 +277,7 @@ pub struct LimitsConfig {
     pub to_keys_per_recipient: usize,
     pub to_recipients: usize,
     pub ws_size: usize,
+    pub local_acl_limit: usize,
 }
 
 impl Default for LimitsConfig {
@@ -288,6 +296,7 @@ impl Default for LimitsConfig {
             to_keys_per_recipient: 100,
             to_recipients: 100,
             ws_size: 10_485_760,
+            local_acl_limit: 1_000,
         }
     }
 }
@@ -307,6 +316,7 @@ struct LimitsConfigRaw {
     pub to_keys_per_recipient: String,
     pub to_recipients: String,
     pub ws_size: String,
+    pub local_acl_limit: String,
 }
 
 impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
@@ -330,6 +340,7 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
+            local_acl_limit: raw.local_acl_limit.parse().unwrap_or(1_000),
         })
     }
 }
@@ -415,6 +426,7 @@ pub struct Config {
     pub log_level: LevelFilter,
     pub listen_address: String,
     pub mediator_did: String,
+    pub mediator_did_hash: String,
     pub mediator_did_doc: Option<Document>,
     pub admin_did: String,
     pub api_prefix: String,
@@ -434,6 +446,7 @@ impl fmt::Debug for Config {
             .field("log_level", &self.log_level)
             .field("listen_address", &self.listen_address)
             .field("mediator_did", &self.mediator_did)
+            .field("mediator_did_hash", &self.mediator_did_hash)
             .field("admin_did", &self.admin_did)
             .field("mediator_did_doc", &"Hidden")
             .field("database", &self.database)
@@ -461,6 +474,7 @@ impl Default for Config {
             log_level: LevelFilter::INFO,
             listen_address: "".into(),
             mediator_did: "".into(),
+            mediator_did_hash: "".into(),
             mediator_did_doc: None,
             admin_did: "".into(),
             database: DatabaseConfig::default(),
@@ -511,6 +525,8 @@ impl TryFrom<ConfigRaw> for Config {
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
+
+        config.mediator_did_hash = digest(&config.mediator_did);
 
         // Are we self-hosting our own did:web Document?
         if let Some(path) = raw.server.did_web_self_hosted {
@@ -846,7 +862,7 @@ async fn aws_parameter_store(
         ));
     }
 
-    return parameter.value.ok_or_else(|| {
+    parameter.value.ok_or_else(|| {
         event!(
             Level::ERROR,
             "Parameter ({:?}) found, but no parameter value found in response",
@@ -859,7 +875,7 @@ async fn aws_parameter_store(
                 parameter.name
             ),
         )
-    });
+    })
 }
 
 /// Reads document from file or aws_parameter_store

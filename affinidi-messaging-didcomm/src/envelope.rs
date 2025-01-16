@@ -1,21 +1,22 @@
-use std::str::FromStr;
-
+//! High level DIDComm Envelope types and handling
+//! JWS = Signed Messages
+//! JWE = Encrypted Messages
+//! Message = Plaintext Messages
 use crate::{
     error::{err_msg, Error, ErrorKind, Result, ToResult},
-    secrets::SecretsResolver,
     utils::crypto::KnownKeyPair,
     UnpackMetadata,
 };
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use serde::Deserialize;
-use sha256::digest;
-use ssi::dids::Document;
-
 use crate::{
     jwe::{envelope::Jwe, ParsedJWE},
     jws::{Jws, ParsedJWS},
     Message,
 };
+use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use serde::Deserialize;
+use sha256::digest;
+use ssi::dids::Document;
+use std::str::FromStr;
 
 /// High level wrapper so we can serialize and deserialize the envelope types
 #[derive(Debug, Deserialize)]
@@ -71,8 +72,10 @@ impl ParsedEnvelope {
 /// Higher level Envelope that holds all required information pertaining to a DIDComm Message
 #[derive(Debug, Default)]
 pub struct MetaEnvelope {
-    pub envelope: Option<Envelope>,              // The raw envelope
-    pub parsed_envelope: Option<ParsedEnvelope>, // The parsed envelope
+    /// Raw envelope
+    pub envelope: Option<Envelope>,
+    /// Parsed envelope         
+    pub parsed_envelope: Option<ParsedEnvelope>,
     pub metadata: UnpackMetadata,
     pub from_kid: Option<String>,       // Key ID of Sender
     pub from_did: Option<String>,       // DID of Sender (did:method:identifier)
@@ -80,19 +83,21 @@ pub struct MetaEnvelope {
     pub from_key: Option<KnownKeyPair>, // Key of Sender
     pub to_kid: Option<String>,
     pub to_did: Option<String>,
+    /// Matching to_kids found againts known Secrets
+    /// Populated during the unpack() stage only
     pub to_kids_found: Vec<String>,
+    /// SHA256 Hash of the raw message
     pub sha256_hash: String,
 }
 
 impl MetaEnvelope {
-    pub async fn new<S>(
+    /// Create a new MetaEnvelope from a raw message
+    /// Parses the type of the message and populates envelope information where it can
+    pub async fn new(
         msg: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &S,
-    ) -> Result<Self>
-    where
-        S: SecretsResolver + Send,
-    {
+        //secrets_resolver: &S,
+    ) -> Result<Self> {
         let mut envelope = Self::default();
         envelope.sha256_hash = digest(msg);
         envelope.envelope = Some(Envelope::from_str(msg)?);
@@ -105,7 +110,7 @@ impl MetaEnvelope {
                 .verify_didcomm()?,
         );
 
-        envelope._from(did_resolver, secrets_resolver).await?;
+        envelope._from(did_resolver).await?;
 
         Ok(envelope)
     }
@@ -113,12 +118,12 @@ impl MetaEnvelope {
     async fn _from(
         &mut self,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &dyn SecretsResolver,
+        //secrets_resolver: &dyn SecretsResolver,
     ) -> Result<&Self> {
         match self.parsed_envelope.as_ref() {
             Some(ParsedEnvelope::Jwe(jwe)) => {
                 jwe.to_owned()
-                    .fill_envelope_from(self, did_resolver, secrets_resolver)
+                    .fill_envelope_from(self, did_resolver)
                     .await?;
             }
             Some(ParsedEnvelope::Jws(_)) => {}

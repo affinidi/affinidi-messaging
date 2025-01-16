@@ -2,6 +2,39 @@
 
 ## Changelog history
 
+## 16th January 2025 (0.8.9)
+
+### All (0.8.9)
+
+* Added Global-ACL Support
+
+### Mediator (0.8.9)
+
+* Added Global ACL Support
+* Added default_acl to `security` block in configuration
+  * Allows to set the default ACL to apply
+* New error type ACLDenied added
+* Local Direct Delivery added
+  * Allows for known recipient DIDs to receive messages directly sent to the
+  mediator without wrapping them in a forward envelope
+
+### SDK (0.8.9)
+
+* Authentication will now fail due to ACL Errors and not retry.
+* Deleting Messages has been split between direct and background
+  * Direct: immediate deletion and the main thread will block
+  * Background: requests are handled via a background task
+
+### Affinidi Text Client (0.8.9)
+
+* Updated ratatui-image from 3.x to 4.x
+
+### Affinidi DIDComm (0.8.9)
+
+* MetaEnvelope::new() no longer checks for recipient keys.
+  * This has been shifted to the unpack() function
+  * This allows for easier handling of any DIDComm message even if recipient is not known by it's secrets
+
 ## 16th December 2024 (0.8.1)
 
 ### All (0.8.1)

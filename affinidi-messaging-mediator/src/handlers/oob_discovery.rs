@@ -14,7 +14,8 @@
 */
 
 use crate::{
-    common::errors::{AppError, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::Session,
     SharedData,
 };
 use affinidi_messaging_didcomm::Message;
@@ -41,6 +42,13 @@ pub async fn oob_invite_handler(
     State(state): State<SharedData>,
     Json(body): Json<Message>,
 ) -> Result<(StatusCode, Json<SuccessResponse<OOBInviteResponse>>), AppError> {
+    // ACL Check
+    if !session.acls.get_create_invites().0 {
+        return Err(
+            MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),
+        );
+    }
+
     let oob_id = state
         .database
         .oob_discovery_store(&session.did_hash, &body)
@@ -62,19 +70,9 @@ pub async fn oob_invite_handler(
 /// Unauthenticated route that if you know a unique invite ID you can retrieve the invitation
 pub async fn oobid_handler(
     State(state): State<SharedData>,
-    oobid: Option<Query<Parameters>>,
+    oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
-    let invite = if let Some(oobid) = oobid {
-        state.database.oob_discovery_get(&oobid.0._oobid).await?
-    } else {
-        return Err(MediatorError::RequestDataError(
-            "NA".into(),
-            "no _oobid parameter in URL!".into(),
-        )
-        .into());
-    };
-
-    if invite.is_some() {
+    if let Some(invite) = state.database.oob_discovery_get(&oobid._oobid).await? {
         Ok((
             StatusCode::OK,
             Json(SuccessResponse {
@@ -83,7 +81,7 @@ pub async fn oobid_handler(
                 errorCode: 0,
                 errorCodeStr: "NA".to_string(),
                 message: "Success".to_string(),
-                data: invite,
+                data: Some(invite),
             }),
         ))
     } else {
@@ -106,17 +104,16 @@ pub async fn oobid_handler(
 pub async fn delete_oobid_handler(
     session: Session,
     State(state): State<SharedData>,
-    oobid: Option<Query<Parameters>>,
+    oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
-    let response = if let Some(oobid) = oobid {
-        state.database.oob_discovery_delete(&oobid.0._oobid).await?
-    } else {
-        return Err(MediatorError::RequestDataError(
-            "NA".into(),
-            "no _oob_id parameter in URL!".into(),
-        )
-        .into());
-    };
+    // ACL Check
+    if !session.acls.get_create_invites().0 {
+        return Err(
+            MediatorError::ACLDenied("DID does not have create_invites access".into()).into(),
+        );
+    }
+
+    let response = state.database.oob_discovery_delete(&oobid._oobid).await?;
 
     Ok((
         StatusCode::OK,

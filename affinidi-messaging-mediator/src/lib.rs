@@ -1,10 +1,7 @@
 use std::fmt::Debug;
 
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use axum::{
-    async_trait,
-    extract::{FromRef, FromRequestParts},
-};
+use axum::extract::{FromRef, FromRequestParts};
 use chrono::{DateTime, Utc};
 use common::{config::Config, jwt_auth::AuthError};
 use database::DatabaseHandler;
@@ -37,7 +34,6 @@ impl Debug for SharedData {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for SharedData
 where
     Self: FromRef<S>,

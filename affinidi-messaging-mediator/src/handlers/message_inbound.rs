@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{span, Instrument, Level};
 
 use crate::{
-    common::errors::{AppError, MediatorError, Session, SuccessResponse},
+    common::errors::{AppError, MediatorError, SuccessResponse},
+    database::session::Session,
     messages::inbound::handle_inbound,
     SharedData,
 };
@@ -30,6 +31,9 @@ pub struct InboundMessage {
     pub tag: String,
 }
 
+/// Handles inbound messages to the mediator
+/// ACL_MODE: Rquires LOCAL access
+///
 pub async fn message_inbound_handler(
     session: Session,
     State(state): State<SharedData>,
@@ -41,6 +45,13 @@ pub async fn message_inbound_handler(
         session = session.session_id
     );
     async move {
+        // ACL Check
+        if !session.acls.get_send_messages().0 {
+            return Err(
+                MediatorError::ACLDenied("DID does not have send/inbound access".into()).into(),
+            );
+        }
+
         let s = match serde_json::to_string(&body) {
             Ok(s) => s,
             Err(e) => {

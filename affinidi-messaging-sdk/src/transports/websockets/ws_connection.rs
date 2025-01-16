@@ -21,7 +21,7 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_tungstenite::{
     connect_async_tls_with_config,
-    tungstenite::{client::IntoClientRequest, protocol::frame::Utf8Payload, Message},
+    tungstenite::{client::IntoClientRequest, protocol::frame::Utf8Bytes, Message},
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, span, Instrument};
@@ -96,7 +96,13 @@ impl WsConnection {
             debug!("Starting websocket connection");
 
             self.state = State::Connecting;
-            let mut web_socket = self._create_socket().await.unwrap();
+            let mut web_socket = match self._create_socket().await {
+                Ok(ws) => ws,
+                Err(e) => {
+                    error!("Error creating websocket connection: {:?}", e);
+                    return;
+                }
+            };
             // TODO: Need to implement a recovery here
             debug!("Websocket connected");
             {
@@ -167,7 +173,7 @@ impl WsConnection {
                             match cmd {
                                 WsConnectionCommands::Send(msg) => {
                                     debug!("Sending message ({}) to websocket", msg);
-                                    match web_socket.send(Message::Text(Utf8Payload::from(msg))).await {
+                                    match web_socket.send(Message::Text(Utf8Bytes::from(msg))).await {
                                         Ok(_) => {
                                             debug!("Message sent");
                                         }
@@ -236,15 +242,22 @@ impl WsConnection {
         );
 
         // Connect to the websocket
-        let ws_stream = connect_async_tls_with_config(
+        let ws_stream = match connect_async_tls_with_config(
             request,
             None,
             false,
             Some(self.shared.ws_connector.clone()),
         )
         .await
-        .expect("Failed to connect")
-        .0;
+        {
+            Ok((ws_stream, _)) => ws_stream,
+            Err(e) => {
+                return Err(ATMError::TransportError(format!(
+                    "Could not connect to websocket. Reason: {}",
+                    e
+                )))
+            }
+        };
 
         debug!("Completed websocket connection");
 

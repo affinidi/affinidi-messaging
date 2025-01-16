@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = '0.8.8'
+version = '0.8.9'
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
@@ -22,23 +22,24 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-affinidi-messaging-sdk = { version = "0.8.7", path = "./affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.8.7", path = "./affinidi-messaging-didcomm" }
-affinidi-messaging-mediator = { version = "0.8.7", path = "./affinidi-messaging-mediator" }
-affinidi-did-resolver-cache-sdk = { version = "0.2.3", features = ["network"] }
+affinidi-messaging-sdk = { version = "0.8.9", path = "./affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.8.9", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.8.9", path = "./affinidi-messaging-mediator" }
+affinidi-did-resolver-cache-sdk = { version = "0.2.4", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.55"
-aws-sdk-memorydb = "1.52"
-aws-sdk-secretsmanager = "1.54"
-aws-sdk-ssm = "1.56"
-axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9.6", features = ["typed-header"] }
+aws-sdk-dynamodb = "1.59"
+aws-sdk-memorydb = "1.56"
+aws-sdk-secretsmanager = "1.58"
+aws-sdk-ssm = "1.60"
+axum = { version = "0.8", features = ["ws"] }
+axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
+bitfield-struct = "0.10"
 bs58 = "0.5"
 chrono = "0.4"
 circular-queue = { version = "0.2", features = ["serde_support"] }
@@ -49,21 +50,21 @@ criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2.3" }
+did-peer = { version = "0.2.4" }
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"
 http = "1"
 image = "0.25.5"
-itertools = "0.13"
+itertools = "0.14"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
-log = "0.4.22"
+log = "0.4.25"
 num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.8"
 ratatui = "0.29"
-ratatui-image = { version = "3", features = ["crossterm", "image-defaults"] }
+ratatui-image = { version = "4", features = ["crossterm", "image-defaults"] }
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
@@ -80,7 +81,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 rustls-pemfile = "2"
-rustls-platform-verifier = "0.4"
+rustls-platform-verifier = "0.5"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-enum-str = '0.4'
 serde_json = "1.0"
@@ -89,20 +90,24 @@ sha256 = "1.5"
 ssi = { version = "0.10" }
 thiserror = "2.0"
 time = "0.3"
-tokio = { version = "1.42", features = ["full"] }
+tokio = { version = "1.43", features = ["full"] }
 tokio-stream = "0.1"
-tokio-tungstenite = { version = "0.25", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
 toml = "0.8"
 tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_info",
 ] }
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "json",
+] }
 tracing-test = "0.2"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
-uuid = { version = "1.11", features = ["v4", "fast-rng"] }
+uuid = { version = "1.12", features = ["v4", "fast-rng"] }
 varint = "0.9"
 semver = "1.0.24"

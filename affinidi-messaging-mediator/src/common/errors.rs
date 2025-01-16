@@ -62,6 +62,8 @@ pub enum MediatorError {
     ForwardMessageError(SessId, String),
     #[error("Authentication error: {0}")]
     AuthenticationError(String),
+    #[error("ACL Denied: {0}")]
+    ACLDenied(String),
 }
 
 impl IntoResponse for AppError {
@@ -265,6 +267,17 @@ impl IntoResponse for AppError {
                 event!(Level::WARN, "{}", response.to_string());
                 response
             }
+            MediatorError::ACLDenied(message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::UNAUTHORIZED.as_u16(),
+                    sessionId: "NO-SESSION".to_string(),
+                    errorCode: 19,
+                    errorCodeStr: "ACLDenied".to_string(),
+                    message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
         };
         (
             StatusCode::from_u16(response.httpCode).ok().unwrap(),
@@ -272,15 +285,6 @@ impl IntoResponse for AppError {
         )
             .into_response()
     }
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct Session {
-    pub session_id: String,             // Unique session transaction ID
-    pub authenticated: bool,            // Has this session been authenticated?
-    pub challenge_sent: Option<String>, // Challenge sent to the client
-    pub did: String,                    // DID of the client
-    pub did_hash: String,               // Sha256 hash of the DID
 }
 
 #[derive(Serialize, Debug)]

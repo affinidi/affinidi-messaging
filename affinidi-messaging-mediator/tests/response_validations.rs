@@ -13,6 +13,7 @@ use affinidi_messaging_sdk::{
 use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use sha256::digest;
 
+#[allow(dead_code)]
 pub async fn validate_status_reply<S>(
     status_reply: SendMessageResponse,
     recipient_did: String,
@@ -50,6 +51,7 @@ pub async fn validate_status_reply<S>(
     }
 }
 
+#[allow(dead_code)]
 pub async fn validate_message_delivery<S>(
     message_delivery: SendMessageResponse,
     did_resolver: &DIDCacheClient,
@@ -119,13 +121,12 @@ where
                             panic!("{:?}", e);
                         }
                     };
-                    let mut envelope =
-                        match MetaEnvelope::new(&decoded, did_resolver, secrets_resolver).await {
-                            Ok(envelope) => envelope,
-                            Err(e) => {
-                                panic!("{:?}", e);
-                            }
-                        };
+                    let mut envelope = match MetaEnvelope::new(&decoded, did_resolver).await {
+                        Ok(envelope) => envelope,
+                        Err(e) => {
+                            panic!("{:?}", e);
+                        }
+                    };
 
                     match Message::unpack(
                         &mut envelope,
@@ -156,6 +157,7 @@ where
     response
 }
 
+#[allow(dead_code)]
 pub async fn validate_message_received_status_reply<S>(
     status_reply: SendMessageResponse,
     recipient_did: String,
@@ -192,6 +194,7 @@ pub async fn validate_message_received_status_reply<S>(
     }
 }
 
+#[allow(dead_code)]
 pub async fn validate_forward_request_response(
     forward_request_response: SendMessageResponse,
 ) -> bool {
@@ -231,6 +234,7 @@ pub async fn validate_get_message_response<S>(
     }
 }
 
+#[allow(dead_code)]
 pub fn validate_list_messages(list: Vec<MessageListElement>, mediator_did: &str) {
     assert_eq!(list.len(), 4);
 

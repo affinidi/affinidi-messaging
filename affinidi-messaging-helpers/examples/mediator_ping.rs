@@ -153,10 +153,9 @@ async fn main() -> Result<(), ATMError> {
     info!(" counters: success: {}", success_count);
 
     sleep(Duration::from_millis(2000)).await;
-    info!(" ***************************************************** ");
 
     // Send a WebSocket message
-    info!("  *****************************************************  ");
+    info!(" *****************************************************  ");
     info!("Starting WebSocket test...");
     let start = SystemTime::now();
     atm.profile_enable_websocket(&alice).await?;
@@ -177,6 +176,7 @@ async fn main() -> Result<(), ATMError> {
             false,
             &response.message_id,
             Duration::from_secs(10),
+            true,
         )
         .await?;
     let after_pong_receive = SystemTime::now();
@@ -221,5 +221,66 @@ async fn main() -> Result<(), ATMError> {
             .as_millis()
     );
 
+    sleep(Duration::from_millis(1000)).await;
+    // 2nd WebSocket message
+    info!(" *****************************************************  ");
+    info!("2nd WebSocket test...");
+    let start = SystemTime::now();
+    let response = protocols
+        .trust_ping
+        .send_ping(&atm, &alice, &mediator_did, true, true, false)
+        .await?;
+    let after_ping_send = SystemTime::now();
+    info!("PING sent: {}", response.message_id);
+
+    let response = protocols
+        .message_pickup
+        .live_stream_get(
+            &atm,
+            &alice,
+            false,
+            &response.message_id,
+            Duration::from_secs(10),
+            true,
+        )
+        .await?;
+    let after_pong_receive = SystemTime::now();
+
+    if let Some((msg, _)) = response {
+        info!("PONG received: {}", msg.id);
+    } else {
+        error!("No response from live stream");
+    }
+
+    // Print out timing information
+    info!(
+        "Sending Ping took {}ms :: total {}ms to complete",
+        after_ping_send
+            .duration_since(after_connect)
+            .unwrap()
+            .as_millis(),
+        after_ping_send.duration_since(start).unwrap().as_millis()
+    );
+
+    info!(
+        "Receiving unpacked Pong took {}ms :: total {}ms to complete",
+        after_pong_receive
+            .duration_since(after_ping_send)
+            .unwrap()
+            .as_millis(),
+        after_pong_receive
+            .duration_since(start)
+            .unwrap()
+            .as_millis()
+    );
+    info!(
+        "Total WebSocket trust-ping took {}ms to complete",
+        after_pong_receive
+            .duration_since(start)
+            .unwrap()
+            .as_millis()
+    );
+    info!(" ***************************************************** ");
+    atm.graceful_shutdown().await;
     Ok(())
 }

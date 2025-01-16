@@ -1,23 +1,33 @@
 //! Database routines to add/remove/list admin accounts
-use affinidi_messaging_sdk::protocols::mediator::MediatorAdminList;
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
+use affinidi_messaging_sdk::protocols::mediator::{
+    accounts::AccountType, acls::MediatorACLSet, administration::MediatorAdminList,
+};
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
-
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
 
 impl DatabaseHandler {
     /// Ensures that the mediator admin account is correctly configured and set up.
     /// It does not do any cleanup or maintenance of other admin accounts.
     /// Updates both the DID role type and the global ADMIN Set in Redis.
-    pub(crate) async fn setup_admin_account(&self, admin_did: &str) -> Result<(), MediatorError> {
+    pub(crate) async fn setup_admin_account(
+        &self,
+        admin_did: &str,
+        admin_type: AccountType,
+        acls: &MediatorACLSet,
+    ) -> Result<(), MediatorError> {
+        let did_hash = sha256::digest(admin_did);
+        // Check if the admin account already exists
+        if !self.account_exists(&did_hash).await? {
+            debug!("Admin account doesn't exist, creating: {}", admin_did);
+            self.account_add(&did_hash, acls).await?;
+        }
         let mut con = self.get_async_connection().await?;
 
-        let did_hash = sha256::digest(admin_did);
         debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
 
-        let _result: Value = deadpool_redis::redis::pipe()
+        deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SADD")
             .arg("ADMINS")
@@ -25,10 +35,10 @@ impl DatabaseHandler {
             .ignore()
             .cmd("HSET")
             .arg(["DID:", &did_hash].concat())
-            .arg("ADMIN")
-            .arg(1)
+            .arg("ROLE_TYPE")
+            .arg::<String>(admin_type.into())
             .ignore()
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::DatabaseError(
@@ -44,17 +54,19 @@ impl DatabaseHandler {
         Ok(())
     }
 
+    /// Checks if the provided DID is an admin level account
+    /// Returns true if the DID is an admin account, false otherwise
     pub(crate) async fn check_admin_account(&self, did_hash: &str) -> Result<bool, MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let result: Vec<i32> = deadpool_redis::redis::pipe()
+        let (exists, role_type): (u32, u32) = deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SISMEMBER")
             .arg("ADMINS")
             .arg(did_hash)
             .cmd("HGET")
             .arg(["DID:", did_hash].concat())
-            .arg("ADMIN")
+            .arg("ROLE_TYPE")
             .query_async(&mut con)
             .await
             .map_err(|err| {
@@ -67,8 +79,12 @@ impl DatabaseHandler {
                 )
             })?;
 
-        if result.iter().sum::<i32>() == 2 {
-            Ok(true)
+        if exists == 1 {
+            match role_type.into() {
+                AccountType::RootAdmin => Ok(true),
+                AccountType::Admin => Ok(true),
+                _ => Ok(false),
+            }
         } else {
             Ok(false)
         }
@@ -79,7 +95,8 @@ impl DatabaseHandler {
     pub(crate) async fn add_admin_accounts(
         &self,
         accounts: Vec<String>,
-    ) -> Result<i32, MediatorError> {
+        acls: &MediatorACLSet,
+    ) -> Result<usize, MediatorError> {
         let _span = span!(
             Level::DEBUG,
             "add_admin_accounts",
@@ -95,39 +112,21 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
-
-            let mut tx = deadpool_redis::redis::pipe();
-            let mut tx = tx.atomic().cmd("SADD").arg("ADMINS");
-
-            // Add to the ADMINS Set
             for account in &accounts {
                 debug!("Adding Admin account: {}", account);
-                tx = tx.arg(account);
+                self.setup_admin_account(account, AccountType::Admin, acls)
+                    .await?;
             }
 
-            // Set the role type for each DID
-            for account in &accounts {
-                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg(1);
-            }
-
-            let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
-                MediatorError::DatabaseError(
-                    "NA".to_string(),
-                    format!("Add failed. Reason: {}", err),
-                )
-            })?;
-            debug!("Admin accounts added successfully: {:?}", result);
-
-            Ok(result.first().unwrap_or(&0).to_owned())
+            Ok(accounts.len())
         }
         .instrument(_span)
         .await
     }
 
-    /// Removes up to 100 admin accounts from the mediator
-    /// - `accounts` - The list of accounts to remove
-    pub(crate) async fn remove_admin_accounts(
+    /// Strips up to 100 admin accounts from the mediator
+    /// - `accounts` - The list of accounts to strip admin rights from
+    pub(crate) async fn strip_admin_accounts(
         &self,
         accounts: Vec<String>,
     ) -> Result<i32, MediatorError> {
@@ -159,7 +158,7 @@ impl DatabaseHandler {
 
             // Remove admin field on each DID
             for account in &accounts {
-                tx = tx.cmd("HDEL").arg(account).arg("ROLE_TYPE");
+                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg("0");
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {

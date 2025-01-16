@@ -1,7 +1,4 @@
-use crate::{
-    common::errors::{AppError, Session},
-    SharedData,
-};
+use crate::{common::errors::AppError, database::session::Session, SharedData};
 use affinidi_messaging_sdk::messages::SuccessResponse;
 use axum::{
     extract::State,
@@ -33,7 +30,7 @@ pub fn application_routes(api_prefix: &str, shared_data: &SharedData) -> Router 
         .route("/fetch", post(inbox_fetch::inbox_fetch_handler))
         // Listing of messages for a DID
         .route(
-            "/list/:did_hash/:folder",
+            "/list/{did_hash}/{folder}",
             get(message_list::message_list_handler),
         )
         // Delete/remove messages stored in ATM

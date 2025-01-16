@@ -45,6 +45,7 @@ mod message_builders;
 mod response_validations;
 
 //#[tokio::test]
+#[allow(dead_code)]
 async fn test_mediator_server() {
     // Generate secrets and did for mediator if not existing
     if fs::metadata(SECRETS_PATH).is_err() {
@@ -385,6 +386,7 @@ async fn _start_mediator_server() {
     println!("Server running");
 }
 
+#[allow(dead_code)]
 fn init_client(config: Config) -> Client {
     // Set up the HTTPS client
     let mut client = ClientBuilder::new()
@@ -611,6 +613,7 @@ async fn _outbound_message(
     list
 }
 
+#[allow(dead_code)]
 async fn list_messages(
     client: Client,
     tokens: AuthorizationResponse,

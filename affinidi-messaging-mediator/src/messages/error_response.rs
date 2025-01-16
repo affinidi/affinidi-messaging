@@ -9,10 +9,7 @@ use affinidi_messaging_sdk::messages::problem_report::ProblemReport;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{
-    common::errors::{MediatorError, Session},
-    SharedData,
-};
+use crate::{common::errors::MediatorError, database::session::Session, SharedData};
 
 use super::ProcessMessageResponse;
 
@@ -53,7 +50,7 @@ pub(crate) fn generate_error_response(
     Ok(ProcessMessageResponse {
         store_message,
         force_live_delivery: false,
-        message: Some(error_msg),
+        data: super::WrapperType::Message(error_msg),
         forward_message: false,
     })
 }

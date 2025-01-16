@@ -52,7 +52,7 @@ impl ATM {
     }
 
     /// Close the WebSocket task gracefully
-    pub async fn abort_websocket_task(&mut self) -> Result<(), ATMError> {
+    pub async fn abort_websocket_task(&self) -> Result<(), ATMError> {
         let _ = self
             .inner
             .ws_handler_send_stream

@@ -130,7 +130,7 @@ impl ATM {
 
         if let FetchDeletePolicy::OnReceive = options.delete_policy {
             match self
-                .delete_messages(
+                .delete_messages_direct(
                     profile,
                     &DeleteMessageRequest {
                         message_ids: list.success.iter().map(|m| m.msg_id.clone()).collect(),

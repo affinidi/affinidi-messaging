@@ -1,7 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::{AppError, MediatorError},
+    database::session::Session,
     messages::inbound::handle_inbound,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
     SharedData,
@@ -25,7 +26,8 @@ use tokio::{
 use tracing::{debug, info, span, warn, Instrument};
 use uuid::Uuid;
 
-// Handles the switching of the protocol to a websocket connection
+/// Handles the switching of the protocol to a websocket connection
+/// ACL_MODE: Rquires LOCAL access
 pub async fn websocket_handler(
     session: Session,
     ws: WebSocketUpgrade,
@@ -36,9 +38,16 @@ pub async fn websocket_handler(
         "websocket_handler",
         session = session.session_id
     );
-    async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
-        .instrument(_span)
-        .await
+    // ACL Check (websockets only work on local DID's)
+    if session.acls.get_local() {
+        async move { ws.on_upgrade(move |socket| handle_socket(socket, state, session)) }
+            .instrument(_span)
+            .await
+    } else {
+        let app_error: AppError =
+            MediatorError::ACLDenied("DID does not have LOCAL access".into()).into();
+        app_error.into_response()
+    }
 }
 
 /// WebSocket state machine. This is spawned per connection.
@@ -118,11 +127,11 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                         match msg {
                             WebSocketCommands::Message(msg) => {
                                 debug!("ws: Received message from streaming task: {:?}", msg);
-                                let _ = socket.send(Message::Text(msg)).await;
+                                let _ = socket.send(Message::Text(msg.into())).await;
                             },
                             WebSocketCommands::Close => {
                                 if let Ok(msg) =  _generate_duplicate_connection_problem_report(&state, &session).await {
-                                   let _ = socket.send(Message::Text(msg)).await;
+                                   let _ = socket.send(Message::Text(msg.into())).await;
                             }
                                 debug!("Received close message from streaming task, closing websocket connection");
                                 already_deregistered_flag = true;

@@ -138,7 +138,7 @@ impl DatabaseHandler {
     pub async fn update_send_stats(&self, sent_bytes: i64) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let _result: Value = deadpool_redis::redis::pipe()
+        deadpool_redis::redis::pipe()
             .atomic()
             .cmd("HINCRBY")
             .arg("GLOBAL")
@@ -147,7 +147,7 @@ impl DatabaseHandler {
             .cmd("HINCRBY")
             .arg("SENT_COUNT")
             .arg(1)
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::DatabaseError(
@@ -163,11 +163,11 @@ impl DatabaseHandler {
     pub async fn global_stats_increment_websocket_open(&self) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let _result: Value = deadpool_redis::redis::cmd("HINCRBY")
+        deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("WEBSOCKET_OPEN")
             .arg(1)
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::DatabaseError(
@@ -186,11 +186,11 @@ impl DatabaseHandler {
     pub async fn global_stats_increment_websocket_close(&self) -> Result<(), MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let _result: Value = deadpool_redis::redis::cmd("HINCRBY")
+        deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
             .arg("WEBSOCKET_CLOSE")
             .arg(1)
-            .query_async(&mut con)
+            .exec_async(&mut con)
             .await
             .map_err(|err| {
                 MediatorError::DatabaseError(

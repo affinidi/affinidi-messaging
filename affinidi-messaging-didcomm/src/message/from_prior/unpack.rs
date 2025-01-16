@@ -68,7 +68,7 @@ impl FromPrior {
             .verification_relationships
             .authentication
             .iter()
-            .find(|a| a.id().resolve(&did_doc.id.as_did()).as_str() == kid)
+            .find(|a| a.id().resolve(did_doc.id.as_did()).as_str() == kid)
             .ok_or_else(|| {
                 err_msg(
                     ErrorKind::DIDUrlNotFound,
@@ -78,7 +78,7 @@ impl FromPrior {
 
         // TODO: dropping a reference here otherwise
         let _kid = kid.id();
-        let kid = _kid.resolve(&did_doc.id.as_did());
+        let kid = _kid.resolve(did_doc.id.as_did());
         let kid = kid.as_str();
 
         let key = did_doc

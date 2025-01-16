@@ -1,3 +1,9 @@
+/*!
+ * Message Pickup Protocol 3.0 implementation
+ *
+ * NOTE: All messages generated from this protocol are ephemeral and are not stored in the database
+ * They are fire and forget messages
+ */
 use affinidi_messaging_didcomm::{Attachment, Message};
 use affinidi_messaging_sdk::{
     messages::fetch::FetchOptions,
@@ -16,7 +22,8 @@ use tracing::{debug, error, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::{MediatorError, Session},
+    common::errors::MediatorError,
+    database::session::Session,
     messages::ProcessMessageResponse,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
     SharedData,
@@ -204,7 +211,7 @@ async fn generate_status_reply(
         Ok(ProcessMessageResponse {
             store_message: false,
             force_live_delivery,
-            message: Some(status_msg),
+            data: crate::messages::WrapperType::Message(status_msg),
             forward_message: false,
         })
     }
@@ -385,7 +392,7 @@ pub(crate) async fn delivery_request(
             Ok(ProcessMessageResponse {
                 store_message: false,
                 force_live_delivery: false,
-                message: Some(response_msg),
+                data: crate::messages::WrapperType::Message(response_msg),
                 forward_message: false,
             })
         } else {

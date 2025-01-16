@@ -1,24 +1,30 @@
 //! Example of how to manage administration accounts for the mediator
+use account_management::account_management::account_management_menu;
 use affinidi_messaging_helpers::common::{
     affinidi_logo::print_logo,
     check_path,
     profiles::{Profile, Profiles},
 };
-use affinidi_messaging_mediator::common::config::ACLMode;
-use affinidi_messaging_sdk::{config::Config, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{
+    config::Config,
+    protocols::{
+        mediator::acls::{ACLModeType, MediatorACLSet},
+        Protocols,
+    },
+    ATM,
+};
 use clap::Parser;
 use console::{style, Style, Term};
-use dialoguer::theme::ColorfulTheme;
-use global_acls::global_acls_menu;
+use dialoguer::{theme::ColorfulTheme, Select};
 use serde::Deserialize;
 use serde_json::Value;
 use sha256::digest;
 use std::error::Error;
 use std::{collections::HashMap, env};
 use tracing_subscriber::filter;
-use ui::{add_admin, list_admins, main_menu, remove_admins};
+use ui::administration_accounts_menu;
 
-mod global_acls;
+mod account_management;
 mod ui;
 
 #[derive(Parser, Debug)]
@@ -30,13 +36,15 @@ struct Args {
 
 /// Holds information from the mediator configuration
 #[derive(Debug, Deserialize)]
-struct BasicMediatorConfig {
+struct SharedConfig {
     pub version: String,
-    pub root_admin_did: String,
-    pub acl_mode: ACLMode,
+    pub root_admin_hash: String,
+    pub our_admin_hash: String,
+    pub acl_mode: ACLModeType,
+    pub global_acl_default: MediatorACLSet,
 }
 
-impl BasicMediatorConfig {
+impl SharedConfig {
     // Converts and loads a retrieved configuration into a basic config structure
     pub fn new(input: HashMap<String, Value>) -> Result<Self, Box<dyn Error>> {
         let version = if let Some(version) = input.get("version") {
@@ -70,20 +78,38 @@ impl BasicMediatorConfig {
 
         let acl_mode = if let Some(acl_mode) = config
             .get("security")
-            .and_then(|security| security.get("acl_mode"))
+            .and_then(|security| security.get("mediator_acl_mode"))
         {
-            match serde_json::from_value::<ACLMode>(acl_mode.to_owned()) {
+            match serde_json::from_value::<ACLModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
-                Err(_) => return Err("Couldn't find acl_mode in Mediator Configuration".into()),
+                Err(_) => {
+                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())
+                }
             }
         } else {
-            return Err("Couldn't find admin_did in Mediator Configuration".into());
+            return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into());
         };
 
-        Ok(BasicMediatorConfig {
+        let global_acl_default = if let Some(global_acl_default) = config
+            .get("security")
+            .and_then(|security| security.get("global_acl_default"))
+            .and_then(|acls| acls.get("acl"))
+        {
+            if let Some(global_acl_default) = global_acl_default.as_u64() {
+                MediatorACLSet::from_u64(global_acl_default)
+            } else {
+                return Err("Couldn't find global_acl_default in Mediator Configuration".into());
+            }
+        } else {
+            return Err("Couldn't find global_acl_default in Mediator Configuration".into());
+        };
+
+        Ok(SharedConfig {
             version,
-            root_admin_did,
+            root_admin_hash: digest(&root_admin_did),
             acl_mode,
+            global_acl_default,
+            our_admin_hash: String::new(),
         })
     }
 }
@@ -146,50 +172,52 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Err("Admin DID not found in Profile".into());
     };
 
-    let admin_hash = digest(&admin.did);
-
     // Create a new ATM Client
     let atm = ATM::new(config).await?;
     let protocols = Protocols::new();
 
     // Create the admin profile and enable it
-
     let admin_profile = admin.into_profile(&atm).await?;
     let admin = atm.profile_add(&admin_profile, true).await?;
 
     println!("{}", style("Admin account connected...").green());
 
     println!("{}", style("Fetching Mediator Configuration...").blue());
-    let mediator_config: HashMap<String, Value> =
+    let shared_config: HashMap<String, Value> =
         serde_json::from_value(protocols.mediator.get_config(&atm, &admin).await?)?;
-    let mediator_config = BasicMediatorConfig::new(mediator_config)?;
+    let mut mediator_config = SharedConfig::new(shared_config)?;
     println!(
-        "{}{}{}",
-        style("Mediator version(").green(),
+        "{}{}{}{}{}",
+        style("Mediator server(").green(),
+        style(admin_profile.dids()?.1).color256(208),
+        style(") version(").green(),
         style(&mediator_config.version).color256(208),
         style("). Configuration loaded successfully").green()
     );
 
+    mediator_config.our_admin_hash = digest(admin.dids()?.0);
+
     loop {
         println!();
-        let selection = main_menu(&theme);
+        let selections = &["Account Management", "Administration Accounts", "Quit"];
+
+        let selection = Select::with_theme(&theme)
+            .with_prompt("Select an action?")
+            .default(0)
+            .items(&selections[..])
+            .interact()
+            .unwrap();
 
         println!();
         match selection {
             0 => {
-                list_admins(
-                    &atm,
-                    &admin,
-                    &protocols,
-                    &admin_hash,
-                    &digest(&mediator_config.root_admin_did),
-                )
-                .await
+                account_management_menu(&atm, &admin, &protocols, &theme, &mediator_config).await?;
             }
-            1 => add_admin(&atm, &admin, &protocols, &theme).await,
-            2 => remove_admins(&atm, &admin, &protocols, &admin_hash, &theme).await,
-            3 => global_acls_menu(&atm, &admin, &protocols, &theme, &mediator_config).await?,
-            4 => {
+            1 => {
+                administration_accounts_menu(&atm, &admin, &protocols, &theme, &mediator_config)
+                    .await;
+            }
+            2 => {
                 println!("Quitting");
                 break;
             }

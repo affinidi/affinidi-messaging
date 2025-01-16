@@ -2,7 +2,7 @@ use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use tracing::{debug, event, span, Instrument, Level};
+use tracing::{debug, event, info, span, Instrument, Level};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MessageMetaData {
@@ -27,23 +27,11 @@ impl DatabaseHandler {
             let message_hash = digest(message.as_bytes());
             let to_hash = digest(to_did.as_bytes());
 
-            let mut conn = self.get_async_connection().await?;
-            let mut tx = deadpool_redis::redis::cmd("FCALL");
-
-            tx.arg("store_message")
-                .arg(1)
-                .arg(&message_hash)
-                .arg(message)
-                .arg(message.len())
-                .arg(to_did)
-                .arg(&to_hash);
-
-            if let Some(from_did) = from_did {
-                let from_hash = digest(from_did.as_bytes());
-                tx.arg(from_did).arg(from_hash);
+            let from_hash = if let Some(from_did) = from_did {
+                digest(from_did)
             } else {
-                tx.arg("ANONYMOUS");
-            }
+                "ANONYMOUS".to_string()
+            };
 
             debug!(
                 "trying to store msg_id({}), from({:?}) from_hash({:?}) to({}) to_hash({}), bytes({})",
@@ -55,17 +43,23 @@ impl DatabaseHandler {
                 message.len()
             );
 
-            let result: String = tx.query_async(&mut conn).await.map_err(|err| {
-                event!(Level::ERROR, "Couldn't store message in database: {}", err);
-                MediatorError::DatabaseError(
-                    session_id.into(),
-                    format!("Couldn't store message in database: {}", err),
-                )
-            })?;
+            let mut conn = self.get_async_connection().await?;
+            deadpool_redis::redis::cmd("FCALL")
+            .arg("store_message")
+                .arg(1)
+                .arg(&message_hash)
+                .arg(message)
+                .arg(message.len())
+                .arg(&to_hash)
+                .arg(&from_hash).exec_async(&mut conn).await.map_err(|err| {
+                    event!(Level::ERROR, "Couldn't store message in database: {}", err);
+                    MediatorError::DatabaseError(
+                        session_id.into(),
+                        format!("Couldn't store message in database: {}", err),
+                    )
+                })?;
 
-            debug!("result = {:?}", result);
-
-            debug!("Message hash({}) stored in database", message_hash);
+            info!("Message hash({}) from({}) to({}) stored in database", message_hash, from_hash, to_hash);
 
             Ok(message_hash)
         }

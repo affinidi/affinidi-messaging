@@ -1,27 +1,65 @@
 //! UI Related functions
-use std::sync::Arc;
-
 use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use regex::Regex;
 use sha256::digest;
+use std::sync::Arc;
 
-pub(crate) fn main_menu(theme: &ColorfulTheme) -> usize {
+use crate::SharedConfig;
+
+pub(crate) async fn administration_accounts_menu(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    shared_config: &SharedConfig,
+) {
     let selections = &[
         "List Administration DIDs",
-        "Add new Administration DID",
+        "Add Administration DID",
         "Remove Administration DID",
-        "Global ACL Management",
-        "Quit",
+        "Back",
     ];
 
-    Select::with_theme(theme)
-        .with_prompt("Select an action?")
-        .default(0)
-        .items(&selections[..])
-        .interact()
-        .unwrap()
+    loop {
+        let selection = Select::with_theme(theme)
+            .with_prompt("Select an action?")
+            .default(0)
+            .items(&selections[..])
+            .interact()
+            .unwrap();
+
+        match selection {
+            0 => {
+                list_admins(
+                    atm,
+                    profile,
+                    protocols,
+                    &shared_config.our_admin_hash,
+                    &shared_config.root_admin_hash,
+                )
+                .await;
+            }
+            1 => add_admin(atm, profile, protocols, theme).await,
+            2 => {
+                remove_admins(
+                    atm,
+                    profile,
+                    protocols,
+                    &shared_config.our_admin_hash,
+                    theme,
+                )
+                .await
+            }
+            3 => {
+                break;
+            }
+            _ => {
+                println!("Invalid selection");
+            }
+        }
+    }
 }
 
 /// List first 100 Administration DIDs
@@ -168,11 +206,7 @@ pub(crate) async fn remove_admins(
                     .iter()
                     .map(|&idx| admins[idx].clone())
                     .collect::<Vec<_>>();
-                match protocols
-                    .mediator
-                    .remove_admins(atm, profile, &admins)
-                    .await
-                {
+                match protocols.mediator.strip_admins(atm, profile, &admins).await {
                     Ok(result) => {
                         println!("{}", style(format!("Removed {} DIDs", result)).green());
                     }

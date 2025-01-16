@@ -1,16 +1,48 @@
+use crate::database::session::Session;
 use crate::messages::MessageHandler;
 use crate::{
-    common::errors::{MediatorError, Session},
-    database::DatabaseHandler,
-    messages::PackOptions,
-    SharedData,
+    common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions, SharedData,
 };
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use sha256::digest;
 use tracing::{debug, error, span, trace, warn, Instrument};
 
-use super::ProcessMessageResponse;
+use super::{ProcessMessageResponse, WrapperType};
+
+async fn _store_message(
+    state: &SharedData,
+    session: &Session,
+    response: &ProcessMessageResponse,
+    data: &str,
+    to_did: &str,
+) -> Result<String, MediatorError> {
+    // Live stream the message?
+    if let Some(stream_uuid) = state
+        .database
+        .streaming_is_client_live(&session.did_hash, response.force_live_delivery)
+        .await
+    {
+        _live_stream(
+            &state.database,
+            &session.did_hash,
+            &stream_uuid,
+            data,
+            response.force_live_delivery,
+        )
+        .await;
+    }
+
+    state
+        .database
+        .store_message(
+            &session.session_id,
+            data,
+            to_did,
+            Some(&state.config.mediator_did),
+        )
+        .await
+}
 
 /// Stores a message in the mediator's database
 /// handles a lot of higher order logic for storing messages
@@ -31,92 +63,88 @@ pub(crate) async fn store_message(
             Ok(InboundMessageResponse::Forwarded)
         } else if response.store_message {
             let mut stored_messages = InboundMessageList::default();
-            if let Some(message) = &response.message {
-                // Pack the message for the next recipient(s)
-                let to_dids = if let Some(to_did) = &message.to {
-                    to_did
-                } else {
-                    return Err(MediatorError::MessagePackError(
-                        session.session_id.clone(),
-                        "No recipients found".into(),
-                    ));
-                };
-                debug!(
-                    "response to_dids: count({}) vec({:?})",
-                    to_dids.len(),
-                    to_dids
-                );
+            match &response.data {
+                WrapperType::None => {}
+                WrapperType::Message(message) => {
+                    // Pack the message for the next recipient(s)
+                    let Some(to_dids) = &message.to else {
+                        return Err(MediatorError::MessagePackError(
+                            session.session_id.clone(),
+                            "No recipients found".into(),
+                        ));
+                    };
 
-                if to_dids.len() > state.config.limits.to_recipients {
-                    return Err(MediatorError::MessagePackError(
-                        session.session_id.clone(),
-                        format!("Recipient count({}) exceeds limit", to_dids.len()),
-                    ));
-                }
+                    debug!(
+                        "response to_dids: count({}) vec({:?})",
+                        to_dids.len(),
+                        to_dids
+                    );
 
-                for recipient in to_dids {
-                    let (packed, _): (String, PackEncryptedMetadata) = message
-                        .pack(
-                            recipient,
-                            &state.config.mediator_did,
-                            metadata,
-                            &state.config.security.mediator_secrets,
-                            &state.did_resolver,
-                            &PackOptions {
-                                to_keys_per_recipient_limit: state
-                                    .config
-                                    .limits
-                                    .to_keys_per_recipient,
-                            },
-                        )
-                        .await?;
-
-                    // Live stream the message?
-                    if let Some(stream_uuid) = state
-                        .database
-                        .streaming_is_client_live(&session.did_hash, response.force_live_delivery)
-                        .await
-                    {
-                        _live_stream(
-                            &state.database,
-                            &session.did_hash,
-                            &stream_uuid,
-                            &packed,
-                            response.force_live_delivery,
-                        )
-                        .await;
+                    if to_dids.len() > state.config.limits.to_recipients {
+                        return Err(MediatorError::MessagePackError(
+                            session.session_id.clone(),
+                            format!("Recipient count({}) exceeds limit", to_dids.len()),
+                        ));
                     }
 
-                    match state
-                        .database
-                        .store_message(
-                            &session.session_id,
-                            &packed,
-                            recipient,
-                            Some(&state.config.mediator_did),
-                        )
-                        .await
-                    {
+                    for recipient in to_dids {
+                        let (packed, _): (String, PackEncryptedMetadata) = message
+                            .pack(
+                                recipient,
+                                &state.config.mediator_did,
+                                metadata,
+                                &state.config.security.mediator_secrets,
+                                &state.did_resolver,
+                                &PackOptions {
+                                    to_keys_per_recipient_limit: state
+                                        .config
+                                        .limits
+                                        .to_keys_per_recipient,
+                                },
+                            )
+                            .await?;
+
+                        match _store_message(state, session, response, &packed, recipient).await {
+                            Ok(msg_id) => {
+                                debug!(
+                                    "message id({}) stored successfully recipient({})",
+                                    msg_id, recipient
+                                );
+                                stored_messages
+                                    .messages
+                                    .push((recipient.to_string(), msg_id));
+                            }
+                            Err(e) => {
+                                warn!("error storing message recipient({}): {:?}", recipient, e);
+                                stored_messages
+                                    .errors
+                                    .push((recipient.to_string(), e.to_string()));
+                            }
+                        }
+                    }
+                }
+                WrapperType::Envelope(to_did, message) => {
+                    // Message is already packed, likely a direct delivery from a client
+                    match _store_message(state, session, response, message, to_did).await {
                         Ok(msg_id) => {
                             debug!(
                                 "message id({}) stored successfully recipient({})",
-                                msg_id, recipient
+                                msg_id, to_did
                             );
-                            stored_messages
-                                .messages
-                                .push((recipient.to_string(), msg_id));
+                            stored_messages.messages.push((to_did.to_string(), msg_id));
                         }
                         Err(e) => {
-                            warn!("error storing message recipient({}): {:?}", recipient, e);
+                            warn!("error storing message recipient({}): {:?}", to_did, e);
                             stored_messages
                                 .errors
-                                .push((recipient.to_string(), e.to_string()));
+                                .push((to_did.to_string(), e.to_string()));
                         }
                     }
                 }
             }
+
             Ok(InboundMessageResponse::Stored(stored_messages))
-        } else if let Some(message) = &response.message {
+        } else if let WrapperType::Message(message) = &response.data {
             let (packed, meta) = message
                 .pack(
                     &session.did,

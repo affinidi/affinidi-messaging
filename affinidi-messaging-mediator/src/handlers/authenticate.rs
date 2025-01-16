@@ -8,14 +8,19 @@
 
 use super::message_inbound::InboundMessage;
 use crate::{
+    common::acl_checks::ACLCheck,
     common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::{Session as DBSession, SessionClaims, SessionState},
+    database::session::{Session, SessionClaims, SessionState},
     SharedData,
 };
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
 use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
+    protocols::mediator::{
+        accounts::AccountType,
+        acls::{ACLModeType, MediatorACLSet},
+    },
 };
 use axum::{extract::State, Json};
 use http::StatusCode;
@@ -44,23 +49,51 @@ pub struct ChallengeBody {
 /// This is the first step in the authentication process
 /// Creates a new sessionID and a random challenge string to the client
 pub async fn authentication_challenge(
-    // ConnectInfo(connect_info): ConnectInfo<SocketAddr>,
     State(state): State<SharedData>,
     Json(body): Json<ChallengeBody>,
 ) -> Result<(StatusCode, Json<SuccessResponse<AuthenticationChallenge>>), AppError> {
-    let session = DBSession {
+    let session = Session {
         session_id: create_random_string(12),
         challenge: create_random_string(32),
         state: SessionState::ChallengeSent,
         did: body.did.clone(),
+        did_hash: digest(body.did),
+        authenticated: false,
+        acls: MediatorACLSet::default(), // this will be updated later
+        account_type: AccountType::Standard,
     };
     let _span = span!(
         Level::DEBUG,
         "authentication_challenge",
         session_id = session.session_id,
-        did_hash = digest(&session.did)
+        did_hash = session.did_hash.clone()
     );
     async move {
+        // ACL Checks to be done
+        // 1. Do we know this DID?
+        //   1.1 If yes, then is it blocked?
+        // 2. If not known, then does the mediator acl_mode allow for new accounts?
+        // 3. If yes, then add the account and continue
+
+        if let Some(acls) = state.database.get_did_acl(&session.did_hash).await? {
+            if acls.get_blocked() {
+                info!("DID({}) is blocked from connecting", session.did);
+                return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+            }
+        } else {
+            // Unknown DID
+            if state.config.security.mediator_acl_mode == ACLModeType::ExplicitAllow {
+                info!("Unknown DID({}) is blocked from connecting", session.did);
+                return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+            } else {
+                // Register the DID as a local DID
+                state
+                    .database
+                    .account_add(&session.did_hash, &state.config.security.global_acl_default)
+                    .await?;
+            }
+        }
+
         state.database.create_session(&session).await?;
 
         debug!(
@@ -101,13 +134,7 @@ pub async fn authentication_response(
     async move {
         let s = serde_json::to_string(&body).unwrap();
 
-        let mut envelope = match MetaEnvelope::new(
-            &s,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-        )
-        .await
-        {
+        let mut envelope = match MetaEnvelope::new(&s, &state.did_resolver).await {
             Ok(envelope) => envelope,
             Err(e) => {
                 return Err(MediatorError::ParseError(
@@ -117,6 +144,20 @@ pub async fn authentication_response(
                 )
                 .into());
             }
+        };
+
+        let from_did = if let Some(from_did) = &envelope.from_did {
+            // Check if DID is allowed to connect
+            if !MediatorACLSet::authentication_check(&state, &digest(from_did), None).await? {
+                info!("DID({}) is blocked from connecting", from_did);
+                return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
+            }
+            from_did.to_string()
+        } else {
+            return Err(MediatorError::AuthenticationError(
+                "Could not determine from_did".to_string(),
+            )
+            .into());
         };
 
         // Unpack the message
@@ -179,7 +220,10 @@ pub async fn authentication_response(
             })?;
 
         // Retrieve the session info from the database
-        let mut session = state.database.get_session(&challenge.session_id).await?;
+        let mut session = state
+            .database
+            .get_session(&challenge.session_id, &from_did)
+            .await?;
 
         // check that the DID matches from what was given for the initial challenge request to what was used for the message response
         if let Some(from_did) = msg.from {
@@ -258,6 +302,9 @@ pub async fn authentication_response(
             .update_session_authenticated(&old_sid, &session.session_id, &digest(&session.did))
             .await?;
 
+        // Register the DID and initial setup
+        _register_did_and_setup(&state, &session.did_hash).await?;
+
         info!(
             "{}: Authentication successful for DID({})",
             session.session_id, session.did
@@ -279,6 +326,24 @@ pub async fn authentication_response(
     .await
 }
 
+/// Check if the DID is already registered and set up (as needed)
+/// A DID is only registered if local accounts are enabled via ACL
+async fn _register_did_and_setup(state: &SharedData, did_hash: &str) -> Result<(), MediatorError> {
+    // Do we already know about this DID?
+    if state.database.account_exists(did_hash).await? {
+        debug!("DID({}) already registered", did_hash);
+        return Ok(());
+    } else if state.config.security.global_acl_default.get_local() {
+        // Register the DID as a local DID
+        state
+            .database
+            .account_add(did_hash, &state.config.security.global_acl_default)
+            .await?;
+    }
+
+    Ok(())
+}
+
 /// POST /authenticate/refresh
 /// Refresh existing JWT tokens.
 /// Initiated by the client when they notice JWT is expiring
@@ -292,13 +357,7 @@ pub async fn authentication_refresh(
     async move {
         let s = serde_json::to_string(&body).unwrap();
 
-        let mut envelope = match MetaEnvelope::new(
-            &s,
-            &state.did_resolver,
-            &state.config.security.mediator_secrets,
-        )
-        .await
-        {
+        let mut envelope = match MetaEnvelope::new(&s, &state.did_resolver).await {
             Ok(envelope) => envelope,
             Err(e) => {
                 return Err(MediatorError::ParseError(
@@ -402,10 +461,17 @@ pub async fn authentication_refresh(
         };
 
         // Refresh token is valid - check against database and ensure it still exists
-        let session_check = state
-            .database
-            .get_session(&results.claims.session_id)
-            .await?;
+        let session_check = if let Some(from_did) = &envelope.from_did {
+            state
+                .database
+                .get_session(&results.claims.session_id, from_did)
+                .await?
+        } else {
+            return Err(MediatorError::AuthenticationError(
+                "Could not determine from_did".to_string(),
+            )
+            .into());
+        };
 
         // Is the session in an authenticated state? If not, then we can't refresh
         if session_check.state != SessionState::Authenticated {
@@ -414,6 +480,12 @@ pub async fn authentication_refresh(
                 "Session is not in an authenticated state".into(),
             )
             .into());
+        }
+
+        // Does the Global ACL still allow them to connect?
+        if session_check.acls.get_blocked() {
+            info!("DID({}) is blocked from connecting", session_check.did);
+            return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
         }
 
         // Generate a new access token

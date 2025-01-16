@@ -1,15 +1,15 @@
 use self::protocols::ping;
-use crate::{
-    common::errors::{MediatorError, Session},
-    SharedData,
-};
+use crate::database::session::Session;
+use crate::{common::errors::MediatorError, SharedData};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
     secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
 use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
-use protocols::{mediator_administration, mediator_local_acls, routing};
-use protocols::{mediator_global_acls, message_pickup};
+use protocols::{
+    mediator::{accounts, acls, administration},
+    message_pickup, routing,
+};
 use std::time::SystemTime;
 
 pub mod error_response;
@@ -31,14 +31,12 @@ impl MessageType {
     ) -> Result<ProcessMessageResponse, MediatorError> {
         match self.0 {
             SDKMessageType::MediatorAdministration => {
-                mediator_administration::process(message, state, session).await
+                administration::process(message, state, session).await
             }
-            SDKMessageType::MediatorGlobalACLManagement => {
-                mediator_global_acls::process(message, state, session).await
+            SDKMessageType::MediatorAccountManagement => {
+                accounts::process(message, state, session).await
             }
-            SDKMessageType::MediatorLocalACLManagement => {
-                mediator_local_acls::process(message, state, session).await
-            }
+            SDKMessageType::MediatorACLManagement => acls::process(message, state, session).await,
             SDKMessageType::TrustPing => ping::process(message, session),
             SDKMessageType::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await
@@ -73,12 +71,22 @@ impl MessageType {
     }
 }
 
+/// Type of message wrapper we are dealing with
+/// used when storing messages in the database
+#[derive(Debug, Default)]
+pub enum WrapperType {
+    /// to_did, message
+    Envelope(String, String),
+    Message(Message),
+    #[default]
+    None,
+}
 #[derive(Debug, Default)]
 pub(crate) struct ProcessMessageResponse {
     pub store_message: bool,
     pub force_live_delivery: bool, // Will force a live delivery attempt.
     pub forward_message: bool, // Set to true if the message was forwarded. Means we don't need to store it.
-    pub message: Option<Message>,
+    pub data: WrapperType,
 }
 
 #[derive(Debug)]
