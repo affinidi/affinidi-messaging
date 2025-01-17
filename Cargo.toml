@@ -48,7 +48,6 @@ color-eyre = "0.6"
 console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
-deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
 did-peer = { version = "0.2.4" }
 futures-util = "0.3"
@@ -69,10 +68,13 @@ rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
 ] }
+# Redis can only be updated when deadpool-redis supports the new version
 redis = { version = "0.27", features = [
     "tokio-rustls-comp",
     "tls-rustls-insecure",
 ] }
+deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
+
 regex = "1.11"
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 ring = { version = "0.17", features = ["std"] }
