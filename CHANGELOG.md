@@ -2,6 +2,20 @@
 
 ## Changelog history
 
+## 18th January 2025 (0.9.2)
+
+### Mediator (0.9.2)
+
+* WebSocket connections will now close when the auth session token expires.
+* Logging can be configured to use JSON or not (log_json)
+* JWT_EXPIRY_TOKEN has a minimum of 10 seconds enforced to stop an issue where clients can get stuck in an
+endless refresh loop
+
+### SDK (0.9.2)
+
+* authentication logic will trigger a token refresh if <5 seconds remain on the expiry token (was 10 seconds)
+* Fix: refresh retry logic where there was a lock related bug on authentication refresh tokens
+
 ## 17th January 2025 (0.8.10)
 
 * Fix Axum Path routes for new version. Internal only.
