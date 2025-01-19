@@ -142,7 +142,7 @@ where
         let did_hash = digest(&did);
 
         // Everything has passed token wise - expensive database operations happen here
-        let saved_session = state
+        let mut saved_session = state
             .database
             .get_session(&session_id, &did)
             .await
@@ -162,6 +162,9 @@ where
             info!("DID({}) is blocked from connecting", did);
             return Err(AuthError::Blocked);
         }
+
+        // Update the expires at time
+        saved_session.expires_at = token_data.claims.exp;
 
         info!(
             "{}: Protected connection accepted from did_hash({})",

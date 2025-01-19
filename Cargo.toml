@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = '0.9.1'
+version = '0.9.2'
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
@@ -22,9 +22,9 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-affinidi-messaging-sdk = { version = "0.9.1", path = "./affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.9.1", path = "./affinidi-messaging-didcomm" }
-affinidi-messaging-mediator = { version = "0.9.1", path = "./affinidi-messaging-mediator" }
+affinidi-messaging-sdk = { version = "0.9.2", path = "./affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.9.2", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.9.2", path = "./affinidi-messaging-mediator" }
 affinidi-did-resolver-cache-sdk = { version = "0.2.4", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
@@ -48,7 +48,6 @@ color-eyre = "0.6"
 console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
-deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 dialoguer = "0.11"
 did-peer = { version = "0.2.4" }
 futures-util = "0.3"
@@ -69,10 +68,12 @@ rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
 ] }
+# Redis can only be updated when deadpool-redis supports the new version
 redis = { version = "0.27", features = [
     "tokio-rustls-comp",
     "tls-rustls-insecure",
 ] }
+deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
 regex = "1.11"
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 ring = { version = "0.17", features = ["std"] }
@@ -110,4 +111,4 @@ tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
 uuid = { version = "1.12", features = ["v4", "fast-rng"] }
 varint = "0.9"
-semver = "1.0.24"
+semver = "1.0"

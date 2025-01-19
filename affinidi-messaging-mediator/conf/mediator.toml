@@ -1,6 +1,15 @@
+### Mediator Configuration
+### You can override these settings by setting environment variables
+### Example: export MEDIATOR_DID=did://did:web:localhost%3A7037:mediator:v1:.well-known
+
 ### log_level: trace debug info warn error
 ### default: info
+### NOTE: RUST_LOG environment variable can override this setting
 log_level = "info"
+
+### log_json: If true, log output will be in JSON format
+### default: true
+log_json = "${LOG_JSON:false}"
 
 ### mediator_did: DID of the mediator
 ### REQUIRED: DID of the mediator
@@ -29,7 +38,7 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
 ###       This causes more use cases where the secrets of the mediator itself can be exposed in administration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
-admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkhTiMG5qhSDGj7mnsBh1ENgpV11nmXSYZyiE8EVk3ZWM5.EzQ3shXy6V6WRQgWBMLaPRqbzvj6Bn4u2mxfFap6oD1EQWKuQh}"
+admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MksaHPuhNEewaJTywkDdBWnHWe2xpW6hva2KSkuvKBKys3.EzQ3shX5rNyeLJXqiBoYq9UFGPpi8sSoBqB5VgDS1LA4CyFAZs}"
 
 ### did_web_self_hosted: <DID Document Path> Path to the self-hosted DID Document
 ### Default: None
@@ -137,6 +146,8 @@ jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2Vw
 
 ### jwt_access_expiry: Expiry time in seconds for JWT access tokens
 ### Default: 900 (15 Minutes)
+### NOTE: JWT_ACCESS_EXPIRY has a minimum value of 10 seconds, if you try to set below this it will override it to 10
+###       This is due to SDK's needing some time to refresh the token and handle a transaction before triggering a refresh
 jwt_access_expiry = "${JWT_ACCESS_EXPIRY:900}"
 
 ### jwt_refresh_expiry: Expiry time in seconds for JWT refresh tokens

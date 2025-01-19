@@ -11,17 +11,21 @@ use crate::{errors::ATMError, profiles::Profile, protocols::Protocols, ATM};
 use affinidi_messaging_didcomm::{Message as DidcommMessage, UnpackMetadata};
 use futures_util::SinkExt;
 use http::header::AUTHORIZATION;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     select,
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
+    time::sleep,
 };
 use tokio_stream::StreamExt;
 use tokio_tungstenite::{
     connect_async_tls_with_config,
-    tungstenite::{client::IntoClientRequest, protocol::frame::Utf8Bytes, Message},
+    tungstenite::{
+        client::IntoClientRequest, error::ProtocolError, protocol::frame::Utf8Bytes,
+        Error as ws_error, Message,
+    },
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, span, Instrument};
@@ -93,56 +97,20 @@ impl WsConnection {
             };
             let protocols = Protocols::new();
 
-            debug!("Starting websocket connection");
-
-            self.state = State::Connecting;
-            let mut web_socket = match self._create_socket().await {
+            let mut web_socket = match self._handle_connection(&atm, &protocols, true).await {
                 Ok(ws) => ws,
                 Err(e) => {
                     error!("Error creating websocket connection: {:?}", e);
                     return;
                 }
             };
-            // TODO: Need to implement a recovery here
-            debug!("Websocket connected");
-            {
-                // Update the mediator state
-                if let Some(mediator) = &*self.profile.inner.mediator {
-                    mediator.ws_connected.store(true, std::sync::atomic::Ordering::Relaxed);
-                    *mediator.ws_channel_tx.lock().await = Some(self.to_connection.clone());
-                }
-            }
-            debug!("Mediator state updated to connected");
-            self.state = State::Connected;
-
-            // Enable live_streaming on this socket
-            let status_id = match protocols
-                .message_pickup
-                .toggle_live_delivery(&atm, &self.profile, true)
-                .await
-            {
-                Ok(status_id) => {
-                    debug!("Live streaming enabled");
-                    status_id
-                }
-                Err(e) => {
-                    error!("Error enabling live streaming: {:?}", e);
-                    return;
-                }
-            };
-
-            let a = self
-                .to_handler
-                .send(WsConnectionCommands::Connected(self.profile.clone(), status_id))
-                .await;
-
-            debug!("Signaled handler that connection is ready: {:?}", a);
 
             loop {
                 select! {
                     value = web_socket.next() => {
                                     if let Some(msg) = value {
-                                        if let Ok(payload) = msg {
+                                        match msg {
+                                            Ok(payload) => {
                                             if payload.is_text() {
                                                 if let Ok(msg) = payload.to_text() {
                                                     debug!("Received text message ({})", msg);
@@ -157,15 +125,40 @@ impl WsConnection {
                                             } else {
                                                 error!("Received non-text message");
                                             }
+                                        } else if payload.is_close() {
+                                            error!("Websocket closed");
+                                            web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                                Ok(ws) => ws,
+                                                Err(e) => {
+                                                    error!("Error creating websocket connection: {:?}", e);
+                                                    return;
+                                                }
+                                            };
                                         } else {
-                                            error!("Error getting payload from message");
+                                            error!("Error getting payload from message: {:?}", payload);
                                             continue;
                                         }
-                                    } else {
-
-                                        error!("Error getting message");
+                                    }
+                                    Err(err) => match err {
+                                        ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
+                                        error!("Websocket reset without closing handshake");
+                                        web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                            Ok(ws) => ws,
+                                            Err(e) => {
+                                                error!("Error creating websocket connection: {:?}", e);
+                                                return;
+                                            }
+                                        };
+                                    }
+                                    _ => {
+                                        error!("Unknown WebSocket Error: {:?}", err);
                                         break;
                                     }
+                                }
+                                }
+                                } else {
+                                    error!("websocket error : {:?}", value);
+                                    break;
                                 }
                     }
                     value = self.from_handler.recv() => {
@@ -186,8 +179,13 @@ impl WsConnection {
                                     debug!("Stopping websocket connection");
                                     break;
                                 }
-                                _ => {}
+                                _ => {
+                                    println!("Unhandled command");
+                                }
                             }
+                        } else {
+                            error!("Error getting command {:#?}", value);
+                            break;
                         }
                     }
                 }
@@ -201,7 +199,79 @@ impl WsConnection {
         Ok(())
     }
 
-    /// Responsible for creating a websocket connection to the mediator
+    // Wrapper that handles all of the logic of setting up a connection to the mediator
+    async fn _handle_connection(
+        &mut self,
+        atm: &ATM,
+        protocols: &Protocols,
+        update_sdk: bool,
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
+        debug!("Starting websocket connection");
+
+        self.state = State::Connecting;
+        let mut delay: u8 = 1;
+        let web_socket = loop {
+            match self._create_socket().await {
+                Ok(ws) => break ws,
+                Err(e) => {
+                    error!("Error creating websocket connection: {:?}", e);
+                    sleep(Duration::from_secs(delay as u64)).await;
+                    if delay < 60 {
+                        delay *= 2;
+                    }
+                    if delay > 60 {
+                        delay = 60;
+                    }
+                }
+            }
+        };
+
+        debug!("Websocket connected");
+        {
+            // Update the mediator state
+            if let Some(mediator) = &*self.profile.inner.mediator {
+                mediator
+                    .ws_connected
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
+                *mediator.ws_channel_tx.lock().await = Some(self.to_connection.clone());
+            }
+        }
+        debug!("Mediator state updated to connected");
+        self.state = State::Connected;
+
+        // Enable live_streaming on this socket
+        let status_id = match protocols
+            .message_pickup
+            .toggle_live_delivery(atm, &self.profile, true)
+            .await
+        {
+            Ok(status_id) => {
+                debug!("Live streaming enabled");
+                status_id
+            }
+            Err(e) => {
+                error!("Error enabling live streaming: {:?}", e);
+                return Err(ATMError::TransportError(
+                    "Error enabling live streaming".to_string(),
+                ));
+            }
+        };
+
+        if update_sdk {
+            let a = self
+                .to_handler
+                .send(WsConnectionCommands::Connected(
+                    self.profile.clone(),
+                    status_id,
+                ))
+                .await;
+            debug!("Signaled handler that connection is ready: {:?}", a);
+        }
+
+        Ok(web_socket)
+    }
+
+    // Responsible for creating a websocket connection to the mediator
     async fn _create_socket(
         &mut self,
     ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {

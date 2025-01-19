@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
     common::errors::{AppError, MediatorError},
@@ -80,6 +80,12 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         let _ = state.database.global_stats_increment_websocket_open().await;
         info!("Websocket connection established");
 
+        // Set a timeout for the websocket connection for when the JWT Auth token expires
+        let auth_timeout = tokio::time::sleep(Duration::from_secs(session.expires_at -  SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()));
+        tokio::pin!(auth_timeout);
+        debug!("WebSocket will timeout in {:?}", auth_timeout);
+        
+
         // Flag to prevent double deregistration
         // This can occur because in some situations the streaming-task will send a close message
         // due to duplicate channels. If we were to deregister on close in this scenario, we would
@@ -87,6 +93,10 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         let mut already_deregistered_flag = false;
         loop {
             select! {
+                _ = &mut auth_timeout => {
+                    debug!("Auth Timeout reached");
+                    break;
+                }
                 value = socket.recv() => {
                     if let Some(msg) = value {
                         debug!("ws: Received message: {:?}", msg);
@@ -158,6 +168,7 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         }
 
         // We're done, close the connection
+        let _ = socket.send(Message::Close(None)).await;
         let _ = state
             .database
             .global_stats_increment_websocket_close()

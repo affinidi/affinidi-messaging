@@ -61,6 +61,7 @@ pub struct Session {
     pub authenticated: bool,
     pub acls: MediatorACLSet,
     pub account_type: AccountType,
+    pub expires_at: u64,
 }
 
 impl TryFrom<(&str, HashMap<String, String>)> for Session {

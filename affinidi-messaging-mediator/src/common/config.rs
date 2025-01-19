@@ -25,8 +25,8 @@ use std::{
     path::Path,
 };
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{error, event, info, Level};
-use tracing_subscriber::{filter::LevelFilter, reload::Handle, EnvFilter, Registry};
+use tracing::info;
+use tracing_subscriber::{filter::LevelFilter, EnvFilter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -204,8 +204,7 @@ impl SecurityConfigRaw {
         // Convert the default ACL Set into a GlobalACLSet
         config.global_acl_default = MediatorACLSet::from_string_ruleset(&self.global_acl_default)
             .map_err(|err| {
-            event!(
-                Level::ERROR,
+            eprintln!(
                 "Couldn't parse global_acl_default config parameter. Reason: {}",
                 err
             );
@@ -232,7 +231,7 @@ impl SecurityConfigRaw {
         config.jwt_encoding_key = EncodingKey::from_ed_der(&jwt_secret);
 
         let pair = Ed25519KeyPair::from_pkcs8(&jwt_secret).map_err(|err| {
-            event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+            eprintln!("Could not create JWT key pair. {}", err);
             MediatorError::ConfigError(
                 "NA".into(),
                 format!("Could not create JWT key pair. {}", err),
@@ -410,6 +409,7 @@ impl DIDResolverConfig {
 #[derive(Debug, Serialize, Deserialize)]
 struct ConfigRaw {
     pub log_level: String,
+    pub log_json: String,
     pub mediator_did: String,
     pub server: ServerConfig,
     pub database: DatabaseConfigRaw,
@@ -424,6 +424,8 @@ struct ConfigRaw {
 pub struct Config {
     #[serde(skip_serializing)]
     pub log_level: LevelFilter,
+    #[serde(skip_serializing)]
+    pub log_json: bool,
     pub listen_address: String,
     pub mediator_did: String,
     pub mediator_did_hash: String,
@@ -444,6 +446,7 @@ impl fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
             .field("log_level", &self.log_level)
+            .field("log_json", &self.log_json)
             .field("listen_address", &self.listen_address)
             .field("mediator_did", &self.mediator_did)
             .field("mediator_did_hash", &self.mediator_did_hash)
@@ -472,6 +475,7 @@ impl Default for Config {
 
         Config {
             log_level: LevelFilter::INFO,
+            log_json: true,
             listen_address: "".into(),
             mediator_did: "".into(),
             mediator_did_hash: "".into(),
@@ -513,6 +517,7 @@ impl TryFrom<ConfigRaw> for Config {
                 "error" => LevelFilter::ERROR,
                 _ => LevelFilter::INFO,
             },
+            log_json: raw.log_json.parse().unwrap_or(true),
             listen_address: raw.server.listen_address,
             mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
             admin_did: read_did_config(&raw.server.admin_did, &aws_config).await?,
@@ -532,11 +537,7 @@ impl TryFrom<ConfigRaw> for Config {
         if let Some(path) = raw.server.did_web_self_hosted {
             let content = read_document(&path, &aws_config).await?;
             let doc: Document = serde_json::from_str(&content).map_err(|err| {
-                event!(
-                    Level::ERROR,
-                    "Could not parse DID Document. Reason: {}",
-                    err
-                );
+                eprintln!("Could not parse DID Document. Reason: {}", err);
                 MediatorError::ConfigError(
                     "NA".into(),
                     format!("Could not parse DID Document. Reason: {}", err),
@@ -547,7 +548,7 @@ impl TryFrom<ConfigRaw> for Config {
 
         // Ensure that the security JWT expiry times are valid
         if config.security.jwt_access_expiry >= config.security.jwt_refresh_expiry {
-            error!(
+            eprintln!(
                 "JWT Access expiry ({}) must be less than JWT Refresh expiry ({})",
                 config.security.jwt_access_expiry, config.security.jwt_refresh_expiry
             );
@@ -578,7 +579,7 @@ async fn load_secrets(
             "Invalid `mediator_secrets` format".into(),
         ));
     }
-    info!("Loading secrets method({}) path({})", parts[0], parts[1]);
+    println!("Loading secrets method({}) path({})", parts[0], parts[1]);
     let content: String = match parts[0] {
         "file" => read_file_lines(parts[1])?.concat(),
         "aws_secrets" => {
@@ -590,14 +591,14 @@ async fn load_secrets(
                 .send()
                 .await
                 .map_err(|e| {
-                    event!(Level::ERROR, "Could not get secret value. {}", e);
+                    eprintln!("Could not get secret value. {}", e);
                     MediatorError::ConfigError(
                         "NA".into(),
                         format!("Could not get secret value. {}", e),
                     )
                 })?;
             response.secret_string.ok_or_else(|| {
-                event!(Level::ERROR, "No secret string found in response");
+                eprintln!("No secret string found in response");
                 MediatorError::ConfigError("NA".into(), "No secret string found in response".into())
             })?
         }
@@ -611,11 +612,7 @@ async fn load_secrets(
 
     Ok(AffinidiSecrets::new(
         serde_json::from_str(&content).map_err(|err| {
-            event!(
-                Level::ERROR,
-                "Could not parse `mediator_secrets` JSON content. {}",
-                err
-            );
+            eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
             MediatorError::ConfigError(
                 "NA".into(),
                 format!("Could not parse `mediator_secrets` JSON content. {}", err),
@@ -629,19 +626,14 @@ async fn load_secrets(
 /// and conversion to Config struct
 fn read_config_file(file_name: &str) -> Result<ConfigRaw, MediatorError> {
     // Read configuration file parameters
-    event!(Level::INFO, "Config file({})", file_name);
+    println!("Config file({})", file_name);
     let raw_config = read_file_lines(file_name)?;
 
-    event!(Level::DEBUG, "raw_config = {:?}", raw_config);
     let config_with_vars = expand_env_vars(&raw_config)?;
     match toml::from_str(&config_with_vars.join("\n")) {
         Ok(config) => Ok(config),
         Err(err) => {
-            event!(
-                Level::ERROR,
-                "Could not parse configuration settings. {:?}",
-                err
-            );
+            eprintln!("Could not parse configuration settings. {:?}", err);
             Err(MediatorError::ConfigError(
                 "NA".into(),
                 format!("Could not parse configuration settings. Reason: {:?}", err),
@@ -662,8 +654,7 @@ where
     P: AsRef<Path>,
 {
     let file = File::open(file_name.as_ref()).map_err(|err| {
-        event!(
-            Level::ERROR,
+        eprintln!(
             "Could not open file({}). {}",
             file_name.as_ref().display(),
             err
@@ -757,7 +748,7 @@ async fn config_jwt_secret(
     let content: String = match parts[0] {
         "string" => parts[1].to_string(),
         "aws_secrets" => {
-            info!("Loading JWT secret from AWS Secrets Manager");
+            println!("Loading JWT secret from AWS Secrets Manager");
             let asm = aws_sdk_secretsmanager::Client::new(aws_config);
 
             let response = asm
@@ -766,14 +757,14 @@ async fn config_jwt_secret(
                 .send()
                 .await
                 .map_err(|e| {
-                    event!(Level::ERROR, "Could not get secret value. {}", e);
+                    eprintln!("Could not get secret value. {}", e);
                     MediatorError::ConfigError(
                         "NA".into(),
                         format!("Could not get secret value. {}", e),
                     )
                 })?;
             response.secret_string.ok_or_else(|| {
-                event!(Level::ERROR, "No secret string found in response");
+                eprintln!("No secret string found in response");
                 MediatorError::ConfigError("NA".into(), "No secret string found in response".into())
             })?
         }
@@ -785,7 +776,7 @@ async fn config_jwt_secret(
     };
 
     BASE64_URL_SAFE_NO_PAD.decode(content).map_err(|err| {
-        event!(Level::ERROR, "Could not create JWT key pair. {}", err);
+        eprintln!("Could not create JWT key pair. {}", err);
         MediatorError::ConfigError(
             "NA".into(),
             format!("Could not create JWT key pair. {}", err),
@@ -832,19 +823,14 @@ async fn aws_parameter_store(
         .send()
         .await
         .map_err(|e| {
-            event!(
-                Level::ERROR,
-                "Could not get ({:?}) parameter. {}",
-                parameter_name,
-                e
-            );
+            eprintln!("Could not get ({:?}) parameter. {}", parameter_name, e);
             MediatorError::ConfigError(
                 "NA".into(),
                 format!("Could not get ({:?}) parameter. {}", parameter_name, e),
             )
         })?;
     let parameter = response.parameter.ok_or_else(|| {
-        event!(Level::ERROR, "No parameter string found in response");
+        eprintln!("No parameter string found in response");
         MediatorError::ConfigError("NA".into(), "No parameter string found in response".into())
     })?;
 
@@ -863,8 +849,7 @@ async fn aws_parameter_store(
     }
 
     parameter.value.ok_or_else(|| {
-        event!(
-            Level::ERROR,
+        eprintln!(
             "Parameter ({:?}) found, but no parameter value found in response",
             parameter.name
         );
@@ -905,36 +890,50 @@ async fn read_document(
     Ok(content)
 }
 
-pub async fn init(
-    config_file: &str,
-    reload_handle: Option<Handle<EnvFilter, Registry>>,
-) -> Result<Config, MediatorError> {
+pub async fn init(config_file: &str, with_ansi: bool) -> Result<Config, MediatorError> {
     // Read configuration file parameters
     let config = read_config_file(config_file)?;
 
-    // Setup logging if RUST_LOG env not set
-    if env::var("RUST_LOG").is_err() && reload_handle.is_some() {
-        let level: EnvFilter = EnvFilter::new(config.log_level.as_str());
-        reload_handle
-            .unwrap()
-            .modify(|filter| *filter = level)
-            .map_err(|e| MediatorError::InternalError("NA".into(), e.to_string()))?;
-        event!(Level::INFO, "Log level set to ({})", config.log_level);
+    // setup logging/tracing framework
+    let filter = if env::var("RUST_LOG").is_ok() {
+        EnvFilter::from_default_env()
     } else {
-        event!(
-            Level::INFO,
-            "Log level set to ({}) :: RUST_LOG environment",
-            env::var("RUST_LOG").unwrap_or_default()
-        );
+        EnvFilter::new(config.log_level.as_str())
+    };
+
+    let subscriber = tracing_subscriber::fmt()
+        // Use a more compact, abbreviated log format
+        .compact()
+        // Display source code file paths
+        .with_file(false)
+        // Display source code line numbers
+        .with_line_number(false)
+        // Display the thread ID an event was recorded on
+        .with_thread_ids(false)
+        // Don't display the event's target (module path)
+        .with_target(true)
+        .with_ansi(with_ansi)
+        .with_env_filter(filter);
+
+    println!("Switching to tracing subscriber for all logging...");
+    if config.log_json.parse().unwrap_or(true) {
+        let subscriber = subscriber
+            .json()
+            // Build the subscriber
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).map_err(|e| {
+            MediatorError::ConfigError("NA".into(), format!("Couldn't setup logging: {}", e))
+        })?;
+    } else {
+        let subscriber = subscriber.finish();
+        tracing::subscriber::set_global_default(subscriber).map_err(|e| {
+            MediatorError::ConfigError("NA".into(), format!("Couldn't setup logging: {}", e))
+        })?;
     }
 
     match <Config as async_convert::TryFrom<ConfigRaw>>::try_from(config).await {
         Ok(config) => {
-            event!(
-                Level::INFO,
-                "Configuration settings parsed successfully.\n{:#?}",
-                config
-            );
+            info!("Configuration settings parsed successfully.\n{:#?}", config);
             Ok(config)
         }
         Err(err) => Err(err),

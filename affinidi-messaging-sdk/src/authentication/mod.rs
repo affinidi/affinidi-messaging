@@ -64,18 +64,23 @@ impl Profile {
     ) -> Result<AuthorizationResponse, ATMError> {
         if self.inner.authenticated.load(Ordering::Relaxed) {
             // Already authenticated
+            debug!("Already authenticated");
 
             // Check if we need to refresh the tokens
             match self._refresh_authentication(shared_state).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    debug!("Tokens refreshed");
+                }
                 Err(err) => {
                     // Couldn't refresh the tokens
-                    self.inner.authenticated.store(true, Ordering::Relaxed);
+                    debug!("Couldn't refresh the tokens: {:?}", err);
+                    self.inner.authenticated.store(false, Ordering::Relaxed);
                     return Err(err);
                 }
             };
 
             if let Some(tokens) = &*self.inner.authorization.lock().await {
+                debug!("Returning existing tokens");
                 return Ok(tokens.clone());
             } else {
                 self.inner.authenticated.store(false, Ordering::Relaxed);
@@ -245,61 +250,64 @@ impl Profile {
         &self,
         shared_state: &Arc<SharedState>,
     ) -> Result<(), ATMError> {
-        if let Some(tokens) = &*self.inner.authorization.lock().await {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            // Check if the access token has or is going to expire in next 10 seconds
-            if tokens.access_expires_at - 10 <= now {
-                // Need to refresh the token
-                if tokens.refresh_expires_at <= now {
-                    // Refresh token has also expired
-                    Err(ATMError::AuthenticationError(
-                        "Refresh token has expired".to_owned(),
-                    ))
-                } else {
-                    // Refresh the token
-
-                    let Some(mediator_endpoint) = self.get_mediator_rest_endpoint() else {
-                        return Err(ATMError::AuthenticationError(
-                            "there is no mediation REST endpoint".to_string(),
-                        ));
-                    };
-
-                    let refresh_msg = self
-                        ._create_refresh_request(&tokens.refresh_token, shared_state)
-                        .await?;
-                    let new_tokens = _http_post::<AuthRefreshResponse>(
-                        &shared_state.client,
-                        &[&mediator_endpoint, "/authenticate/refresh"].concat(),
-                        &refresh_msg,
-                    )
-                    .await?;
-
-                    if let Some(new_tokens) = new_tokens.data {
-                        *self.inner.authorization.lock().await = Some(AuthorizationResponse {
-                            access_token: new_tokens.access_token,
-                            access_expires_at: new_tokens.access_expires_at,
-                            refresh_token: tokens.refresh_token.clone(),
-                            refresh_expires_at: tokens.refresh_expires_at,
-                        });
-                        debug!("JWT successfully refreshed");
-                        Ok(())
-                    } else {
-                        Err(ATMError::AuthenticationError(
-                            "No tokens received from ATM".to_owned(),
-                        ))
-                    }
-                }
+        let tokens = {
+            let Some(tokens) = &*self.inner.authorization.lock().await else {
+                return Err(ATMError::AuthenticationError(
+                    "No tokens found to refresh".to_owned(),
+                ));
+            };
+            tokens.clone()
+        };
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        // Check if the access token has or is going to expire in next 5 seconds
+        if tokens.access_expires_at - 5 <= now {
+            // Need to refresh the token
+            if tokens.refresh_expires_at <= now {
+                // Refresh token has also expired
+                Err(ATMError::AuthenticationError(
+                    "Refresh token has expired".to_owned(),
+                ))
             } else {
-                // No need to refresh the token
-                Ok(())
+                // Refresh the token
+
+                let Some(mediator_endpoint) = self.get_mediator_rest_endpoint() else {
+                    return Err(ATMError::AuthenticationError(
+                        "there is no mediation REST endpoint".to_string(),
+                    ));
+                };
+
+                let refresh_msg = self
+                    ._create_refresh_request(&tokens.refresh_token, shared_state)
+                    .await?;
+                let new_tokens = _http_post::<AuthRefreshResponse>(
+                    &shared_state.client,
+                    &[&mediator_endpoint, "/authenticate/refresh"].concat(),
+                    &refresh_msg,
+                )
+                .await?;
+
+                if let Some(new_tokens) = new_tokens.data {
+                    debug!("Locking authorization");
+                    *self.inner.authorization.lock().await = Some(AuthorizationResponse {
+                        access_token: new_tokens.access_token,
+                        access_expires_at: new_tokens.access_expires_at,
+                        refresh_token: tokens.refresh_token.clone(),
+                        refresh_expires_at: tokens.refresh_expires_at,
+                    });
+                    debug!("JWT successfully refreshed");
+                    Ok(())
+                } else {
+                    Err(ATMError::AuthenticationError(
+                        "No tokens received from ATM".to_owned(),
+                    ))
+                }
             }
         } else {
-            Err(ATMError::AuthenticationError(
-                "No tokens found to refresh".to_owned(),
-            ))
+            // No need to refresh the token
+            Ok(())
         }
     }
 }

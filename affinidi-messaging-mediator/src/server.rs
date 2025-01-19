@@ -13,61 +13,42 @@ use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::{event, Level};
-use tracing_subscriber::{layer::SubscriberExt, reload, util::SubscriberInitExt, EnvFilter};
 
 pub async fn start() {
-    // setup logging/tracing framework
-    let filter = EnvFilter::from_default_env(); // This can be changed in the config file!
-    let (filter, reload_handle) = reload::Layer::new(filter);
     let ansi = env::var("LOCAL").is_ok();
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_ansi(ansi).json())
-        .init();
 
     if ansi {
-        event!(Level::INFO, "");
-        event!(
-            Level::INFO,
+        println!();
+        println!(
             r#"        db          ad88     ad88  88               88           88  88     88b           d88                       88  88"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"       d88b        d8"      d8"    ""               ""           88  ""     888b         d888                       88  ""                ,d"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"      d8'`8b       88       88                                   88         88`8b       d8'88                       88                    88"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"     d8'  `8b    MM88MMM  MM88MMM  88  8b,dPPYba,   88   ,adPPYb,88  88     88 `8b     d8' 88   ,adPPYba,   ,adPPYb,88  88  ,adPPYYba,  MM88MMM  ,adPPYba,   8b,dPPYba,"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"    d8YaaaaY8b     88       88     88  88P'   `"8a  88  a8"    `Y88  88     88  `8b   d8'  88  a8P_____88  a8"    `Y88  88  ""     `Y8    88    a8"     "8a  88P'   "Y8"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"   d8""""""""8b    88       88     88  88       88  88  8b       88  88     88   `8b d8'   88  8PP"""""""  8b       88  88  ,adPPPPP88    88    8b       d8  88"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#"  d8'        `8b   88       88     88  88       88  88  "8a,   ,d88  88     88    `888'    88  "8b,   ,aa  "8a,   ,d88  88  88,    ,88    88,   "8a,   ,a8"  88"#
         );
-        event!(
-            Level::INFO,
+        println!(
             r#" d8'          `8b  88       88     88  88       88  88   `"8bbdP"Y8  88     88     `8'     88   `"Ybbd8"'   `"8bbdP"Y8  88  `"8bbdP"Y8    "Y888  `"YbbdP"'   88"#
         );
-        event!(Level::INFO, "");
+        println!();
     }
 
-    event!(
-        Level::INFO,
-        "[Loading Affinidi Secure Messaging Mediator configuration]"
-    );
+    println!("[Loading Affinidi Secure Messaging Mediator configuration]");
 
-    let config = init("conf/mediator.toml", Some(reload_handle))
+    let config = init("conf/mediator.toml", ansi)
         .await
         .expect("Couldn't initialize mediator!");
 

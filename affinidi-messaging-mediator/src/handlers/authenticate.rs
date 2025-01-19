@@ -61,6 +61,7 @@ pub async fn authentication_challenge(
         authenticated: false,
         acls: MediatorACLSet::default(), // this will be updated later
         account_type: AccountType::Standard,
+        expires_at: 0,
     };
     let _span = span!(
         Level::DEBUG,
@@ -278,6 +279,8 @@ pub async fn authentication_response(
                 + (state.config.security.jwt_refresh_expiry
                     - state.config.security.jwt_access_expiry)),
         };
+
+        session.expires_at = access_expires_at;
 
         let response = AuthorizationResponse {
             access_token,
