@@ -2,6 +2,12 @@
 
 ## Changelog history
 
+## XX January 2025 (0.9.3)
+
+### DIDComm Library
+
+* Cleaned up unneeded lifetime parameters
+
 ## 18th January 2025 (0.9.2)
 
 ### Mediator (0.9.2)
