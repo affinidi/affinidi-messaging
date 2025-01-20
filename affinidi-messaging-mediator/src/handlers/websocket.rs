@@ -84,7 +84,6 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
         let auth_timeout = tokio::time::sleep(Duration::from_secs(session.expires_at -  SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()));
         tokio::pin!(auth_timeout);
         debug!("WebSocket will timeout in {:?}", auth_timeout);
-        
 
         // Flag to prevent double deregistration
         // This can occur because in some situations the streaming-task will send a close message
