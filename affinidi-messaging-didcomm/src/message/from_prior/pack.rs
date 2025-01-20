@@ -30,7 +30,7 @@ impl FromPrior {
     /// - `SecretNotFound` Issuer secret is not found.
     /// - `Unsupported` Used crypto or method is unsupported.
     /// - `InvalidState` Indicates a library error.
-    pub async fn pack<'dr, 'sr>(
+    pub async fn pack<'sr>(
         &self,
         issuer_kid: Option<&str>,
         did_resolver: &DIDCacheClient,

@@ -18,7 +18,7 @@ use crate::{
     utils::crypto::{AsKnownKeyPair, KnownKeyAlg},
 };
 
-pub(crate) async fn anoncrypt<'dr, 'sr>(
+pub(crate) async fn anoncrypt(
     to: &str,
     did_resolver: &DIDCacheClient,
     msg: &[u8],
