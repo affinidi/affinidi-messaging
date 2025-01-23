@@ -176,6 +176,25 @@ impl DatabaseHandler {
             self.purge_messages(session, did_hash, Folder::Inbox)
                 .await?;
 
+            // Remove from Known DIDs
+            // Remove DID Record
+            let mut con = self.get_async_connection().await?;
+            deadpool_redis::redis::pipe()
+                .atomic()
+                .cmd("SREM")
+                .arg("KNOWN_DIDS")
+                .arg(did_hash)
+                .cmd("DEL")
+                .arg(["DID:", did_hash].concat())
+                .exec_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("Error removing DID ({}) Records. Reason: {}", did_hash, err),
+                    )
+                })?;
+
             Ok(true)
         }
         .instrument(_span)

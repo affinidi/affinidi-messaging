@@ -316,7 +316,6 @@ async fn _select_from_existing_dids(
 
     println!(
         "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags");
-    println!("{:#?}", did_list);
     let selected = Select::with_theme(theme)
         .with_prompt("Select DID (space to select, enter to continue)?")
         .items(&did_list)

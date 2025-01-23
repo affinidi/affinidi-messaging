@@ -345,7 +345,6 @@ pub async fn handle_message(
     match message.type_.as_str() {
         "https://affinidi.com/atm/client-actions/connection-setup" => {
             // Completes an inbound OOB Invitation flow (after sharing a QR Code)
-            info!("TIMTAM: Invite Connection Setup Received");
             _handle_connection_setup(atm, state, message, meta).await;
             return; // message was deleted in the function
         }

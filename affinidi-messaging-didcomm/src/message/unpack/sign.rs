@@ -83,16 +83,12 @@ pub(crate) async fn _try_unpack_sign(
         ));
     }
 
-    let signer_key = signer_ddoc
-        .verification_method
-        .iter()
-        .find(|&vm| &vm.id.to_string() == signer_kid)
-        .ok_or_else(|| {
-            err_msg(
-                ErrorKind::DIDUrlNotFound,
-                "Sender verification method not found in did",
-            )
-        })?;
+    let Some(signer_key) = signer_ddoc.get_verification_method(signer_kid) else {
+        return Err(err_msg(
+            ErrorKind::DIDUrlNotFound,
+            "Sender verification method not found in did",
+        ));
+    };
 
     let signer_key_jwk = if let Some(jwk) = signer_key.get_jwk() {
         jwk

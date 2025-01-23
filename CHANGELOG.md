@@ -2,11 +2,13 @@
 
 ## Changelog history
 
-## XX January 2025 (0.9.3)
+## XX January 2025 (0.9.4)
 
 ### DIDComm Library
 
 * Cleaned up unneeded lifetime parameters
+* Changed how DID Document Verification Methods are discovered, more robust algorithm used
+* Tested multi-key recipient sending/receiving - some changes required to pack/unpack
 
 ## 18th January 2025 (0.9.2)
 

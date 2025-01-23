@@ -79,12 +79,11 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8d33858c2476745bbecacab6a28b42a1a6cba3be7e2005f07ca37539ea459ba"
+version = "0.2.5"
 dependencies = [
  "blake2",
- "did-peer",
+ "did-example",
+ "did-peer 0.2.5",
  "futures-util",
  "moka",
  "rand",
@@ -103,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -130,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-helpers"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -141,7 +140,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer",
+ "did-peer 0.2.4",
  "rcgen",
  "regex",
  "reqwest 0.12.12",
@@ -160,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-mediator"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -209,14 +208,14 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-processor"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -226,7 +225,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer",
+ "did-peer 0.2.4",
  "futures-util",
  "http 1.2.0",
  "jsonwebtoken",
@@ -255,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-text-client"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -594,9 +593,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.12.1"
+version = "1.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ea835662a0af02443aa1396d39be523bbf8f11ee6fad20329607c480bea48c3"
+checksum = "4c2b7ddaa2c56a367ad27a094ad8ef4faacf8a617c2575acb2ba88949df999ca"
 dependencies = [
  "aws-lc-sys",
  "paste",
@@ -644,9 +643,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-dynamodb"
-version = "1.60.0"
+version = "1.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54f34babaece1c08facb64116253f1965b53cf0d279531c539bfabdd1176e2ac"
+checksum = "822deb729d56924c4c97427cb7fbe2f2e168face2c61d1b2b769b16befd23b6b"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -667,9 +666,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-memorydb"
-version = "1.56.0"
+version = "1.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ad26b00a0097d6dc6ba198a05479905efb5bbf037b039f09e2361bd93abc311"
+checksum = "f8e95a26af70086a13a3c39e394e906a4e102c2f574988426d58a91d82cadfb2"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -689,9 +688,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.58.0"
+version = "1.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdc7908d175501c59616048f93fbcb5a909766e6e04f4cf13e4a0f7c88e9d007"
+checksum = "acc06c5f6e1075e954a07e6b08ead581be2a2002dc1be962dd3703cc66149c40"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -712,9 +711,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssm"
-version = "1.60.0"
+version = "1.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "617c2ccc67e4830a83a43a6c00ab9dd93dffb35ac380fe6e0b0ba92b26d2d409"
+checksum = "14a3b7cf98273e11fc80ed77b6da3782f51d3087d12586117e7c28d1b1953e80"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -735,9 +734,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sso"
-version = "1.54.0"
+version = "1.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921a13ed6aabe2d1258f65ef7804946255c799224440774c30e1a2c65cdf983a"
+checksum = "33993c0b054f4251ff2946941b56c26b582677303eeca34087594eb901ece022"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -757,9 +756,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssooidc"
-version = "1.55.0"
+version = "1.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "196c952738b05dfc917d82a3e9b5ba850822a6d6a86d677afda2a156cc172ceb"
+checksum = "3bd3ceba74a584337a8f3839c818f14f1a2288bfd24235120ff22d7e17a0dd54"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -779,9 +778,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sts"
-version = "1.55.0"
+version = "1.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ef5b73a927ed80b44096f8c20fb4abae65469af15198367e179ae267256e9d"
+checksum = "07835598e52dd354368429cb2abf447ce523ea446d0a533a63cb42cd0d2d9280"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1964,9 +1963,9 @@ dependencies = [
 
 [[package]]
 name = "crunchy"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
+checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
 
 [[package]]
 name = "crypto-bigint"
@@ -2326,6 +2325,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "did-example"
+version = "0.2.5"
+dependencies = [
+ "ssi",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "did-ion"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2392,6 +2399,21 @@ name = "did-peer"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8de48e7224ca82356ef1e94497a9fe963f979c1bb7eb76af990e4e50095371b5"
+dependencies = [
+ "base64 0.22.1",
+ "iref",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "ssi",
+ "thiserror 2.0.11",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "did-peer"
+version = "0.2.5"
 dependencies = [
  "base64 0.22.1",
  "iref",
@@ -3694,13 +3716,13 @@ dependencies = [
 
 [[package]]
 name = "is-terminal"
-version = "0.4.13"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "261f68e344040fbd0edea105bef17c66edf46f984ddb1115b775ce31be948f4b"
+checksum = "e19b23d53f35ce9f56aebc7d1bb4e6ac1e9c0db7ac85c8d1760c04379edced37"
 dependencies = [
  "hermit-abi 0.4.0",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5744,9 +5766,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.43"
+version = "0.38.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a78891ee6bf2340288408954ac787aa063d8e8817e9f53abb37c695c6d834ef6"
+checksum = "fdb5bc1ae2baa591800df16c9ca78619bf65c0488b41b96ccec5d11220d8c154"
 dependencies = [
  "bitflags 2.8.0",
  "errno",
@@ -8075,9 +8097,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.12.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744018581f9a3454a9e15beb8a33b017183f1e7c0cd170232a2d1453b23a51c4"
+checksum = "b3758f5e68192bb96cc8f9b7e2c2cfdabb435499a28499a42f8f984092adad4b"
 dependencies = [
  "getrandom",
  "rand",

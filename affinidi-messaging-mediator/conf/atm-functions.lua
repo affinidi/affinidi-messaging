@@ -5,12 +5,12 @@
 -- args = [1] message
 --        [2] message length in bytes
 --        [3] to_did_hash
---        [4] from_did_hash
+--        [4] from_did_hash <optional>
 local function store_message(keys, args)
     -- Do we have the correct number of arguments?
-    -- from_did_hash can be optional!!!
-    if #args ~= 4 then
-        return redis.error_reply('store_message: expected 4 arguments')
+    -- from_did_hash can be optional!!! Means an anonymous message
+    if #args < 3 and #args > 4 then
+        return redis.error_reply('store_message: expected 3 or 4 arguments')
     end
 
     -- set response type to Version 3
@@ -43,7 +43,7 @@ local function store_message(keys, args)
 
     -- Update the sender records
     local SQ = nil
-    if table.getn(args) == 6 then
+    if table.getn(args) == 4 then
         -- Update the sender records
         redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_BYTES', bytes)
         redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_COUNT', 1)
