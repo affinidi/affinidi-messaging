@@ -32,26 +32,10 @@ pub(crate) async fn administration_accounts_menu(
 
         match selection {
             0 => {
-                list_admins(
-                    atm,
-                    profile,
-                    protocols,
-                    &shared_config.our_admin_hash,
-                    &shared_config.root_admin_hash,
-                )
-                .await;
+                list_admins(atm, profile, protocols, shared_config).await;
             }
             1 => add_admin(atm, profile, protocols, theme).await,
-            2 => {
-                remove_admins(
-                    atm,
-                    profile,
-                    protocols,
-                    &shared_config.our_admin_hash,
-                    theme,
-                )
-                .await
-            }
+            2 => remove_admins(atm, profile, protocols, shared_config, theme).await,
             3 => {
                 break;
             }
@@ -67,8 +51,7 @@ pub(crate) async fn list_admins(
     atm: &ATM,
     profile: &Arc<Profile>,
     protocols: &Protocols,
-    admin_hash: &str,
-    root_admin_hash: &str,
+    config: &SharedConfig,
 ) {
     match protocols
         .mediator
@@ -82,12 +65,20 @@ pub(crate) async fn list_admins(
             );
 
             for (idx, admin) in admins.accounts.iter().enumerate() {
-                print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
-                if admin == root_admin_hash {
-                    print!("  {}", style("(ROOT Admin)").red())
-                }
-                if admin == admin_hash {
-                    print!("  {}", style("(our Admin account)").color256(208));
+                if admin == &config.mediator_did_hash {
+                    print!(
+                        "  {}  {}",
+                        style(format!("{}: {}", idx, admin)).color256(129),
+                        style("(Mediator DID)").color256(129)
+                    );
+                } else {
+                    print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
+                    if admin == &config.root_admin_hash {
+                        print!("  {}", style("(ROOT Admin)").red())
+                    }
+                    if admin == &config.our_admin_hash {
+                        print!("  {}", style("(our Admin account)").color256(208));
+                    }
                 }
                 println!();
             }
@@ -163,7 +154,7 @@ pub(crate) async fn remove_admins(
     atm: &ATM,
     profile: &Arc<Profile>,
     protocols: &Protocols,
-    admin_hash: &String,
+    config: &SharedConfig,
     theme: &ColorfulTheme,
 ) {
     match protocols
@@ -176,7 +167,7 @@ pub(crate) async fn remove_admins(
             let admins: Vec<&String> = admins
                 .accounts
                 .iter()
-                .filter(|&x| x != admin_hash)
+                .filter(|&x| x != &config.our_admin_hash && x != &config.mediator_did_hash)
                 .collect();
 
             if admins.is_empty() {

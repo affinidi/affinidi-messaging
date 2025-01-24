@@ -40,6 +40,7 @@ struct SharedConfig {
     pub version: String,
     pub root_admin_hash: String,
     pub our_admin_hash: String,
+    pub mediator_did_hash: String,
     pub acl_mode: ACLModeType,
     pub global_acl_default: MediatorACLSet,
 }
@@ -64,6 +65,16 @@ impl SharedConfig {
             }
         } else {
             return Err("Couldn't parse Mediator Configuration".into());
+        };
+
+        let mediator_did = if let Some(mediator_did) = config.get("mediator_did") {
+            if let Some(mediator_did) = mediator_did.as_str() {
+                mediator_did.to_string()
+            } else {
+                return Err("Couldn't find mediator_did in Mediator Configuration".into());
+            }
+        } else {
+            return Err("Couldn't find mediator_did in Mediator Configuration".into());
         };
 
         let root_admin_did = if let Some(root_admin_did) = config.get("admin_did") {
@@ -110,6 +121,7 @@ impl SharedConfig {
             acl_mode,
             global_acl_default,
             our_admin_hash: String::new(),
+            mediator_did_hash: digest(mediator_did),
         })
     }
 }

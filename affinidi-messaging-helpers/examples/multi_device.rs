@@ -1,6 +1,6 @@
 //! Tests a message being sent from Alice to Bob, which can be read by any of Bob's devices.
 //!
-//! NOTE: This example requires that the resolver is running with `did_example` feature flag enabled/
+//! NOTE: This example requires that the resolver is running with `did_example` feature flag enabled!
 //! NOTE: The mediator is NOT used in this example.
 
 use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};

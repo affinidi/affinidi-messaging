@@ -96,10 +96,10 @@ pub(crate) async fn process(
                 }
             }
             MediatorAdminRequest::AdminStrip(attr) => {
-                // Remove root admin DID in case it is in the list
-                // Protects accidentally deleting the only admin account
+                // Remove root admin DID and Mediator DID in case it is in the list
+                // Protects accidentally deleting the only admin account or the mediator itself
                 let root_admin = digest(&state.config.admin_did);
-                let attr = attr.iter().filter_map(|a| if a == &root_admin { None } else { Some(a.to_owned()) }).collect();
+                let attr = attr.iter().filter_map(|a| if a == &root_admin || a == &state.config.mediator_did_hash { None } else { Some(a.to_owned()) }).collect();
                 match  state.database.strip_admin_accounts(attr).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))

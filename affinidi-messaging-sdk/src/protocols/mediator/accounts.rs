@@ -24,16 +24,23 @@ pub enum MediatorAccountRequest {
 /// Different levels of accounts in the mediator
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum AccountType {
+    /// The DID refers to the mediator itself
+    Mediator,
+    /// The root admin DID, used to manage other admins.
     RootAdmin,
+    /// Admin accounts, can modify other accounts
     Admin,
+    /// Standard accounts, can only modify their own account
     #[default]
     Standard,
+    /// Unknown account type
     Unknown,
 }
 
 impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            AccountType::Mediator => write!(f, "Mediator"),
             AccountType::RootAdmin => write!(f, "Root Admin"),
             AccountType::Admin => write!(f, "Admin"),
             AccountType::Standard => write!(f, "Standard"),
@@ -48,6 +55,7 @@ impl From<&str> for AccountType {
             "0" => AccountType::Standard,
             "1" => AccountType::Admin,
             "2" => AccountType::RootAdmin,
+            "3" => AccountType::Mediator,
             _ => AccountType::Unknown,
         }
     }
@@ -59,6 +67,7 @@ impl From<u32> for AccountType {
             0 => AccountType::Standard,
             1 => AccountType::Admin,
             2 => AccountType::RootAdmin,
+            3 => AccountType::Mediator,
             _ => AccountType::Unknown,
         }
     }
@@ -73,6 +82,7 @@ impl From<String> for AccountType {
 impl From<AccountType> for String {
     fn from(role_type: AccountType) -> Self {
         match role_type {
+            AccountType::Mediator => "3".to_owned(),
             AccountType::RootAdmin => "2".to_owned(),
             AccountType::Admin => "1".to_owned(),
             AccountType::Standard => "0".to_owned(),

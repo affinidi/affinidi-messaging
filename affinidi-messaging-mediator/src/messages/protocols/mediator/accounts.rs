@@ -211,24 +211,43 @@ pub(crate) async fn process(
                 }
             }
             MediatorAccountRequest::AccountRemove(did_hash) => {
-               // Check permissions and ACLs
-               if !check_permissions(session, &[did_hash.clone()]) {
-                warn!("ACL Request from DID ({}) failed. ", session.did_hash);
-                return generate_error_response(
-                    state,
-                    session,
-                    &msg.id,
-                    ProblemReport::new(
-                        ProblemReportSorter::Error,
-                        ProblemReportScope::Protocol,
-                        "permission_error".into(),
-                        "Error getting ACLs {1}".into(),
-                        vec!["Permission denied".to_string()],
-                        None,
-                    ),
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("ACL Request from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error getting ACLs {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
                     false,
-                );
-            }
+                    );
+                }
+
+                // Check if the mediator DID is being removed
+                // Protects accidentally deleting the mediator itself
+                if state.config.mediator_did_hash == did_hash {
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "invalid_request".into(),
+                            "Error removing account. Cannot remove the Mediator DID".into(),
+                            vec![],
+                            None,
+                        ),
+                        false,
+                    );
+                }
 
                 // Check if the root admin DID is being removed
                 // Protects accidentally deleting the only admin account

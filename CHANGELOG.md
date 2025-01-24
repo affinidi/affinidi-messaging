@@ -10,6 +10,12 @@
 * Changed how DID Document Verification Methods are discovered, more robust algorithm used
 * Tested multi-key recipient sending/receiving - some changes required to pack/unpack
 
+### Mediator (0.9.4)
+
+* Removing Accounts implemented with full cleanup of associated data
+* Database Schema version is now recorded, allows for upgrade paths when schema changes
+* Mediator Account Type added, allows for treating the Mediator DID separately
+
 ## 18th January 2025 (0.9.2)
 
 ### Mediator (0.9.2)

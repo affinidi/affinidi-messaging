@@ -7,6 +7,7 @@ pub mod delete;
 pub mod fetch;
 pub mod get;
 pub mod handlers;
+pub(crate) mod initialization;
 pub mod list;
 pub(crate) mod messages;
 pub(crate) mod oob_discovery;

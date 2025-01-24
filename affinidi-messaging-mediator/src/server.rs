@@ -6,7 +6,6 @@ use crate::{
     SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_sdk::protocols::mediator::accounts::AccountType;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{env, net::SocketAddr};
@@ -62,15 +61,10 @@ pub async fn start() {
         }
     };
 
-    // Set up the administration account if it doesn't exist
     database
-        .setup_admin_account(
-            &config.admin_did,
-            AccountType::RootAdmin,
-            &config.security.global_acl_default,
-        )
+        .initialize(&config)
         .await
-        .expect("Could not setup admin account! exiting...");
+        .expect("Error initializing database");
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread

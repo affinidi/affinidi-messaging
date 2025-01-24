@@ -158,7 +158,11 @@ impl DatabaseHandler {
 
             // Remove admin field on each DID
             for account in &accounts {
-                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg("0");
+                tx = tx
+                    .cmd("HSET")
+                    .arg(account)
+                    .arg("ROLE_TYPE")
+                    .arg(AccountType::Standard.to_string());
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {

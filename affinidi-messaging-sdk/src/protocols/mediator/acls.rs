@@ -200,6 +200,9 @@ impl MediatorACLSet {
                 "self_manage_list" => {
                     default_acl.set_self_manage_list(true);
                 }
+                "blocked" => {
+                    default_acl.set_blocked(true);
+                }
                 _ => {
                     return Err(ATMError::ConfigError(format!(
                         "Invalid ACL String ({})",

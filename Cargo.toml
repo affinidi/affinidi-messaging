@@ -25,17 +25,13 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.9.4", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.9.4", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.9.4", path = "./affinidi-messaging-mediator" }
-#affinidi-did-resolver-cache-sdk = { version = "0.2.4", features = ["network"] }
-affinidi-did-resolver-cache-sdk = { version = "0.2", features = [
-    "network",
-    "did_example",
-], path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk" }
+affinidi-did-resolver-cache-sdk = { version = "0.2.4", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.61"
+aws-sdk-dynamodb = "1.62"
 aws-sdk-memorydb = "1.57"
 aws-sdk-secretsmanager = "1.59"
 aws-sdk-ssm = "1.61"
@@ -53,7 +49,7 @@ console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2.4" }
+did-peer = { version = "0.2.5" }
 futures-util = "0.3"
 getrandom = "0.2"
 hostname = "0.4"
@@ -87,6 +83,7 @@ rustls = { version = "0.23", default-features = false, features = [
 ] }
 rustls-pemfile = "2"
 rustls-platform-verifier = "0.5"
+semver = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-enum-str = '0.4'
 serde_json = "1.0"
@@ -115,4 +112,3 @@ tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
 uuid = { version = "1.12", features = ["v4", "fast-rng"] }
 varint = "0.9"
-semver = "1.0"
