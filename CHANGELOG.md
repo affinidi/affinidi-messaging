@@ -15,6 +15,12 @@
 * Removing Accounts implemented with full cleanup of associated data
 * Database Schema version is now recorded, allows for upgrade paths when schema changes
 * Mediator Account Type added, allows for treating the Mediator DID separately
+* FIX: Trying to strip admin rights from an empty list will now correctly create a ProblemReport that explains the issue
+
+### SDK (0.9.4)
+
+* FIX: If ProblemReport had no args, deserializing would fail as no args field. Now defaults to empty array correctly
+* TEST: Added ProblemReport tests to check for empty args and serialization/deserialization
 
 ## 18th January 2025 (0.9.2)
 

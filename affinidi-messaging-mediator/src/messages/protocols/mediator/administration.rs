@@ -99,7 +99,16 @@ pub(crate) async fn process(
                 // Remove root admin DID and Mediator DID in case it is in the list
                 // Protects accidentally deleting the only admin account or the mediator itself
                 let root_admin = digest(&state.config.admin_did);
-                let attr = attr.iter().filter_map(|a| if a == &root_admin || a == &state.config.mediator_did_hash { None } else { Some(a.to_owned()) }).collect();
+                let attr: Vec<String> = attr.iter().filter_map(|a| if a == &root_admin || a == &state.config.mediator_did_hash { None } else { Some(a.to_owned()) }).collect();
+                if attr.is_empty() {
+                    return generate_error_response(state, session, &msg.id, ProblemReport::new(
+                        ProblemReportSorter::Error,
+                        ProblemReportScope::Protocol,
+                        "invalid_request".into(),
+                        "You must specify at least one DID!".into(),
+                        vec![], None
+                    ), false);
+                }
                 match  state.database.strip_admin_accounts(attr).await {
                     Ok(response) => {
                         _generate_response_message(&msg.id, &session.did, &state.config.mediator_did, &json!(response))

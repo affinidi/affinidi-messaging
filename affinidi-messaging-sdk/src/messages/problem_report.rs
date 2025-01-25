@@ -5,11 +5,11 @@ use core::fmt;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, PartialEq)]
 pub struct ProblemReport {
     pub code: String,
     pub comment: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub args: Vec<String>,
     #[serde(rename = "escalate_to", skip_serializing_if = "Option::is_none")]
     pub escalate_to: Option<String>,
@@ -150,5 +150,49 @@ mod tests {
             problem_report.interpolation(),
             "authentication for Alice failed due to invalid signature ?".to_string()
         );
+    }
+
+    #[test]
+    fn test_problem_report_empty_args() {
+        let comment = "test of no interpolation required";
+        let args = vec![];
+        let problem_report = ProblemReport::new(
+            ProblemReportSorter::Error,
+            ProblemReportScope::Other("test".to_string()),
+            "authentication".to_string(),
+            comment.to_string(),
+            args.clone(),
+            None,
+        );
+
+        assert_eq!(problem_report.code, "e.test.authentication");
+        assert_eq!(problem_report.comment, comment);
+        assert_eq!(problem_report.args, args);
+    }
+
+    #[test]
+    fn test_problem_report_serialize_empty() {
+        let comment = "test of no interpolation required";
+        let args = vec![];
+        let problem_report = ProblemReport::new(
+            ProblemReportSorter::Error,
+            ProblemReportScope::Other("test".to_string()),
+            "authentication".to_string(),
+            comment.to_string(),
+            args.clone(),
+            None,
+        );
+
+        let ser = match serde_json::to_string(&problem_report) {
+            Ok(ser) => ser,
+            Err(err) => panic!("Error serializing ProblemReport: {}", err),
+        };
+
+        let pr: ProblemReport = match serde_json::from_str(&ser) {
+            Ok(pr) => pr,
+            Err(err) => panic!("Error deserializing ProblemReport: {}", err),
+        };
+
+        assert_eq!(problem_report, pr);
     }
 }

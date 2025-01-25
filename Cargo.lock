@@ -79,12 +79,11 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8d33858c2476745bbecacab6a28b42a1a6cba3be7e2005f07ca37539ea459ba"
+version = "0.2.5"
 dependencies = [
  "blake2",
- "did-peer",
+ "did-example",
+ "did-peer 0.2.5",
  "futures-util",
  "moka",
  "rand",
@@ -141,7 +140,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer",
+ "did-peer 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcgen",
  "regex",
  "reqwest 0.12.12",
@@ -226,7 +225,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "did-peer",
+ "did-peer 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util",
  "http 1.2.0",
  "jsonwebtoken",
@@ -2326,6 +2325,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "did-example"
+version = "0.2.5"
+dependencies = [
+ "ssi",
+ "thiserror 2.0.11",
+]
+
+[[package]]
 name = "did-ion"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2385,6 +2392,21 @@ dependencies = [
  "ssi-multicodec",
  "static-iref",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "did-peer"
+version = "0.2.5"
+dependencies = [
+ "base64 0.22.1",
+ "iref",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "ssi",
+ "thiserror 2.0.11",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
