@@ -519,8 +519,8 @@ impl TryFrom<ConfigRaw> for Config {
             },
             log_json: raw.log_json.parse().unwrap_or(true),
             listen_address: raw.server.listen_address,
-            mediator_did: read_did_config(&raw.mediator_did, &aws_config).await?,
-            admin_did: read_did_config(&raw.server.admin_did, &aws_config).await?,
+            mediator_did: read_did_config(&raw.mediator_did, &aws_config, "mediator_did").await?,
+            admin_did: read_did_config(&raw.server.admin_did, &aws_config, "admin_did").await?,
             database: raw.database.try_into()?,
             streaming_enabled: raw.streaming.enabled.parse().unwrap_or(true),
             did_resolver_config: raw.did_resolver.convert(),
@@ -709,12 +709,13 @@ fn expand_env_vars(raw_config: &Vec<String>) -> Result<Vec<String>, MediatorErro
 async fn read_did_config(
     did_config: &str,
     aws_config: &SdkConfig,
+    field_name: &str,
 ) -> Result<String, MediatorError> {
     let parts: Vec<&str> = did_config.split("://").collect();
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
             "NA".into(),
-            "Invalid `mediator_did` format".into(),
+            format!("Invalid `{}` format", field_name).into(),
         ));
     }
     let content: String = match parts[0] {
