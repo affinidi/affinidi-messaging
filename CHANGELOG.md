@@ -16,6 +16,7 @@
 * Database Schema version is now recorded, allows for upgrade paths when schema changes
 * Mediator Account Type added, allows for treating the Mediator DID separately
 * FIX: Trying to strip admin rights from an empty list will now correctly create a ProblemReport that explains the issue
+* FIX: Mediator Administration generates a client side error when no Admin DID is selected when removing Admin Accounts
 
 ### SDK (0.9.4)
 

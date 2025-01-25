@@ -182,6 +182,11 @@ pub(crate) async fn remove_admins(
                 .interact()
                 .unwrap();
 
+            if dids.is_empty() {
+                println!("{}", style("No Admin DIDs selected").red());
+                return;
+            }
+
             println!();
             println!("{}", style("Removing the following DIDs:").green());
             for did in &dids {
