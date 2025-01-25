@@ -715,7 +715,7 @@ async fn read_did_config(
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
             "NA".into(),
-            format!("Invalid `{}` format", field_name).into(),
+            format!("Invalid `{}` format", field_name),
         ));
     }
     let content: String = match parts[0] {
