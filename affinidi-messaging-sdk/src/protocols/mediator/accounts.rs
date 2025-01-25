@@ -36,6 +36,14 @@ pub enum AccountType {
     /// Unknown account type
     Unknown,
 }
+impl AccountType {
+    pub fn is_admin(&self) -> bool {
+        matches!(
+            self,
+            AccountType::Admin | AccountType::RootAdmin | AccountType::Mediator
+        )
+    }
+}
 
 impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

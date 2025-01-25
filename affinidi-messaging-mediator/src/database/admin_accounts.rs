@@ -127,7 +127,7 @@ impl DatabaseHandler {
     }
 
     /// Strips up to 100 admin accounts from the mediator
-    /// - `accounts` - The list of accounts to strip admin rights from
+    /// - `accounts` - The list of DID hashes to strip admin rights from
     pub(crate) async fn strip_admin_accounts(
         &self,
         accounts: Vec<String>,

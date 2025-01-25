@@ -150,6 +150,9 @@ impl DatabaseHandler {
         async move {
             debug!("Removing account from the mediator");
 
+            let current = self.account_get(did_hash).await?;
+            debug!("retrieving existing account: {:?}", current);
+
             // Step 1 - block access to this account
             let mut blocked_acl = MediatorACLSet::from_u64(0);
             blocked_acl.set_blocked(true);
@@ -175,6 +178,14 @@ impl DatabaseHandler {
             // This will remove any messages that are queued and still to be delivered to this DID
             self.purge_messages(session, did_hash, Folder::Inbox)
                 .await?;
+
+            // If DID is an admin account then remove from the admin list
+            if let Some(current) = current {
+                if current._type.is_admin() {
+                    self.strip_admin_accounts(vec![did_hash.to_string()])
+                        .await?;
+                }
+            }
 
             // Remove from Known DIDs
             // Remove DID Record
