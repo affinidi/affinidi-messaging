@@ -13,28 +13,30 @@ impl DatabaseHandler {
     /// Updates both the DID role type and the global ADMIN Set in Redis.
     pub(crate) async fn setup_admin_account(
         &self,
-        admin_did: &str,
+        admin_did_hash: &str,
         admin_type: AccountType,
         acls: &MediatorACLSet,
     ) -> Result<(), MediatorError> {
-        let did_hash = sha256::digest(admin_did);
         // Check if the admin account already exists
-        if !self.account_exists(&did_hash).await? {
-            debug!("Admin account doesn't exist, creating: {}", admin_did);
-            self.account_add(&did_hash, acls).await?;
+        if !self.account_exists(admin_did_hash).await? {
+            debug!("Admin account doesn't exist, creating: {}", admin_did_hash);
+            self.account_add(admin_did_hash, acls).await?;
         }
         let mut con = self.get_async_connection().await?;
 
-        debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
+        debug!(
+            "Admin DID ({}) == hash ({})",
+            admin_did_hash, admin_did_hash
+        );
 
         deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SADD")
             .arg("ADMINS")
-            .arg(&did_hash)
+            .arg(admin_did_hash)
             .ignore()
             .cmd("HSET")
-            .arg(["DID:", &did_hash].concat())
+            .arg(["DID:", admin_did_hash].concat())
             .arg("ROLE_TYPE")
             .arg::<String>(admin_type.into())
             .ignore()
@@ -45,12 +47,12 @@ impl DatabaseHandler {
                     "NA".to_string(),
                     format!(
                         "error in setup of admin account for ({}). Reason: {}",
-                        admin_did, err
+                        admin_did_hash, err
                     ),
                 )
             })?;
 
-        info!("Admin account successfully setup: {}", admin_did);
+        info!("Admin account successfully setup: {}", admin_did_hash);
         Ok(())
     }
 

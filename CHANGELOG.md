@@ -17,6 +17,7 @@
 * Mediator Account Type added, allows for treating the Mediator DID separately
 * FIX: Trying to strip admin rights from an empty list will now correctly create a ProblemReport that explains the issue
 * FIX: Mediator Administration generates a client side error when no Admin DID is selected when removing Admin Accounts
+* FIX: Double hashing of DID's on admin_add, refactored so now only uses SHA256 hashed DID's
 
 ### SDK (0.9.4)
 

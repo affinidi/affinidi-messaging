@@ -6,6 +6,7 @@ use super::DatabaseHandler;
 use crate::common::{config::Config, errors::MediatorError};
 use affinidi_messaging_sdk::protocols::mediator::{accounts::AccountType, acls::MediatorACLSet};
 use semver::Version;
+use sha256::digest;
 use tracing::{info, warn};
 
 impl DatabaseHandler {
@@ -18,7 +19,7 @@ impl DatabaseHandler {
         // Setup the mediator account if it doesn't exist
         // Set the ACL for the mediator account to deny_all by default
         self.setup_admin_account(
-            &config.mediator_did,
+            &config.mediator_did_hash,
             AccountType::Mediator,
             &MediatorACLSet::from_string_ruleset("DENY_ALL,LOCAL,BLOCKED").unwrap(),
         )
@@ -27,7 +28,7 @@ impl DatabaseHandler {
 
         // Set up the administration account if it doesn't exist
         self.setup_admin_account(
-            &config.admin_did,
+            &digest(&config.admin_did),
             AccountType::RootAdmin,
             &config.security.global_acl_default,
         )
