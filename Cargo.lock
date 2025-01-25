@@ -667,9 +667,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-memorydb"
-version = "1.57.0"
+version = "1.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e95a26af70086a13a3c39e394e906a4e102c2f574988426d58a91d82cadfb2"
+checksum = "fd5de9df4a527708cac9cfe9042dfe1858acf649f550db91b0d741fc30fcf12f"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -689,9 +689,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.59.0"
+version = "1.60.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acc06c5f6e1075e954a07e6b08ead581be2a2002dc1be962dd3703cc66149c40"
+checksum = "b5e6d85eec25e5dca9d94c9dc165820e11906e400e49cb3046408737b966ee78"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -712,9 +712,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssm"
-version = "1.61.0"
+version = "1.62.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14a3b7cf98273e11fc80ed77b6da3782f51d3087d12586117e7c28d1b1953e80"
+checksum = "d63a88fd9ec67176141d879a1ea3f84c6416576203b6d84a34edf34519f3f34f"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",

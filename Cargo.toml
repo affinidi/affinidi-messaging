@@ -25,16 +25,16 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.9.4", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.9.4", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.9.4", path = "./affinidi-messaging-mediator" }
-affinidi-did-resolver-cache-sdk = { version = "0.2.4", features = ["network"] }
+affinidi-did-resolver-cache-sdk = { version = "0.2.5", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.62"
-aws-sdk-memorydb = "1.57"
-aws-sdk-secretsmanager = "1.59"
-aws-sdk-ssm = "1.61"
+aws-sdk-memorydb = "1.58"
+aws-sdk-secretsmanager = "1.60"
+aws-sdk-ssm = "1.62"
 axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
