@@ -34,7 +34,6 @@ uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ['async_futures'] }
-getrandom = { workspace = true, features = ['js'] }
 lazy_static.workspace = true
 tracing-test.workspace = true
 

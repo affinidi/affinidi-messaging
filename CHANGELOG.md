@@ -9,6 +9,7 @@
 * Cleaned up unneeded lifetime parameters
 * Changed how DID Document Verification Methods are discovered, more robust algorithm used
 * Tested multi-key recipient sending/receiving - some changes required to pack/unpack
+* Removed getrandom crate which is no longer used.
 
 ### Mediator (0.9.4)
 
