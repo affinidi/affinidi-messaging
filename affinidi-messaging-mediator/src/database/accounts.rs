@@ -153,6 +153,20 @@ impl DatabaseHandler {
             let current = self.account_get(did_hash).await?;
             debug!("retrieving existing account: {:?}", current);
 
+            if let Some(current) = &current {
+                if current._type == AccountType::Mediator {
+                    return Err(MediatorError::InternalError(
+                        "NA".to_string(),
+                        "Cannot remove the mediator account".to_string(),
+                    ));
+                } else if current._type == AccountType::RootAdmin {
+                    return Err(MediatorError::InternalError(
+                        "NA".to_string(),
+                        "Cannot remove the root admin account".to_string(),
+                    ));
+                }
+            }
+
             // Step 1 - block access to this account
             let mut blocked_acl = MediatorACLSet::from_u64(0);
             blocked_acl.set_blocked(true);

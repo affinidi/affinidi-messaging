@@ -137,14 +137,23 @@ pub(crate) async fn manage_account_menu(
             0 => {}
             1 => {}
             2 => {
-                protocols
+                match protocols
                     .mediator
                     .account_remove(atm, profile, Some(account.did_hash.clone()))
-                    .await?;
-                println!("{}", style("Account deleted successfully").green());
-                return Ok(());
+                    .await
+                {
+                    Ok(_) => {
+                        println!("{}", style("Account deleted successfully").green());
+                        return Ok(());
+                    }
+                    Err(err) => println!(
+                        "{}",
+                        style(format!("Error deleting account: {}", err)).red()
+                    ),
+                }
             }
             3 => {
+                // Return to previous menu
                 return Ok(());
             }
             _ => {
