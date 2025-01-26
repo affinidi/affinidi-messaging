@@ -1,5 +1,9 @@
 //! UI Related functions
-use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{
+    profiles::Profile,
+    protocols::{mediator::accounts::AccountType, Protocols},
+    ATM,
+};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use regex::Regex;
@@ -17,8 +21,8 @@ pub(crate) async fn administration_accounts_menu(
 ) {
     let selections = &[
         "List Administration DIDs",
-        "Add Administration DID",
-        "Remove Administration DID",
+        "Add Administration rights to a DID (will create if it doesn't exist)",
+        "Strip Administration rights from a DID (DID will be set back to Standard)",
         "Back",
     ];
 
@@ -65,21 +69,21 @@ pub(crate) async fn list_admins(
             );
 
             for (idx, admin) in admins.accounts.iter().enumerate() {
-                if admin == &config.mediator_did_hash {
-                    print!(
-                        "  {}  {}",
-                        style(format!("{}: {}", idx, admin)).color256(129),
-                        style("(Mediator DID)").color256(129)
-                    );
-                } else {
-                    print!("  {}", style(format!("{}: {}", idx, admin)).yellow());
-                    if admin == &config.root_admin_hash {
-                        print!("  {}", style("(ROOT Admin)").red())
-                    }
-                    if admin == &config.our_admin_hash {
-                        print!("  {}", style("(our Admin account)").color256(208));
-                    }
+                print!(
+                    "  {}",
+                    style(format!("{}: {}", idx, admin.did_hash)).yellow(),
+                );
+                let (role, color) = match admin._type {
+                    AccountType::Mediator => (admin._type.to_string(), 27_u8),
+                    AccountType::RootAdmin => (admin._type.to_string(), 127_u8),
+                    AccountType::Admin => (admin._type.to_string(), 129_u8),
+                    _ => ("Unknown".into(), 1_u8),
+                };
+                print!(" {}", style(format!("({})", role)).color256(color));
+                if admin.did_hash == config.our_admin_hash {
+                    print!(" {}", style("(our Admin account)").color256(208));
                 }
+
                 println!();
             }
         }
@@ -164,10 +168,17 @@ pub(crate) async fn remove_admins(
     {
         Ok(admins) => {
             // remove the mediator administrator account from the list
-            let admins: Vec<&String> = admins
+            let admins: Vec<String> = admins
                 .accounts
                 .iter()
-                .filter(|&x| x != &config.our_admin_hash && x != &config.mediator_did_hash)
+                .filter_map(|x| {
+                    if x.did_hash != config.our_admin_hash && x.did_hash != config.mediator_did_hash
+                    {
+                        Some(x.did_hash.clone())
+                    } else {
+                        None
+                    }
+                })
                 .collect();
 
             if admins.is_empty() {
@@ -190,7 +201,7 @@ pub(crate) async fn remove_admins(
             println!();
             println!("{}", style("Removing the following DIDs:").green());
             for did in &dids {
-                println!("  {}", style(admins[did.to_owned()]).yellow());
+                println!("  {}", style(&admins[did.to_owned()]).yellow());
             }
 
             if Confirm::with_theme(theme)

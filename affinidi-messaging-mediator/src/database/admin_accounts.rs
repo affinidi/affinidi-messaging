@@ -2,7 +2,9 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
-    accounts::AccountType, acls::MediatorACLSet, administration::MediatorAdminList,
+    accounts::AccountType,
+    acls::MediatorACLSet,
+    administration::{AdminAccount, MediatorAdminList},
 };
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
@@ -162,9 +164,9 @@ impl DatabaseHandler {
             for account in &accounts {
                 tx = tx
                     .cmd("HSET")
-                    .arg(account)
+                    .arg(["DID:", account].concat())
                     .arg("ROLE_TYPE")
-                    .arg(AccountType::Standard.to_string());
+                    .arg::<String>(AccountType::Standard.into());
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
@@ -250,8 +252,41 @@ impl DatabaseHandler {
                     )
                 })?;
             }
+
+            // Get the corresponding role type for each admin
+            let mut response: Vec<AdminAccount> = Vec::with_capacity(admins.len());
+            let mut tx = deadpool_redis::redis::pipe();
+            let mut tx = tx.atomic();
+            for admin in &admins {
+                tx = tx
+                    .cmd("HGET")
+                    .arg(["DID:", admin].concat())
+                    .arg("ROLE_TYPE");
+            }
+
+            let _types: Vec<Option<String>> = tx.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("Fetching Admin role types failed. Reason: {}", err),
+                )
+            })?;
+
+            for (i, t) in _types.iter().enumerate() {
+                if let Some(role_type) = t {
+                    response.push(AdminAccount {
+                        did_hash: admins[i].clone(),
+                        _type: AccountType::from(role_type.as_str()),
+                    });
+                } else {
+                    response.push(AdminAccount {
+                        did_hash: admins[i].clone(),
+                        _type: AccountType::Unknown,
+                    });
+                }
+            }
+
             Ok(MediatorAdminList {
-                accounts: admins,
+                accounts: response,
                 cursor: new_cursor,
             })
         }

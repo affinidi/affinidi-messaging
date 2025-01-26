@@ -309,4 +309,44 @@ impl DatabaseHandler {
         .instrument(_span)
         .await
     }
+
+    /// Changes the type of an account to the new type
+    /// - `did_hash` - SHA256 hash of the DID
+    /// - `_type` - AccountType to change to
+    pub(crate) async fn account_change_type(
+        &self,
+        did_hash: &str,
+        _type: &AccountType,
+    ) -> Result<(), MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "account_change_type",
+            "did_hash" = did_hash,
+            "new_type" = _type.to_string()
+        );
+
+        async move {
+            debug!("Changing account type");
+
+            let mut con = self.get_async_connection().await?;
+
+            deadpool_redis::redis::cmd("HSET")
+                .arg(["DID:", did_hash].concat())
+                .arg("ROLE_TYPE")
+                .arg::<String>(_type.to_owned().into())
+                .exec_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("account_change_type() failed. Reason: {}", err),
+                    )
+                })?;
+            debug!("Account type changed successfully");
+
+            Ok(())
+        }
+        .instrument(_span)
+        .await
+    }
 }

@@ -38,7 +38,6 @@ struct Args {
 #[derive(Debug, Deserialize)]
 struct SharedConfig {
     pub version: String,
-    pub root_admin_hash: String,
     pub our_admin_hash: String,
     pub mediator_did_hash: String,
     pub acl_mode: ACLModeType,
@@ -77,16 +76,6 @@ impl SharedConfig {
             return Err("Couldn't find mediator_did in Mediator Configuration".into());
         };
 
-        let root_admin_did = if let Some(root_admin_did) = config.get("admin_did") {
-            if let Some(root_admin_did) = root_admin_did.as_str() {
-                root_admin_did.to_string()
-            } else {
-                return Err("Couldn't find admin_did in Mediator Configuration".into());
-            }
-        } else {
-            return Err("Couldn't find admin_did in Mediator Configuration".into());
-        };
-
         let acl_mode = if let Some(acl_mode) = config
             .get("security")
             .and_then(|security| security.get("mediator_acl_mode"))
@@ -117,7 +106,6 @@ impl SharedConfig {
 
         Ok(SharedConfig {
             version,
-            root_admin_hash: digest(&root_admin_did),
             acl_mode,
             global_acl_default,
             our_admin_hash: String::new(),

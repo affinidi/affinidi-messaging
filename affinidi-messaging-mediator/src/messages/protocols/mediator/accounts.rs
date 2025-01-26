@@ -10,7 +10,7 @@ use affinidi_messaging_sdk::{
 };
 use serde_json::{json, Value};
 use sha256::digest;
-use tracing::{span, warn, Instrument};
+use tracing::{debug, info, span, warn, Instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -286,6 +286,84 @@ pub(crate) async fn process(
                                 ProblemReportScope::Protocol,
                                 "database_error".into(),
                                 "Error removing account {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorAccountRequest::AccountChangeType {did_hash, _type } => {
+                // Must be an admin level account to change this
+                if !state.database.check_admin_account(&session.did_hash).await? {
+                    warn!("DID ({}) is not an admin account", session.did_hash);
+                    return generate_error_response(state, session, &msg.id, ProblemReport::new(
+                        ProblemReportSorter::Error,
+                        ProblemReportScope::Protocol,
+                        "unauthorized".into(),
+                        "unauthorized to change account type. Must be an administrator for this Mediator!".into(),
+                        vec![], None
+                    ), false);
+                }
+
+                // Get current account type and handle any shift to/from admin
+                let current = state.database.account_get(&did_hash).await?;
+                if let Some(current) = &current {
+                    if current._type == _type {
+                        // Types are the same, no need to change.
+                        return _generate_response_message(
+                            &msg.id,
+                            &session.did,
+                            &state.config.mediator_did,
+                            &json!(true),
+                        );
+                    } else if current._type.is_admin() && _type.is_admin() {
+                        // Changing between different admin types is ok
+                        debug!("Switching admin type for DID: {} from ({}) to ({})", did_hash, current._type, _type);
+                    } else if current._type.is_admin() && !_type.is_admin() {
+                        // Need to strip admin rights first
+                        state.database.strip_admin_accounts(vec![did_hash.clone()]).await?;
+                    } else if !current._type.is_admin() && _type.is_admin() {
+                        // Need to add admin rights
+                        state.database.setup_admin_account(&did_hash, _type, &MediatorACLSet::from_u64(current.acls)).await?;
+                        info!("Added admin ({}) rights to DID: {}", _type, did_hash);
+                        return _generate_response_message(
+                            &msg.id,
+                            &session.did,
+                            &state.config.mediator_did,
+                            &json!(true),
+                        );
+                    }
+                }
+
+                // If here, then it is a simple type change at this point
+
+                match state.database.account_change_type(&did_hash, &_type).await {
+                    Ok(_) => {
+                        let current_type = if let Some(current) = &current {
+                            current._type.to_string()
+                        } else {
+                            "Unknown".to_string()
+                        };
+                        info!("Changed account type for DID: ({}) from ({}) to ({})", did_hash, current_type, _type);
+                        _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(true),
+                    )}
+                    Err(err) => {
+                        warn!("Error Changing account type. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error changing account type. Reason: {1}".into(),
                                 vec![err.to_string()],
                                 None,
                             ),

@@ -1,7 +1,10 @@
 use affinidi_messaging_sdk::{
     profiles::Profile,
     protocols::{
-        mediator::{accounts::Account, acls::MediatorACLSet},
+        mediator::{
+            accounts::{Account, AccountType},
+            acls::MediatorACLSet,
+        },
         Protocols,
     },
     ATM,
@@ -100,6 +103,7 @@ pub(crate) async fn manage_account_menu(
         "Back",
     ];
 
+    let mut account = account.clone();
     loop {
         println!();
         println!(
@@ -134,9 +138,23 @@ pub(crate) async fn manage_account_menu(
             .unwrap();
 
         match selection {
-            0 => {}
-            1 => {}
+            0 => {
+                // Modify ACLs
+            }
+            1 => {
+                // Change Account Type
+                match _change_account_type(atm, profile, protocols, theme, &account).await {
+                    Ok(_type) => {
+                        account._type = _type;
+                    }
+                    Err(err) => println!(
+                        "{}",
+                        style(format!("Error changing account type: {}", err)).red()
+                    ),
+                }
+            }
             2 => {
+                // Delete Account
                 match protocols
                     .mediator
                     .account_remove(atm, profile, Some(account.did_hash.clone()))
@@ -160,6 +178,48 @@ pub(crate) async fn manage_account_menu(
                 println!("Invalid selection");
             }
         }
+    }
+}
+
+async fn _change_account_type(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<AccountType, Box<dyn std::error::Error>> {
+    let mut selections = AccountType::iterator()
+        .map(|t| t.to_string())
+        .collect::<Vec<String>>();
+
+    selections.push("Back".to_string());
+
+    let selection = Select::with_theme(theme)
+        .with_prompt("Select Account Type?")
+        .default(0)
+        .items(&selections[..])
+        .interact()
+        .unwrap();
+
+    if selection == selections.len() - 1 {
+        // No change, exit gracefully
+        return Ok(account._type);
+    }
+
+    let new_type = AccountType::from(selection as u32);
+    println!("Changing account type to: {}", new_type);
+
+    if new_type == account._type {
+        // No change, exit gracefully
+        Ok(account._type)
+    } else {
+        protocols
+            .mediator
+            .account_change_type(atm, profile, &account.did_hash, new_type)
+            .await
+            .map_err(|e| e.to_string())?;
+        println!("{}", style("Account type changed successfully").green());
+        Ok(new_type)
     }
 }
 

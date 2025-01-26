@@ -12,6 +12,8 @@ use std::{sync::Arc, time::SystemTime};
 use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
 
+use super::accounts::AccountType;
+
 #[derive(Default)]
 pub struct Mediator {}
 
@@ -28,8 +30,15 @@ pub enum MediatorAdminRequest {
 /// - `cursor` - The offset to use for the next request
 #[derive(Serialize, Deserialize)]
 pub struct MediatorAdminList {
-    pub accounts: Vec<String>,
+    pub accounts: Vec<AdminAccount>,
     pub cursor: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AdminAccount {
+    pub did_hash: String,
+    #[serde(rename = "type")]
+    pub _type: AccountType,
 }
 
 impl Mediator {
