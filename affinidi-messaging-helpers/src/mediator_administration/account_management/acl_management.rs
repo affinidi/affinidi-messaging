@@ -15,7 +15,6 @@ use affinidi_messaging_sdk::{
 };
 use console::style;
 use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
-use ssi::json_ld::syntax::print;
 use std::sync::Arc;
 
 use crate::SharedConfig;
@@ -93,9 +92,9 @@ pub(crate) async fn manage_account_acls(
 }
 
 async fn _modify_acl_flags(
-    atm: &ATM,
-    profile: &Arc<Profile>,
-    protocols: &Protocols,
+    _atm: &ATM,
+    _profile: &Arc<Profile>,
+    _protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
 ) -> Result<MediatorACLSet, Box<dyn std::error::Error>> {
@@ -187,10 +186,7 @@ async fn _modify_acl_flags(
     if new_acls == acls {
         println!("{}", style("No changes made").yellow());
         return Ok(acls);
-    } else {
-        println!("New ACLs: {:064b}", new_acls.to_u64());
-        todo!("Change the ACL on the mediator");
     }
-
-    Ok(acls)
+    println!("New ACLs: {:064b}", new_acls.to_u64());
+    todo!("Change the ACL on the mediator");
 }

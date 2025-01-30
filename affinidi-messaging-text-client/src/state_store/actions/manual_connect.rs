@@ -7,7 +7,7 @@ use did_peer::{
 use ssi::{jwk::Params, JWK};
 
 /// Creates a DID Peer to use as the DIDComm agent for a Ollama Model
-pub fn create_did_peer(mediator_did: &str, alias: &str) -> Result<(String, Vec<Secret>)> {
+pub fn _create_did_peer(mediator_did: &str, _alias: &str) -> Result<(String, Vec<Secret>)> {
     let e_secp256k1_key = JWK::generate_secp256k1();
     let v_ed25519_key = JWK::generate_ed25519().unwrap();
 
