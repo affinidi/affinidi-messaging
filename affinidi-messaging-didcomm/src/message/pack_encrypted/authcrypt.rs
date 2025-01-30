@@ -82,10 +82,29 @@ pub(crate) async fn authcrypt<'sr>(
     let from_keys = from_kids
         .into_iter()
         .map(|kid| {
+            from_ddoc.get_verification_method(&kid).ok_or_else(|| {
+                // TODO: support external keys
+                err_msg(
+                    ErrorKind::Malformed,
+                    format!(
+                        "No verification material found for sender key agreement {}",
+                        kid
+                    ),
+                )
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    /*
+     let from_keys = from_kids
+        .into_iter()
+        .map(|kid| {
             from_ddoc
                 .verification_method
                 .iter()
-                .find(|vm| vm.id == kid)
+                .find(|vm| {
+                    println!("vm.id: {}", vm.id);
+                    vm.id == kid
+                })
                 .ok_or_else(|| {
                     // TODO: support external keys
                     err_msg(
@@ -98,6 +117,7 @@ pub(crate) async fn authcrypt<'sr>(
                 })
         })
         .collect::<Result<Vec<_>>>()?;
+    */
 
     // Initial list of recipient keys is all key_agreements of recipient did doc
     // or filtered to keep only provided key
@@ -125,20 +145,16 @@ pub(crate) async fn authcrypt<'sr>(
     let to_keys = to_kids
         .into_iter()
         .map(|kid| {
-            to_ddoc
-                .verification_method
-                .iter()
-                .find(|vm| vm.id == kid)
-                .ok_or_else(|| {
-                    // TODO: support external keys
-                    err_msg(
-                        ErrorKind::Malformed,
-                        format!(
-                            "No verification material found for recipient key agreement {}",
-                            kid
-                        ),
-                    )
-                })
+            to_ddoc.get_verification_method(&kid).ok_or_else(|| {
+                // TODO: support external keys
+                err_msg(
+                    ErrorKind::Malformed,
+                    format!(
+                        "No verification material found for recipient key agreement {}",
+                        kid
+                    ),
+                )
+            })
         })
         .collect::<Result<Vec<_>>>()?;
 

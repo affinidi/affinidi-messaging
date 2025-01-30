@@ -13,21 +13,21 @@ use std::fmt::Display;
 use crate::errors::ATMError;
 use serde::{Deserialize, Serialize};
 
-/// There are two ACL Modes
-/// - `ExplicitAllow`: DIDs listed in the ACL will be allowed
-/// - `ExplicitDeny`: DIDs listed in the ACL will be denied
+/// There are two access list Modes
+/// - `ExplicitAllow`: DIDs listed in the access list will be allowed
+/// - `ExplicitDeny`: DIDs listed in the access list will be denied
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
-pub enum ACLModeType {
+pub enum AccessListModeType {
     #[default]
     ExplicitAllow,
     ExplicitDeny,
 }
 
-impl Display for ACLModeType {
+impl Display for AccessListModeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ACLModeType::ExplicitAllow => write!(f, "Explicit_Allow"),
-            ACLModeType::ExplicitDeny => write!(f, "Explicit_Deny"),
+            AccessListModeType::ExplicitAllow => write!(f, "Explicit_Allow"),
+            AccessListModeType::ExplicitDeny => write!(f, "Explicit_Deny"),
         }
     }
 }
@@ -37,8 +37,8 @@ impl Display for ACLModeType {
 pub struct MediatorACLSet {
     /*
     Bit position mapping
-        0: did_acl_mode (0 = explicit_allow, 1 = explicit_deny)
-        1: did_acl_mode_change (0 = admin_only, 1 = self)
+        0: access_list_mode (0 = explicit_allow, 1 = explicit_deny)
+        1: access_list_mode_change (0 = admin_only, 1 = self)
         2: did_blocked (0 = allow, 1 = blocked)
         3: did_local (0 = false, 1 = true/local)
         4: send_messages (0 = false, 1 = true)
@@ -53,10 +53,10 @@ pub struct MediatorACLSet {
        13: create_invites_change (0 = admin_only, 1 = self)
        14: anon_receive (0 = no, 1 = yes)
        15: anon_receive_change (0 = admin_only, 1 = self)
-       16: self_manage_list (0 = no, 1 = yes)
+       16: self_manage_list (0 = admin_only, 1 = self)
     */
-    did_acl_mode: ACLModeType,
-    did_acl_mode_self_change: bool,
+    access_list_mode: AccessListModeType,
+    access_list_mode_self_change: bool,
     did_blocked: bool,
     did_local: bool,
     send_messages: bool,
@@ -76,6 +76,12 @@ pub struct MediatorACLSet {
     acl: u64,
 }
 
+impl PartialEq for MediatorACLSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.acl == other.acl
+    }
+}
+
 impl MediatorACLSet {
     /// Takes a comma separated string of ACL rules and converts it to an ACLSet
     /// Example format: "MODE_EXPLICIT_DENY, LOCAL, SEND_MESSAGES"
@@ -88,7 +94,11 @@ impl MediatorACLSet {
 
             match item {
                 "allow_all" => {
-                    default_acl.set_did_acl_mode(ACLModeType::ExplicitDeny, true, true)?;
+                    default_acl.set_access_list_mode(
+                        AccessListModeType::ExplicitDeny,
+                        true,
+                        true,
+                    )?;
                     default_acl.set_local(true);
                     default_acl.set_send_messages(true, true, true)?;
                     default_acl.set_receive_messages(true, true, true)?;
@@ -99,7 +109,11 @@ impl MediatorACLSet {
                     default_acl.set_self_manage_list(true);
                 }
                 "deny_all" => {
-                    default_acl.set_did_acl_mode(ACLModeType::ExplicitAllow, false, true)?;
+                    default_acl.set_access_list_mode(
+                        AccessListModeType::ExplicitAllow,
+                        false,
+                        true,
+                    )?;
                     default_acl.set_local(false);
                     default_acl.set_send_messages(false, false, true)?;
                     default_acl.set_receive_messages(false, false, true)?;
@@ -110,21 +124,25 @@ impl MediatorACLSet {
                     default_acl.set_self_manage_list(false);
                 }
                 "mode_explicit_allow" => {
-                    default_acl.set_did_acl_mode(
-                        ACLModeType::ExplicitAllow,
-                        default_acl.get_did_acl_mode_admin_change(),
+                    default_acl.set_access_list_mode(
+                        AccessListModeType::ExplicitAllow,
+                        default_acl.get_access_list_mode_admin_change(),
                         true,
                     )?;
                 }
                 "mode_explicit_deny" => {
-                    default_acl.set_did_acl_mode(
-                        ACLModeType::ExplicitDeny,
-                        default_acl.get_did_acl_mode_admin_change(),
+                    default_acl.set_access_list_mode(
+                        AccessListModeType::ExplicitDeny,
+                        default_acl.get_access_list_mode_admin_change(),
                         true,
                     )?;
                 }
                 "mode_self_change" => {
-                    default_acl.set_did_acl_mode(default_acl.get_did_acl_mode().0, true, true)?;
+                    default_acl.set_access_list_mode(
+                        default_acl.get_access_list_mode().0,
+                        true,
+                        true,
+                    )?;
                 }
                 "local" => {
                     default_acl.set_local(true);
@@ -200,6 +218,9 @@ impl MediatorACLSet {
                 "self_manage_list" => {
                     default_acl.set_self_manage_list(true);
                 }
+                "blocked" => {
+                    default_acl.set_blocked(true);
+                }
                 _ => {
                     return Err(ATMError::ConfigError(format!(
                         "Invalid ACL String ({})",
@@ -229,8 +250,8 @@ impl MediatorACLSet {
             ..Default::default()
         };
 
-        acls.did_acl_mode = acls.get_did_acl_mode().0;
-        acls.did_acl_mode_self_change = acls.get_did_acl_mode_admin_change();
+        acls.access_list_mode = acls.get_access_list_mode().0;
+        acls.access_list_mode_self_change = acls.get_access_list_mode_admin_change();
         acls.did_blocked = acls.get_blocked();
         acls.did_local = acls.get_local();
         acls.send_messages = acls.get_send_messages().0;
@@ -279,54 +300,60 @@ impl MediatorACLSet {
 
     /// Returns the ACL Mode for a DID
     /// Returns (mode, self_change)
-    pub fn get_did_acl_mode(&self) -> (ACLModeType, bool) {
+    pub fn get_access_list_mode(&self) -> (AccessListModeType, bool) {
         // BIT 0 :: DID ACL Mode
         // BIT 1 :: DID ACL Mode Change
         if self.acl & 1_u64 == 0 {
-            (ACLModeType::ExplicitAllow, self.acl & (1_u64 << 1) != 0)
+            (
+                AccessListModeType::ExplicitAllow,
+                self.acl & (1_u64 << 1) != 0,
+            )
         } else {
-            (ACLModeType::ExplicitDeny, self.acl & (1_u64 << 1) != 0)
+            (
+                AccessListModeType::ExplicitDeny,
+                self.acl & (1_u64 << 1) != 0,
+            )
         }
     }
 
-    /// Sets the ACL Mode for a DID
+    /// Sets the access list Mode for a DID
     /// mode = explicit_allow or explicit_deny
-    /// self_change = true means the DID can change the ACL Mode
+    /// self_change = true means the DID can change the access list Mode
     /// admin = true means the DID is an admin (used to check if you can change settings)
-    pub fn set_did_acl_mode(
+    pub fn set_access_list_mode(
         &mut self,
-        mode: ACLModeType,
+        mode: AccessListModeType,
         self_change: bool,
         admin: bool,
     ) -> Result<(), ATMError> {
-        // BIT 0 :: DID ACL Mode (0 = explicit_allow, 1 = explicit_deny)
-        // BIT 1 :: DID ACL Mode Change (0 = admin_only, 1 = self)
+        // BIT 0 :: DID access list Mode (0 = explicit_allow, 1 = explicit_deny)
+        // BIT 1 :: DID access list Mode Change (0 = admin_only, 1 = self)
 
-        let change = self.get_did_acl_mode_admin_change();
+        let change = self.get_access_list_mode_admin_change();
 
         if !change && !admin {
             Err(ATMError::ACLDenied(
-                "Do not have permission to change the DID ACL Mode".into(),
+                "Do not have permission to change the DID Access List Mode".into(),
             ))
         } else {
             match mode {
-                ACLModeType::ExplicitAllow => self.acl &= !1_u64,
-                ACLModeType::ExplicitDeny => self.acl |= 1_u64,
+                AccessListModeType::ExplicitAllow => self.acl &= !1_u64,
+                AccessListModeType::ExplicitDeny => self.acl |= 1_u64,
             }
-            self.did_acl_mode = mode;
+            self.access_list_mode = mode;
 
-            // Only admin accounts can change the ACL Mode Change setting
+            // Only admin accounts can change the access list Mode Change setting
             if admin {
                 self._generic_set(1, self_change);
-                self.did_acl_mode_self_change = self_change;
+                self.access_list_mode_self_change = self_change;
             }
 
             Ok(())
         }
     }
 
-    /// Do you need to have admin rights to change the DID ACL Mode?
-    pub fn get_did_acl_mode_admin_change(&self) -> bool {
+    /// Do you need to have admin rights to change the access list Mode?
+    pub fn get_access_list_mode_admin_change(&self) -> bool {
         // BIT Position 1
         self._generic_get(1)
     }
@@ -637,7 +664,7 @@ mod tests {
         // set up some ACL's
         acl.set_blocked(true);
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitDeny, true, true)
+            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
             .is_ok());
         acl.set_local(true);
 
@@ -647,8 +674,8 @@ mod tests {
         let acl2 = MediatorACLSet::from_u64(n);
         assert!(acl2.get_blocked());
         assert!(matches!(
-            acl2.get_did_acl_mode(),
-            (ACLModeType::ExplicitDeny, true)
+            acl2.get_access_list_mode(),
+            (AccessListModeType::ExplicitDeny, true)
         ));
         assert!(acl2.get_local());
 
@@ -662,10 +689,10 @@ mod tests {
 
         // Should default to explicit_allow, and only admins can change it
         assert!(matches!(
-            acl.get_did_acl_mode(),
-            (ACLModeType::ExplicitAllow, false)
+            acl.get_access_list_mode(),
+            (AccessListModeType::ExplicitAllow, false)
         ));
-        assert!(!acl.get_did_acl_mode_admin_change());
+        assert!(!acl.get_access_list_mode_admin_change());
     }
 
     #[test]
@@ -674,23 +701,23 @@ mod tests {
 
         // Test that admin can change both the mode and the change setting
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitDeny, true, true)
+            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
             .is_ok());
         assert!(matches!(
-            acl.get_did_acl_mode(),
-            (ACLModeType::ExplicitDeny, true)
+            acl.get_access_list_mode(),
+            (AccessListModeType::ExplicitDeny, true)
         ));
-        assert!(acl.get_did_acl_mode_admin_change());
+        assert!(acl.get_access_list_mode_admin_change());
 
         // Test that we can flip back to the default
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitAllow, false, true)
+            .set_access_list_mode(AccessListModeType::ExplicitAllow, false, true)
             .is_ok());
         assert!(matches!(
-            acl.get_did_acl_mode(),
-            (ACLModeType::ExplicitAllow, false)
+            acl.get_access_list_mode(),
+            (AccessListModeType::ExplicitAllow, false)
         ));
-        assert!(!acl.get_did_acl_mode_admin_change());
+        assert!(!acl.get_access_list_mode_admin_change());
     }
 
     #[test]
@@ -699,13 +726,13 @@ mod tests {
 
         // Test that non-admins can't change the mode
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitDeny, true, false)
+            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, false)
             .is_err());
         assert!(matches!(
-            acl.get_did_acl_mode(),
-            (ACLModeType::ExplicitAllow, false)
+            acl.get_access_list_mode(),
+            (AccessListModeType::ExplicitAllow, false)
         ));
-        assert!(!acl.get_did_acl_mode_admin_change());
+        assert!(!acl.get_access_list_mode_admin_change());
     }
 
     #[test]
@@ -714,18 +741,18 @@ mod tests {
 
         // Set up ACL so we can change it
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitAllow, true, true)
+            .set_access_list_mode(AccessListModeType::ExplicitAllow, true, true)
             .is_ok());
 
         // Test that non-admins only changes what it should
         assert!(acl
-            .set_did_acl_mode(ACLModeType::ExplicitDeny, false, false)
+            .set_access_list_mode(AccessListModeType::ExplicitDeny, false, false)
             .is_ok());
         assert!(matches!(
-            acl.get_did_acl_mode(),
-            (ACLModeType::ExplicitDeny, true)
+            acl.get_access_list_mode(),
+            (AccessListModeType::ExplicitDeny, true)
         ));
-        assert!(acl.get_did_acl_mode_admin_change());
+        assert!(acl.get_access_list_mode_admin_change());
     }
 
     #[test]

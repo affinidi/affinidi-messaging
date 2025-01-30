@@ -8,7 +8,7 @@ use affinidi_messaging_helpers::common::{
 use affinidi_messaging_sdk::{
     config::Config,
     protocols::{
-        mediator::acls::{ACLModeType, MediatorACLSet},
+        mediator::acls::{AccessListModeType, MediatorACLSet},
         Protocols,
     },
     ATM,
@@ -38,9 +38,9 @@ struct Args {
 #[derive(Debug, Deserialize)]
 struct SharedConfig {
     pub version: String,
-    pub root_admin_hash: String,
     pub our_admin_hash: String,
-    pub acl_mode: ACLModeType,
+    pub mediator_did_hash: String,
+    pub acl_mode: AccessListModeType,
     pub global_acl_default: MediatorACLSet,
 }
 
@@ -66,21 +66,21 @@ impl SharedConfig {
             return Err("Couldn't parse Mediator Configuration".into());
         };
 
-        let root_admin_did = if let Some(root_admin_did) = config.get("admin_did") {
-            if let Some(root_admin_did) = root_admin_did.as_str() {
-                root_admin_did.to_string()
+        let mediator_did = if let Some(mediator_did) = config.get("mediator_did") {
+            if let Some(mediator_did) = mediator_did.as_str() {
+                mediator_did.to_string()
             } else {
-                return Err("Couldn't find admin_did in Mediator Configuration".into());
+                return Err("Couldn't find mediator_did in Mediator Configuration".into());
             }
         } else {
-            return Err("Couldn't find admin_did in Mediator Configuration".into());
+            return Err("Couldn't find mediator_did in Mediator Configuration".into());
         };
 
         let acl_mode = if let Some(acl_mode) = config
             .get("security")
             .and_then(|security| security.get("mediator_acl_mode"))
         {
-            match serde_json::from_value::<ACLModeType>(acl_mode.to_owned()) {
+            match serde_json::from_value::<AccessListModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
                 Err(_) => {
                     return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())
@@ -106,10 +106,10 @@ impl SharedConfig {
 
         Ok(SharedConfig {
             version,
-            root_admin_hash: digest(&root_admin_did),
             acl_mode,
             global_acl_default,
             our_admin_hash: String::new(),
+            mediator_did_hash: digest(mediator_did),
         })
     }
 }

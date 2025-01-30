@@ -10,6 +10,8 @@ use protocols::{
     mediator::{accounts, acls, administration},
     message_pickup, routing,
 };
+use ssi::dids::document::service::Endpoint;
+use std::collections::HashSet;
 use std::time::SystemTime;
 
 pub mod error_response;
@@ -89,15 +91,20 @@ pub(crate) struct ProcessMessageResponse {
     pub data: WrapperType,
 }
 
+/// Options for packing a message
 #[derive(Debug)]
 pub struct PackOptions {
+    /// Protects against DoS attacks by limiting the number of keys per recipient
     pub to_keys_per_recipient_limit: usize,
+    /// If true, then will repack the message for the next recipient if possible
+    pub forward: bool,
 }
 
 impl Default for PackOptions {
     fn default() -> Self {
         PackOptions {
             to_keys_per_recipient_limit: 100,
+            forward: true,
         }
     }
 }
@@ -112,14 +119,17 @@ pub(crate) trait MessageHandler {
     ) -> Result<ProcessMessageResponse, MediatorError>;
 
     /// Uses the incoming unpack metadata to determine best way to pack the message
+    #[allow(clippy::too_many_arguments)]
     async fn pack<S>(
         &self,
+        session_id: &str,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
         did_resolver: &DIDCacheClient,
         pack_options: &PackOptions,
+        forward_locals: &HashSet<String>,
     ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
         S: SecretsResolver;
@@ -161,16 +171,50 @@ impl MessageHandler for Message {
 
     async fn pack<S>(
         &self,
+        session_id: &str,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
         secrets_resolver: &S,
         did_resolver: &DIDCacheClient,
         pack_options: &PackOptions,
+        forward_locals: &HashSet<String>,
     ) -> Result<(String, PackEncryptedMetadata), MediatorError>
     where
         S: SecretsResolver,
     {
+        // Check if this message would route back to the mediator based on potential next hops
+        let to_doc = did_resolver.resolve(to_did).await.map_err(|e| {
+            MediatorError::DIDError(session_id.into(), to_did.into(), e.to_string())
+        })?;
+        let mut forward_loopback = to_doc.doc.service.iter().any(|service| {
+            if let Some(endpoints) = &service.service_endpoint {
+                endpoints.into_iter().any(|endpoint| {
+                    let uri = match endpoint {
+                        Endpoint::Uri(uri) => uri.to_string(),
+                        Endpoint::Map(map) => {
+                            if let Some(uri) = map.get("uri") {
+                                uri.as_str().unwrap_or_default().to_string()
+                            } else {
+                                "".to_string()
+                            }
+                        }
+                    };
+                    forward_locals.contains(&uri)
+                })
+            } else {
+                false
+            }
+        });
+
+        // Flip the forward loopback flag if the message is not meant to be forwarded
+        forward_loopback = !forward_loopback;
+
+        // If the pack option was not to forward, then force forward loopback to false
+        if !pack_options.forward {
+            forward_loopback = false;
+        }
+
         if metadata.encrypted {
             // Respond with an encrypted message
             let a = match self
@@ -182,6 +226,7 @@ impl MessageHandler for Message {
                     secrets_resolver,
                     &PackEncryptedOptions {
                         to_kids_limit: pack_options.to_keys_per_recipient_limit,
+                        forward: forward_loopback,
                         ..PackEncryptedOptions::default()
                     },
                 )

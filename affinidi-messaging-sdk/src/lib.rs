@@ -19,6 +19,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio_tungstenite::Connector;
+use tracing::Instrument;
 use tracing::{debug, span};
 use transports::websockets::ws_handler::WsHandlerCommands;
 use transports::websockets::ws_handler::WsHandlerMode;
@@ -206,16 +207,21 @@ impl ATM {
     /// This resolves the DID to the DID Document, and adds it to the list of known DIDs
     /// Returns the DIDDoc itself if successful, or an SDK Error
     pub async fn add_did(&self, did: &str) -> Result<Document, ATMError> {
-        let _span = span!(tracing::Level::DEBUG, "add_did", did = did).entered();
-        debug!("Adding DID to resolver");
+        let _span = span!(tracing::Level::DEBUG, "add_did", did = did);
 
-        match self.inner.did_resolver.resolve(did).await {
-            Ok(results) => Ok(results.doc),
-            Err(err) => Err(ATMError::DIDError(format!(
-                "Couldn't resolve did ({}). Reason: {}",
-                did, err
-            ))),
+        async move {
+            debug!("Adding DID to resolver");
+
+            match self.inner.did_resolver.resolve(did).await {
+                Ok(results) => Ok(results.doc),
+                Err(err) => Err(ATMError::DIDError(format!(
+                    "Couldn't resolve did ({}). Reason: {}",
+                    did, err
+                ))),
+            }
         }
+        .instrument(_span)
+        .await
     }
 
     /// Adds secret to the secrets resolver

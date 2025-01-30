@@ -16,24 +16,62 @@ use std::{
 #[derive(Serialize, Deserialize)]
 pub enum MediatorAccountRequest {
     AccountGet(String),
-    AccountList { cursor: u32, limit: u32 },
-    AccountAdd { did_hash: String, acls: Option<u64> },
+    AccountList {
+        cursor: u32,
+        limit: u32,
+    },
+    AccountAdd {
+        did_hash: String,
+        acls: Option<u64>,
+    },
     AccountRemove(String),
+    AccountChangeType {
+        did_hash: String,
+        #[serde(alias = "type")]
+        _type: AccountType,
+    },
 }
 
 /// Different levels of accounts in the mediator
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum AccountType {
+    /// The DID refers to the mediator itself
+    Mediator,
+    /// The root admin DID, used to manage other admins.
     RootAdmin,
+    /// Admin accounts, can modify other accounts
     Admin,
+    /// Standard accounts, can only modify their own account
     #[default]
     Standard,
+    /// Unknown account type
     Unknown,
+}
+impl AccountType {
+    pub fn is_admin(&self) -> bool {
+        matches!(
+            self,
+            AccountType::Admin | AccountType::RootAdmin | AccountType::Mediator
+        )
+    }
+
+    pub fn iterator() -> impl Iterator<Item = AccountType> {
+        [
+            AccountType::Standard,
+            AccountType::Admin,
+            AccountType::RootAdmin,
+            AccountType::Mediator,
+            AccountType::Unknown,
+        ]
+        .iter()
+        .copied()
+    }
 }
 
 impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            AccountType::Mediator => write!(f, "Mediator"),
             AccountType::RootAdmin => write!(f, "Root Admin"),
             AccountType::Admin => write!(f, "Admin"),
             AccountType::Standard => write!(f, "Standard"),
@@ -48,6 +86,7 @@ impl From<&str> for AccountType {
             "0" => AccountType::Standard,
             "1" => AccountType::Admin,
             "2" => AccountType::RootAdmin,
+            "3" => AccountType::Mediator,
             _ => AccountType::Unknown,
         }
     }
@@ -59,6 +98,7 @@ impl From<u32> for AccountType {
             0 => AccountType::Standard,
             1 => AccountType::Admin,
             2 => AccountType::RootAdmin,
+            3 => AccountType::Mediator,
             _ => AccountType::Unknown,
         }
     }
@@ -73,6 +113,7 @@ impl From<String> for AccountType {
 impl From<AccountType> for String {
     fn from(role_type: AccountType) -> Self {
         match role_type {
+            AccountType::Mediator => "3".to_owned(),
             AccountType::RootAdmin => "2".to_owned(),
             AccountType::Admin => "1".to_owned(),
             AccountType::Standard => "0".to_owned(),
@@ -87,6 +128,7 @@ pub struct Account {
     pub did_hash: String,
     pub acls: u64,
     pub _type: AccountType,
+    pub access_list_count: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -401,6 +443,84 @@ impl Mediator {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Account List response could not be parsed. Reason: {}",
+                err
+            ))
+        })
+    }
+
+    /// Change the Account Type for a DID
+    /// - `atm` - The ATM client to use
+    /// - `profile` - The profile to use
+    /// - `did_hash` - The DID hash to change the type for
+    /// - `new_type` - New `AccountType` to set for the account
+    ///                  - NOTE: You must be an admin to run this command
+    ///
+    /// # Returns
+    /// true or false if the account was changed
+    pub async fn account_change_type(
+        &self,
+        atm: &ATM,
+        profile: &Arc<Profile>,
+        did_hash: &str,
+        new_type: AccountType,
+    ) -> Result<bool, ATMError> {
+        let _span = span!(Level::DEBUG, "account_change_type");
+
+        async move {
+            debug!("Changing account ({}) to type ({}).", did_hash, new_type);
+
+            let (profile_did, mediator_did) = profile.dids()?;
+
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let msg = Message::build(
+                Uuid::new_v4().into(),
+                "https://didcomm.org/mediator/1.0/account-management".to_owned(),
+                json!({"AccountChangeType": {"did_hash": did_hash, "type": new_type}}),
+            )
+            .to(mediator_did.into())
+            .from(profile_did.into())
+            .created_time(now)
+            .expires_time(now + 10)
+            .finalize();
+
+            let msg_id = msg.id.clone();
+
+            // Pack the message
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+            if let SendMessageResponse::Message(message) =
+                atm.send_message(profile, &msg, &msg_id, true, true).await?
+            {
+                self._parse_account_change_type_response(&message)
+            } else {
+                Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                ))
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Parses the response from the mediator for account_add
+    fn _parse_account_change_type_response(&self, message: &Message) -> Result<bool, ATMError> {
+        serde_json::from_value(message.body.clone()).map_err(|err| {
+            ATMError::MsgReceiveError(format!(
+                "Mediator Account Change Type response could not be parsed. Reason: {}",
                 err
             ))
         })

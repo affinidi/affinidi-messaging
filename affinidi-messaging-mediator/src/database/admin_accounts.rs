@@ -2,7 +2,9 @@
 use super::DatabaseHandler;
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
-    accounts::AccountType, acls::MediatorACLSet, administration::MediatorAdminList,
+    accounts::AccountType,
+    acls::MediatorACLSet,
+    administration::{AdminAccount, MediatorAdminList},
 };
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
@@ -13,28 +15,30 @@ impl DatabaseHandler {
     /// Updates both the DID role type and the global ADMIN Set in Redis.
     pub(crate) async fn setup_admin_account(
         &self,
-        admin_did: &str,
+        admin_did_hash: &str,
         admin_type: AccountType,
         acls: &MediatorACLSet,
     ) -> Result<(), MediatorError> {
-        let did_hash = sha256::digest(admin_did);
         // Check if the admin account already exists
-        if !self.account_exists(&did_hash).await? {
-            debug!("Admin account doesn't exist, creating: {}", admin_did);
-            self.account_add(&did_hash, acls).await?;
+        if !self.account_exists(admin_did_hash).await? {
+            debug!("Admin account doesn't exist, creating: {}", admin_did_hash);
+            self.account_add(admin_did_hash, acls).await?;
         }
         let mut con = self.get_async_connection().await?;
 
-        debug!("Admin DID ({}) == hash ({})", admin_did, did_hash);
+        debug!(
+            "Admin DID ({}) == hash ({})",
+            admin_did_hash, admin_did_hash
+        );
 
         deadpool_redis::redis::pipe()
             .atomic()
             .cmd("SADD")
             .arg("ADMINS")
-            .arg(&did_hash)
+            .arg(admin_did_hash)
             .ignore()
             .cmd("HSET")
-            .arg(["DID:", &did_hash].concat())
+            .arg(["DID:", admin_did_hash].concat())
             .arg("ROLE_TYPE")
             .arg::<String>(admin_type.into())
             .ignore()
@@ -45,12 +49,12 @@ impl DatabaseHandler {
                     "NA".to_string(),
                     format!(
                         "error in setup of admin account for ({}). Reason: {}",
-                        admin_did, err
+                        admin_did_hash, err
                     ),
                 )
             })?;
 
-        info!("Admin account successfully setup: {}", admin_did);
+        info!("Admin account successfully setup: {}", admin_did_hash);
         Ok(())
     }
 
@@ -125,7 +129,7 @@ impl DatabaseHandler {
     }
 
     /// Strips up to 100 admin accounts from the mediator
-    /// - `accounts` - The list of accounts to strip admin rights from
+    /// - `accounts` - The list of DID hashes to strip admin rights from
     pub(crate) async fn strip_admin_accounts(
         &self,
         accounts: Vec<String>,
@@ -158,7 +162,11 @@ impl DatabaseHandler {
 
             // Remove admin field on each DID
             for account in &accounts {
-                tx = tx.cmd("HSET").arg(account).arg("ROLE_TYPE").arg("0");
+                tx = tx
+                    .cmd("HSET")
+                    .arg(["DID:", account].concat())
+                    .arg("ROLE_TYPE")
+                    .arg::<String>(AccountType::Standard.into());
             }
 
             let result: Vec<i32> = tx.query_async(&mut con).await.map_err(|err| {
@@ -244,8 +252,41 @@ impl DatabaseHandler {
                     )
                 })?;
             }
+
+            // Get the corresponding role type for each admin
+            let mut response: Vec<AdminAccount> = Vec::with_capacity(admins.len());
+            let mut tx = deadpool_redis::redis::pipe();
+            let mut tx = tx.atomic();
+            for admin in &admins {
+                tx = tx
+                    .cmd("HGET")
+                    .arg(["DID:", admin].concat())
+                    .arg("ROLE_TYPE");
+            }
+
+            let _types: Vec<Option<String>> = tx.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("Fetching Admin role types failed. Reason: {}", err),
+                )
+            })?;
+
+            for (i, t) in _types.iter().enumerate() {
+                if let Some(role_type) = t {
+                    response.push(AdminAccount {
+                        did_hash: admins[i].clone(),
+                        _type: AccountType::from(role_type.as_str()),
+                    });
+                } else {
+                    response.push(AdminAccount {
+                        did_hash: admins[i].clone(),
+                        _type: AccountType::Unknown,
+                    });
+                }
+            }
+
             Ok(MediatorAdminList {
-                accounts: admins,
+                accounts: response,
                 cursor: new_cursor,
             })
         }

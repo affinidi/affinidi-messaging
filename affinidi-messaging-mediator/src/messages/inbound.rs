@@ -84,7 +84,7 @@ pub(crate) async fn handle_inbound(
                 let from_hash = envelope.from_did.as_ref().map(digest);
                 if !state
                     .database
-                    .local_acl_allowed(&digest(to_did), from_hash)
+                    .access_list_allowed(&digest(to_did), from_hash)
                     .await?
                 {
                     // Message is not allowed

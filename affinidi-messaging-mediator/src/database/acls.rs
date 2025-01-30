@@ -1,6 +1,6 @@
 use affinidi_messaging_sdk::protocols::mediator::{
-    acls::{ACLModeType, MediatorACLSet},
-    acls_handler::{MediatorACLExpanded, MediatorACLResponse},
+    acls::{AccessListModeType, MediatorACLSet},
+    acls_handler::{MediatorACLExpanded, MediatorACLGetResponse},
 };
 use redis::{from_redis_value, Cmd, Pipeline, Value};
 use tracing::{debug, span, Instrument, Level};
@@ -11,6 +11,7 @@ use super::DatabaseHandler;
 
 impl DatabaseHandler {
     /// Replace the ACL for a given DID
+    /// Assumes that the checks on can you change the ACL have already been done
     pub(crate) async fn set_did_acl(
         &self,
         did_hash: &str,
@@ -85,8 +86,8 @@ impl DatabaseHandler {
     pub(crate) async fn get_did_acls(
         &self,
         dids: &[String],
-        mediator_acl_mode: ACLModeType,
-    ) -> Result<MediatorACLResponse, MediatorError> {
+        mediator_acl_mode: AccessListModeType,
+    ) -> Result<MediatorACLGetResponse, MediatorError> {
         let _span = span!(Level::DEBUG, "get_did_acls");
 
         async move {
@@ -114,7 +115,7 @@ impl DatabaseHandler {
                 )
             })?;
 
-            let mut acl_response: MediatorACLResponse = MediatorACLResponse {
+            let mut acl_response: MediatorACLGetResponse = MediatorACLGetResponse {
                 acl_response: vec![],
                 mediator_acl_mode,
             };
@@ -136,12 +137,12 @@ impl DatabaseHandler {
         .await
     }
 
-    /// Checks if the `to_hash` is allowed in the local ACL for the given `key_hash`
+    /// Checks if the `to_hash` is allowed in the access list for the given `key_hash`
     /// - `to_hash` - Hash of the DID we are checking against (typically the TO address)
     /// - `from_hash` - Hash of the DID we are checking for (typically the FROM address)
     ///
     /// Returns true if it exists, false otherwise
-    pub async fn local_acl_allowed(
+    pub async fn access_list_allowed(
         &self,
         to_hash: &str,
         from_hash: Option<String>,
@@ -152,7 +153,7 @@ impl DatabaseHandler {
             let (exists, acl): (bool, Option<String>) = deadpool_redis::redis::pipe()
                 .atomic()
                 .cmd("SISMEMBER")
-                .arg(["LOCAL_ACL:", to_hash].concat())
+                .arg(["ACCESS_LIST:", to_hash].concat())
                 .arg(from_hash)
                 .cmd("HGET")
                 .arg(["DID:", to_hash].concat())
@@ -174,15 +175,15 @@ impl DatabaseHandler {
                 return Ok(false);
             };
 
-            if acl.get_did_acl_mode().0 == ACLModeType::ExplicitAllow {
+            if acl.get_access_list_mode().0 == AccessListModeType::ExplicitAllow {
                 debug!(
-                    "local_acl_lookup == true for to_hash({}), from_hash({})",
+                    "access_list_lookup == true for to_hash({}), from_hash({})",
                     to_hash, from_hash
                 );
                 Ok(exists)
             } else {
                 debug!(
-                    "local_acl_lookup == false for to_hash({}), from_hash({})",
+                    "access_list_lookup == false for to_hash({}), from_hash({})",
                     to_hash, from_hash
                 );
                 Ok(!exists)

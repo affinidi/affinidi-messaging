@@ -22,6 +22,10 @@ impl AffinidiSecrets {
     pub fn is_empty(&self) -> bool {
         self.known_secrets.is_empty()
     }
+
+    pub fn known_secrets(&self) -> &Vec<Secret> {
+        &self.known_secrets
+    }
 }
 
 #[async_trait]

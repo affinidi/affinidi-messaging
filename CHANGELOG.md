@@ -2,6 +2,46 @@
 
 ## Changelog history
 
+## XX January 2025 (0.9.4)
+
+### All (0.9.4)
+
+* Rand crate updated from 0.8.x to 0.9.x
+
+### DIDComm Library (0.9.4)
+
+* Cleaned up unneeded lifetime parameters
+* Changed how DID Document Verification Methods are discovered, more robust algorithm used
+* Tested multi-key recipient sending/receiving - some changes required to pack/unpack
+* Removed getrandom crate which is no longer used.
+
+### Mediator (0.9.4)
+
+* Removing Accounts implemented with full cleanup of associated data
+  * If admin account, correctly removes from the ADMIN list
+  * Can not remove the Mediator DID or Root-Admin DID
+* Database Schema version is now recorded, allows for upgrade paths when schema changes
+* Mediator Account Type added, allows for treating the Mediator DID separately
+* FIX: Trying to strip admin rights from an empty list will now correctly create a ProblemReport that explains the issue
+* FIX: Mediator Administration generates a client side error when no Admin DID is selected when removing Admin Accounts
+* FIX: Double hashing of DID's on admin_add, refactored so now only uses SHA256 hashed DID's
+* FEATURE: Added AccountChangeType to the mediator account-management protocol
+* FIX/FEATURE: Mediator will detect when forwarding a message to itself.
+  * When a forward to itself is detected, it will block the forward and deliver locally
+  * Added configurtion for other local mediator DID's that you want to block forwarding towards
+
+### SDK (0.9.4)
+
+* FIX: If ProblemReport had no args, deserializing would fail as no args field. Now defaults to empty array correctly
+* TEST: Added ProblemReport tests to check for empty args and serialization/deserialization
+* FEATURE: Added AccountChangeType to the mediator account-management protocol
+
+### Text-Client (0.9.4)
+
+* Added ability to manually add a remote DID for direct establishment
+
+---
+
 ## 18th January 2025 (0.9.2)
 
 ### Mediator (0.9.2)

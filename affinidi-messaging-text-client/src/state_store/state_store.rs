@@ -176,6 +176,17 @@ impl StateStore {
                         state.accept_invite_popup.show = false;
                         state.accept_invite_popup.invite_link = String::new();
                     }
+                    Action::ManualConnectPopupStart => {
+                        state.manual_connect_popup.show = true;
+                    },
+                    Action::ManualConnectPopupStop => {
+                        state.manual_connect_popup.show = false;
+                        state.manual_connect_popup.remote_did = String::new();
+                    },
+                    Action::ManualConnect { remote_did } => {
+                        state.manual_connect_popup.remote_did = remote_did;
+                        //let _ = send_invitation_accept(&mut state, &self.state_tx, &atm).await;
+                    }
                 },
                 // Tick to terminate the select every N milliseconds
                 _ = ticker.tick() => {

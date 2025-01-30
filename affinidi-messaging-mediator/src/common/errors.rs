@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
@@ -350,7 +350,7 @@ impl<T: GenericDataStruct> SuccessResponse<T> {
 
 // Creates a random transaction identifier for each transaction
 pub fn create_session_id() -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(&Alphanumeric)
         .take(12)
         .map(char::from)
