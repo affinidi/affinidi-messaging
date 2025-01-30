@@ -11,6 +11,7 @@ mod accept_invite_popup;
 mod chat_details_popup;
 mod invite_popup;
 mod main_page;
+mod manual_connect_popup;
 mod settings_popup;
 
 enum ActivePage {

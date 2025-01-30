@@ -265,6 +265,7 @@ dependencies = [
  "circular-queue",
  "color-eyre",
  "crossterm",
+ "did-peer",
  "image",
  "log",
  "qrcode",
@@ -2387,9 +2388,9 @@ dependencies = [
 
 [[package]]
 name = "did-peer"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71c501463d2d032059e2294ffc7504652b057a83a8bb61fd405a1fc6328302cb"
+checksum = "1aec572ef28aae2e88043a0893e10d382cad2aaaefeb2179778f9905b8729517"
 dependencies = [
  "base64 0.22.1",
  "iref",

@@ -28,6 +28,11 @@ impl ComponentRender<RenderProps> for BottomMenu {
                 " Accept Invite ",
                 Style::default().bg(Color::Cyan).fg(Color::Black),
             ),
+            Span::styled(" F4", Style::default().fg(Color::Gray).bold()),
+            Span::styled(
+                " Manual Connect ",
+                Style::default().bg(Color::Cyan).fg(Color::Black),
+            ),
             Span::styled(" F10", Style::default().fg(Color::Gray).bold()),
             Span::styled(" Quit ", Style::default().bg(Color::Cyan).fg(Color::Black)),
         ]);

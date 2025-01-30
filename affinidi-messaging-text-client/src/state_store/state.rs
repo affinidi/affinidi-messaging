@@ -113,6 +113,12 @@ pub struct AcceptInvitePopupState {
     pub messages: Vec<Line<'static>>,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct ManualConnectPopupState {
+    pub show: bool,
+    pub remote_did: String,
+}
+
 /// State holds the state of the application
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct State {
@@ -125,6 +131,8 @@ pub struct State {
     pub chat_details_popup: ChatDetailsPopupState,
     #[serde(skip)]
     pub accept_invite_popup: AcceptInvitePopupState,
+    #[serde(skip)]
+    pub manual_connect_popup: ManualConnectPopupState,
     #[serde(skip)]
     pub initialization: bool,
 }

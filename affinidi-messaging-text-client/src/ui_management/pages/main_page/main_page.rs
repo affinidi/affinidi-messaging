@@ -9,7 +9,9 @@ use crate::{
     ui_management::pages::{
         accept_invite_popup::accept_invite_popup::AcceptInvitePopup,
         chat_details_popup::chat_details_popup::ChatDetailsPopup,
-        invite_popup::invite_popup::InvitePopup, settings_popup::settings_popup::SettingsPopup,
+        invite_popup::invite_popup::InvitePopup,
+        manual_connect_popup::manual_connect_popup::ManualConnectPopup,
+        settings_popup::settings_popup::SettingsPopup,
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -103,6 +105,7 @@ pub struct MainPage {
     message_input_box: MessageInputBox,
     pub settings_popup: SettingsPopup,
     pub invite_popup: InvitePopup,
+    pub manual_connect_popup: ManualConnectPopup,
     pub chat_details_popup: ChatDetailsPopup,
     pub accept_invite_popup: AcceptInvitePopup,
 }
@@ -182,7 +185,8 @@ impl Component for MainPage {
             settings_popup: SettingsPopup::new(state, action_tx.clone()),
             invite_popup: InvitePopup::new(state, action_tx.clone()),
             chat_details_popup: ChatDetailsPopup::new(state, action_tx.clone()),
-            accept_invite_popup: AcceptInvitePopup::new(state, action_tx),
+            accept_invite_popup: AcceptInvitePopup::new(state, action_tx.clone()),
+            manual_connect_popup: ManualConnectPopup::new(state, action_tx),
         }
         .move_with_state(state)
     }
@@ -200,6 +204,7 @@ impl Component for MainPage {
             chat_details_popup: self.chat_details_popup.move_with_state(state),
             message_input_box: self.message_input_box.move_with_state(state),
             accept_invite_popup: self.accept_invite_popup.move_with_state(state),
+            manual_connect_popup: self.manual_connect_popup.move_with_state(state),
             ..self
         }
     }
@@ -221,6 +226,8 @@ impl Component for MainPage {
             self.chat_details_popup.handle_key_event(key);
         } else if self.accept_invite_popup.props.show {
             self.accept_invite_popup.handle_key_event(key);
+        } else if self.manual_connect_popup.props.show {
+            self.manual_connect_popup.handle_key_event(key);
         } else {
             let active_section = self.active_section.clone();
 
@@ -309,6 +316,10 @@ impl Component for MainPage {
                     KeyCode::F(3) => {
                         // Display the Accept Invite Popup
                         let _ = self.action_tx.send(Action::AcceptInvitePopupStart);
+                    }
+                    KeyCode::F(4) => {
+                        // Display the Manual Connect Popup
+                        let _ = self.action_tx.send(Action::ManualConnectPopupStart);
                     }
                     KeyCode::F(10) => {
                         let _ = self.action_tx.send(Action::Exit);
@@ -506,6 +517,9 @@ impl ComponentRender<()> for MainPage {
         }
         if self.accept_invite_popup.props.show {
             self.accept_invite_popup.render(frame, ());
+        }
+        if self.manual_connect_popup.props.show {
+            self.manual_connect_popup.render(frame, ());
         }
     }
 }

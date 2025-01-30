@@ -36,6 +36,10 @@
 * TEST: Added ProblemReport tests to check for empty args and serialization/deserialization
 * FEATURE: Added AccountChangeType to the mediator account-management protocol
 
+### Text-Client (0.9.4)
+
+* Added ability to manually add a remote DID for direct establishment
+
 ---
 
 ## 18th January 2025 (0.9.2)
