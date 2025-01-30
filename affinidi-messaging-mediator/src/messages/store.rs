@@ -90,6 +90,7 @@ pub(crate) async fn store_message(
                     for recipient in to_dids {
                         let (packed, _): (String, PackEncryptedMetadata) = message
                             .pack(
+                                &session.session_id,
                                 recipient,
                                 &state.config.mediator_did,
                                 metadata,
@@ -100,7 +101,9 @@ pub(crate) async fn store_message(
                                         .config
                                         .limits
                                         .to_keys_per_recipient,
+                                    forward: true,
                                 },
+                                &state.config.process_forwarding.blocked_forwarding,
                             )
                             .await?;
 
@@ -147,6 +150,7 @@ pub(crate) async fn store_message(
         } else if let WrapperType::Message(message) = &response.data {
             let (packed, meta) = message
                 .pack(
+                    &session.session_id,
                     &session.did,
                     &state.config.mediator_did,
                     metadata,
@@ -154,9 +158,18 @@ pub(crate) async fn store_message(
                     &state.did_resolver,
                     &PackOptions {
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,
+                        forward: true,
                     },
+                    &state.config.process_forwarding.blocked_forwarding,
                 )
                 .await?;
+            if meta.messaging_service.is_some() {
+                error!("TODO: Forwarded message - but will be sent to the wrong address!!!");
+                return Err(MediatorError::NotImplemented(
+                    session.session_id.clone(),
+                    "Forwarding not implemented when mediator creating a packed message".into(),
+                ));
+            }
             trace!("Ephemeral message packed (meta):\n{:#?}", meta);
             trace!("Ephemeral message (msg):\n{:#?}", packed);
             // Live stream the message?

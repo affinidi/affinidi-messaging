@@ -128,6 +128,7 @@ pub struct Account {
     pub did_hash: String,
     pub acls: u64,
     pub _type: AccountType,
+    pub access_list_count: u32,
 }
 
 #[derive(Serialize, Deserialize)]

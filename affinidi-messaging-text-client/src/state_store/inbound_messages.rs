@@ -7,7 +7,7 @@ use affinidi_messaging_didcomm::{Attachment, AttachmentData, Message, UnpackMeta
 use affinidi_messaging_sdk::protocols::message_pickup::{MessagePickup, MessagePickupStatusReply};
 use affinidi_messaging_sdk::{protocols::Protocols, ATM};
 use base64::prelude::*;
-use rand::distributions::Alphanumeric;
+use rand::distr::Alphanumeric;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -76,7 +76,7 @@ async fn _handle_connection_setup(
                             n: Name {
                                 given: Some("UNKNOWN".to_string()),
                                 surname: Some(
-                                    rand::thread_rng()
+                                    rand::rng()
                                         .sample_iter(&Alphanumeric)
                                         .take(4)
                                         .map(char::from)
@@ -101,7 +101,7 @@ async fn _handle_connection_setup(
                 let surname = if let Some(surname) = vcard.n.surname.as_ref() {
                     surname.to_string()
                 } else {
-                    rand::thread_rng()
+                    rand::rng()
                         .sample_iter(&Alphanumeric)
                         .take(4)
                         .map(char::from)
@@ -113,7 +113,7 @@ async fn _handle_connection_setup(
             } else {
                 format!(
                     "UNKNOWN {}",
-                    rand::thread_rng()
+                    rand::rng()
                         .sample_iter(&Alphanumeric)
                         .take(4)
                         .map(char::from)
@@ -123,7 +123,7 @@ async fn _handle_connection_setup(
         } else {
             format!(
                 "UNKNOWN {}",
-                rand::thread_rng()
+                rand::rng()
                     .sample_iter(&Alphanumeric)
                     .take(4)
                     .map(char::from)
@@ -133,7 +133,7 @@ async fn _handle_connection_setup(
     } else {
         format!(
             "UNKNOWN {}",
-            rand::thread_rng()
+            rand::rng()
                 .sample_iter(&Alphanumeric)
                 .take(4)
                 .map(char::from)
@@ -581,7 +581,7 @@ pub async fn handle_message(
                         let surname = if let Some(surname) = vcard.n.surname.as_ref() {
                             surname.to_string()
                         } else {
-                            rand::thread_rng()
+                            rand::rng()
                                 .sample_iter(&Alphanumeric)
                                 .take(4)
                                 .map(char::from)
@@ -593,7 +593,7 @@ pub async fn handle_message(
                     } else {
                         format!(
                             "UNKNOWN {}",
-                            rand::thread_rng()
+                            rand::rng()
                                 .sample_iter(&Alphanumeric)
                                 .take(4)
                                 .map(char::from)
@@ -603,7 +603,7 @@ pub async fn handle_message(
                 } else {
                     format!(
                         "UNKNOWN {}",
-                        rand::thread_rng()
+                        rand::rng()
                             .sample_iter(&Alphanumeric)
                             .take(4)
                             .map(char::from)
@@ -613,7 +613,7 @@ pub async fn handle_message(
             } else {
                 format!(
                     "UNKNOWN {}",
-                    rand::thread_rng()
+                    rand::rng()
                         .sample_iter(&Alphanumeric)
                         .take(4)
                         .map(char::from)

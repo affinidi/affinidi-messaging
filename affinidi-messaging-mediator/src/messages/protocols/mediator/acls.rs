@@ -97,16 +97,62 @@ pub(crate) async fn process(
                     }
                 }
             }
+            MediatorACLRequest::SetACL { did_hash, acls } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("ACL Request from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error getting ACLs {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state.database.set_did_acl(&did_hash, &acls).await {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error setting ACLs. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error setting ACLs {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
         }
     }
     .instrument(_span)
     .await
 }
 
-// Helper method that determines if an ACL Request can be processed
-// Checks if the account is an admin account (blanket allow/approval)
-// If not admin, then ensures we are only operating on the account's own DID
-// Returns true if the request can be processed, false otherwise
+/// Helper method that determines if an ACL Request can be processed
+/// Checks if the account is an admin account (blanket allow/approval)
+/// If not admin, then ensures we are only operating on the account's own DID
+/// Returns true if the request can be processed, false otherwise
 pub(crate) fn check_permissions(session: &Session, dids: &[String]) -> bool {
     session.account_type == AccountType::RootAdmin
         || session.account_type == AccountType::Admin

@@ -25,24 +25,20 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.9.4", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.9.4", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.9.4", path = "./affinidi-messaging-mediator" }
-#affinidi-did-resolver-cache-sdk = { version = "0.2.5", features = ["network"] }
-affinidi-did-resolver-cache-sdk = { version = "0.2.5", path = "../affinidi-did-resolver/affinidi-did-resolver-cache-sdk", features = [
-    "network",
-] }
+affinidi-did-resolver-cache-sdk = { version = "0.2", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.62"
-aws-sdk-memorydb = "1.58"
-aws-sdk-secretsmanager = "1.60"
-aws-sdk-ssm = "1.62"
+aws-sdk-dynamodb = "1.63"
+aws-sdk-memorydb = "1.59"
+aws-sdk-secretsmanager = "1.61"
+aws-sdk-ssm = "1.63"
 axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 base64 = "0.22"
-bitfield-struct = "0.10"
 bs58 = "0.5"
 chrono = "0.4"
 circular-queue = { version = "0.2", features = ["serde_support"] }
@@ -52,7 +48,7 @@ console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2.5" }
+did-peer = { version = "0.2" }
 futures-util = "0.3"
 hostname = "0.4"
 http = "1"
@@ -63,7 +59,7 @@ lazy_static = "1.5"
 log = "0.4.25"
 num-format = "0.4.4"
 qrcode = "0.14"
-rand = "0.8"
+rand = "0.9"
 ratatui = "0.29"
 ratatui-image = { version = "4", features = ["crossterm", "image-defaults"] }
 rcgen = { version = "0.13", default-features = false, features = [

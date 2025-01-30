@@ -5,7 +5,7 @@ use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::{
         accounts::{AccountType, MediatorAccountRequest},
-        acls::{ACLModeType, MediatorACLSet},
+        acls::{AccessListModeType, MediatorACLSet},
     },
 };
 use serde_json::{json, Value};
@@ -151,7 +151,7 @@ pub(crate) async fn process(
             MediatorAccountRequest::AccountAdd {did_hash, acls } => {
                 // Check permissions and ACLs
                 // 1. Is mediator in explicit_allow mode and is the requestor an ADMIN?
-                if state.config.security.mediator_acl_mode == ACLModeType::ExplicitAllow && !(session.account_type == AccountType::Admin || session.account_type == AccountType::RootAdmin) {
+                if state.config.security.mediator_acl_mode == AccessListModeType::ExplicitAllow && !(session.account_type == AccountType::Admin || session.account_type == AccountType::RootAdmin) {
                     warn!("DID ({}) is not an admin account", session.did_hash);
                     return generate_error_response(
                         state,

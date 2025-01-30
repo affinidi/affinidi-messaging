@@ -19,13 +19,13 @@ use affinidi_messaging_sdk::{
     messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
     protocols::mediator::{
         accounts::AccountType,
-        acls::{ACLModeType, MediatorACLSet},
+        acls::{AccessListModeType, MediatorACLSet},
     },
 };
 use axum::{extract::State, Json};
 use http::StatusCode;
 use jsonwebtoken::{encode, EncodingKey, Header, Validation};
-use rand::{distributions::Alphanumeric, Rng};
+use rand::{distr::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use std::time::SystemTime;
@@ -83,7 +83,7 @@ pub async fn authentication_challenge(
             }
         } else {
             // Unknown DID
-            if state.config.security.mediator_acl_mode == ACLModeType::ExplicitAllow {
+            if state.config.security.mediator_acl_mode == AccessListModeType::ExplicitAllow {
                 info!("Unknown DID({}) is blocked from connecting", session.did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             } else {
@@ -526,7 +526,7 @@ pub async fn authentication_refresh(
 
 /// creates a random string of up to length characters
 fn create_random_string(length: usize) -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(&Alphanumeric)
         .take(length)
         .map(char::from)

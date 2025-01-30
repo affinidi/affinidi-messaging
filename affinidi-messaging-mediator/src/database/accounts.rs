@@ -37,23 +37,28 @@ impl DatabaseHandler {
     ) -> Result<Option<Account>, MediatorError> {
         let mut con = self.get_async_connection().await?;
 
-        let response: HashMap<String, String> = deadpool_redis::redis::cmd("HGETALL")
-            .arg(["DID:", did_hash].concat())
-            .query_async(&mut con)
-            .await
-            .map_err(|err| {
-                MediatorError::DatabaseError(
-                    "NA".to_string(),
-                    format!("Add failed. Reason: {}", err),
-                )
-            })?;
+        let (account, access_list_count): (HashMap<String, String>, u32) =
+            deadpool_redis::redis::pipe()
+                .atomic()
+                .cmd("HGETALL")
+                .arg(["DID:", did_hash].concat())
+                .cmd("SCARD")
+                .arg(["ACCESS_LIST:", did_hash].concat())
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("Add failed. Reason: {}", err),
+                    )
+                })?;
 
-        if response.is_empty() {
+        if account.is_empty() {
             debug!("Account {} does not exist", did_hash);
             return Ok(None);
         }
 
-        let _type = if let Some(_type) = response.get("ROLE_TYPE") {
+        let _type = if let Some(_type) = account.get("ROLE_TYPE") {
             AccountType::from(_type.as_str())
         } else {
             warn!("Account {} does not have a role type", did_hash);
@@ -63,7 +68,7 @@ impl DatabaseHandler {
             ));
         };
 
-        let acls = if let Some(acls) = response.get("ACLS") {
+        let acls = if let Some(acls) = account.get("ACLS") {
             u64::from_str_radix(acls, 16).unwrap_or(0_u64)
         } else {
             warn!("Account {} does not have ACLs", did_hash);
@@ -77,6 +82,7 @@ impl DatabaseHandler {
             did_hash: did_hash.to_string(),
             _type,
             acls,
+            access_list_count,
         }))
     }
 
@@ -127,6 +133,7 @@ impl DatabaseHandler {
                 did_hash: did_hash.to_string(),
                 _type: AccountType::Standard,
                 acls: acls.to_u64(),
+                access_list_count: 0,
             })
         }
         .instrument(_span)
@@ -203,6 +210,7 @@ impl DatabaseHandler {
 
             // Remove from Known DIDs
             // Remove DID Record
+            // Remove ACCESS_LIST Set
             let mut con = self.get_async_connection().await?;
             deadpool_redis::redis::pipe()
                 .atomic()
@@ -211,6 +219,8 @@ impl DatabaseHandler {
                 .arg(did_hash)
                 .cmd("DEL")
                 .arg(["DID:", did_hash].concat())
+                .cmd("DEL")
+                .arg(["ACCESS_LIST:", did_hash].concat())
                 .exec_async(&mut con)
                 .await
                 .map_err(|err| {
@@ -263,25 +273,38 @@ impl DatabaseHandler {
                 })?;
 
             // For each DID, fetch their details
-            let mut query = Pipeline::new();
-            query.atomic();
+            let mut did_query = Pipeline::new();
+            did_query.atomic();
+            let mut access_list_query = Pipeline::new();
+            access_list_query.atomic();
             for did in &dids {
-                query.add_command(redis::Cmd::hget(
+                did_query.add_command(redis::Cmd::hget(
                     ["DID:", did].concat(),
                     &["ROLE_TYPE", "ACLS"],
                 ));
+                access_list_query.add_command(redis::Cmd::scard(["ACCESS_LIST:", did].concat()));
             }
 
-            let results: Vec<(Option<String>, Option<String>)> =
-                query.query_async(&mut con).await.map_err(|err| {
+            let did_results: Vec<(Option<String>, Option<String>)> =
+                did_query.query_async(&mut con).await.map_err(|err| {
                     MediatorError::DatabaseError(
                         "NA".to_string(),
                         format!("HMGET  failed. Reason: {}", err),
                     )
                 })?;
 
+            let access_list_results: Vec<u32> = access_list_query
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("SCARD failed. Reason: {}", err),
+                    )
+                })?;
+
             let mut accounts = Vec::new();
-            for (i, (role_type, acls)) in results.iter().enumerate() {
+            for (i, (role_type, acls)) in did_results.iter().enumerate() {
                 let _type = if let Some(role_type) = role_type {
                     role_type.as_str().into()
                 } else {
@@ -298,6 +321,7 @@ impl DatabaseHandler {
                     did_hash: dids[i].clone(),
                     _type,
                     acls,
+                    access_list_count: access_list_results[i],
                 });
             }
 

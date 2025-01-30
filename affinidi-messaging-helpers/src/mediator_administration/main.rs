@@ -8,7 +8,7 @@ use affinidi_messaging_helpers::common::{
 use affinidi_messaging_sdk::{
     config::Config,
     protocols::{
-        mediator::acls::{ACLModeType, MediatorACLSet},
+        mediator::acls::{AccessListModeType, MediatorACLSet},
         Protocols,
     },
     ATM,
@@ -40,7 +40,7 @@ struct SharedConfig {
     pub version: String,
     pub our_admin_hash: String,
     pub mediator_did_hash: String,
-    pub acl_mode: ACLModeType,
+    pub acl_mode: AccessListModeType,
     pub global_acl_default: MediatorACLSet,
 }
 
@@ -80,7 +80,7 @@ impl SharedConfig {
             .get("security")
             .and_then(|security| security.get("mediator_acl_mode"))
         {
-            match serde_json::from_value::<ACLModeType>(acl_mode.to_owned()) {
+            match serde_json::from_value::<AccessListModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
                 Err(_) => {
                     return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())

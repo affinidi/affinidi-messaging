@@ -181,7 +181,7 @@ uuid = "${STREAMING_UUID:hostname://}"
 ### ****************************************************************************************************************************
 [did_resolver]
 ### service_address: Address of the DID resolver service
-### Default: None (Uses local DID resolver
+### Default: None (Uses local DID resolver)
 #address = "${DID_RESOLVER_ADDRESS:ws://127.0.0.1:8080/did/v1/ws}"
 
 ### cache_capacity: Number of DID's to cache in memory
@@ -263,9 +263,9 @@ to_recipients = "${LIMIT_TO_RECIPIENTS:100}"
 ### It is recommended to use infrastructure level limitation instead of application level limitations
 ws_size = "${LIMIT_WS_SIZE:10485760}"
 
-### local_acl_limit: Maximum number of local ACL entries that each DID can have
+### access_list_limit: Maximum number of access list entries that each DID can have
 ### Default: 1000
-local_acl_limit = "${LOCAL_ACL_LIMIT:1000}"
+access_list_limit = "${ACCESS_LIST_LIMIT:1000}"
 
 ### ****************************************************************************************************************************
 ### Configuration specific to the forwarding processor
@@ -292,3 +292,10 @@ external_forwarding = "${PROCESSOR_FORWARDING_EXTERNAL:true}"
 ### Default: true
 ### NOTE: You may want to disable this in production to prevent leaking information about the mediator
 report_errors = "${PROCESSOR_FORWARDING_REPORT_ERRORS:true}"
+
+### blocked_forwarding_dids: Additional DIDs that the mediator will block forwarding to
+### Default: None (always includes the mediator DID and associated services)
+### NOTE: If you are running a cluster of mediators, you may use this feature to list other cluster DIDs
+###       so that you don't accidentally create a circular forwarding loop
+### Format: ["did_1", "did_2"]
+blocked_forwarding_dids = "${PROCESSOR_FORWARDING_BLOCKED_DIDS:[]}"

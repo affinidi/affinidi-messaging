@@ -14,7 +14,7 @@ use dialoguer::{theme::ColorfulTheme, Input, Select};
 use sha256::digest;
 use std::sync::Arc;
 
-use crate::SharedConfig;
+use crate::{account_management::acl_management::manage_account_acls, SharedConfig};
 
 pub(crate) async fn account_management_menu(
     atm: &ATM,
@@ -111,7 +111,7 @@ pub(crate) async fn manage_account_menu(
             style("Selected DID: ").yellow(),
             style(&account.did_hash).color256(208),
             style("ACL:").yellow(),
-            style(account.acls).blue().bold()
+            style(account.acls).blue().bold(),
         );
 
         println!(
@@ -140,6 +140,16 @@ pub(crate) async fn manage_account_menu(
         match selection {
             0 => {
                 // Modify ACLs
+                match manage_account_acls(atm, profile, protocols, theme, mediator_config, &account)
+                    .await
+                {
+                    Ok(a) => {
+                        account = a;
+                    }
+                    Err(err) => {
+                        println!("{}", style(format!("Error modifying ACLs: {}", err)).red())
+                    }
+                }
             }
             1 => {
                 // Change Account Type

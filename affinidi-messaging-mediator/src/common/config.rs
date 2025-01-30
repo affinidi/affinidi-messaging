@@ -1,7 +1,10 @@
 use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
-use affinidi_did_resolver_cache_sdk::config::{ClientConfig, ClientConfigBuilder};
-use affinidi_messaging_sdk::protocols::mediator::acls::{ACLModeType, MediatorACLSet};
+use affinidi_did_resolver_cache_sdk::{
+    config::{ClientConfig, ClientConfigBuilder},
+    DIDCacheClient,
+};
+use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
 use async_convert::{async_trait, TryFrom};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -16,8 +19,9 @@ use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use ssi::dids::Document;
+use ssi::dids::{document::service::Endpoint, Document};
 use std::{
+    collections::HashSet,
     env,
     fmt::{self, Debug},
     fs::File,
@@ -95,7 +99,7 @@ pub struct SecurityConfigRaw {
 
 #[derive(Clone, Serialize)]
 pub struct SecurityConfig {
-    pub mediator_acl_mode: ACLModeType,
+    pub mediator_acl_mode: AccessListModeType,
     pub global_acl_default: MediatorACLSet,
     pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
@@ -142,7 +146,7 @@ impl Debug for SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         SecurityConfig {
-            mediator_acl_mode: ACLModeType::ExplicitDeny,
+            mediator_acl_mode: AccessListModeType::ExplicitDeny,
             global_acl_default: MediatorACLSet::default(),
             local_direct_delivery_allowed: false,
             mediator_secrets: AffinidiSecrets::new(vec![]),
@@ -185,9 +189,9 @@ impl SecurityConfigRaw {
     async fn convert(&self, aws_config: &SdkConfig) -> Result<SecurityConfig, MediatorError> {
         let mut config = SecurityConfig {
             mediator_acl_mode: match self.mediator_acl_mode.as_str() {
-                "explicit_allow" => ACLModeType::ExplicitAllow,
-                "explicit_deny" => ACLModeType::ExplicitDeny,
-                _ => ACLModeType::ExplicitDeny,
+                "explicit_allow" => AccessListModeType::ExplicitAllow,
+                "explicit_deny" => AccessListModeType::ExplicitDeny,
+                _ => AccessListModeType::ExplicitDeny,
             },
             local_direct_delivery_allowed: self
                 .local_direct_delivery_allowed
@@ -276,7 +280,7 @@ pub struct LimitsConfig {
     pub to_keys_per_recipient: usize,
     pub to_recipients: usize,
     pub ws_size: usize,
-    pub local_acl_limit: usize,
+    pub access_list_limit: usize,
 }
 
 impl Default for LimitsConfig {
@@ -295,7 +299,7 @@ impl Default for LimitsConfig {
             to_keys_per_recipient: 100,
             to_recipients: 100,
             ws_size: 10_485_760,
-            local_acl_limit: 1_000,
+            access_list_limit: 1_000,
         }
     }
 }
@@ -315,7 +319,7 @@ struct LimitsConfigRaw {
     pub to_keys_per_recipient: String,
     pub to_recipients: String,
     pub ws_size: String,
-    pub local_acl_limit: String,
+    pub access_list_limit: String,
 }
 
 impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
@@ -339,7 +343,7 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
-            local_acl_limit: raw.local_acl_limit.parse().unwrap_or(1_000),
+            access_list_limit: raw.access_list_limit.parse().unwrap_or(1_000),
         })
     }
 }
@@ -360,6 +364,9 @@ struct ProcessorsConfigRaw {
 pub struct ForwardingConfig {
     pub enabled: bool,
     pub future_time_limit: u64,
+    pub external_forwarding: bool,
+    pub report_errors: bool,
+    pub blocked_forwarding: HashSet<String>,
 }
 
 impl Default for ForwardingConfig {
@@ -367,6 +374,9 @@ impl Default for ForwardingConfig {
         ForwardingConfig {
             enabled: true,
             future_time_limit: 86400,
+            external_forwarding: true,
+            report_errors: true,
+            blocked_forwarding: HashSet::new(),
         }
     }
 }
@@ -375,6 +385,9 @@ impl Default for ForwardingConfig {
 struct ForwardingConfigRaw {
     pub enabled: String,
     pub future_time_limit: String,
+    pub external_forwarding: String,
+    pub report_errors: String,
+    pub blocked_forwarding_dids: String,
 }
 
 impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
@@ -384,6 +397,9 @@ impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
         Ok(ForwardingConfig {
             enabled: raw.enabled.parse().unwrap_or(true),
             future_time_limit: raw.future_time_limit.parse().unwrap_or(86400),
+            external_forwarding: raw.external_forwarding.parse().unwrap_or(true),
+            report_errors: raw.report_errors.parse().unwrap_or(true),
+            blocked_forwarding: HashSet::new(),
         })
     }
 }
@@ -526,7 +542,7 @@ impl TryFrom<ConfigRaw> for Config {
             did_resolver_config: raw.did_resolver.convert(),
             api_prefix: raw.server.api_prefix,
             security: raw.security.convert(&aws_config).await?,
-            process_forwarding: raw.processors.forwarding.try_into()?,
+            process_forwarding: raw.processors.forwarding.clone().try_into()?,
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
@@ -562,6 +578,33 @@ impl TryFrom<ConfigRaw> for Config {
         if config.streaming_enabled {
             config.streaming_uuid = get_hostname(&raw.streaming.uuid)?;
         }
+
+        // Fill out the forwarding protection for DIDs and associated service endpoints
+        // This protects against the mediator forwarding messages to itself.
+        let mut did_resolver = DIDCacheClient::new(config.did_resolver_config.clone())
+            .await
+            .map_err(|err| {
+                MediatorError::DIDError(
+                    "NA".into(),
+                    "NA".into(),
+                    format!("Couldn't start DID Resolver: {}", err),
+                )
+            })?;
+
+        // Load the Local DID Document if self hosted
+        if let Some(mediator_doc) = &config.mediator_did_doc {
+            did_resolver
+                .add_did_document(&config.mediator_did, mediator_doc.clone())
+                .await;
+        }
+
+        load_forwarding_protection_blocks(
+            &did_resolver,
+            &mut config.process_forwarding,
+            &config.mediator_did,
+            &raw.processors.forwarding.blocked_forwarding_dids,
+        )
+        .await?;
 
         Ok(config)
     }
@@ -889,6 +932,67 @@ async fn read_document(
     };
 
     Ok(content)
+}
+
+/// Creates a set of URI's that can be used to detect if forwarding loopbacks to the mediator could occur
+async fn load_forwarding_protection_blocks(
+    did_resolver: &DIDCacheClient,
+    forwarding_config: &mut ForwardingConfig,
+    mediator_did: &str,
+    blocked_dids: &str,
+) -> Result<(), MediatorError> {
+    let mut blocked_dids: Vec<String> = match serde_json::from_str(blocked_dids) {
+        Ok(dids) => dids,
+        Err(err) => {
+            eprintln!("Could not parse blocked_forwarding_dids. Reason: {}", err);
+            return Err(MediatorError::ConfigError(
+                "NA".into(),
+                format!("Could not parse blocked_forwarding_dids. Reason: {}", err),
+            ));
+        }
+    };
+
+    // Add the mediator DID to the blocked list
+    blocked_dids.push(mediator_did.into());
+
+    // Iterate through each DID that we need to block
+    for did in blocked_dids {
+        let doc = did_resolver.resolve(&did).await.map_err(|err| {
+            MediatorError::DIDError(
+                "NA".into(),
+                did.clone(),
+                format!("Couldn't resolve DID. Reason: {}", err),
+            )
+        })?;
+
+        forwarding_config.blocked_forwarding.insert(did.clone());
+
+        // Add the service endpoints to the forwarding protection list
+        for service in doc.doc.service.iter() {
+            if let Some(endpoints) = &service.service_endpoint {
+                for endpoint in endpoints {
+                    match endpoint {
+                        Endpoint::Uri(uri) => {
+                            forwarding_config.blocked_forwarding.insert(uri.to_string());
+                        }
+                        Endpoint::Map(map) => {
+                            if let Some(uri) = map.get("uri") {
+                                if let Some(uri) = uri.as_str() {
+                                    forwarding_config.blocked_forwarding.insert(uri.into());
+                                } else {
+                                    eprintln!("WARN: Couldn't parse URI as a string: {:#?}", uri);
+                                }
+                            } else {
+                                eprintln!("WARN: Service endpoint map does not contain a URI. DID ({}), Service ({:#?}), Endpoint ({:#?})", did, service, map);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn init(config_file: &str, with_ansi: bool) -> Result<Config, MediatorError> {
