@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, span, Level};
+use tracing::{debug, span, Instrument, Level};
 
 use crate::{
     errors::ATMError,
@@ -64,106 +64,112 @@ impl ATM {
             limit = options.limit,
             start_id = options.start_id,
             delete_policy = options.delete_policy.to_string()
-        )
-        .entered();
+        );
 
-        // Check if limit is within bounds
-        if options.limit < 1 || options.limit > 100 {
-            return Err(ATMError::ConfigError(format!(
-                "FetchOptions.limit must be between 1 and 100 inclusive. Got: {}",
-                options.limit
-            )));
-        }
+        async move {
+            // Check if limit is within bounds
+            if options.limit < 1 || options.limit > 100 {
+                return Err(ATMError::ConfigError(format!(
+                    "FetchOptions.limit must be between 1 and 100 inclusive. Got: {}",
+                    options.limit
+                )));
+            }
 
-        // Check if authenticated
-        let tokens = profile.authenticate(&self.inner).await?;
+            // Check if authenticated
+            let tokens = profile.authenticate(&self.inner).await?;
 
-        let body = serde_json::to_string(options).map_err(|e| {
-            ATMError::TransportError(format!(
-                "Could not serialize fetch_message() options: {:?}",
-                e
-            ))
-        })?;
-
-        let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
-            return Err(ATMError::TransportError(
-                "No mediator URL found".to_string(),
-            ));
-        };
-        let res = self
-            .inner
-            .client
-            .post([&mediator_url, "/fetch"].concat())
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {}", tokens.access_token))
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| {
-                ATMError::TransportError(format!("Could not send list_messages request: {:?}", e))
+            let body = serde_json::to_string(options).map_err(|e| {
+                ATMError::TransportError(format!(
+                    "Could not serialize fetch_message() options: {:?}",
+                    e
+                ))
             })?;
 
-        let status = res.status();
-        debug!("API response: status({})", status);
-
-        let body = res
-            .text()
-            .await
-            .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
-
-        if !status.is_success() {
-            return Err(ATMError::TransportError(format!(
-                "Status not successful. status({}), response({})",
-                status, body
-            )));
-        }
-
-        let body = serde_json::from_str::<SuccessResponse<GetMessagesResponse>>(&body)
-            .ok()
-            .unwrap();
-
-        let mut list = if let Some(list) = body.data {
-            list
-        } else {
-            return Err(ATMError::TransportError("No messages found".to_string()));
-        };
-
-        if let FetchDeletePolicy::OnReceive = options.delete_policy {
-            match self
-                .delete_messages_direct(
-                    profile,
-                    &DeleteMessageRequest {
-                        message_ids: list.success.iter().map(|m| m.msg_id.clone()).collect(),
-                    },
-                )
+            let Some(mediator_url) = profile.get_mediator_rest_endpoint() else {
+                return Err(ATMError::TransportError(
+                    "No mediator URL found".to_string(),
+                ));
+            };
+            let res = self
+                .inner
+                .client
+                .post([&mediator_url, "/fetch"].concat())
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Bearer {}", tokens.access_token))
+                .body(body)
+                .send()
                 .await
-            {
-                Ok(r) => {
-                    debug!("Messages deleted: ({})", r.success.len());
-                    list.delete_errors.extend(r.errors);
-                }
-                Err(e) => {
-                    debug!("Error deleting messages: ({})", e);
-                    list.delete_errors = list
-                        .success
-                        .iter()
-                        .map(|m| (m.msg_id.clone(), "ERROR".to_string()))
-                        .collect();
+                .map_err(|e| {
+                    ATMError::TransportError(format!(
+                        "Could not send list_messages request: {:?}",
+                        e
+                    ))
+                })?;
+
+            let status = res.status();
+            debug!("API response: status({})", status);
+
+            let body = res
+                .text()
+                .await
+                .map_err(|e| ATMError::TransportError(format!("Couldn't get body: {:?}", e)))?;
+
+            if !status.is_success() {
+                return Err(ATMError::TransportError(format!(
+                    "Status not successful. status({}), response({})",
+                    status, body
+                )));
+            }
+
+            let body = serde_json::from_str::<SuccessResponse<GetMessagesResponse>>(&body)
+                .ok()
+                .unwrap();
+
+            let mut list = if let Some(list) = body.data {
+                list
+            } else {
+                return Err(ATMError::TransportError("No messages found".to_string()));
+            };
+
+            if let FetchDeletePolicy::OnReceive = options.delete_policy {
+                match self
+                    .delete_messages_direct(
+                        profile,
+                        &DeleteMessageRequest {
+                            message_ids: list.success.iter().map(|m| m.msg_id.clone()).collect(),
+                        },
+                    )
+                    .await
+                {
+                    Ok(r) => {
+                        debug!("Messages deleted: ({})", r.success.len());
+                        list.delete_errors.extend(r.errors);
+                    }
+                    Err(e) => {
+                        debug!("Error deleting messages: ({})", e);
+                        list.delete_errors = list
+                            .success
+                            .iter()
+                            .map(|m| (m.msg_id.clone(), "ERROR".to_string()))
+                            .collect();
+                    }
                 }
             }
-        }
 
-        debug!(
-            "response: success({}) messages, failed_deleted({}) messages",
-            list.success.len(),
-            list.delete_errors.len()
-        );
-        if !list.delete_errors.is_empty() {
-            for (msg, err) in &list.delete_errors {
-                debug!("failed delete: msg({}) error({})", msg, err);
+            debug!(
+                "response: success({}) messages, failed_deleted({}) messages",
+                list.success.len(),
+                list.delete_errors.len()
+            );
+            if !list.delete_errors.is_empty() {
+                for (msg, err) in &list.delete_errors {
+                    debug!("failed delete: msg({}) error({})", msg, err);
+                }
             }
-        }
 
-        Ok(list)
+            Ok(list)
+        }
+        .instrument(_span)
+        .await
     }
 }
