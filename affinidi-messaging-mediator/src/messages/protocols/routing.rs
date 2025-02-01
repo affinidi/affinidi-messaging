@@ -9,7 +9,7 @@ use base64::prelude::*;
 use serde::Deserialize;
 use sha256::digest;
 use ssi::dids::{document::service::Endpoint, Document};
-use tracing::{debug, error, span, warn, Instrument};
+use tracing::{debug, span, warn, Instrument};
 
 // Reads the body of an incoming forward message
 #[derive(Default, Deserialize)]
@@ -60,7 +60,7 @@ pub(crate) async fn process(
         if !next_acls.get_receive_forwarded().0 {
             return Err(MediatorError::ACLDenied(format!(
                 "Next DID({}) is blocked from receiving forwarded messages",
-                next_did_hash
+                &next
             )));
         }
 
@@ -205,6 +205,25 @@ pub(crate) async fn process(
             AttachmentData::Base64 { ref value } => {
                 String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(&value.base64).unwrap()).unwrap()
             }
+            AttachmentData::Json { ref value } => {
+                if value.jws.is_some() {
+                    // TODO: Implement JWS verification
+                    return Err(MediatorError::NotImplemented(
+                        session.session_id.clone(),
+                        "Attachment contains a JWS encrypted JSON payload.".into(),
+                    ));
+                } else {
+                    match serde_json::to_string(&value.json) {
+                        Ok(data) => data,
+                        Err(e) => {
+                            return Err(MediatorError::RequestDataError(
+                                session.session_id.clone(),
+                                format!("Attachment is not valid JSON: {}", e),
+                            ))
+                        }
+                    }
+                }
+            }
             _ => {
                 return Err(MediatorError::RequestDataError(
                     session.session_id.clone(),
@@ -217,15 +236,7 @@ pub(crate) async fn process(
         debug!(" FROM: {:?}", msg.from);
         debug!(" Forwarded message:\n{}", data);
         debug!(" *************************************** ");
-        if let Some(from) = &msg.from {
-            store_forwarded_message(state, session, &data, from, &next).await?;
-        } else {
-            error!("Forwarded message is missing 'from' field");
-            return Err(MediatorError::ForwardMessageError(
-                session.session_id.clone(),
-                "Forwarded message is missing 'from' field".into(),
-            ));
-        }
+        store_forwarded_message(state, session, &data, msg.from.as_deref(), &next).await?;
 
         Ok(ProcessMessageResponse {
             store_message: false,

@@ -2,7 +2,25 @@
 
 ## Changelog history
 
-## XX January 2025 (0.9.4)
+Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
+Missing versions on the changelog simply reflect minor deployment changes on our tooling.
+
+## xx February 2025 (0.9.6)
+
+### DIDComm Library (0.9.6)
+
+* pack_encrypted will return the forwarded routing_keys from a Service Record
+  * Useful for when detecting if message has already been wrapped in a forward/routing wrapper
+
+### Mediator (0.9.6)
+
+* Mediator can now handle JSON Object Attachments
+
+### Text-Client (0.9.6)
+
+* When sending a message, will detect if mesage is already wrapped in a forward envelope
+
+## 30th January 2025 (0.9.4)
 
 ### All (0.9.4)
 

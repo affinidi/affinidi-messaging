@@ -414,6 +414,7 @@ pub(crate) async fn wrap_in_forward_if_needed(
     let messaging_service = MessagingServiceMetadata {
         id: services_chain.last().unwrap().0.clone(),
         service_endpoint: services_chain.first().unwrap().1.uri.clone(),
+        routing_keys,
     };
 
     Ok(Some((forward_msg, messaging_service)))

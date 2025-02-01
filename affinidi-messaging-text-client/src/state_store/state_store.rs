@@ -1,7 +1,10 @@
 use super::{actions::Action, State};
 use crate::{
     state_store::{
-        actions::invitation::{create_invitation, send_invitation_accept},
+        actions::{
+            invitation::{create_invitation, send_invitation_accept},
+            manual_connect::manual_connect_setup,
+        },
         inbound_messages::handle_message,
         outbound_messages::send_message,
     },
@@ -178,14 +181,24 @@ impl StateStore {
                     }
                     Action::ManualConnectPopupStart => {
                         state.manual_connect_popup.show = true;
+                        state.manual_connect_popup.remote_did = String::new();
+                        state.manual_connect_popup.alias = String::new();
+                        state.manual_connect_popup.error_msg = None;
                     },
                     Action::ManualConnectPopupStop => {
                         state.manual_connect_popup.show = false;
                         state.manual_connect_popup.remote_did = String::new();
                     },
-                    Action::ManualConnect { remote_did } => {
-                        state.manual_connect_popup.remote_did = remote_did;
-                        //let _ = send_invitation_accept(&mut state, &self.state_tx, &atm).await;
+                    Action::ManualConnect { alias, remote_did } => {
+                        match manual_connect_setup(&mut state, &atm, &alias, &remote_did).await {
+                            Ok(_) => {
+                                // Everythign worked - close popup
+                                state.manual_connect_popup.show = false;
+                            },
+                            Err(e) => {
+                                state.manual_connect_popup.error_msg = Some(e.to_string());
+                            }
+                        }
                     }
                 },
                 // Tick to terminate the select every N milliseconds

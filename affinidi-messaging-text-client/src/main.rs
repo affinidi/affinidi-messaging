@@ -71,4 +71,6 @@ pub enum InputType {
     OurName,
     ChatMessage,
     AcceptInvite,
+    ManualConnectRemoteDID,
+    ManualConnectAlias,
 }
