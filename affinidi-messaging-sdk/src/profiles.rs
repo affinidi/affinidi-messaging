@@ -356,6 +356,7 @@ impl ATM {
 
     /// Will create a websocket connection for the profile if one doesn't already exist
     /// Will return Ok() if a connection already exists, or if it successfully started a new connection
+    /// Automatically starts live_streaming
     pub async fn profile_enable_websocket(&self, profile: &Arc<Profile>) -> Result<(), ATMError> {
         let mediator = {
             let Some(mediator) = &*profile.inner.mediator else {

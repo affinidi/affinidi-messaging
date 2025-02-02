@@ -7,6 +7,10 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 ## xx February 2025 (0.9.6)
 
+### All (0.9.6)
+
+* Cleaning up comments and documentation
+
 ### DIDComm Library (0.9.6)
 
 * pack_encrypted will return the forwarded routing_keys from a Service Record
@@ -18,7 +22,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 ### Text-Client (0.9.6)
 
-* When sending a message, will detect if mesage is already wrapped in a forward envelope
+* When sending a message, will detect if message is already wrapped in a forward envelope
+* Chat Messages properly wrap in the text window making it easier to read.
 
 ## 30th January 2025 (0.9.4)
 
