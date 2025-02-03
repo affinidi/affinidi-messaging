@@ -22,8 +22,18 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 ### SDK (0.9.6)
 
+* ATM Struct derives Clone trait, allowing for a simpler clone of the inner representation
 * Message Pickup Protocol
-  * live_stream_next() wraps Duration in an Option to be more clear that this is an optional setting
+  * FEATURE: live_stream_next() wraps Duration in an Option to be more clear that this is an optional setting
+  * FIX: live_stream_next() properly waits now for next message vs. only fetching from cache
+* Added the ability for a Profile to direct-stream received messages via a channel
+  * Allows for mix and match combo when messages are being sent to the SDK
+  * Application may want direct-receive capability (all messages from all profiles come on a single channel)
+    * Use the WsHandler::DirectMode config option on ATM Configuration
+  * Some Profiles may want cache mode where you can call next() against the cache. across all profiles
+    * Default mode
+  * You may have some tasks that want to stream via a dedicated channel on a per-profile basis
+    * use profile.enable_direct_channel() and profile.disable_direct_channel()
 
 ### Text-Client (0.9.6)
 

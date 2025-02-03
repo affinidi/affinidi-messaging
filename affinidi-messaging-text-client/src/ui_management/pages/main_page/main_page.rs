@@ -22,7 +22,6 @@ use ratatui::{
     Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
 
 use super::{
     components::{
@@ -474,11 +473,7 @@ impl ComponentRender<()> for MainPage {
             vec![Line::from(NO_CHAT_SELECTED_MESSAGE)]
         };
         let message_offset = calculate_list_offset(chat_messages.height, messages.len());
-        warn!(
-            "Message Offset: {} messages: {}",
-            message_offset,
-            messages.len()
-        );
+
         let chat_message_window = Paragraph::new(messages)
             .block(Block::default().borders(Borders::ALL).title("Messages"))
             .wrap(Wrap { trim: false })

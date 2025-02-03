@@ -49,6 +49,7 @@ pub enum WsHandlerCommands {
     Activate(Arc<Profile>),
     Deactivate(Arc<Profile>),
     Next,                                   // Gets the next message from the cache
+    CancelNext,                             // Cancels the next message request
     Get(String, Sender<WsHandlerCommands>), // Gets the message with the specified ID from the cache
     TimeOut(Arc<Profile>, String), // SDK request timed out, contains msg_id we were looking for
     // Messages sent from Handler to the SDK
@@ -91,6 +92,8 @@ impl ATM {
                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
             })?;
 
+            // Used to track outstanding next message requests
+            let mut next_counter = 0;
             loop {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {
@@ -112,9 +115,14 @@ impl ATM {
                                             // notify the SDK that a message has been found
                                             let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
                                             debug!("Message delivered to receive channel");
-                                        } else {
-                                            cache.insert(message, meta);
-                                        }
+                                        } else if next_counter > 0 {
+                                                next_counter -= 1;
+                                                to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
+                                                    ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
+                                                })?;
+                                            } else {
+                                                cache.insert(message, meta);
+                                            }
                                     } else {
                                         // Send the message directly to the broadcast channel
                                         if let Some(broadcast) = &shared_state.direct_stream_sender {
@@ -162,12 +170,17 @@ impl ATM {
                                             to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
+                                        } else {
+                                            next_counter += 1;
                                         }
                                     } else {
                                         to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                         })?;
                                     }
+                                }
+                                WsHandlerCommands::CancelNext => {
+                                    next_counter -= 1;
                                 }
                                 WsHandlerCommands::Get(id, channel) => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
@@ -204,7 +217,7 @@ impl ATM {
                                     cache.search_list.remove(&id);
                                 }
                                 _ => {
-                                    debug!("Received unknown command");
+                                    warn!("Received unknown command");
                                 }
                             }
                         } else {

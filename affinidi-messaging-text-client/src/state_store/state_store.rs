@@ -188,12 +188,17 @@ impl StateStore {
                     Action::ManualConnectPopupStop => {
                         state.manual_connect_popup.show = false;
                         state.manual_connect_popup.remote_did = String::new();
+                        state.manual_connect_popup.alias = String::new();
+                        state.manual_connect_popup.error_msg = None;
                     },
                     Action::ManualConnect { alias, remote_did } => {
                         match manual_connect_setup(&mut state, &atm, &alias, &remote_did).await {
                             Ok(_) => {
-                                // Everythign worked - close popup
+                                // Everything worked - close popup
                                 state.manual_connect_popup.show = false;
+                                state.manual_connect_popup.remote_did = String::new();
+                        state.manual_connect_popup.alias = String::new();
+                        state.manual_connect_popup.error_msg = None;
                             },
                             Err(e) => {
                                 state.manual_connect_popup.error_msg = Some(e.to_string());
