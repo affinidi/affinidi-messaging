@@ -20,6 +20,11 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 * Mediator can now handle JSON Object Attachments
 
+### SDK (0.9.6)
+
+* Message Pickup Protocol
+  * live_stream_next() wraps Duration in an Option to be more clear that this is an optional setting
+
 ### Text-Client (0.9.6)
 
 * When sending a message, will detect if message is already wrapped in a forward envelope
