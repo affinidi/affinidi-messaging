@@ -223,13 +223,13 @@ impl MessagePickup {
     /// Waits for the next message to be received via websocket live delivery
     /// atm  : The ATM SDK to use
     /// wait : How long to wait (in milliseconds) for a message before returning None
-    ///        If 0, will block forever until a message is received
+    ///        If None, will block forever until a message is received
     /// Returns a tuple of the message and metadata, or None if no message was received
     /// NOTE: You still need to delete the message from the server after receiving it
     pub async fn live_stream_next(
         &self,
         atm: &ATM,
-        wait: Duration,
+        wait: Option<Duration>,
     ) -> Result<Option<(Message, Box<UnpackMetadata>)>, ATMError> {
         let _span = span!(Level::DEBUG, "live_stream_next");
 
@@ -247,30 +247,40 @@ impl MessagePickup {
                 })?;
             debug!("sent next request to ws_handler");
 
-            // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
-            let sleep: tokio::time::Sleep = tokio::time::sleep(wait);
-
             let stream = &mut atm.inner.ws_handler_recv_stream.lock().await;
-            select! {
-                _ = sleep, if wait.as_millis() > 0 => {
-                    debug!("Timeout reached, no message received");
-                    Ok(None)
-                }
-                value = stream.recv() => {
-                    if let Some(msg) = value {
-                        match msg {
-                            WsHandlerCommands::MessageReceived(message, meta) => {
-                                Ok(Some((message, meta)))
-                            }
-                            _ => {
-                                Err(ATMError::MsgReceiveError("Unexpected message type".into()))
-                            }
-                        }
-                    } else {
+                // Setup the timer for the wait, doesn't do anything till `await` is called in the select! macro
+                let sleep: tokio::time::Sleep = tokio::time::sleep(wait.unwrap_or(Duration::MAX));
+                select! {
+                    _ = sleep, if wait.is_some() => {
+                        debug!("Timeout reached, no message received");
+                        atm.inner
+                .ws_handler_send_stream
+                .send(WsHandlerCommands::CancelNext)
+                .await
+                .map_err(|err| {
+                    ATMError::TransportError(format!(
+                        "Could not send message to ws_handler: {:?}",
+                        err
+                    ))
+                })?;
                         Ok(None)
                     }
+                    value = stream.recv() => {
+                        if let Some(msg) = value {
+                            match msg {
+                                WsHandlerCommands::MessageReceived(message, meta) => {
+                                    Ok(Some((message, meta)))
+                                }
+                                _ => {
+                                    Err(ATMError::MsgReceiveError(format!("Unexpected message type: {:#?}", msg)))
+                                }
+                            }
+                        } else {
+                            Ok(None)
+                        }
+                    }
                 }
-            }
+            
         }
         .instrument(_span)
         .await

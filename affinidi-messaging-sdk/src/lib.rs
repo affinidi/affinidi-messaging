@@ -37,6 +37,7 @@ mod resolvers;
 pub mod secrets;
 pub mod transports;
 
+#[derive(Clone)]
 pub struct ATM {
     pub(crate) inner: Arc<SharedState>,
 }

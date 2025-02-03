@@ -281,6 +281,9 @@ pub struct MessagingServiceMetadata {
 
     /// Service endpoint of used messaging service.
     pub service_endpoint: String,
+
+    /// Routing keys of used messaging service.
+    pub routing_keys: Vec<String>,
 }
 
 #[cfg(test)]

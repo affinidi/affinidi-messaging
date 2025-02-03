@@ -36,6 +36,9 @@ pub(crate) enum WsConnectionCommands {
     // From Handler (or SDK)
     Send(String), // Sends the message string to the websocket
     Stop,         // Stops the connection
+    /// Enables direct channel for this profile
+    EnableDirectChannel(Sender<Box<(DidcommMessage, UnpackMetadata)>>),
+    DisableDirectChannel,
     // To Handler
     Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
@@ -105,6 +108,7 @@ impl WsConnection {
                 }
             };
 
+            let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
             loop {
                 select! {
                     value = web_socket.next() => {
@@ -121,7 +125,11 @@ impl WsConnection {
                                                             continue;
                                                         }
                                                     };
-                                                    let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
+                                                    if let Some(sender) = &direct_channel {
+                                                        let _ = sender.send(Box::new(unpack)).await;
+                                                    } else {
+                                                        let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
+                                                    }
                                             } else {
                                                 error!("Received non-text message");
                                             }
@@ -178,6 +186,14 @@ impl WsConnection {
                                 WsConnectionCommands::Stop => {
                                     debug!("Stopping websocket connection");
                                     break;
+                                }
+                                WsConnectionCommands::EnableDirectChannel(sender) => {
+                                    debug!("Enabling direct channel");
+                                    direct_channel = Some(sender);
+                                }
+                                WsConnectionCommands::DisableDirectChannel => {
+                                    debug!("Disabling direct channel");
+                                    direct_channel = None;
                                 }
                                 _ => {
                                     println!("Unhandled command");

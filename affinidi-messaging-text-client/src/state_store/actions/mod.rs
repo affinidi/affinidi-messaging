@@ -20,7 +20,7 @@ pub enum Action {
     // Manual Connect
     ManualConnectPopupStart,
     ManualConnectPopupStop,
-    ManualConnect { remote_did: String },
+    ManualConnect { alias: String, remote_did: String },
     // Chat information
     ShowChatDetails { chat: String },
     CloseChatDetails,

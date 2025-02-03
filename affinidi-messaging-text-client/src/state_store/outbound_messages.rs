@@ -41,15 +41,15 @@ pub(crate) async fn send_message(state: &mut State, atm: &ATM, chat_msg: &str) {
     let (our_did, mediator_did) = our_profile.dids().unwrap();
 
     // Create the message
-    let id = Uuid::new_v4();
+    let id = Uuid::new_v4().to_string();
     let msg = MessageBuilder::new(
-        id.to_string(),
+        id.clone(),
         "https://affinidi.com/atm/client-actions/chat-message".into(),
         json!({"text": chat_msg}),
     )
     .from(our_did.to_string())
     .to(remote_did.to_string())
-    .thid(id.to_string())
+    .thid(id.clone())
     .created_time(
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -59,7 +59,7 @@ pub(crate) async fn send_message(state: &mut State, atm: &ATM, chat_msg: &str) {
     .finalize();
 
     // Pack the message
-    let (packed, _) = match atm
+    let (packed, packed_meta) = match atm
         .pack_encrypted(&msg, remote_did, Some(our_did), Some(our_did))
         .await
     {
@@ -74,6 +74,32 @@ pub(crate) async fn send_message(state: &mut State, atm: &ATM, chat_msg: &str) {
         warn!("Couldn't get mutable chat({})", &chat.name);
         return;
     };
+
+    if let Some(forwarded) = packed_meta.messaging_service {
+        if forwarded.routing_keys.contains(&mediator_did.to_string()) {
+            // Already forwarded
+            match atm
+                .send_message(&our_profile, &packed, &id, false, false)
+                .await
+            {
+                Ok(_) => {
+                    // Update the chat with the new message
+                    mut_chat.messages.push(ChatMessage::new(
+                        ChatMessageType::Outbound,
+                        chat_msg.to_string(),
+                    ));
+                }
+                Err(e) => {
+                    mut_chat.messages.push(ChatMessage::new(
+                        ChatMessageType::Error,
+                        chat_msg.to_string(),
+                    ));
+                    warn!("Failed to send message: {}", e);
+                }
+            }
+            return;
+        }
+    }
 
     // Forward wrap and send the message
     match atm

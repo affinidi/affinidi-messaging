@@ -12,6 +12,7 @@ pub enum MessageType {
     MediatorAccountManagement,       // Mediator Account Management Protocol
     MediatorACLManagement,           // Mediator Global ACL Management Protocol
     MessagePickupStatusRequest,      // Message Pickup 3.0 Status Request
+    MessagePickupStatusResponse,     // Message Pickup 3.0 Status Request
     MessagePickupDeliveryRequest,    // Message Pickup 3.0 Delivery Request
     MessagePickupMessagesReceived,   // Message Pickup 3.0 Messages Received (ok to delete)
     MessagePickupLiveDeliveryChange, // Message Pickup 3.0 Live-delivery-change (Streaming enabled)
@@ -38,6 +39,7 @@ impl FromStr for MessageType {
             "https://didcomm.org/messagepickup/3.0/status-request" => {
                 Ok(Self::MessagePickupStatusRequest)
             }
+            "https://didcomm.org/messagepickup/3.0/status" => Ok(Self::MessagePickupStatusResponse),
             "https://didcomm.org/messagepickup/3.0/live-delivery-change" => {
                 Ok(Self::MessagePickupLiveDeliveryChange)
             }

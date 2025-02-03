@@ -1,13 +1,59 @@
-use affinidi_messaging_sdk::secrets::{Secret, SecretType};
-use anyhow::{Context, Result};
+use super::chat_list::ChatStatus;
+use crate::state_store::State;
+use affinidi_messaging_sdk::{
+    profiles::Profile,
+    secrets::{Secret, SecretType},
+    ATM,
+};
+use anyhow::{anyhow, Context, Result};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
 use ssi::{jwk::Params, JWK};
 
+pub async fn manual_connect_setup(
+    state: &mut State,
+    atm: &ATM,
+    alias: &str,
+    remote_did: &str,
+) -> anyhow::Result<()> {
+    // Are the settings ok?
+    let Some(mediator_did) = &state.settings.mediator_did else {
+        return Err(anyhow!("Mediator DID not set"));
+    };
+
+    // Create a local DID for this connection
+    let (did_peer, secrets) = create_did_peer(mediator_did)?;
+
+    let profile = Profile::new(
+        atm,
+        Some(alias.to_string()),
+        did_peer.clone(),
+        Some(mediator_did.to_string()),
+        secrets,
+    )
+    .await?;
+
+    let profile = atm.profile_add(&profile, true).await?;
+
+    state
+        .chat_list
+        .create_chat(
+            alias,
+            "Manually Added Channel - No Discovery",
+            &profile,
+            Some(remote_did.to_string()),
+            None,
+            ChatStatus::EstablishedChannel,
+        )
+        .await;
+
+    Ok(())
+}
+
 /// Creates a DID Peer to use as the DIDComm agent for a Ollama Model
-pub fn _create_did_peer(mediator_did: &str, _alias: &str) -> Result<(String, Vec<Secret>)> {
+pub fn create_did_peer(mediator_did: &str) -> Result<(String, Vec<Secret>)> {
     let e_secp256k1_key = JWK::generate_secp256k1();
     let v_ed25519_key = JWK::generate_ed25519().unwrap();
 

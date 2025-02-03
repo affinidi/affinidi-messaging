@@ -455,28 +455,31 @@ impl ComponentRender<()> for MainPage {
         );
         frame.render_widget(chat_description, chat_title);
 
-        // Chat Messages
         let messages = if let Some(active_chat) = self.props.chat_list.active_chat.as_ref() {
             self.get_chat_data(active_chat)
                 .map(|chat_data| {
-                    let message_offset =
-                        calculate_list_offset(chat_messages.height, chat_data.messages.len());
+                    // let message_offset =
+                    //   calculate_list_offset(chat_messages.height, chat_data.messages.len());
 
                     chat_data
                         .messages
                         .asc_iter()
-                        .skip(message_offset)
-                        .map(|mbi| ListItem::new(mbi.render()))
-                        .collect::<Vec<ListItem>>()
+                        // .skip(message_offset)
+                        .flat_map(|mbi| mbi.render(chat_messages.width as usize - 2))
+                        .collect::<Vec<Line>>()
                 })
                 .unwrap_or_default()
         } else {
-            vec![ListItem::new(Line::from(NO_CHAT_SELECTED_MESSAGE))]
+            vec![Line::from(NO_CHAT_SELECTED_MESSAGE)]
         };
+        let message_offset = calculate_list_offset(chat_messages.height, messages.len());
 
-        let messages =
-            List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-        frame.render_widget(messages, chat_messages);
+        let chat_message_window = Paragraph::new(messages)
+            .block(Block::default().borders(Borders::ALL).title("Messages"))
+            .wrap(Wrap { trim: false })
+            .scroll((message_offset as u16, 0));
+
+        frame.render_widget(chat_message_window, chat_messages);
 
         // Chat Message Input
         self.message_input_box.render(

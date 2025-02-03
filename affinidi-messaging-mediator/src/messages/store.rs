@@ -228,7 +228,7 @@ pub(crate) async fn store_forwarded_message(
     state: &SharedData,
     session: &Session,
     message: &str,
-    sender: &str,
+    sender: Option<&str>,
     recipient: &str,
 ) -> Result<(), MediatorError> {
     let _span = span!(tracing::Level::DEBUG, "store_forwarded_message",);
@@ -246,7 +246,7 @@ pub(crate) async fn store_forwarded_message(
 
         match state
             .database
-            .store_message(&session.session_id, message, recipient, Some(sender))
+            .store_message(&session.session_id, message, recipient, sender)
             .await
         {
             Ok(msg_id) => {

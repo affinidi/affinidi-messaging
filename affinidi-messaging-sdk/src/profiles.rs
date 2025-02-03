@@ -17,6 +17,7 @@ use crate::{
     },
     ATM,
 };
+use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use serde::{Deserialize, Serialize};
 use ssi::dids::{
     document::{service::Endpoint, Service},
@@ -99,7 +100,9 @@ pub struct ProfileInner {
     pub mediator: Arc<Option<Mediator>>,
     pub(crate) authorization: Mutex<Option<AuthorizationResponse>>,
     pub(crate) authenticated: AtomicBool,
+    /// Channel to send commands to the WS_Handler task
     pub(crate) channel_tx: Mutex<Sender<WsHandlerCommands>>,
+    /// Channel to receive commands from the WS_Handler task
     pub(crate) channel_rx: Mutex<Receiver<WsHandlerCommands>>,
 }
 
@@ -166,6 +169,56 @@ impl Profile {
             mediator.rest_endpoint.clone()
         } else {
             None
+        }
+    }
+
+    /// Sets up a direct channel to a provided MPSC Receiver
+    /// This will bypass the WS_Handler and send messages directly to the provided Receiver
+    pub async fn enable_direct_channel(
+        &self,
+        channel_tx: Sender<Box<(Message, UnpackMetadata)>>,
+    ) -> Result<(), ATMError> {
+        if let Some(mediator) = &*self.inner.mediator {
+            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                channel
+                    .send(WsConnectionCommands::EnableDirectChannel(channel_tx))
+                    .await
+                    .map_err(|err| {
+                        ATMError::TransportError(format!(
+                            "Could not send websocket message: {:?}",
+                            err
+                        ))
+                    })?;
+            }
+
+            Ok(())
+        } else {
+            Err(ATMError::TransportError(
+                "There is no mediator configured for this profile".to_string(),
+            ))
+        }
+    }
+
+    /// Disables the direct channel to the provided MPSC Receiver
+    pub async fn disable_direct_channel(&self) -> Result<(), ATMError> {
+        if let Some(mediator) = &*self.inner.mediator {
+            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                channel
+                    .send(WsConnectionCommands::DisableDirectChannel)
+                    .await
+                    .map_err(|err| {
+                        ATMError::TransportError(format!(
+                            "Could not send websocket message: {:?}",
+                            err
+                        ))
+                    })?;
+            }
+
+            Ok(())
+        } else {
+            Err(ATMError::TransportError(
+                "There is no mediator configured for this profile".to_string(),
+            ))
         }
     }
 }
@@ -356,6 +409,7 @@ impl ATM {
 
     /// Will create a websocket connection for the profile if one doesn't already exist
     /// Will return Ok() if a connection already exists, or if it successfully started a new connection
+    /// Automatically starts live_streaming
     pub async fn profile_enable_websocket(&self, profile: &Arc<Profile>) -> Result<(), ATMError> {
         let mediator = {
             let Some(mediator) = &*profile.inner.mediator else {

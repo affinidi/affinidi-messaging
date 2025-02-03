@@ -2,7 +2,45 @@
 
 ## Changelog history
 
-## XX January 2025 (0.9.4)
+Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
+Missing versions on the changelog simply reflect minor deployment changes on our tooling.
+
+## 3rd February 2025 (0.9.6)
+
+### All (0.9.6)
+
+* Cleaning up comments and documentation
+
+### DIDComm Library (0.9.6)
+
+* pack_encrypted will return the forwarded routing_keys from a Service Record
+  * Useful for when detecting if message has already been wrapped in a forward/routing wrapper
+
+### Mediator (0.9.6)
+
+* Mediator can now handle JSON Object Attachments
+
+### SDK (0.9.6)
+
+* ATM Struct derives Clone trait, allowing for a simpler clone of the inner representation
+* Message Pickup Protocol
+  * FEATURE: live_stream_next() wraps Duration in an Option to be more clear that this is an optional setting
+  * FIX: live_stream_next() properly waits now for next message vs. only fetching from cache
+* Added the ability for a Profile to direct-stream received messages via a channel
+  * Allows for mix and match combo when messages are being sent to the SDK
+  * Application may want direct-receive capability (all messages from all profiles come on a single channel)
+    * Use the WsHandler::DirectMode config option on ATM Configuration
+  * Some Profiles may want cache mode where you can call next() against the cache. across all profiles
+    * Default mode
+  * You may have some tasks that want to stream via a dedicated channel on a per-profile basis
+    * use profile.enable_direct_channel() and profile.disable_direct_channel()
+
+### Text-Client (0.9.6)
+
+* When sending a message, will detect if message is already wrapped in a forward envelope
+* Chat Messages properly wrap in the text window making it easier to read.
+
+## 30th January 2025 (0.9.4)
 
 ### All (0.9.4)
 

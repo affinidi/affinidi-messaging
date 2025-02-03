@@ -117,6 +117,8 @@ pub struct AcceptInvitePopupState {
 pub struct ManualConnectPopupState {
     pub show: bool,
     pub remote_did: String,
+    pub alias: String,
+    pub error_msg: Option<String>,
 }
 
 /// State holds the state of the application

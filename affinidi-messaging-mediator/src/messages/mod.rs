@@ -43,6 +43,10 @@ impl MessageType {
             SDKMessageType::MessagePickupStatusRequest => {
                 message_pickup::status_request(message, state, session).await
             }
+            SDKMessageType::MessagePickupStatusResponse => Err(MediatorError::NotImplemented(
+                session.session_id.clone(),
+                "Mediator does not handle Message Pickup Status responses".into(),
+            )),
             SDKMessageType::MessagePickupDeliveryRequest => {
                 message_pickup::delivery_request(message, state, session).await
             }

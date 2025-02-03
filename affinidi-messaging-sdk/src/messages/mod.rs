@@ -128,14 +128,14 @@ pub struct GetMessagesResponse {
 impl GenericDataStruct for GetMessagesResponse {}
 
 /// Enum for the delete policy when retrieving messages
-/// Optimistic  - Deletes messages as they are fetched, occurs automatically within ATM
-/// OnReceive   - Will delete messages after they are received by the SDK
-/// DoNotDelete - Messages are not deleted (Default behavior)
-///               It is up to the caller as to when and how they want to delete messages
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub enum FetchDeletePolicy {
+    /// Optimistic  - Deletes messages as they are fetched, occurs automatically within ATM
     Optimistic,
+    /// OnReceive   - Will delete messages after they are received by the SDK
     OnReceive,
+    /// DoNotDelete - Messages are not deleted (Default behavior)
+    ///               It is up to the caller as to when and how they want to delete messages
     #[default]
     DoNotDelete,
 }
