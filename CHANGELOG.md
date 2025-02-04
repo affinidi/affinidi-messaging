@@ -5,6 +5,16 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
+## XX February 2025 (0.9.7)
+
+### All (0.9.7)
+
+* Crate dependencies updated to latest
+
+### Mediator (0.9.7)
+
+* Config: oob_invite_ttl added allowing for customisable time to live (TTL) for OOB Invites
+
 ## 3rd February 2025 (0.9.6)
 
 ### All (0.9.6)

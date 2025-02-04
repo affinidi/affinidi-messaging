@@ -22,11 +22,14 @@ const HASH_KEY_PREFIX: &str = "OOB_INVITES";
 
 impl DatabaseHandler {
     /// Stores an OOB Discovery Invitation
-    /// Will set an expiry on the Invite URL
+    /// `did_hash` - The hash of the DID that is creating the OOB Discovery Invitation
+    /// `invite` - The OOB Discovery Invitation Message
+    /// `oob_invite_ttl` - The time to live for the OOB Discovery Invitation
     pub async fn oob_discovery_store(
         &self,
         did_hash: &str,
         invite: &Message,
+        oob_invite_ttl: u64,
     ) -> Result<String, MediatorError> {
         let _span = span!(Level::DEBUG, "oob_discovery_store", did_hash = did_hash);
 
@@ -50,15 +53,15 @@ impl DatabaseHandler {
                 }
             };
 
-            //TODO: Should add this as a configurable value (Defaults to 24 hours)
+            // Setup the expiry in the database
             let expire_at = if let Some(expiry) = invite.expires_time {
-                if expiry > now + 86_400 {
-                    now + 86_400
+                if expiry > now + oob_invite_ttl {
+                    now + oob_invite_ttl
                 } else {
                     expiry
                 }
             } else {
-                now + 86_400
+                now + oob_invite_ttl
             };
 
             let base64_invite = match serde_json::to_string(invite) {

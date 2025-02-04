@@ -51,7 +51,11 @@ pub async fn oob_invite_handler(
 
     let oob_id = state
         .database
-        .oob_discovery_store(&session.did_hash, &body)
+        .oob_discovery_store(
+            &session.did_hash,
+            &body,
+            state.config.limits.oob_invite_ttl as u64,
+        )
         .await?;
 
     Ok((

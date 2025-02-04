@@ -267,6 +267,10 @@ ws_size = "${LIMIT_WS_SIZE:10485760}"
 ### Default: 1000
 access_list_limit = "${ACCESS_LIST_LIMIT:1000}"
 
+### oob_invite_ttl: Time to live in seconds for OOB invites
+### Default 86_400
+oob_invite_ttl = "${OOB_INVITE_TTL:86_400}"
+
 ### ****************************************************************************************************************************
 ### Configuration specific to the forwarding processor
 ### ****************************************************************************************************************************

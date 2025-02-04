@@ -281,6 +281,7 @@ pub struct LimitsConfig {
     pub to_recipients: usize,
     pub ws_size: usize,
     pub access_list_limit: usize,
+    pub oob_invite_ttl: usize,
 }
 
 impl Default for LimitsConfig {
@@ -300,6 +301,7 @@ impl Default for LimitsConfig {
             to_recipients: 100,
             ws_size: 10_485_760,
             access_list_limit: 1_000,
+            oob_invite_ttl: 86_400,
         }
     }
 }
@@ -320,6 +322,7 @@ struct LimitsConfigRaw {
     pub to_recipients: String,
     pub ws_size: String,
     pub access_list_limit: String,
+    pub oob_invite_ttl: String,
 }
 
 impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
@@ -344,6 +347,7 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
             access_list_limit: raw.access_list_limit.parse().unwrap_or(1_000),
+            oob_invite_ttl: raw.oob_invite_ttl.parse().unwrap_or(86_400),
         })
     }
 }
