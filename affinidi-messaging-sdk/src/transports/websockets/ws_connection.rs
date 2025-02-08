@@ -17,7 +17,7 @@ use tokio::{
     select,
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
-    time::sleep,
+    time::{sleep, Instant},
 };
 use tokio_stream::StreamExt;
 use tokio_tungstenite::{
@@ -28,7 +28,7 @@ use tokio_tungstenite::{
     },
     MaybeTlsStream, WebSocketStream,
 };
-use tracing::{debug, error, span, Instrument};
+use tracing::{debug, error, info, span, Instrument};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -109,8 +109,20 @@ impl WsConnection {
             };
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
+            let watchdog_interval = tokio::time::interval_at(
+                Instant::now() + Duration::from_secs(1),
+                Duration::from_secs(1),
+            );
+            tokio::pin!(watchdog_interval);
             loop {
                 select! {
+                    _ = watchdog_interval.tick() => {
+                        // This loops the main loop for this task
+                        // Helps with resuming network connections when the underlying
+                        // OS goes to sleep
+
+                        // Nothing actually happens here - it just loops
+                    }
                     value = web_socket.next() => {
                                     if let Some(msg) = value {
                                         match msg {
@@ -126,6 +138,7 @@ impl WsConnection {
                                                         }
                                                     };
                                                     if let Some(sender) = &direct_channel {
+                                                        info!("TIMTAM: Sending message to direct channel: Free slots: {}", sender.capacity() );
                                                         let _ = sender.send(Box::new(unpack)).await;
                                                     } else {
                                                         let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;

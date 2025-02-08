@@ -16,10 +16,12 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug, Formatter},
     sync::Arc,
+    time::Duration,
 };
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
+    time::Instant,
 };
 use tracing::{debug, info, span, warn, Instrument, Level};
 
@@ -94,8 +96,20 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
+            let watchdog_interval = tokio::time::interval_at(
+                Instant::now() + Duration::from_secs(1),
+                Duration::from_secs(1),
+            );
+            tokio::pin!(watchdog_interval);
             loop {
                 select! {
+                    _ = watchdog_interval.tick() => {
+                        // This loops the main loop for this task
+                        // Helps with resuming network connections when the underlying
+                        // OS goes to sleep
+
+                        // Nothing actually happens here - it just loops
+                    }
                     value = handler_rx.recv(), if !cache.is_full() => {
                         // These are inbound messages from the WS_Connections
                         if let Some(message) = value {

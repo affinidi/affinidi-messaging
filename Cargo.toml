@@ -11,7 +11,7 @@ resolver = "2"
 
 [workspace.package]
 version = '0.9.7'
-edition = "2021"
+edition = "2024"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
 readme = "README.md"
@@ -31,10 +31,10 @@ askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.63"
-aws-sdk-memorydb = "1.59"
-aws-sdk-secretsmanager = "1.61"
-aws-sdk-ssm = "1.63"
+aws-sdk-dynamodb = "1.64"
+aws-sdk-memorydb = "1.60"
+aws-sdk-secretsmanager = "1.62"
+aws-sdk-ssm = "1.64"
 axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
@@ -109,5 +109,5 @@ tracing-test = "0.2"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
-uuid = { version = "1.12", features = ["v4", "fast-rng"] }
+uuid = { version = "1.13", features = ["v4", "fast-rng"] }
 varint = "0.9"
