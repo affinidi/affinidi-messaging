@@ -62,12 +62,12 @@ impl DatabaseHandler {
         did_hash: &str,
         force_delivery: bool,
     ) -> Option<String> {
-        let mut conn = if let Ok(conn) = self.get_async_connection().await {
+        let mut conn = match self.get_async_connection().await { Ok(conn) => {
             conn
-        } else {
+        } _ => {
             error!("is_live_streaming(): Failed to get connection to Redis");
             return None;
-        };
+        }};
 
         match deadpool_redis::redis::cmd("HGET")
             .arg("GLOBAL_STREAMING")

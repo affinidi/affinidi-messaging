@@ -76,12 +76,12 @@ pub async fn authentication_challenge(
         // 2. If not known, then does the mediator acl_mode allow for new accounts?
         // 3. If yes, then add the account and continue
 
-        if let Some(acls) = state.database.get_did_acl(&session.did_hash).await? {
+        match state.database.get_did_acl(&session.did_hash).await? { Some(acls) => {
             if acls.get_blocked() {
                 info!("DID({}) is blocked from connecting", session.did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             }
-        } else {
+        } _ => {
             // Unknown DID
             if state.config.security.mediator_acl_mode == AccessListModeType::ExplicitAllow {
                 info!("Unknown DID({}) is blocked from connecting", session.did);
@@ -93,7 +93,7 @@ pub async fn authentication_challenge(
                     .account_add(&session.did_hash, &state.config.security.global_acl_default)
                     .await?;
             }
-        }
+        }}
 
         state.database.create_session(&session).await?;
 
@@ -147,19 +147,19 @@ pub async fn authentication_response(
             }
         };
 
-        let from_did = if let Some(from_did) = &envelope.from_did {
+        let from_did = match &envelope.from_did { Some(from_did) => {
             // Check if DID is allowed to connect
             if !MediatorACLSet::authentication_check(&state, &digest(from_did), None).await? {
                 info!("DID({}) is blocked from connecting", from_did);
                 return Err(MediatorError::ACLDenied("DID Blocked".to_string()).into());
             }
             from_did.to_string()
-        } else {
+        } _ => {
             return Err(MediatorError::AuthenticationError(
                 "Could not determine from_did".to_string(),
             )
             .into());
-        };
+        }};
 
         // Unpack the message
         let (msg, _) = match Message::unpack(
@@ -464,17 +464,17 @@ pub async fn authentication_refresh(
         };
 
         // Refresh token is valid - check against database and ensure it still exists
-        let session_check = if let Some(from_did) = &envelope.from_did {
+        let session_check = match &envelope.from_did { Some(from_did) => {
             state
                 .database
                 .get_session(&results.claims.session_id, from_did)
                 .await?
-        } else {
+        } _ => {
             return Err(MediatorError::AuthenticationError(
                 "Could not determine from_did".to_string(),
             )
             .into());
-        };
+        }};
 
         // Is the session in an authenticated state? If not, then we can't refresh
         if session_check.state != SessionState::Authenticated {

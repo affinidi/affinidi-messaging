@@ -112,7 +112,7 @@ impl ATM {
                     }
                     value = handler_rx.recv(), if !cache.is_full() => {
                         // These are inbound messages from the WS_Connections
-                        if let Some(message) = value {
+                        match value { Some(message) => {
                             match message {
                                 WsConnectionCommands::Connected(profile, status_msg_id) => {
                                     debug!("Profile({}): Connected", profile.inner.alias);
@@ -124,19 +124,19 @@ impl ATM {
                                     debug!("Message received from WS_Connection");
                                     if let WsHandlerMode::Cached = ws_handler_mode {
                                         // If we are in cached mode, we need to cache the message
-                                        if let Some(channel) = cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) {
+                                        match cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) { Some(channel) => {
                                             debug!("Message found in cache");
                                             // notify the SDK that a message has been found
                                             let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
                                             debug!("Message delivered to receive channel");
-                                        } else if next_counter > 0 {
+                                        } _ => if next_counter > 0 {
                                                 next_counter -= 1;
                                                 to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                     ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                                 })?;
                                             } else {
                                                 cache.insert(message, meta);
-                                            }
+                                            }}
                                     } else {
                                         // Send the message directly to the broadcast channel
                                         if let Some(broadcast) = &shared_state.direct_stream_sender {
@@ -148,12 +148,12 @@ impl ATM {
                                     warn!("Received unknown message from WS_Connection");
                                 }
                             }
-                        } else {
+                        } _ => {
                             warn!("Channel to_handler closed");
-                        }
+                        }}
                     }
                     value = from_sdk.recv() => {
-                        if let Some(cmd) = value {
+                        match value { Some(cmd) => {
                             match cmd {
                                 WsHandlerCommands::Activate(profile) => {
                                     debug!("Profile({}): Activating", profile.inner.alias);
@@ -180,13 +180,13 @@ impl ATM {
                                 }
                                 WsHandlerCommands::Next => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
-                                        if let Some((message, meta)) = cache.next() {
+                                        match cache.next() { Some((message, meta)) => {
                                             to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        } else {
+                                        } _ => {
                                             next_counter += 1;
-                                        }
+                                        }}
                                     } else {
                                         to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
@@ -198,15 +198,15 @@ impl ATM {
                                 }
                                 WsHandlerCommands::Get(id, channel) => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
-                                        if let Some((message, meta)) = cache.get(&id, &channel) {
+                                        match cache.get(&id, &channel) { Some((message, meta)) => {
                                             channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        } else {
+                                        } _ => {
                                             channel.send(WsHandlerCommands::NotFound).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        }
+                                        }}
                                     } else {
                                         to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
@@ -234,10 +234,10 @@ impl ATM {
                                     warn!("Received unknown command");
                                 }
                             }
-                        } else {
+                        } _ => {
                             info!("Channel Closed");
                             break;
-                        }
+                        }}
                     }
                 }
             }

@@ -39,15 +39,15 @@ pub async fn well_known_web_did_handler(
 ) -> Result<Json<Document>, AppError> {
     let _span = span!(Level::DEBUG, "well_known_web_did_handler");
     async move {
-        if let Some(doc) = state.config.mediator_did_doc {
+        match state.config.mediator_did_doc { Some(doc) => {
             Ok(Json(doc))
-        } else {
+        } _ => {
             Err(MediatorError::ConfigError(
                 "NA".to_string(),
                 "No Mediator DID Document is configured".to_string(),
             )
             .into())
-        }
+        }}
     }
     .instrument(_span)
     .await

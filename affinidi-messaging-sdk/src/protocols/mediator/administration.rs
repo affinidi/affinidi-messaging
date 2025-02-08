@@ -79,15 +79,14 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
+            match atm.send_message(profile, &msg, &msg_id, true, true).await?
+            { SendMessageResponse::Message(message) => {
                 Ok(message.body)
-            } else {
+            } _ => {
                 Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
                 ))
-            }
+            }}
         }
         .instrument(_span)
         .await
@@ -181,15 +180,14 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
+            match atm.send_message(profile, &msg, &msg_id, true, true).await?
+            { SendMessageResponse::Message(message) => {
                 self._parse_add_admins_response(&message)
-            } else {
+            } _ => {
                 Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
                 ))
-            }
+            }}
         }
         .instrument(_span)
         .await
@@ -275,15 +273,14 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
+            match atm.send_message(profile, &msg, &msg_id, true, true).await?
+            { SendMessageResponse::Message(message) => {
                 self._parse_strip_admins_response(&message)
-            } else {
+            } _ => {
                 Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
                 ))
-            }
+            }}
         }
         .instrument(_span)
         .await
@@ -357,15 +354,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-                if let SendMessageResponse::Message(message) = atm
+                match atm
                 .send_message(profile, &msg, &msg_id, true, true)
-                .await? {
+                .await? { SendMessageResponse::Message(message) => {
                 self._parse_list_admins_response(&message)
-                } else {
+                } _ => {
                     Err(ATMError::MsgReceiveError(
                         "No response from mediator".to_owned(),
                     ))
-                }
+                }}
         }
         .instrument(_span)
         .await

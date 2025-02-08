@@ -1,7 +1,7 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
 use std::collections::HashMap;
 
-use super::{session::Session, DatabaseHandler};
+use super::{DatabaseHandler, session::Session};
 use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::Folder,
@@ -11,7 +11,7 @@ use affinidi_messaging_sdk::{
     },
 };
 use redis::Pipeline;
-use tracing::{debug, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, span, warn};
 
 impl DatabaseHandler {
     /// Quick and efficient check if an account exists locally in the mediator
@@ -143,7 +143,7 @@ impl DatabaseHandler {
     /// Removes an account from the mediator
     /// - `did_hash` - SHA256 Hash of DID to remove
     /// - `remove_outbox` - This will remove messages that have not been delivered from this DID to others
-    ///                     NOTE: This should only be used as last resort. It is better to let the messages be delivered
+    ///   NOTE: This should only be used as last resort. It is better to let the messages be delivered
     /// - `remove_forwards` - This will remove messages that are queued to be delivered from this DID via forwarding
     pub(crate) async fn account_remove(
         &self,
@@ -239,7 +239,7 @@ impl DatabaseHandler {
     /// Retrieves up to 100 accounts from the mediator
     /// - `cursor` - The offset to start from (0 is the start)
     /// - `limit` - The maximum number of accounts to return (max 100)
-    ///    NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
+    ///   NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
     pub(crate) async fn account_list(
         &self,
         cursor: u32,

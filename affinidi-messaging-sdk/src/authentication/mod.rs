@@ -79,15 +79,15 @@ impl Profile {
                 }
             };
 
-            if let Some(tokens) = &*self.inner.authorization.lock().await {
+            match &*self.inner.authorization.lock().await { Some(tokens) => {
                 debug!("Returning existing tokens");
                 return Ok(tokens.clone());
-            } else {
+            } _ => {
                 self.inner.authenticated.store(false, Ordering::Relaxed);
                 return Err(ATMError::AuthenticationError(
                     "Authenticated but no tokens found".to_owned(),
                 ));
-            }
+            }}
         }
 
         let _span = span!(Level::DEBUG, "authenticate",);

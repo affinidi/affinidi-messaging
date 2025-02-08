@@ -1,9 +1,9 @@
 use crate::{
+    ATM,
     errors::ATMError,
-    messages::{known::MessageType, GenericDataStruct, GetMessagesRequest},
+    messages::{GenericDataStruct, GetMessagesRequest, known::MessageType},
     profiles::Profile,
     protocols::{message_pickup::MessagePickup, routing::Routing},
-    ATM,
 };
 use affinidi_messaging_didcomm::Message;
 use serde_json::Value;
@@ -57,7 +57,7 @@ impl ATM {
     /// - msg_id: The ID of the message (used for message response pickup)
     /// - wait_for_response: Whether to wait for a message response from the mediator
     /// - auto_delete: Whether to delete the message response after receiving it
-    ///                NOTE: If set to false, then you must delete the message elsewhere
+    ///   NOTE: If set to false, then you must delete the message elsewhere
     ///
     /// Returns: If wait_for_response is true, the response message from the mediator
     ///          Else Ok(None) - Message sent Successfully
@@ -169,7 +169,7 @@ impl ATM {
     /// - next_did: The DID of the next agent to forward the message to
     /// - expires_time: The time at which the message expires if not delivered
     /// - delay_milli: The time to wait before delivering the message
-    ///               NOTE: If negative, picks a random delay between 0 and the absolute value
+    ///   NOTE: If negative, picks a random delay between 0 and the absolute value
     /// - wait_for_response: Whether to wait for a message response from the mediator
     #[allow(clippy::too_many_arguments)]
     pub async fn forward_and_send_message(

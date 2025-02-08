@@ -159,23 +159,23 @@ impl StreamingTask {
                                 let payload: PubSubRecord = serde_json::from_str(&payload).unwrap();
 
                                 // Find the MPSC transmit channel for the associated DID hash
-                                if let Some((tx, active)) = clients.get(&payload.did_hash) {
+                                match clients.get(&payload.did_hash) { Some((tx, active)) => {
                                     if payload.force_delivery ||  *active {
                                         // Send the message to the client
-                                        if let Err(err) = tx.send(WebSocketCommands::Message(payload.message.clone())).await {
+                                        match tx.send(WebSocketCommands::Message(payload.message.clone())).await { Err(err) => {
                                             error!("Error sending message to client ({}): {}", payload.did_hash, err);
-                                        } else {
+                                        } _ => {
                                             info!("Sent message to client ({})", payload.did_hash);
-                                        }
+                                        }}
                                     } else {
                                         warn!("pub/sub msg received for did_hash({}) but it is not active", payload.did_hash);
                                         if let Err(err) = database.streaming_stop_live(&payload.did_hash, &self.uuid).await {
                                             error!("Error stopping streaming for client ({}): {}", payload.did_hash, err);
                                         }
                                     }
-                                } else {
+                                } _ => {
                                     warn!("pub/sub msg received for did_hash({}) but it doesn't exist in clients HashMap", payload.did_hash);
-                                }
+                                }}
 
                             } else {
                                 error!("Error getting payload from message");

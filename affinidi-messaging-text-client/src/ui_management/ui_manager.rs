@@ -44,11 +44,11 @@ impl UiManager {
     ) -> anyhow::Result<Interrupted> {
         // consume the first state to initialize the ui app
         let mut app_router = {
-            if let Some(state) = state_rx.recv().await {
+            match state_rx.recv().await { Some(state) => {
                 AppRouter::new(&state, self.action_tx.clone())
-            } else {
+            } _ => {
                 return Err(anyhow::anyhow!("could not get the initial state"));
-            }
+            }}
         };
 
         let mut terminal = setup_terminal()?;

@@ -124,11 +124,11 @@ impl WsConnection {
                         // Nothing actually happens here - it just loops
                     }
                     value = web_socket.next() => {
-                                    if let Some(msg) = value {
+                                    match value { Some(msg) => {
                                         match msg {
                                             Ok(payload) => {
                                             if payload.is_text() {
-                                                if let Ok(msg) = payload.to_text() {
+                                                match payload.to_text() { Ok(msg) => {
                                                     debug!("Received text message ({})", msg);
                                                     let unpack = match atm.unpack(msg).await {
                                                         Ok(unpack) => unpack,
@@ -137,15 +137,15 @@ impl WsConnection {
                                                             continue;
                                                         }
                                                     };
-                                                    if let Some(sender) = &direct_channel {
+                                                    match &direct_channel { Some(sender) => {
                                                         info!("TIMTAM: Sending message to direct channel: Free slots: {}", sender.capacity() );
                                                         let _ = sender.send(Box::new(unpack)).await;
-                                                    } else {
+                                                    } _ => {
                                                         let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
-                                                    }
-                                            } else {
+                                                    }}
+                                            } _ => {
                                                 error!("Received non-text message");
-                                            }
+                                            }}
                                         } else if payload.is_close() {
                                             error!("Websocket closed");
                                             web_socket = match self._handle_connection(&atm, &protocols, true).await {
@@ -177,13 +177,13 @@ impl WsConnection {
                                     }
                                 }
                                 }
-                                } else {
+                                } _ => {
                                     error!("websocket error : {:?}", value);
                                     break;
-                                }
+                                }}
                     }
                     value = self.from_handler.recv() => {
-                        if let Some(cmd) = value {
+                        match value { Some(cmd) => {
                             match cmd {
                                 WsConnectionCommands::Send(msg) => {
                                     debug!("Sending message ({}) to websocket", msg);
@@ -212,10 +212,10 @@ impl WsConnection {
                                     println!("Unhandled command");
                                 }
                             }
-                        } else {
+                        } _ => {
                             error!("Error getting command {:#?}", value);
                             break;
-                        }
+                        }}
                     }
                 }
             }

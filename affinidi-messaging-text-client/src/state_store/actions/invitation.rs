@@ -69,15 +69,15 @@ pub async fn create_new_profile(
     let p256_key = JWK::generate_p256();
     let did_key = DIDKey::generate(&p256_key).unwrap();
 
-    let (d, x, y) = if let Params::EC(map) = p256_key.clone().params {
+    let (d, x, y) = match p256_key.clone().params { Params::EC(map) => {
         (
             String::from(map.ecc_private_key.clone().unwrap()),
             String::from(map.x_coordinate.clone().unwrap()),
             String::from(map.y_coordinate.clone().unwrap()),
         )
-    } else {
+    } _ => {
         panic!("Failed to generate P256 key")
-    };
+    }};
 
     let secret = Secret {
         id: format!("{}#{}", did_key, did_key.to_string().split_at(8).1),

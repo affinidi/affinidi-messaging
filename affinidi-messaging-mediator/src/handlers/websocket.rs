@@ -97,10 +97,10 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                     break;
                 }
                 value = socket.recv() => {
-                    if let Some(msg) = value {
+                    match value { Some(msg) => {
                         debug!("ws: Received message: {:?}", msg);
                         if let Ok(msg) = msg {
-                            if let Message::Text(msg) = msg {
+                            match msg { Message::Text(msg) => {
                                 debug!("ws: Received text message: {:?}", msg);
                                 if msg.len() > state.config.limits.ws_size {
                                     warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.limits.ws_size, msg.len());
@@ -118,18 +118,18 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                                         continue;
                                     }
                                 };
-                            } else if let Message::Close(_) = msg {
+                            } _ => { match msg { Message::Close(_) => {
                                 debug!("Received close message, closing connection");
                                 break;
-                            } else {
+                            } _ => {
                                 warn!("Received non-text message, ignoring");
                                 continue;
-                            }
+                            }}}}
                         }
-                    } else {
+                    } _ => {
                         debug!("Received None, closing connection");
                         break;
-                    }
+                    }}
                 }
                 value = rx.recv() => {
                     if let Some(msg) = value {

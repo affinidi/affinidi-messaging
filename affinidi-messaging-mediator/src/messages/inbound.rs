@@ -30,7 +30,7 @@ pub(crate) async fn handle_inbound(
             }
         };
 
-        if let Some(to_did) = &envelope.to_did {
+        match &envelope.to_did { Some(to_did) => {
             if to_did == &state.config.mediator_did {
                 // Message is to the mediator
                 let (msg, metadata) = match Message::unpack(
@@ -107,13 +107,13 @@ pub(crate) async fn handle_inbound(
 
                 store_message(state, session, &data, &UnpackMetadata::default()).await
             }
-        } else {
+        } _ => {
             Err(MediatorError::ParseError(
                 session.session_id.clone(),
                 "to_did".into(),
                 "Missing to_did in the envelope".into(),
             ))
-        }
+        }}
     }
     .instrument(_span)
     .await

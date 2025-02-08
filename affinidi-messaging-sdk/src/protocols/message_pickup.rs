@@ -138,20 +138,20 @@ impl MessagePickup {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) = atm
+            match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            {
+            { SendMessageResponse::Message(message) => {
                 if wait_for_response {
                     self._parse_status_response(&message).await
                 } else {
                     Ok(None)
                 }
-            } else {
+            } _ => {
                 Err(ATMError::MsgReceiveError(
                     "Invalid response from API".into(),
                 ))
-            }
+            }}
         }
         .instrument(_span)
         .await
@@ -266,7 +266,7 @@ impl MessagePickup {
                         Ok(None)
                     }
                     value = stream.recv() => {
-                        if let Some(msg) = value {
+                        match value { Some(msg) => {
                             match msg {
                                 WsHandlerCommands::MessageReceived(message, meta) => {
                                     Ok(Some((message, meta)))
@@ -275,9 +275,9 @@ impl MessagePickup {
                                     Err(ATMError::MsgReceiveError(format!("Unexpected message type: {:#?}", msg)))
                                 }
                             }
-                        } else {
+                        } _ => {
                             Ok(None)
-                        }
+                        }}
                     }
                 }
             
@@ -347,7 +347,7 @@ impl MessagePickup {
                     return Ok(None);
                 }
                 value = return_channel_rx.recv() => {
-                    if let Some(msg) = value {
+                    match value { Some(msg) => {
                         match msg {
                             WsHandlerCommands::MessageReceived(message, meta) => {
                                 // If auto_delete is true, delete the message
@@ -363,9 +363,9 @@ impl MessagePickup {
                                 return Err(ATMError::MsgReceiveError("Unexpected message type".into()));
                             }
                         }
-                    } else {
+                    } _ => {
                         return Ok(None);
-                    }
+                    }}
                 }
             }
         }
@@ -436,14 +436,14 @@ impl MessagePickup {
                 msg
             };
 
-            if let SendMessageResponse::Message(message) = atm
+            match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            {
+            { SendMessageResponse::Message(message) => {
                 self._handle_delivery(atm, &message).await
-            } else {
+            } _ => {
                 Err(ATMError::MsgReceiveError("No Messages from API".into()))
-            }
+            }}
         }
         .instrument(_span)
         .await

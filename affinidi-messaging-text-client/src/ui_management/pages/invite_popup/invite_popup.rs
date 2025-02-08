@@ -28,11 +28,11 @@ pub struct Props {
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
-        let qr_code = if let Some(invite) = &state.invite_popup.invite {
+        let qr_code = match &state.invite_popup.invite { Some(invite) => {
             invite.qr_code.clone()
-        } else {
+        } _ => {
             None
-        };
+        }};
 
         Props {
             invite_state: state.invite_popup.clone(),
@@ -153,7 +153,7 @@ impl ComponentRender<()> for InvitePopup {
             .render(invite_url, frame.buffer_mut());
         }
 
-        if let Some(mediator_did) = &self.props.mediator_did {
+        match &self.props.mediator_did { Some(mediator_did) => {
             let mut lines = vec![
                 Line::default(),
                 Line::styled(
@@ -177,7 +177,7 @@ impl ComponentRender<()> for InvitePopup {
                 .alignment(Alignment::Left)
                 .wrap(Wrap { trim: true })
                 .render(text_area, frame.buffer_mut());
-        } else {
+        } _ => {
             Paragraph::new(vec![
                 Line::default(),
                 Line::styled(
@@ -192,9 +192,9 @@ impl ComponentRender<()> for InvitePopup {
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true })
             .render(text_area, frame.buffer_mut());
-        }
+        }}
 
-        if let Some(qr_code) = &self.props.qr_code {
+        match &self.props.qr_code { Some(qr_code) => {
             // Render QR Code
             //let image =
             //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
@@ -203,7 +203,7 @@ impl ComponentRender<()> for InvitePopup {
             let picker = self.picker.lock().unwrap();
             let mut a = picker.new_resize_protocol(DynamicImage::ImageLuma8(qr_code.clone()));
             StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut a);
-        } else {
+        } _ => {
             // Render Affinidi Logo
             //let image =
             //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
@@ -211,6 +211,6 @@ impl ComponentRender<()> for InvitePopup {
             //println!("Inner Block {}", inner_blocks[0]);
             let mut image2 = self.image.lock().unwrap();
             StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut *image2);
-        }
+        }}
     }
 }

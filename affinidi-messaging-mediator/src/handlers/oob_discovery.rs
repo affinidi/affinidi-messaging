@@ -76,7 +76,7 @@ pub async fn oobid_handler(
     State(state): State<SharedData>,
     oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
-    if let Some(invite) = state.database.oob_discovery_get(&oobid._oobid).await? {
+    match state.database.oob_discovery_get(&oobid._oobid).await? { Some(invite) => {
         Ok((
             StatusCode::OK,
             Json(SuccessResponse {
@@ -88,7 +88,7 @@ pub async fn oobid_handler(
                 data: Some(invite),
             }),
         ))
-    } else {
+    } _ => {
         Ok((
             StatusCode::OK,
             Json(SuccessResponse {
@@ -100,7 +100,7 @@ pub async fn oobid_handler(
                 data: None,
             }),
         ))
-    }
+    }}
 }
 
 /// Removes a OOB Invitation if it exists

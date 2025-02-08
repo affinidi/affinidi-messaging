@@ -329,12 +329,12 @@ pub async fn handle_message(
     };
 
     let profile = {
-        if let Some(profile) = atm.get_profiles().read().await.find_by_did(&to_did) {
+        match atm.get_profiles().read().await.find_by_did(&to_did) { Some(profile) => {
             profile
-        } else {
+        } _ => {
             warn!("Profile not found for DID({})", &to_did);
             return;
-        }
+        }}
     };
 
     let Some(chat) = state.chat_list.find_chat_by_did(&to_did) else {

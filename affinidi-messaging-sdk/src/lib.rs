@@ -110,9 +110,9 @@ impl ATM {
         let ws_connector = Connector::Rustls(Arc::new(tls_config));
 
         // Set up the DID Resolver
-        let did_resolver = if let Some(did_resolver) = &config.did_resolver {
+        let did_resolver = match &config.did_resolver { Some(did_resolver) => {
             did_resolver.clone()
-        } else {
+        } _ => {
             match DIDCacheClient::new(
                 affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder::default().build(),
             )
@@ -126,7 +126,7 @@ impl ATM {
                     )))
                 }
             }
-        };
+        }};
 
         // Set up the channels for the WebSocket handler
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
@@ -141,12 +141,12 @@ impl ATM {
         // Create a new channel with a capacity of at most 32. This communicates from deletion handler to the SDK
         let (deletion_sdk_tx, sdk_deletion_rx) = mpsc::channel::<DeletionHandlerCommands>(32);
 
-        let direct_stream_sender = if let WsHandlerMode::DirectChannel = config.ws_handler_mode {
+        let direct_stream_sender = match config.ws_handler_mode { WsHandlerMode::DirectChannel => {
             let (direct_stream_sender, _) = broadcast::channel(32);
             Some(direct_stream_sender)
-        } else {
+        } _ => {
             None
-        };
+        }};
 
         let shared_state = SharedState {
             config: config.clone(),

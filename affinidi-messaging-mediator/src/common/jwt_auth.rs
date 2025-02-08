@@ -102,16 +102,16 @@ where
                 ))
             })?;
 
-        if let Some(address) = parts
+        match parts
             .extensions
             .get::<axum::extract::ConnectInfo<SocketAddr>>()
             .map(|ci| ci.0)
-        {
+        { Some(address) => {
             address.to_string()
-        } else {
+        } _ => {
             warn!("No remote address in request!");
             return Err(AuthError::MissingCredentials);
-        };
+        }};
 
         let mut validation = Validation::new(jsonwebtoken::Algorithm::EdDSA);
         validation.set_audience(&["ATM"]);

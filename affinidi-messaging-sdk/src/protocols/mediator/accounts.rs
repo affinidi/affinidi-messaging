@@ -2,11 +2,11 @@ use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha256::digest;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
 use super::{acls::MediatorACLSet, administration::Mediator};
-use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
+use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
 use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,
@@ -188,14 +188,11 @@ impl Mediator {
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
             // send the message
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
-                self._parse_account_get_response(&message)
-            } else {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => self._parse_account_get_response(&message),
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
+                )),
             }
         }
         .instrument(_span)
@@ -217,7 +214,7 @@ impl Mediator {
     /// - `profile` - The profile to use
     /// - `did_hash` - The DID hash to create
     /// - `acls` - The ACLs to set for the account (Defaults to None if not provided)
-    ///                  - NOTE: If not an admin account, the mediator will default this to the default ACL
+    ///   - NOTE: If not an admin account, the mediator will default this to the default ACL
     ///
     /// NOTE: If the mediator is running in explicit_allow mode, then only admin level accounts can add new accounts
     /// # Returns
@@ -267,14 +264,11 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
-                self._parse_account_add_response(&message)
-            } else {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => self._parse_account_add_response(&message),
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
+                )),
             }
         }
         .instrument(_span)
@@ -340,14 +334,13 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
-                self._parse_account_remove_response(&message)
-            } else {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => {
+                    self._parse_account_remove_response(&message)
+                }
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
+                )),
             }
         }
         .instrument(_span)
@@ -421,15 +414,15 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-                if let SendMessageResponse::Message(message) = atm
+                match atm
                 .send_message(profile, &msg, &msg_id, true, true)
-                .await? {
+                .await? { SendMessageResponse::Message(message) => {
                 self._parse_accounts_list_response(&message)
-                } else {
+                } _ => {
                     Err(ATMError::MsgReceiveError(
                         "No response from mediator".to_owned(),
                     ))
-                }
+                }}
         }
         .instrument(_span)
         .await
@@ -453,7 +446,7 @@ impl Mediator {
     /// - `profile` - The profile to use
     /// - `did_hash` - The DID hash to change the type for
     /// - `new_type` - New `AccountType` to set for the account
-    ///                  - NOTE: You must be an admin to run this command
+    ///   - NOTE: You must be an admin to run this command
     ///
     /// # Returns
     /// true or false if the account was changed
@@ -502,14 +495,13 @@ impl Mediator {
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            if let SendMessageResponse::Message(message) =
-                atm.send_message(profile, &msg, &msg_id, true, true).await?
-            {
-                self._parse_account_change_type_response(&message)
-            } else {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => {
+                    self._parse_account_change_type_response(&message)
+                }
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
+                )),
             }
         }
         .instrument(_span)

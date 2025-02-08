@@ -190,11 +190,11 @@ impl DatabaseHandler {
             }
         } else {
             // Anonymous Message
-            if let Some(acl) = self.get_did_acl(to_hash).await? {
+            match self.get_did_acl(to_hash).await? { Some(acl) => {
                 Ok(acl.get_anon_receive().0)
-            } else {
+            } _ => {
                 Ok(false)
-            }
+            }}
         }
     }
 }

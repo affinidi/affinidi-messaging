@@ -50,12 +50,12 @@ pub(crate) async fn process(
 
         // ****************************************************
         // Check if the next hop is allowed to receive forwarded messages
-        let next_acls = if let Some(next_acls) = state.database.get_did_acl(&next_did_hash).await? {
+        let next_acls = match state.database.get_did_acl(&next_did_hash).await? { Some(next_acls) => {
             next_acls
-        } else {
+        } _ => {
             // DID is not known, so use default ACL
             state.config.security.global_acl_default.clone()
-        };
+        }};
 
         if !next_acls.get_receive_forwarded().0 {
             return Err(MediatorError::ACLDenied(format!(
@@ -91,12 +91,12 @@ pub(crate) async fn process(
 
         if let Some(from) = &msg.from {
             let from_acls =
-                if let Some(from_acls) = state.database.get_did_acl(&digest(from.clone())).await? {
+                match state.database.get_did_acl(&digest(from.clone())).await? { Some(from_acls) => {
                     from_acls
-                } else {
+                } _ => {
                     // DID is not known, so use default ACL
                     state.config.security.global_acl_default.clone()
-                };
+                }};
 
             if !from_acls.get_send_forwarded().0 {
                 return Err(MediatorError::ACLDenied(
