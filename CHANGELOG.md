@@ -10,10 +10,19 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 ### All (0.9.7)
 
 * Crate dependencies updated to latest
+* Workspace ready for Rust Edition 2024
 
 ### Mediator (0.9.7)
 
 * Config: oob_invite_ttl added allowing for customisable time to live (TTL) for OOB Invites
+
+### SDK (0.9.7)
+
+* Watchdog ticks added to WebSocket Connections to help with recovery (testing)
+
+### Helpers (0.9.7)
+
+* read_raw_didcomm example added to help with troubleshooting of DIDComm message errors
 
 ## 3rd February 2025 (0.9.6)
 
