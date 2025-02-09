@@ -1,12 +1,12 @@
 use crate::database::session::Session;
 use crate::messages::MessageHandler;
 use crate::{
-    common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions, SharedData,
+    SharedData, common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions,
 };
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use sha256::digest;
-use tracing::{debug, error, span, trace, warn, Instrument};
+use tracing::{Instrument, debug, error, span, trace, warn};
 
 use super::{ProcessMessageResponse, WrapperType};
 
@@ -231,7 +231,11 @@ pub(crate) async fn store_forwarded_message(
     sender: Option<&str>,
     recipient: &str,
 ) -> Result<(), MediatorError> {
-    let _span = span!(tracing::Level::DEBUG, "store_forwarded_message",);
+    let _span = span!(
+        tracing::Level::DEBUG,
+        "store_forwarded_message",
+        session = session.session_id
+    );
 
     async move {
         let did_hash = digest(recipient);
@@ -242,6 +246,7 @@ pub(crate) async fn store_forwarded_message(
             .await
         {
             _live_stream(&state.database, &did_hash, &stream_uuid, message, false).await;
+            debug!("Live streaming message to did_hash: {}", did_hash);
         }
 
         match state
