@@ -3,14 +3,15 @@
 -- store_message
 -- keys = message_hash
 -- args = [1] message
---        [2] message length in bytes
---        [3] to_did_hash
---        [4] from_did_hash <optional>
+--        [2] expiry epoch at in seconds resolution
+--        [3] message length in bytes
+--        [4] to_did_hash
+--        [5] from_did_hash <optional>
 local function store_message(keys, args)
     -- Do we have the correct number of arguments?
     -- from_did_hash can be optional!!! Means an anonymous message
-    if #args < 3 and #args > 4 then
-        return redis.error_reply('store_message: expected 3 or 4 arguments')
+    if #args < 4 and #args > 5 then
+        return redis.error_reply('store_message: expected 4 or 5 arguments')
     end
 
     -- set response type to Version 3
@@ -19,7 +20,7 @@ local function store_message(keys, args)
     -- Get current time on server
     local time = redis.call('TIME')
     local time = string.format("%d%03d", time[1], time[2] / 1000)
-    local bytes = tonumber(args[2])
+    local bytes = tonumber(args[3])
     if bytes == nil then
         return redis.error_reply('store_message: invalid bytes')
     end
@@ -32,28 +33,29 @@ local function store_message(keys, args)
     redis.call('HINCRBY', 'GLOBAL', 'RECEIVED_COUNT', 1)
 
     -- Create Message Expiry Record
-    redis.call('RPUSH', 'MSG_EXPIRY', keys[1] .. ':' .. time)
+    redis.call('ZADD', 'MSG_EXPIRY', 'NX', args[2], 'MSG_EXPIRY:' ..args[2])
+    redis.call('SADD', 'MSG_EXPIRY:' ..args[2], keys[1])
 
     -- Update the receiver records
-    redis.call('HINCRBY', 'DID:' .. args[3], 'RECEIVE_QUEUE_BYTES', bytes)
-    redis.call('HINCRBY', 'DID:' .. args[3], 'RECEIVE_QUEUE_COUNT', 1)
+    redis.call('HINCRBY', 'DID:' .. args[4], 'RECEIVE_QUEUE_BYTES', bytes)
+    redis.call('HINCRBY', 'DID:' .. args[4], 'RECEIVE_QUEUE_COUNT', 1)
     -- If changing the fields in the future, update the fetch_messages function
-    local RQ = redis.call('XADD', 'RECEIVE_Q:' .. args[3], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM',
-        args[4])
+    local RQ = redis.call('XADD', 'RECEIVE_Q:' .. args[4], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'FROM',
+        args[5])
 
     -- Update the sender records
     local SQ = nil
-    if table.getn(args) == 4 then
+    if table.getn(args) == 5 then
         -- Update the sender records
-        redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_BYTES', bytes)
-        redis.call('HINCRBY', 'DID:' .. args[4], 'SEND_QUEUE_COUNT', 1)
-        SQ = redis.call('XADD', 'SEND_Q:' .. args[4], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'TO', args[3])
+        redis.call('HINCRBY', 'DID:' .. args[5], 'SEND_QUEUE_BYTES', bytes)
+        redis.call('HINCRBY', 'DID:' .. args[5], 'SEND_QUEUE_COUNT', 1)
+        SQ = redis.call('XADD', 'SEND_Q:' .. args[5], time .. '-*', 'MSG_ID', keys[1], 'BYTES', bytes, 'TO', args[4])
     end
 
     -- Update message MetaData
-    redis.call('HMSET', 'MSG:META:' .. keys[1], 'BYTES', bytes, 'TO', args[3], 'TIMESTAMP', time, 'RECEIVE_ID', RQ)
+    redis.call('HMSET', 'MSG:META:' .. keys[1], 'BYTES', bytes, 'TO', args[4], 'TIMESTAMP', time, 'RECEIVE_ID', RQ)
     if SQ ~= nil then
-        redis.call('HMSET', 'MSG:META:' .. keys[1], 'FROM', args[4], 'SEND_ID', SQ)
+        redis.call('HMSET', 'MSG:META:' .. keys[1], 'FROM', args[5], 'SEND_ID', SQ)
     end
 
     return redis.status_reply('OK')

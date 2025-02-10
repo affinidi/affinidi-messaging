@@ -81,8 +81,8 @@ impl MessageType {
 /// used when storing messages in the database
 #[derive(Debug, Default)]
 pub enum WrapperType {
-    /// to_did, message
-    Envelope(String, String),
+    /// to_did, message, expires_at
+    Envelope(String, String, u64),
     Message(Message),
     #[default]
     None,

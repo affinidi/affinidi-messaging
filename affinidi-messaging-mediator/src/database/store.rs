@@ -15,12 +15,14 @@ pub struct MessageMetaData {
 impl DatabaseHandler {
     /// Stores a message in the database
     /// Returns the message_id (hash of the message)
+    /// - expires_at: The timestamp at which the message expires (since epoch in seconds)
     pub async fn store_message(
         &self,
         session_id: &str,
         message: &str,
         to_did: &str,
         from_did: Option<&str>,
+        expires_at: u64,
     ) -> Result<String, MediatorError> {
         let _span = span!(Level::DEBUG, "store_message", session_id = session_id);
         async move {
@@ -49,6 +51,7 @@ impl DatabaseHandler {
                 .arg(1)
                 .arg(&message_hash)
                 .arg(message)
+                .arg(expires_at)
                 .arg(message.len())
                 .arg(&to_hash)
                 .arg(&from_hash).exec_async(&mut conn).await.map_err(|err| {

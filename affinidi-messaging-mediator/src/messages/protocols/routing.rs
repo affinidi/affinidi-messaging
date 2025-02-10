@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use crate::{
     common::errors::MediatorError,
     database::session::Session,
@@ -50,12 +52,13 @@ pub(crate) async fn process(
 
         // ****************************************************
         // Check if the next hop is allowed to receive forwarded messages
-        let next_acls = match state.database.get_did_acl(&next_did_hash).await? { Some(next_acls) => {
-            next_acls
-        } _ => {
-            // DID is not known, so use default ACL
-            state.config.security.global_acl_default.clone()
-        }};
+        let next_acls = match state.database.get_did_acl(&next_did_hash).await? {
+            Some(next_acls) => next_acls,
+            _ => {
+                // DID is not known, so use default ACL
+                state.config.security.global_acl_default.clone()
+            }
+        };
 
         if !next_acls.get_receive_forwarded().0 {
             return Err(MediatorError::ACLDenied(format!(
@@ -90,13 +93,13 @@ pub(crate) async fn process(
         // If message is anonymous, then use the session DID
 
         if let Some(from) = &msg.from {
-            let from_acls =
-                match state.database.get_did_acl(&digest(from.clone())).await? { Some(from_acls) => {
-                    from_acls
-                } _ => {
+            let from_acls = match state.database.get_did_acl(&digest(from.clone())).await? {
+                Some(from_acls) => from_acls,
+                _ => {
                     // DID is not known, so use default ACL
                     state.config.security.global_acl_default.clone()
-                }};
+                }
+            };
 
             if !from_acls.get_send_forwarded().0 {
                 return Err(MediatorError::ACLDenied(
@@ -231,12 +234,40 @@ pub(crate) async fn process(
                 ))
             }
         };
+
+        let expires_at = if let Some(expires_at) = msg.expires_time {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            if expires_at > now + state.config.limits.message_expiry_seconds {
+                now + state.config.limits.message_expiry_seconds
+            } else {
+                expires_at
+            }
+        } else {
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + state.config.limits.message_expiry_seconds
+        };
+
         debug!(" *************************************** ");
         debug!(" TO: {}", next);
         debug!(" FROM: {:?}", msg.from);
         debug!(" Forwarded message:\n{}", data);
         debug!(" *************************************** ");
-        store_forwarded_message(state, session, &data, msg.from.as_deref(), &next).await?;
+        store_forwarded_message(
+            state,
+            session,
+            &data,
+            msg.from.as_deref(),
+            &next,
+            Some(expires_at),
+        )
+        .await?;
 
         Ok(ProcessMessageResponse {
             store_message: false,
