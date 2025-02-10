@@ -15,6 +15,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 ### Mediator (0.9.7)
 
 * Config: oob_invite_ttl added allowing for customisable time to live (TTL) for OOB Invites
+* Message Expiry handling refactored and placed into Expiry Processor
+* Config: message_expiry_minutes changed to message_expiry_seconds
 
 ### SDK (0.9.7)
 

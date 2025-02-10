@@ -234,10 +234,10 @@ listed_messages = "${LIMIT_LISTED_MESSAGES:100}"
 ### Default: 1_000
 local_max_acl = "${LIMIT_LOCAL_MAX_ACL:1000}"
 
-### message_expiry_minutes: Time to live in minutes for messages stored
+### message_expiry_seconds: Time to live in seconds for messages stored
 ### Messages will expire after this limit
-### Default: 10080 (7 days)
-message_expiry_minutes = "${LIMIT_MESSAGE_EXPIRY_MINUTES:10080}"
+### Default: 604_800 (7 days)
+message_expiry_seconds = "${LIMIT_MESSAGE_EXPIRY_SECONDS:604800}"
 
 ### message_size: Maximum size of a message in bytes
 ### Default: 1048576 (1MB)
