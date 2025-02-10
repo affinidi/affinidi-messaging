@@ -3,7 +3,7 @@ members = [
     "affinidi-messaging-didcomm",
     "affinidi-messaging-sdk",
     "affinidi-messaging-mediator",
-    "affinidi-messaging-processor",
+    "affinidi-messaging-processors",
     "affinidi-messaging-helpers",
     "affinidi-messaging-text-client",
 ]

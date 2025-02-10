@@ -11,6 +11,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 * Crate dependencies updated to latest
 * Workspace ready for Rust Edition 2024
+* affinidi-messaging-processor crate renamed to affinidi-messaging-processors
+  * Multiple binaries configured for processors
 
 ### Mediator (0.9.7)
 
