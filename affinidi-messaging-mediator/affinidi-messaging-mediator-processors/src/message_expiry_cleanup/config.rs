@@ -3,10 +3,8 @@
 // configuration to run the processor
 // *****************************************************************
 
-use affinidi_messaging_processors::{
-    common::database_handler::DatabaseConfig,
-    message_expiry_cleanup::config::MessageExpiryCleanupConfig,
-};
+use affinidi_messaging_mediator_common::database::config::DatabaseConfig;
+use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::MessageExpiryCleanupConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

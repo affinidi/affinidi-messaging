@@ -164,6 +164,7 @@ version = "0.10.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
+ "affinidi-messaging-mediator-common",
  "affinidi-messaging-mediator-processors",
  "affinidi-messaging-sdk",
  "async-convert",
@@ -211,11 +212,24 @@ dependencies = [
 [[package]]
 name = "affinidi-messaging-mediator-common"
 version = "0.10.0"
+dependencies = [
+ "affinidi-messaging-sdk",
+ "axum",
+ "deadpool-redis",
+ "rand 0.9.0",
+ "redis",
+ "rustls 0.23.22",
+ "semver",
+ "serde",
+ "thiserror 2.0.11",
+ "tracing",
+]
 
 [[package]]
 name = "affinidi-messaging-mediator-processors"
 version = "0.10.0"
 dependencies = [
+ "affinidi-messaging-mediator-common",
  "async-trait",
  "clap",
  "deadpool-redis",

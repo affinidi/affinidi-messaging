@@ -1,8 +1,5 @@
-use affinidi_messaging_processors::common::error::ProcessorError;
-use affinidi_messaging_processors::{
-    common::database_handler::DatabaseHandler,
-    message_expiry_cleanup::processor::MessageExpiryCleanupProcessor,
-};
+use affinidi_messaging_mediator_common::{database::DatabaseHandler, errors::ProcessorError};
+use affinidi_messaging_mediator_processors::message_expiry_cleanup::processor::MessageExpiryCleanupProcessor;
 use clap::Parser;
 use config::Config;
 use tokio::join;
@@ -50,7 +47,7 @@ async fn main() -> Result<(), ProcessorError> {
     };
 
     let processor =
-        MessageExpiryCleanupProcessor::new(config.processors.message_expiry_cleanup, database.pool);
+        MessageExpiryCleanupProcessor::new(config.processors.message_expiry_cleanup, database);
 
     let handle = {
         tokio::spawn(async move {

@@ -11,3 +11,13 @@ license.workspace = true
 readme.workspace = true
 
 [dependencies]
+affinidi-messaging-sdk.workspace = true
+axum.workspace = true
+rand.workspace = true
+redis.workspace = true
+deadpool-redis.workspace = true
+rustls.workspace = true
+semver.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

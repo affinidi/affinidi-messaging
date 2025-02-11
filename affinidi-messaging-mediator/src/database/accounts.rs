@@ -1,8 +1,8 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
 use std::collections::HashMap;
 
-use super::{DatabaseHandler, session::Session};
-use crate::common::errors::MediatorError;
+use super::{session::Session, Database};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::Folder,
     protocols::mediator::{
@@ -11,12 +11,12 @@ use affinidi_messaging_sdk::{
     },
 };
 use redis::Pipeline;
-use tracing::{Instrument, Level, debug, span, warn};
+use tracing::{debug, span, warn, Instrument, Level};
 
-impl DatabaseHandler {
+impl Database {
     /// Quick and efficient check if an account exists locally in the mediator
     pub(crate) async fn account_exists(&self, did_hash: &str) -> Result<bool, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("EXISTS")
             .arg(["DID:", did_hash].concat())
@@ -35,7 +35,7 @@ impl DatabaseHandler {
         &self,
         did_hash: &str,
     ) -> Result<Option<Account>, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let (account, access_list_count): (HashMap<String, String>, u32) =
             deadpool_redis::redis::pipe()
@@ -98,7 +98,7 @@ impl DatabaseHandler {
         async move {
             debug!("Adding account to the mediator");
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             deadpool_redis::redis::pipe()
                 .atomic()
@@ -211,7 +211,7 @@ impl DatabaseHandler {
             // Remove from Known DIDs
             // Remove DID Record
             // Remove ACCESS_LIST Set
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
             deadpool_redis::redis::pipe()
                 .atomic()
                 .cmd("SREM")
@@ -256,7 +256,7 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let (new_cursor, dids): (u32, Vec<String>) = deadpool_redis::redis::cmd("SSCAN")
                 .arg("KNOWN_DIDS")
@@ -352,7 +352,7 @@ impl DatabaseHandler {
         async move {
             debug!("Changing account type");
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             deadpool_redis::redis::cmd("HSET")
                 .arg(["DID:", did_hash].concat())

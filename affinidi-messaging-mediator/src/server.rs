@@ -1,11 +1,12 @@
 use crate::{
     common::config::init,
-    database::DatabaseHandler,
+    database::Database,
     handlers::{application_routes, health_checker_handler},
     tasks::{statistics::statistics, websocket_streaming::StreamingTask},
     SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_messaging_mediator_common::database::DatabaseHandler;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{env, net::SocketAddr};
@@ -52,7 +53,7 @@ pub async fn start() {
         .expect("Couldn't initialize mediator!");
 
     // Start setting up the database durability and handling
-    let database = match DatabaseHandler::new(&config).await {
+    let database = match DatabaseHandler::new(&config.database).await {
         Ok(db) => db,
         Err(err) => {
             event!(Level::ERROR, "Error opening database: {}", err);
@@ -61,10 +62,23 @@ pub async fn start() {
         }
     };
 
+    // Convert from the common generic DatabaseHandler to the Mediator specific Database
+    let database = Database(database);
+
     database
         .initialize(&config)
         .await
         .expect("Error initializing database");
+
+    event!(
+        Level::INFO,
+        "Loading LUA scripts into the database from file: {}",
+        &config.database.functions_file
+    );
+    database
+        .load_scripts(&config.database.functions_file)
+        .await
+        .unwrap();
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread

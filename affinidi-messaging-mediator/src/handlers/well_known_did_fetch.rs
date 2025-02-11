@@ -1,13 +1,11 @@
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError};
 use affinidi_messaging_sdk::messages::SuccessResponse;
 use axum::{extract::State, Json};
 use http::StatusCode;
 use ssi::dids::Document;
 use tracing::{span, Instrument, Level};
 
-use crate::{
-    common::errors::{AppError, MediatorError},
-    SharedData,
-};
+use crate::SharedData;
 
 /// Returns the DID for the mediator
 pub async fn well_known_did_fetch_handler(
@@ -39,15 +37,14 @@ pub async fn well_known_web_did_handler(
 ) -> Result<Json<Document>, AppError> {
     let _span = span!(Level::DEBUG, "well_known_web_did_handler");
     async move {
-        match state.config.mediator_did_doc { Some(doc) => {
-            Ok(Json(doc))
-        } _ => {
-            Err(MediatorError::ConfigError(
+        match state.config.mediator_did_doc {
+            Some(doc) => Ok(Json(doc)),
+            _ => Err(MediatorError::ConfigError(
                 "NA".to_string(),
                 "No Mediator DID Document is configured".to_string(),
             )
-            .into())
-        }}
+            .into()),
+        }
     }
     .instrument(_span)
     .await

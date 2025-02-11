@@ -2,10 +2,9 @@
  * Main task that runs in a loop checking for expired messages and removing them
  */
 
+use affinidi_messaging_mediator_common::{database::DatabaseHandler, errors::ProcessorError};
 use std::time::Duration;
 use tracing::info;
-
-use crate::common::database_handler::DatabaseHandler;
 
 use super::config::MessageExpiryCleanupConfig;
 
@@ -18,14 +17,11 @@ pub struct MessageExpiryCleanupProcessor {
 }
 
 impl MessageExpiryCleanupProcessor {
-    pub fn new(config: MessageExpiryCleanupConfig, database: deadpool_redis::Pool) -> Self {
-        MessageExpiryCleanupProcessor {
-            config,
-            database: DatabaseHandler { pool: database },
-        }
+    pub fn new(config: MessageExpiryCleanupConfig, database: DatabaseHandler) -> Self {
+        MessageExpiryCleanupProcessor { config, database }
     }
 
-    pub async fn start(&self) -> Result<(), crate::common::error::ProcessorError> {
+    pub async fn start(&self) -> Result<(), ProcessorError> {
         info!("Expired message cleanup processor started");
 
         loop {
@@ -33,8 +29,8 @@ impl MessageExpiryCleanupProcessor {
 
             sleep.await;
             let timeslots = self.timeslot_scan().await?;
-            for timeslot in timeslots {
-                let (expired, total) = self.expire_messages_from_timeslot(&timeslot).await?;
+            for timeslot in &timeslots {
+                let (expired, total) = self.expire_messages_from_timeslot(timeslot).await?;
             }
             info!("Timeslots count: {}", timeslots.len());
         }

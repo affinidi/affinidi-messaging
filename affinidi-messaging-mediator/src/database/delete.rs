@@ -1,8 +1,9 @@
-use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use tracing::{debug, info, span, Instrument, Level};
 
-impl DatabaseHandler {
+use super::Database;
+
+impl Database {
     /// Deletes a message in the database
     /// - session_id: authentication session ID
     /// - did: DID of the delete requestor
@@ -21,7 +22,7 @@ impl DatabaseHandler {
             message_hash = message_hash,
         );
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
             let response: String = deadpool_redis::redis::cmd("FCALL")
                 .arg("delete_message")
                 .arg(1)

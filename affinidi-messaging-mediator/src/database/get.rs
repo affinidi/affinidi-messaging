@@ -1,13 +1,11 @@
+use super::Database;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::MessageListElement;
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
 use tracing::{debug, event, span, Instrument, Level};
 
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
-
-impl DatabaseHandler {
+impl Database {
     /// Get a message from the database
     /// - msg_id: The unique identifier of the message
     pub async fn get_message(
@@ -17,7 +15,7 @@ impl DatabaseHandler {
     ) -> Result<MessageListElement, MediatorError> {
         let _span = span!(Level::DEBUG, "get_message", msg_id = msg_id,);
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
 
             let (didcomm_message, meta_data): (Value, Vec<String>) = deadpool_redis::redis::pipe()
                 .atomic()

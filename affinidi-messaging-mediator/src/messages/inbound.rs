@@ -1,12 +1,12 @@
 use std::time::SystemTime;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::{store::store_message, MessageHandler},
     SharedData,
 };
 use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::sending::InboundMessageResponse;
 use sha256::digest;
 use tracing::{debug, info, span, Instrument};

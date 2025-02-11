@@ -5,6 +5,7 @@
  * They are fire and forget messages
  */
 use affinidi_messaging_didcomm::{Attachment, Message};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::fetch::FetchOptions,
     protocols::message_pickup::{
@@ -22,7 +23,6 @@ use tracing::{debug, error, event, info, span, warn, Instrument, Level};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::ProcessMessageResponse,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
@@ -105,7 +105,7 @@ async fn generate_status_reply(
     let _span = span!(tracing::Level::DEBUG, "generate_status_reply",);
 
     async move {
-        let mut conn = state.database.get_async_connection().await?;
+        let mut conn = state.database.0.get_async_connection().await?;
 
         let response: Vec<Value> = deadpool_redis::redis::cmd("FCALL")
             .arg("get_status_reply")

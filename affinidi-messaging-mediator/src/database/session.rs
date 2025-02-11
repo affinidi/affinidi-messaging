@@ -1,5 +1,4 @@
-use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{accounts::AccountType, acls::MediatorACLSet};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
@@ -8,6 +7,8 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 use tracing::{debug, warn};
+
+use super::Database;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionClaims {
@@ -129,11 +130,11 @@ impl TryFrom<(&str, HashMap<String, String>)> for Session {
     }
 }
 
-impl DatabaseHandler {
+impl Database {
     /// Creates a new session in the database
     /// Typically called when sending the initial challenge to the client
     pub async fn create_session(&self, session: &Session) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let sid = format!("SESSION:{}", session.session_id);
 
@@ -171,7 +172,7 @@ impl DatabaseHandler {
     /// Retrieves a session and associated other info from the database
     ///
     pub async fn get_session(&self, session_id: &str, did: &str) -> Result<Session, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let (session_db, did_db): (HashMap<String, String>, Vec<Option<String>>) =
             deadpool_redis::redis::pipe()
@@ -289,7 +290,7 @@ impl DatabaseHandler {
         new_session_id: &str,
         did_hash: &str,
     ) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let old_sid = format!("SESSION:{}", old_session_id);
         let new_sid = format!("SESSION:{}", new_session_id);

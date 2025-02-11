@@ -1,11 +1,11 @@
 use std::time::SystemTime;
 
 use crate::database::session::Session;
+use crate::database::Database;
 use crate::messages::MessageHandler;
-use crate::{
-    common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions, SharedData,
-};
+use crate::{messages::PackOptions, SharedData};
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use sha256::digest;
 use tracing::{debug, error, span, trace, warn, Instrument};
@@ -230,7 +230,7 @@ pub(crate) async fn store_message(
 /// If live streaming is enabled, this function will send the message to the live stream
 /// Ok to ignore errors here
 async fn _live_stream(
-    database: &DatabaseHandler,
+    database: &Database,
     did_hash: &str,
     stream_uuid: &str,
     message: &str,

@@ -18,6 +18,7 @@ name = "message_expiry_cleanup"
 path = "src/message_expiry_cleanup/main.rs"
 
 [dependencies]
+affinidi-messaging-mediator-common.workspace = true
 async-trait.workspace = true
 clap.workspace = true
 redis.workspace = true

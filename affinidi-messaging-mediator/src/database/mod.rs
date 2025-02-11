@@ -1,5 +1,7 @@
 //! All Redis related database methods are handled by `DatabaseHandler` module
 
+use affinidi_messaging_mediator_common::database::DatabaseHandler;
+
 pub mod accounts;
 pub(crate) mod acls;
 pub mod admin_accounts;
@@ -17,7 +19,4 @@ pub mod store;
 pub mod streaming;
 
 #[derive(Clone)]
-pub struct DatabaseHandler {
-    pub pool: deadpool_redis::Pool,
-    redis_url: String,
-}
+pub struct Database(pub DatabaseHandler);

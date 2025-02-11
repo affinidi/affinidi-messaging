@@ -1,12 +1,12 @@
 use std::time::SystemTime;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::{store::store_forwarded_message, ProcessMessageResponse, WrapperType},
     SharedData,
 };
 use affinidi_messaging_didcomm::{AttachmentData, Message};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use base64::prelude::*;
 use serde::Deserialize;
 use sha256::digest;

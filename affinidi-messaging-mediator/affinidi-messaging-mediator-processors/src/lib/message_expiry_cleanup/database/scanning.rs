@@ -11,9 +11,9 @@
 
 use std::time::SystemTime;
 
-use crate::{
-    common::error::ProcessorError, message_expiry_cleanup::processor::MessageExpiryCleanupProcessor,
-};
+use affinidi_messaging_mediator_common::errors::ProcessorError;
+
+use crate::message_expiry_cleanup::processor::MessageExpiryCleanupProcessor;
 
 impl MessageExpiryCleanupProcessor {
     pub(crate) async fn timeslot_scan(&self) -> Result<Vec<String>, ProcessorError> {

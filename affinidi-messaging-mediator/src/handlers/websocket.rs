@@ -1,13 +1,13 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{
-    common::errors::{AppError, MediatorError},
     database::session::Session,
     messages::inbound::handle_inbound,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
     SharedData,
 };
 use affinidi_messaging_didcomm::{Message as DidcommMessage, PackEncryptedOptions};
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError};
 use affinidi_messaging_sdk::messages::problem_report::{
     ProblemReport, ProblemReportScope, ProblemReportSorter,
 };

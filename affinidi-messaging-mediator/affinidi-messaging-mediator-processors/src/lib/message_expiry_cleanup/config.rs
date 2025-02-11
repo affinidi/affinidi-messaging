@@ -1,7 +1,5 @@
+use affinidi_messaging_mediator_common::errors::ProcessorError;
 use serde::{Deserialize, Serialize};
-
-use crate::common::database_handler::DatabaseConfig;
-use crate::common::error::ProcessorError;
 
 /// MessageExpiryCleanup Struct contains configuration specific to cleaning up expired messages
 #[derive(Clone, Debug, Serialize, Deserialize)]

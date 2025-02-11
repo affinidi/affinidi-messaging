@@ -1,4 +1,3 @@
-use affinidi_messaging_processors::common::error::ProcessorError;
 use affinidi_messaging_sdk::messages::GenericDataStruct;
 use axum::{
     http::StatusCode,
@@ -22,6 +21,16 @@ where
     fn from(err: E) -> Self {
         Self(err.into())
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ProcessorError {
+    #[error("CommonError: {0}")]
+    CommonError(String),
+    #[error("ForwardingError: {0}")]
+    ForwardingError(String),
+    #[error("MessageExpiryCleanupError: {0}")]
+    MessageExpiryCleanupError(String),
 }
 
 /// MediatorError the first String is always the session_id
@@ -67,6 +76,12 @@ pub enum MediatorError {
     ACLDenied(String),
     #[error("Processor ({0}) error: {1}")]
     ProcessorError(ProcessorError, String),
+}
+
+impl From<MediatorError> for ProcessorError {
+    fn from(error: MediatorError) -> Self {
+        ProcessorError::CommonError(error.to_string())
+    }
 }
 
 impl IntoResponse for AppError {

@@ -13,12 +13,9 @@
  Alice and Bob then swap messages and create a confidential communication channel between themselves.
 */
 
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
+use crate::{database::session::Session, SharedData};
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::protocols::oob_discovery::OOBInviteResponse;
 use axum::{
     extract::{Query, State},
@@ -76,8 +73,8 @@ pub async fn oobid_handler(
     State(state): State<SharedData>,
     oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
-    match state.database.oob_discovery_get(&oobid._oobid).await? { Some(invite) => {
-        Ok((
+    match state.database.oob_discovery_get(&oobid._oobid).await? {
+        Some(invite) => Ok((
             StatusCode::OK,
             Json(SuccessResponse {
                 sessionId: "NA".into(),
@@ -87,9 +84,8 @@ pub async fn oobid_handler(
                 message: "Success".to_string(),
                 data: Some(invite),
             }),
-        ))
-    } _ => {
-        Ok((
+        )),
+        _ => Ok((
             StatusCode::OK,
             Json(SuccessResponse {
                 sessionId: "NA".into(),
@@ -99,8 +95,8 @@ pub async fn oobid_handler(
                 message: "NO CONTENT".to_string(),
                 data: None,
             }),
-        ))
-    }}
+        )),
+    }
 }
 
 /// Removes a OOB Invitation if it exists

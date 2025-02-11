@@ -9,9 +9,9 @@
    OOB_ID = SHA256 Hash of the Invite Message
 */
 
-use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use super::Database;
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use base64::prelude::*;
 use sha256::digest;
 use std::time::SystemTime;
@@ -20,7 +20,7 @@ use tracing::{debug, error, info, span, Instrument, Level};
 // const HASH_KEY: &str = "OOB_INVITES";
 const HASH_KEY_PREFIX: &str = "OOB_INVITES";
 
-impl DatabaseHandler {
+impl Database {
     /// Stores an OOB Discovery Invitation
     /// `did_hash` - The hash of the DID that is creating the OOB Discovery Invitation
     /// `invite` - The OOB Discovery Invitation Message
@@ -34,7 +34,7 @@ impl DatabaseHandler {
         let _span = span!(Level::DEBUG, "oob_discovery_store", did_hash = did_hash);
 
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
 
             let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(now) => now.as_secs(),
@@ -79,7 +79,7 @@ impl DatabaseHandler {
             };
 
             let invite_hash = digest(&base64_invite);
-            let key = DatabaseHandler::to_cache_key(invite_hash.to_owned());
+            let key = Database::to_cache_key(invite_hash.to_owned());
 
             match deadpool_redis::redis::pipe()
                 .atomic()
@@ -118,9 +118,9 @@ impl DatabaseHandler {
         let _span = span!(Level::DEBUG, "oob_discovery_get", oob_id = oob_id);
 
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
 
-            let key = DatabaseHandler::to_cache_key(oob_id.to_owned());
+            let key = Database::to_cache_key(oob_id.to_owned());
             let invitation: Option<String> = match deadpool_redis::redis::pipe()
                 .atomic()
                 // .cmd("HGET")
@@ -158,9 +158,9 @@ impl DatabaseHandler {
         let _span = span!(Level::DEBUG, "oob_discovery_delete", oob_id = oob_id);
 
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
 
-            let key = DatabaseHandler::to_cache_key(oob_id.to_owned());
+            let key = Database::to_cache_key(oob_id.to_owned());
             // let result: bool = match deadpool_redis::redis::cmd("HDEL")
             //     .arg(HASH_KEY)
             //     .arg(oob_id)

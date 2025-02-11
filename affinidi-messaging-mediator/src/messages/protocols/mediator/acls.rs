@@ -1,12 +1,12 @@
 use std::time::SystemTime;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
 };
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::{accounts::AccountType, acls_handler::MediatorACLRequest},

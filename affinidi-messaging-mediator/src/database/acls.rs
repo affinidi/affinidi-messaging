@@ -1,3 +1,5 @@
+use super::Database;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
     acls::{AccessListModeType, MediatorACLSet},
     acls_handler::{MediatorACLExpanded, MediatorACLGetResponse},
@@ -5,11 +7,7 @@ use affinidi_messaging_sdk::protocols::mediator::{
 use redis::{from_redis_value, Cmd, Pipeline, Value};
 use tracing::{debug, span, Instrument, Level};
 
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
-
-impl DatabaseHandler {
+impl Database {
     /// Replace the ACL for a given DID
     /// Assumes that the checks on can you change the ACL have already been done
     pub(crate) async fn set_did_acl(
@@ -22,7 +20,7 @@ impl DatabaseHandler {
         async move {
             debug!("Setting ACL for ({}) DID in mediator", did_hash);
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             deadpool_redis::redis::Cmd::hset(
                 format!("DID:{}", did_hash),
@@ -55,7 +53,7 @@ impl DatabaseHandler {
         async move {
             debug!("Requesting ACL for ({}) DID from mediator", did_hash);
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let acl: Option<String> =
                 deadpool_redis::redis::Cmd::hget(format!("DID:{}", did_hash), "ACLS")
@@ -99,7 +97,7 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let mut query = Pipeline::new();
             query.atomic();
@@ -147,7 +145,7 @@ impl DatabaseHandler {
         to_hash: &str,
         from_hash: Option<String>,
     ) -> Result<bool, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         if let Some(from_hash) = &from_hash {
             let (exists, acl): (bool, Option<String>) = deadpool_redis::redis::pipe()
@@ -190,11 +188,10 @@ impl DatabaseHandler {
             }
         } else {
             // Anonymous Message
-            match self.get_did_acl(to_hash).await? { Some(acl) => {
-                Ok(acl.get_anon_receive().0)
-            } _ => {
-                Ok(false)
-            }}
+            match self.get_did_acl(to_hash).await? {
+                Some(acl) => Ok(acl.get_anon_receive().0),
+                _ => Ok(false),
+            }
         }
     }
 }

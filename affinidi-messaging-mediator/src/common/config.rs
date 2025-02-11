@@ -1,10 +1,13 @@
-use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::{
     config::{ClientConfig, ClientConfigBuilder},
     DIDCacheClient,
 };
-use affinidi_messaging_processors::message_expiry_cleanup::config::{
+use affinidi_messaging_mediator_common::{
+    database::config::{DatabaseConfig, DatabaseConfigRaw},
+    errors::MediatorError,
+};
+use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
     MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
@@ -41,47 +44,6 @@ pub struct ServerConfig {
     pub api_prefix: String,
     pub admin_did: String,
     pub did_web_self_hosted: Option<String>,
-}
-
-/// Database Struct contains database and storage of messages related configuration details
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DatabaseConfigRaw {
-    pub functions_file: String,
-    pub database_url: String,
-    pub database_pool_size: String,
-    pub database_timeout: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DatabaseConfig {
-    pub functions_file: String,
-    pub database_url: String,
-    pub database_pool_size: usize,
-    pub database_timeout: u32,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        DatabaseConfig {
-            functions_file: "./conf/atm-functions.lua".into(),
-            database_url: "redis://127.0.0.1/".into(),
-            database_pool_size: 10,
-            database_timeout: 2,
-        }
-    }
-}
-
-impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
-    type Error = MediatorError;
-
-    fn try_from(raw: DatabaseConfigRaw) -> Result<Self, Self::Error> {
-        Ok(DatabaseConfig {
-            functions_file: raw.functions_file,
-            database_url: raw.database_url,
-            database_pool_size: raw.database_pool_size.parse().unwrap_or(10),
-            database_timeout: raw.database_timeout.parse().unwrap_or(2),
-        })
-    }
 }
 
 /// SecurityConfig Struct contains security related configuration details

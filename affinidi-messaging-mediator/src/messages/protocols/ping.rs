@@ -1,13 +1,13 @@
 use std::time::SystemTime;
 
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{debug, info, span};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::{ProcessMessageResponse, WrapperType},
 };

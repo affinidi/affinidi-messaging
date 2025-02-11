@@ -2,14 +2,15 @@
  * Handles the initial setup of the database when the Mediator starts
  */
 
-use super::DatabaseHandler;
-use crate::common::{config::Config, errors::MediatorError};
+use super::Database;
+use crate::common::config::Config;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{accounts::AccountType, acls::MediatorACLSet};
 use semver::Version;
 use sha256::digest;
 use tracing::{info, warn};
 
-impl DatabaseHandler {
+impl Database {
     /// Initializes the database and ensures minimal configuration required is in place.
     pub(crate) async fn initialize(&self, config: &Config) -> Result<(), MediatorError> {
         // Check the schema version and update if necessary
@@ -38,7 +39,7 @@ impl DatabaseHandler {
     }
 
     async fn _check_schema_version(&self) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         let schema_version: Option<String> =
             deadpool_redis::redis::Cmd::hget("GLOBAL", "SCHEMA_VERSION")

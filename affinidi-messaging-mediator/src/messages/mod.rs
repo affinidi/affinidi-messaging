@@ -1,10 +1,10 @@
 use self::protocols::ping;
-use crate::database::session::Session;
-use crate::{common::errors::MediatorError, SharedData};
+use crate::{database::session::Session, SharedData};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
     secrets::SecretsResolver, Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
 use protocols::{
     mediator::{accounts, acls, administration},
