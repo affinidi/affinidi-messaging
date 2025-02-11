@@ -15,6 +15,7 @@ pub mod session;
 pub mod stats;
 pub mod store;
 pub mod streaming;
+
 #[derive(Clone)]
 pub struct DatabaseHandler {
     pub pool: deadpool_redis::Pool,

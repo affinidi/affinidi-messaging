@@ -4,6 +4,9 @@ use affinidi_did_resolver_cache_sdk::{
     config::{ClientConfig, ClientConfigBuilder},
     DIDCacheClient,
 };
+use affinidi_messaging_processors::message_expiry_cleanup::config::{
+    MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
+};
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
 use async_convert::{async_trait, TryFrom};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
@@ -356,11 +359,13 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProcessorsConfig {
     pub forwarding: ForwardingConfig,
+    pub message_expiry_cleanup: MessageExpiryCleanupConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct ProcessorsConfigRaw {
     pub forwarding: ForwardingConfigRaw,
+    pub message_expiry_cleanup: MessageExpiryCleanupConfigRaw,
 }
 
 /// ForwardingConfig Struct contains configuration specific to DIDComm Routing/Forwarding

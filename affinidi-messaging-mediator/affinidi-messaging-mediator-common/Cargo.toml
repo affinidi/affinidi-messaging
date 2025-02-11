@@ -1,0 +1,13 @@
+[package]
+name = "affinidi-messaging-mediator-common"
+version.workspace = true
+description = "Affinidi Messaging Mediator Common Library"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+readme.workspace = true
+
+[dependencies]

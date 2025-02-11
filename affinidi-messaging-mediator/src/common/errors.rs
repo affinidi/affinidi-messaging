@@ -1,3 +1,4 @@
+use affinidi_messaging_processors::common::error::ProcessorError;
 use affinidi_messaging_sdk::messages::GenericDataStruct;
 use axum::{
     http::StatusCode,
@@ -64,6 +65,8 @@ pub enum MediatorError {
     AuthenticationError(String),
     #[error("ACL Denied: {0}")]
     ACLDenied(String),
+    #[error("Processor ({0}) error: {1}")]
+    ProcessorError(ProcessorError, String),
 }
 
 impl IntoResponse for AppError {
@@ -274,6 +277,17 @@ impl IntoResponse for AppError {
                     errorCode: 19,
                     errorCodeStr: "ACLDenied".to_string(),
                     message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::ProcessorError(processor, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    sessionId: "NO-SESSION".to_string(),
+                    errorCode: 20,
+                    errorCodeStr: "ACLDenied".to_string(),
+                    message: format!("Processor ({}): {}", processor, message),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response

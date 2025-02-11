@@ -5,26 +5,29 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
-## XX February 2025 (0.9.7)
+## XX February 2025 (0.10.0)
 
-### All (0.9.7)
+### All (0.10.0)
 
 * Crate dependencies updated to latest
-* Workspace ready for Rust Edition 2024
+* Workspace updated for Rust Edition 2024
 * affinidi-messaging-processor crate renamed to affinidi-messaging-processors
   * Multiple binaries configured for processors
 
-### Mediator (0.9.7)
+### Mediator (0.10.0)
 
 * Config: oob_invite_ttl added allowing for customisable time to live (TTL) for OOB Invites
 * Message Expiry handling refactored and placed into Expiry Processor
 * Config: message_expiry_minutes changed to message_expiry_seconds
+* Workspace layout modified
+  * Processors moved under the Mediator Workspace
+  * Mediator-common created for shared code between Mediator and Processors
 
-### SDK (0.9.7)
+### SDK (0.10.0)
 
 * Watchdog ticks added to WebSocket Connections to help with recovery (testing)
 
-### Helpers (0.9.7)
+### Helpers (0.10.0)
 
 * read_raw_didcomm example added to help with troubleshooting of DIDComm message errors
 

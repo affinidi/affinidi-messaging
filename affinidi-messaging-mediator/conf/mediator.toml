@@ -303,3 +303,8 @@ report_errors = "${PROCESSOR_FORWARDING_REPORT_ERRORS:true}"
 ###       so that you don't accidentally create a circular forwarding loop
 ### Format: ["did_1", "did_2"]
 blocked_forwarding_dids = "${PROCESSOR_FORWARDING_BLOCKED_DIDS:[]}"
+
+[processors.message_expiry_cleanup]
+### enabled: If true, the message expiry cleanup processor is enabled within the mediator locally
+### Default: true
+enabled = "${PROCESSOR_MESSAGE_EXPIRY_CLEANUP_ENABLED:true}"

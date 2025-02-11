@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
+affinidi-messaging-processors.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 async-convert.workspace = true
 async-trait.workspace = true

@@ -1,11 +1,9 @@
+use super::DatabaseHandler;
+use crate::common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::{Folder, MessageList, MessageListElement};
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
 use tracing::{event, span, Instrument, Level};
-
-use crate::common::errors::MediatorError;
-
-use super::DatabaseHandler;
 
 impl DatabaseHandler {
     /// Retrieves list of messages for the specified DID and folder

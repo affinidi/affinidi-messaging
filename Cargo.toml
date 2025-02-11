@@ -3,15 +3,16 @@ members = [
     "affinidi-messaging-didcomm",
     "affinidi-messaging-sdk",
     "affinidi-messaging-mediator",
-    "affinidi-messaging-processors",
+    "affinidi-messaging-mediator/affinidi-messaging-mediator-common",
+    "affinidi-messaging-mediator/affinidi-messaging-mediator-processors",
     "affinidi-messaging-helpers",
     "affinidi-messaging-text-client",
 ]
 resolver = "2"
 
 [workspace.package]
-version = '0.9.7'
-edition = "2021"
+version = '0.10.0'
+edition = "2024"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
 readme = "README.md"
@@ -22,9 +23,11 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-affinidi-messaging-sdk = { version = "0.9.7", path = "./affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.9.7", path = "./affinidi-messaging-didcomm" }
-affinidi-messaging-mediator = { version = "0.9.7", path = "./affinidi-messaging-mediator" }
+affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
+affinidi-messaging-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
+affinidi-messaging-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
 affinidi-did-resolver-cache-sdk = { version = "~0.2.8", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
