@@ -1,16 +1,17 @@
-use affinidi_messaging_mediator_common::errors::MediatorError;
 use tracing::{debug, info, span, Instrument, Level};
 
-use super::Database;
+use crate::errors::MediatorError;
 
-impl Database {
+use super::DatabaseHandler;
+
+impl DatabaseHandler {
     /// Deletes a message in the database
-    /// - session_id: authentication session ID
-    /// - did: DID of the delete requestor
+    /// - session_id: Some(authentication session ID)
+    /// - did_hash: DID of the delete requestor (can be `ADMIN` if the mediator is deleting the message, i.e. Expired Message cleanup)
     /// - message_hash: sha256 hash of the message to delete
     pub async fn delete_message(
         &self,
-        session_id: &str,
+        session_id: Option<&str>,
         did_hash: &str,
         message_hash: &str,
     ) -> Result<(), MediatorError> {
@@ -22,7 +23,7 @@ impl Database {
             message_hash = message_hash,
         );
         async move {
-            let mut conn = self.0.get_async_connection().await?;
+            let mut conn = self.get_async_connection().await?;
             let response: String = deadpool_redis::redis::cmd("FCALL")
                 .arg("delete_message")
                 .arg(1)
@@ -41,12 +42,22 @@ impl Database {
                 })?;
 
             debug!(
-                "{}: did_hash({}) message_id({}). database response: ({})",
-                session_id, did_hash, message_hash, response
+                "{}did_hash({}) message_id({}). database response: ({})",
+                if let Some(session_id) = session_id {
+                    format!("{}: ", session_id)
+                } else {
+                    "".to_string()
+                },
+                did_hash,
+                message_hash,
+                response
             );
 
             if response != "OK" {
-                Err(MediatorError::DatabaseError(session_id.into(), response))
+                Err(MediatorError::DatabaseError(
+                    session_id.unwrap_or("NA").into(),
+                    response,
+                ))
             } else {
                 info!("Successfully deleted",);
                 Ok(())

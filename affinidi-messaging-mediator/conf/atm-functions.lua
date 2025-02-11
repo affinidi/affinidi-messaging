@@ -86,7 +86,7 @@ local function delete_message(keys, args)
     end
 
     -- Check that the requesting DID has some form of ownership of this message
-    if meta.map.TO ~= args[1] and meta.map.FROM ~= args[1] then
+    if meta.map.TO ~= args[1] and meta.map.FROM ~= args[1] and args[1] ~= "ADMIN" then
         return redis.error_reply('Requesting DID does not have ownership of this message')
     end
 

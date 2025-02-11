@@ -185,16 +185,17 @@ pub(crate) async fn process(
             0
         };
 
-        if delay_milli.abs() > (state.config.process_forwarding.future_time_limit as i64 * 1000) {
+        if delay_milli.abs() > (state.config.processors.forwarding.future_time_limit as i64 * 1000)
+        {
             warn!(
                 "Forwarding delay is too long, limit is {}",
-                state.config.process_forwarding.future_time_limit
+                state.config.processors.forwarding.future_time_limit
             );
             return Err(MediatorError::ServiceLimitError(
                 session.session_id.clone(),
                 format!(
                     "Forwarding delay is too long. Max ({})",
-                    state.config.process_forwarding.future_time_limit
+                    state.config.processors.forwarding.future_time_limit
                 ),
             ));
         }

@@ -23,7 +23,7 @@ where
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum ProcessorError {
     #[error("CommonError: {0}")]
     CommonError(String),
@@ -81,6 +81,12 @@ pub enum MediatorError {
 impl From<MediatorError> for ProcessorError {
     fn from(error: MediatorError) -> Self {
         ProcessorError::CommonError(error.to_string())
+    }
+}
+
+impl From<ProcessorError> for MediatorError {
+    fn from(error: ProcessorError) -> Self {
+        MediatorError::ProcessorError(error.clone(), error.to_string())
     }
 }
 

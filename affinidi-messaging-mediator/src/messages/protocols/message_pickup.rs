@@ -433,7 +433,8 @@ pub(crate) async fn messages_received(
                     debug!("Deleting message: {}", msg_id);
                     match state
                         .database
-                        .delete_message(&session.session_id, &session.did_hash, msg_id)
+                        .0
+                        .delete_message(Some(&session.session_id), &session.did_hash, msg_id)
                         .await
                     {
                         Ok(_) => {

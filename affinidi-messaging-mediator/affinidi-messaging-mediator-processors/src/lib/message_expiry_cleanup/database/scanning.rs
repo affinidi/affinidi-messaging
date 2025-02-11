@@ -3,7 +3,7 @@
  *
  * Message expiry is stored in two different database fields:
  * 1. A Sorted Set `MSG_EXPIRY` that stores at a per second resolution any messages expiring at that time
- *   These are call `expiry timeslots`
+ *    These are called `expiry timeslots`
  * 2. A Set `MSG_EXPIRY:<SECONDS>` that stores the message IDs that are expiring at that time
  *
  * Where SECONDS is the number of seconds since the Unix epoch
@@ -65,14 +65,33 @@ impl MessageExpiryCleanupProcessor {
                 .await
                 .map_err(|err| {
                     ProcessorError::MessageExpiryCleanupError(format!(
-                        "timeslot_scan failed. Reason: {}",
-                        err
+                        "SPOP {} failed. Reason: {}",
+                        key, err
                     ))
                 })?;
 
             if let Some(msg_id) = msg_id {
+                if self
+                    .database
+                    .delete_message(None, &msg_id, "ADMIN")
+                    .await
+                    .is_ok()
+                {
+                    expired += 1;
+                }
                 total += 1;
             } else {
+                deadpool_redis::redis::cmd("ZREM")
+                    .arg("MSG_EXPIRY")
+                    .arg(key)
+                    .exec_async(&mut conn)
+                    .await
+                    .map_err(|err| {
+                        ProcessorError::MessageExpiryCleanupError(format!(
+                            "ZREM MSG_EXPIRY {} failed. Reason: {}",
+                            key, err
+                        ))
+                    })?;
                 break;
             }
         }

@@ -7,6 +7,7 @@ use std::{thread::sleep, time::Duration};
 use tracing::{error, event, info, Level};
 
 pub mod config;
+pub mod delete;
 
 #[derive(Clone)]
 pub struct DatabaseHandler {

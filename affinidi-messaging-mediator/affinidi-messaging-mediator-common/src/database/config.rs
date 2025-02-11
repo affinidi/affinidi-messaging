@@ -14,7 +14,7 @@ pub struct DatabaseConfigRaw {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    pub functions_file: String,
+    pub functions_file: Option<String>,
     pub database_url: String,
     pub database_pool_size: usize,
     pub database_timeout: u32,
@@ -23,7 +23,7 @@ pub struct DatabaseConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         DatabaseConfig {
-            functions_file: "./conf/atm-functions.lua".into(),
+            functions_file: Some("./conf/atm-functions.lua".into()),
             database_url: "redis://127.0.0.1/".into(),
             database_pool_size: 10,
             database_timeout: 2,
@@ -36,7 +36,7 @@ impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
 
     fn try_from(raw: DatabaseConfigRaw) -> Result<Self, Self::Error> {
         Ok(DatabaseConfig {
-            functions_file: raw.functions_file,
+            functions_file: Some(raw.functions_file),
             database_url: raw.database_url,
             database_pool_size: raw.database_pool_size.parse().unwrap_or(10),
             database_timeout: raw.database_timeout.parse().unwrap_or(2),

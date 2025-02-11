@@ -425,7 +425,7 @@ pub struct Config {
     pub security: SecurityConfig,
     #[serde(skip_serializing)]
     pub did_resolver_config: ClientConfig,
-    pub process_forwarding: ForwardingConfig,
+    pub processors: ProcessorsConfig,
     pub limits: LimitsConfig,
 }
 
@@ -445,7 +445,7 @@ impl fmt::Debug for Config {
             .field("DID Resolver config", &self.did_resolver_config)
             .field("api_prefix", &self.api_prefix)
             .field("security", &self.security)
-            .field("processor Forwarding", &self.process_forwarding)
+            .field("processors", &self.processors)
             .field("Limits", &self.limits)
             .finish()
     }
@@ -474,7 +474,10 @@ impl Default for Config {
             did_resolver_config,
             api_prefix: "/mediator/v1/".into(),
             security: SecurityConfig::default(),
-            process_forwarding: ForwardingConfig::default(),
+            processors: ProcessorsConfig {
+                forwarding: ForwardingConfig::default(),
+                message_expiry_cleanup: MessageExpiryCleanupConfig::default(),
+            },
             limits: LimitsConfig::default(),
         }
     }
@@ -513,7 +516,10 @@ impl TryFrom<ConfigRaw> for Config {
             did_resolver_config: raw.did_resolver.convert(),
             api_prefix: raw.server.api_prefix,
             security: raw.security.convert(&aws_config).await?,
-            process_forwarding: raw.processors.forwarding.clone().try_into()?,
+            processors: ProcessorsConfig {
+                forwarding: raw.processors.forwarding.clone().try_into()?,
+                message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
+            },
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
@@ -571,7 +577,7 @@ impl TryFrom<ConfigRaw> for Config {
 
         load_forwarding_protection_blocks(
             &did_resolver,
-            &mut config.process_forwarding,
+            &mut config.processors.forwarding,
             &config.mediator_did,
             &raw.processors.forwarding.blocked_forwarding_dids,
         )

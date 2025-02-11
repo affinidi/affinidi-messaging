@@ -7,6 +7,7 @@ use crate::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_mediator_common::database::DatabaseHandler;
+use affinidi_messaging_mediator_processors::message_expiry_cleanup::processor::MessageExpiryCleanupProcessor;
 use axum::{routing::get, Router};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{env, net::SocketAddr};
@@ -70,15 +71,20 @@ pub async fn start() {
         .await
         .expect("Error initializing database");
 
-    event!(
-        Level::INFO,
-        "Loading LUA scripts into the database from file: {}",
-        &config.database.functions_file
-    );
-    database
-        .load_scripts(&config.database.functions_file)
-        .await
-        .unwrap();
+    if let Some(functions_file) = &config.database.functions_file {
+        event!(
+            Level::INFO,
+            "Loading LUA scripts into the database from file: {}",
+            functions_file
+        );
+        database.load_scripts(functions_file).await.unwrap();
+    } else {
+        event!(
+            Level::INFO,
+            "No LUA scripts file specified in the configuration. Skipping loading LUA scripts."
+        );
+        return;
+    }
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread
@@ -87,6 +93,19 @@ pub async fn start() {
             .await
             .expect("Error starting statistics thread");
     });
+
+    // Start the message expiry cleanup thread if required
+    if config.processors.message_expiry_cleanup.enabled {
+        let _database = database.0.clone(); // Clone the database handler for the message expiry cleanup thread
+        let _config = config.processors.message_expiry_cleanup.clone();
+        tokio::spawn(async move {
+            let _processor = MessageExpiryCleanupProcessor::new(_config, _database);
+            _processor
+                .start()
+                .await
+                .expect("Error starting message expiry cleanup processor");
+        });
+    }
 
     // Start the streaming thread if enabled
     let (streaming_task, _) = if config.streaming_enabled {

@@ -96,7 +96,8 @@ impl Database {
             };
 
             // Delete the message
-            self.delete_message(&session.session_id, did_hash, message_hash)
+            self.0
+                .delete_message(Some(&session.session_id), did_hash, message_hash)
                 .await?;
 
             // Delete the stream entry

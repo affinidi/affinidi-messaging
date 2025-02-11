@@ -5,7 +5,6 @@ use affinidi_messaging_mediator_common::database::DatabaseHandler;
 pub mod accounts;
 pub(crate) mod acls;
 pub mod admin_accounts;
-pub mod delete;
 pub mod fetch;
 pub mod get;
 pub mod handlers;

@@ -52,8 +52,8 @@ pub async fn message_delete_handler(
         for message in &body.message_ids {
             debug!("Deleting message: message_id({})", message);
             let result = state
-                .database
-                .delete_message(&session.session_id, &session.did_hash, message)
+                .database.0
+                .delete_message(Some(&session.session_id), &session.did_hash, message)
                 .await;
 
             match result {

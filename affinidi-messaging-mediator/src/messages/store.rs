@@ -126,7 +126,7 @@ pub(crate) async fn store_message(
                                         .to_keys_per_recipient,
                                     forward: true,
                                 },
-                                &state.config.process_forwarding.blocked_forwarding,
+                                &state.config.processors.forwarding.blocked_forwarding,
                             )
                             .await?;
 
@@ -187,7 +187,7 @@ pub(crate) async fn store_message(
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,
                         forward: true,
                     },
-                    &state.config.process_forwarding.blocked_forwarding,
+                    &state.config.processors.forwarding.blocked_forwarding,
                 )
                 .await?;
             if meta.messaging_service.is_some() {
