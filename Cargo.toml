@@ -26,8 +26,8 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
-affinidi-messaging-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
-affinidi-messaging-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
+affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
+affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
 affinidi-did-resolver-cache-sdk = { version = "~0.2.8", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
