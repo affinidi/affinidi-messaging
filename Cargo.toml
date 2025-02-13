@@ -11,7 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = '0.10.0'
+version = '0.9.7'
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
@@ -23,12 +23,12 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-didcomm" }
-affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
-affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
-affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
-affinidi-did-resolver-cache-sdk = { version = "~0.2.8", features = ["network"] }
+affinidi-messaging-sdk = { version = "0.9.7", path = "./affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.9.7", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.9.7", path = "./affinidi-messaging-mediator" }
+affinidi-messaging-mediator-processors = { version = "0.9.7", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
+affinidi-messaging-mediator-common = { version = "0.9.7", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
+affinidi-did-resolver-cache-sdk = { version = "~0.2.9", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
@@ -70,11 +70,11 @@ rcgen = { version = "0.13", default-features = false, features = [
     "pem",
 ] }
 # Redis can only be updated when deadpool-redis supports the new version
-redis = { version = "0.27", features = [
+redis = { version = "0.28", features = [
     "tokio-rustls-comp",
     "tls-rustls-insecure",
 ] }
-deadpool-redis = { version = "0.18", features = ["rt_tokio_1"] }
+deadpool-redis = { version = "0.19", features = ["rt_tokio_1"] }
 regex = "1.11"
 reqwest = { version = "0.12", features = ["rustls-tls-manual-roots", "json"] }
 ring = { version = "0.17", features = ["std"] }

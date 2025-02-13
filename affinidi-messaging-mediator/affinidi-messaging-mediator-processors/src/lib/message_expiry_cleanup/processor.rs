@@ -28,9 +28,9 @@ impl MessageExpiryCleanupProcessor {
         info!("Expired message cleanup processor started");
 
         loop {
-            let sleep = tokio::time::sleep(Duration::from_secs(1));
-
+            let sleep: tokio::time::Sleep = tokio::time::sleep(Duration::from_secs(1));
             sleep.await;
+
             let timeslots = match self.timeslot_scan().await {
                 Ok(timeslots) => timeslots,
                 Err(err) => {

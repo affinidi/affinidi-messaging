@@ -16,12 +16,10 @@ use std::{
     collections::HashMap,
     fmt::{self, Debug, Formatter},
     sync::Arc,
-    time::Duration,
 };
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
-    time::Instant,
 };
 use tracing::{debug, info, span, warn, Instrument, Level};
 
@@ -60,6 +58,7 @@ pub enum WsHandlerCommands {
     NotFound, // Message not found in the cache
     // Messages sent from the Handler to a specific Profile
     Activated(String), // Profile WebSocket connection is active (status_message to get)
+    Disconnected(),    // Profile Websocket connection is disconnected
     InDirectChannelModeError, // WsHandler is in DirectChannelMode and is not caching messages
 }
 
@@ -96,28 +95,34 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
-            let watchdog_interval = tokio::time::interval_at(
-                Instant::now() + Duration::from_secs(1),
-                Duration::from_secs(1),
-            );
-            tokio::pin!(watchdog_interval);
+           
             loop {
                 select! {
-                    _ = watchdog_interval.tick() => {
-                        // This loops the main loop for this task
-                        // Helps with resuming network connections when the underlying
-                        // OS goes to sleep
-
-                        // Nothing actually happens here - it just loops
-                    }
                     value = handler_rx.recv(), if !cache.is_full() => {
                         // These are inbound messages from the WS_Connections
                         match value { Some(message) => {
                             match message {
                                 WsConnectionCommands::Connected(profile, status_msg_id) => {
-                                    debug!("Profile({}): Connected", profile.inner.alias);
                                     // Send a message to the SDK that the profile has connected
-                                    let _ = profile.inner.channel_tx.lock().await.send(WsHandlerCommands::Activated(status_msg_id)).await;
+                                    match profile.inner.channel_tx.lock().await.try_send(WsHandlerCommands::Activated(status_msg_id)) {
+                                        Ok(_) => {
+                                            debug!("Profile({}): Sent Activated message", profile.inner.alias);
+                                        }
+                                        Err(err) => {
+                                            debug!("Profile({}): SDK_TX Channel is full: {:?}", profile.inner.alias, err);
+                                        }
+                                    }
+                                }
+                                WsConnectionCommands::Disconnected(profile) => {
+                                    // Send a message to the SDK that the profile has disconnected
+                                    match profile.inner.channel_tx.lock().await.try_send(WsHandlerCommands::Disconnected()) {
+                                        Ok(_) => {
+                                            debug!("Profile({}): Sent Disconnected message", profile.inner.alias);
+                                        }
+                                        Err(err) => {
+                                            debug!("Profile({}): SDK_TX Channel is full: {:?}", profile.inner.alias, err);
+                                        }
+                                    }
                                 }
                                 WsConnectionCommands::MessageReceived(data) => {
                                     let (message, meta) = *data;

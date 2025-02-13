@@ -6,7 +6,7 @@ authors = [
     'Glenn Gore <glenn@affinidi.com>',
 ]
 edition = '2018'
-description = 'DIDComm for Rust'
+description = 'DIDComm for Rust, integrates into Affinidi Messaging. See Affinidi Messaging for a complete communications solution.'
 license = 'Apache-2.0'
 repository.workspace = true
 readme = 'README.md'

@@ -17,7 +17,7 @@ use tokio::{
     select,
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
-    time::{sleep, Instant},
+    time::sleep,
 };
 use tokio_stream::StreamExt;
 use tokio_tungstenite::{
@@ -28,7 +28,7 @@ use tokio_tungstenite::{
     },
     MaybeTlsStream, WebSocketStream,
 };
-use tracing::{debug, error, info, span, Instrument};
+use tracing::{debug, warn, error, span, Instrument};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -41,6 +41,7 @@ pub(crate) enum WsConnectionCommands {
     DisableDirectChannel,
     // To Handler
     Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
+    Disconnected(Arc<Profile>), // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
@@ -109,60 +110,54 @@ impl WsConnection {
             };
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
-            let watchdog_interval = tokio::time::interval_at(
-                Instant::now() + Duration::from_secs(1),
-                Duration::from_secs(1),
-            );
-            tokio::pin!(watchdog_interval);
+           
             loop {
                 select! {
-                    _ = watchdog_interval.tick() => {
-                        // This loops the main loop for this task
-                        // Helps with resuming network connections when the underlying
-                        // OS goes to sleep
-
-                        // Nothing actually happens here - it just loops
-                    }
                     value = web_socket.next() => {
-                                    match value { Some(msg) => {
-                                        match msg {
-                                            Ok(payload) => {
-                                            if payload.is_text() {
-                                                match payload.to_text() { Ok(msg) => {
-                                                    debug!("Received text message ({})", msg);
-                                                    let unpack = match atm.unpack(msg).await {
-                                                        Ok(unpack) => unpack,
-                                                        Err(e) => {
-                                                            error!("Error unpacking message: {:?}", e);
-                                                            continue;
-                                                        }
-                                                    };
-                                                    match &direct_channel { Some(sender) => {
-                                                        info!("TIMTAM: Sending message to direct channel: Free slots: {}", sender.capacity() );
+                        match value { Some(msg) => {
+                            match msg {
+                                Ok(payload) => {
+                                    if payload.is_text() {
+                                        match payload.to_text() {
+                                            Ok(msg) => {
+                                                debug!("Received text message ({})", msg);
+                                                let unpack = match atm.unpack(msg).await {
+                                                    Ok(unpack) => unpack,
+                                                    Err(e) => {
+                                                        error!("Error unpacking message: {:?}", e);
+                                                        continue;
+                                                    }
+                                                };
+                                                match &direct_channel { 
+                                                    Some(sender) => {
                                                         let _ = sender.send(Box::new(unpack)).await;
                                                     } _ => {
                                                         let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
-                                                    }}
+                                                    }
+                                                }
                                             } _ => {
                                                 error!("Received non-text message");
-                                            }}
-                                        } else if payload.is_close() {
-                                            error!("Websocket closed");
-                                            web_socket = match self._handle_connection(&atm, &protocols, true).await {
-                                                Ok(ws) => ws,
-                                                Err(e) => {
-                                                    error!("Error creating websocket connection: {:?}", e);
-                                                    return;
-                                                }
-                                            };
-                                        } else {
-                                            error!("Error getting payload from message: {:?}", payload);
-                                            continue;
+                                            }
                                         }
+                                    } else if payload.is_close() {
+                                        error!("Websocket closed");
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                        web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                            Ok(ws) => ws,
+                                            Err(e) => {
+                                                error!("Error creating websocket connection: {:?}", e);
+                                                return;
+                                            }
+                                        };
+                                    } else {
+                                        error!("Error getting payload from message: {:?}", payload);
+                                        continue;
                                     }
-                                    Err(err) => match err {
-                                        ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
+                                }
+                                Err(err) => match err {
+                                    ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
                                         error!("Websocket reset without closing handshake");
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
                                         web_socket = match self._handle_connection(&atm, &protocols, true).await {
                                             Ok(ws) => ws,
                                             Err(e) => {
@@ -172,15 +167,18 @@ impl WsConnection {
                                         };
                                     }
                                     _ => {
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
                                         error!("Unknown WebSocket Error: {:?}", err);
                                         break;
                                     }
                                 }
-                                }
-                                } _ => {
-                                    error!("websocket error : {:?}", value);
-                                    break;
-                                }}
+                            }
+                            } _ => {
+                                let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                error!("websocket error : {:?}", value);
+                                break;
+                            }
+                        }
                     }
                     value = self.from_handler.recv() => {
                         match value { Some(cmd) => {
@@ -214,11 +212,12 @@ impl WsConnection {
                             }
                         } _ => {
                             error!("Error getting command {:#?}", value);
-                            break;
+                            continue;
                         }}
                     }
                 }
             }
+            let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
             let _ = web_socket.close(None).await;
             debug!("Websocket connection closed");
         }
@@ -287,14 +286,18 @@ impl WsConnection {
         };
 
         if update_sdk {
-            let a = self
+            debug!("channel to SDK = capacity = {}", self.to_handler.capacity());
+            match self
                 .to_handler
-                .send(WsConnectionCommands::Connected(
+                .try_send(WsConnectionCommands::Connected(
                     self.profile.clone(),
                     status_id,
-                ))
-                .await;
-            debug!("Signaled handler that connection is ready: {:?}", a);
+                )) {
+                Ok(_) => {}
+                Err(e) => {
+                warn!("Channel to WS_handler is full: {:?}", e);
+                }
+            }
         }
 
         Ok(web_socket)
