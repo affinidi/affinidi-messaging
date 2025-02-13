@@ -34,6 +34,7 @@ impl OOBDiscovery {
     /// Creates an OOB Invite
     /// atm :: ATM SDK Client
     /// expiry :: Optional - how long should this invitation exist for in seconds?
+    ///           Default is 24 hours
     pub async fn create_invite(
         &self,
         atm: &ATM,

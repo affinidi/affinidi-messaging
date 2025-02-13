@@ -121,12 +121,12 @@ async fn main() -> Result<(), ATMError> {
     did_resolver
         .add_example_did(alice_raw_doc)
         .expect("Couldn't add Alice's DID");
-    let (alice_did, _) = if let Ok(response) = did_resolver.resolve("did:example:alice").await {
+    let (alice_did, _) = match did_resolver.resolve("did:example:alice").await { Ok(response) => {
         (response.did, response.doc)
-    } else {
+    } _ => {
         error!("Couldn't resolve Alice's DID");
         return Ok(());
-    };
+    }};
     info!("Alice DID Created");
 
     // Create Alice Secrets
@@ -316,12 +316,12 @@ async fn main() -> Result<(), ATMError> {
     did_resolver
         .add_example_did(bob_raw_doc)
         .expect("Couldn't add Bob's DID");
-    let (bob_did, _) = if let Ok(response) = did_resolver.resolve("did:example:bob").await {
+    let (bob_did, _) = match did_resolver.resolve("did:example:bob").await { Ok(response) => {
         (response.did, response.doc)
-    } else {
+    } _ => {
         error!("Couldn't resolve Bob's DID");
         return Ok(());
-    };
+    }};
     info!("Bob DID Created");
 
     // Create Bob Secrets

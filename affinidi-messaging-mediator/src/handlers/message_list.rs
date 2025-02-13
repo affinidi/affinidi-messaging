@@ -1,9 +1,6 @@
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
+use crate::{database::session::Session, SharedData};
 use affinidi_messaging_didcomm::UnpackMetadata;
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{Folder, GenericDataStruct, MessageList};
 use axum::{
     extract::{Path, State},

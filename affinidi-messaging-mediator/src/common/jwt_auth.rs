@@ -1,8 +1,8 @@
-use super::errors::ErrorResponse;
 use crate::{
     database::session::{Session, SessionClaims},
     SharedData,
 };
+use affinidi_messaging_mediator_common::errors::ErrorResponse;
 use axum::{
     extract::{FromRef, FromRequestParts},
     response::{IntoResponse, Response},
@@ -102,15 +102,16 @@ where
                 ))
             })?;
 
-        if let Some(address) = parts
+        match parts
             .extensions
             .get::<axum::extract::ConnectInfo<SocketAddr>>()
             .map(|ci| ci.0)
         {
-            address.to_string()
-        } else {
-            warn!("No remote address in request!");
-            return Err(AuthError::MissingCredentials);
+            Some(address) => address.to_string(),
+            _ => {
+                warn!("No remote address in request!");
+                return Err(AuthError::MissingCredentials);
+            }
         };
 
         let mut validation = Validation::new(jsonwebtoken::Algorithm::EdDSA);

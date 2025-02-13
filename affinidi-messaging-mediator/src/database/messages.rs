@@ -3,14 +3,13 @@
  *
  */
 
-use std::collections::HashMap;
-
-use super::{session::Session, DatabaseHandler};
-use crate::common::errors::MediatorError;
+use super::{session::Session, Database};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::Folder;
+use std::collections::HashMap;
 use tracing::{debug, span, warn, Instrument, Level};
 
-impl DatabaseHandler {
+impl Database {
     /// Will purge/delete all messages from the database for the given DID and folder
     /// Returns the number of messages purged and the total bytes purged
     pub(crate) async fn purge_messages(
@@ -49,7 +48,7 @@ impl DatabaseHandler {
         let _span = span!(Level::DEBUG, "purge_messages", did_hash = did_hash, folder = ?folder);
 
         async move {
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             // Grab a message from the Stream
             let key = if folder == &Folder::Inbox {
@@ -97,7 +96,8 @@ impl DatabaseHandler {
             };
 
             // Delete the message
-            self.delete_message(&session.session_id, did_hash, message_hash)
+            self.0
+                .delete_message(Some(&session.session_id), did_hash, message_hash)
                 .await?;
 
             // Delete the stream entry
@@ -117,7 +117,7 @@ impl DatabaseHandler {
         key: &str,
         id: &str,
     ) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::Cmd::xdel(key, &[id])
             .exec_async(&mut con)
@@ -132,7 +132,7 @@ impl DatabaseHandler {
         did_hash: &str,
         folder: &Folder,
     ) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let key = if folder == &Folder::Inbox {
             ["RECEIVE_Q:", did_hash].concat()

@@ -54,10 +54,10 @@ pub async fn manual_connect_setup(
 
 /// Creates a DID Peer to use as the DIDComm agent for a Ollama Model
 pub fn create_did_peer(mediator_did: &str) -> Result<(String, Vec<Secret>)> {
-    let e_secp256k1_key = JWK::generate_secp256k1();
+    let e_p256_key = JWK::generate_p256();
     let v_ed25519_key = JWK::generate_ed25519().unwrap();
 
-    let e_did_key = ssi::dids::DIDKey::generate(&e_secp256k1_key).unwrap();
+    let e_did_key = ssi::dids::DIDKey::generate(&e_p256_key).unwrap();
     let v_did_key = ssi::dids::DIDKey::generate(&v_ed25519_key).unwrap();
 
     let keys = vec![
@@ -102,7 +102,7 @@ pub fn create_did_peer(mediator_did: &str) -> Result<(String, Vec<Secret>)> {
         });
     }
 
-    if let Params::EC(map) = e_secp256k1_key.params {
+    if let Params::EC(map) = e_p256_key.params {
         secrets.push(Secret {
             id: [&did_peer, "#key-2"].concat(),
             type_: SecretType::JsonWebKey2020,

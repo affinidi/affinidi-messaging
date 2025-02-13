@@ -1,8 +1,8 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
 use std::collections::HashMap;
 
-use super::{session::Session, DatabaseHandler};
-use crate::common::errors::MediatorError;
+use super::{session::Session, Database};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::Folder,
     protocols::mediator::{
@@ -13,10 +13,10 @@ use affinidi_messaging_sdk::{
 use redis::Pipeline;
 use tracing::{debug, span, warn, Instrument, Level};
 
-impl DatabaseHandler {
+impl Database {
     /// Quick and efficient check if an account exists locally in the mediator
     pub(crate) async fn account_exists(&self, did_hash: &str) -> Result<bool, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("EXISTS")
             .arg(["DID:", did_hash].concat())
@@ -35,7 +35,7 @@ impl DatabaseHandler {
         &self,
         did_hash: &str,
     ) -> Result<Option<Account>, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let (account, access_list_count): (HashMap<String, String>, u32) =
             deadpool_redis::redis::pipe()
@@ -98,7 +98,7 @@ impl DatabaseHandler {
         async move {
             debug!("Adding account to the mediator");
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             deadpool_redis::redis::pipe()
                 .atomic()
@@ -143,7 +143,7 @@ impl DatabaseHandler {
     /// Removes an account from the mediator
     /// - `did_hash` - SHA256 Hash of DID to remove
     /// - `remove_outbox` - This will remove messages that have not been delivered from this DID to others
-    ///                     NOTE: This should only be used as last resort. It is better to let the messages be delivered
+    ///   NOTE: This should only be used as last resort. It is better to let the messages be delivered
     /// - `remove_forwards` - This will remove messages that are queued to be delivered from this DID via forwarding
     pub(crate) async fn account_remove(
         &self,
@@ -211,7 +211,7 @@ impl DatabaseHandler {
             // Remove from Known DIDs
             // Remove DID Record
             // Remove ACCESS_LIST Set
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
             deadpool_redis::redis::pipe()
                 .atomic()
                 .cmd("SREM")
@@ -239,7 +239,7 @@ impl DatabaseHandler {
     /// Retrieves up to 100 accounts from the mediator
     /// - `cursor` - The offset to start from (0 is the start)
     /// - `limit` - The maximum number of accounts to return (max 100)
-    ///    NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
+    ///   NOTE: `limit` may return more than what is specified. This is a peculiarity of Redis
     pub(crate) async fn account_list(
         &self,
         cursor: u32,
@@ -256,7 +256,7 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let (new_cursor, dids): (u32, Vec<String>) = deadpool_redis::redis::cmd("SSCAN")
                 .arg("KNOWN_DIDS")
@@ -352,7 +352,7 @@ impl DatabaseHandler {
         async move {
             debug!("Changing account type");
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             deadpool_redis::redis::cmd("HSET")
                 .arg(["DID:", did_hash].concat())

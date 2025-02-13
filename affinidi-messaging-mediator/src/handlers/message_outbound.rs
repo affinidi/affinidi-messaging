@@ -1,13 +1,10 @@
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{GetMessagesRequest, GetMessagesResponse};
 use axum::{extract::State, Json};
 use http::StatusCode;
 use tracing::{debug, span, Instrument, Level};
 
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
+use crate::{database::session::Session, SharedData};
 
 /// Delivers messages to the client for given message_ids
 /// outbound refers to outbound from the mediator perspective
@@ -47,7 +44,8 @@ pub async fn message_outbound_handler(
                         debug!("Deleting message: {}", msg_id);
                         match state
                             .database
-                            .delete_message(&session.session_id, &session.did_hash, msg_id)
+                            .0
+                            .delete_message(Some(&session.session_id), &session.did_hash, msg_id)
                             .await
                         {
                             Ok(_) => {

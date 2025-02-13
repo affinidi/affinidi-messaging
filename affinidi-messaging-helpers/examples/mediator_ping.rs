@@ -69,12 +69,12 @@ async fn main() -> Result<(), ATMError> {
 
     let mut success_count = 0;
     let mediator = alice.inner.mediator.clone();
-    let mediator_did = if let Some(mediator) = &*mediator {
+    let mediator_did = match &*mediator { Some(mediator) => {
         mediator.did.clone()
-    } else {
+    } _ => {
         error!("No mediator found in Alice's profile");
         return Ok(());
-    };
+    }};
     println!("Mediator = {}", mediator_did);
 
     // Ready to send a trust-ping to ATM

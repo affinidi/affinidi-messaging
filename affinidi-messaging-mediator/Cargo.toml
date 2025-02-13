@@ -10,9 +10,15 @@ publish.workspace = true
 license.workspace = true
 readme = "README.md"
 
+[[bin]]
+name = "mediator"
+path = "src/main.rs"
+
 [dependencies]
 affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
+affinidi-messaging-mediator-processors.workspace = true
+affinidi-messaging-mediator-common.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 async-convert.workspace = true
 async-trait.workspace = true

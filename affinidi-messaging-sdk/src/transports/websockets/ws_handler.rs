@@ -58,6 +58,7 @@ pub enum WsHandlerCommands {
     NotFound, // Message not found in the cache
     // Messages sent from the Handler to a specific Profile
     Activated(String), // Profile WebSocket connection is active (status_message to get)
+    Disconnected(),    // Profile Websocket connection is disconnected
     InDirectChannelModeError, // WsHandler is in DirectChannelMode and is not caching messages
 }
 
@@ -94,35 +95,53 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
+           
             loop {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {
                         // These are inbound messages from the WS_Connections
-                        if let Some(message) = value {
+                        match value { Some(message) => {
                             match message {
                                 WsConnectionCommands::Connected(profile, status_msg_id) => {
-                                    debug!("Profile({}): Connected", profile.inner.alias);
                                     // Send a message to the SDK that the profile has connected
-                                    let _ = profile.inner.channel_tx.lock().await.send(WsHandlerCommands::Activated(status_msg_id)).await;
+                                    match profile.inner.channel_tx.lock().await.try_send(WsHandlerCommands::Activated(status_msg_id)) {
+                                        Ok(_) => {
+                                            debug!("Profile({}): Sent Activated message", profile.inner.alias);
+                                        }
+                                        Err(err) => {
+                                            debug!("Profile({}): SDK_TX Channel is full: {:?}", profile.inner.alias, err);
+                                        }
+                                    }
+                                }
+                                WsConnectionCommands::Disconnected(profile) => {
+                                    // Send a message to the SDK that the profile has disconnected
+                                    match profile.inner.channel_tx.lock().await.try_send(WsHandlerCommands::Disconnected()) {
+                                        Ok(_) => {
+                                            debug!("Profile({}): Sent Disconnected message", profile.inner.alias);
+                                        }
+                                        Err(err) => {
+                                            debug!("Profile({}): SDK_TX Channel is full: {:?}", profile.inner.alias, err);
+                                        }
+                                    }
                                 }
                                 WsConnectionCommands::MessageReceived(data) => {
                                     let (message, meta) = *data;
                                     debug!("Message received from WS_Connection");
                                     if let WsHandlerMode::Cached = ws_handler_mode {
                                         // If we are in cached mode, we need to cache the message
-                                        if let Some(channel) = cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) {
+                                        match cache.search(&message.id, message.thid.as_deref(), message.pthid.as_deref()) { Some(channel) => {
                                             debug!("Message found in cache");
                                             // notify the SDK that a message has been found
                                             let _ = channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await;
                                             debug!("Message delivered to receive channel");
-                                        } else if next_counter > 0 {
+                                        } _ => if next_counter > 0 {
                                                 next_counter -= 1;
                                                 to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                     ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                                 })?;
                                             } else {
                                                 cache.insert(message, meta);
-                                            }
+                                            }}
                                     } else {
                                         // Send the message directly to the broadcast channel
                                         if let Some(broadcast) = &shared_state.direct_stream_sender {
@@ -134,12 +153,12 @@ impl ATM {
                                     warn!("Received unknown message from WS_Connection");
                                 }
                             }
-                        } else {
+                        } _ => {
                             warn!("Channel to_handler closed");
-                        }
+                        }}
                     }
                     value = from_sdk.recv() => {
-                        if let Some(cmd) = value {
+                        match value { Some(cmd) => {
                             match cmd {
                                 WsHandlerCommands::Activate(profile) => {
                                     debug!("Profile({}): Activating", profile.inner.alias);
@@ -166,13 +185,13 @@ impl ATM {
                                 }
                                 WsHandlerCommands::Next => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
-                                        if let Some((message, meta)) = cache.next() {
+                                        match cache.next() { Some((message, meta)) => {
                                             to_sdk.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        } else {
+                                        } _ => {
                                             next_counter += 1;
-                                        }
+                                        }}
                                     } else {
                                         to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
@@ -184,15 +203,15 @@ impl ATM {
                                 }
                                 WsHandlerCommands::Get(id, channel) => {
                                     if let WsHandlerMode::Cached = ws_handler_mode {
-                                        if let Some((message, meta)) = cache.get(&id, &channel) {
+                                        match cache.get(&id, &channel) { Some((message, meta)) => {
                                             channel.send(WsHandlerCommands::MessageReceived(message, Box::new(meta))).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        } else {
+                                        } _ => {
                                             channel.send(WsHandlerCommands::NotFound).await.map_err(|err| {
                                                 ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
                                             })?;
-                                        }
+                                        }}
                                     } else {
                                         to_sdk.send(WsHandlerCommands::InDirectChannelModeError).await.map_err(|err| {
                                             ATMError::TransportError(format!("Could not send message to SDK: {:?}", err))
@@ -220,10 +239,10 @@ impl ATM {
                                     warn!("Received unknown command");
                                 }
                             }
-                        } else {
+                        } _ => {
                             info!("Channel Closed");
                             break;
-                        }
+                        }}
                     }
                 }
             }

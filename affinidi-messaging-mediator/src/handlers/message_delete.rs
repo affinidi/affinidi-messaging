@@ -1,4 +1,6 @@
+use crate::{database::session::Session, SharedData};
 use affinidi_messaging_didcomm::UnpackMetadata;
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{
     DeleteMessageRequest, DeleteMessageResponse, GenericDataStruct,
 };
@@ -6,12 +8,6 @@ use axum::{extract::State, Json};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, span, warn, Instrument, Level};
-
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ResponseData {
@@ -56,8 +52,8 @@ pub async fn message_delete_handler(
         for message in &body.message_ids {
             debug!("Deleting message: message_id({})", message);
             let result = state
-                .database
-                .delete_message(&session.session_id, &session.did_hash, message)
+                .database.0
+                .delete_message(Some(&session.session_id), &session.did_hash, message)
                 .await;
 
             match result {

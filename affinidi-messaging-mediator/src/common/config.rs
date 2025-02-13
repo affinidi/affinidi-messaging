@@ -1,8 +1,14 @@
-use super::errors::MediatorError;
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::{
     config::{ClientConfig, ClientConfigBuilder},
     DIDCacheClient,
+};
+use affinidi_messaging_mediator_common::{
+    database::config::{DatabaseConfig, DatabaseConfigRaw},
+    errors::MediatorError,
+};
+use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
+    MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
 use async_convert::{async_trait, TryFrom};
@@ -38,47 +44,6 @@ pub struct ServerConfig {
     pub api_prefix: String,
     pub admin_did: String,
     pub did_web_self_hosted: Option<String>,
-}
-
-/// Database Struct contains database and storage of messages related configuration details
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DatabaseConfigRaw {
-    pub functions_file: String,
-    pub database_url: String,
-    pub database_pool_size: String,
-    pub database_timeout: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DatabaseConfig {
-    pub functions_file: String,
-    pub database_url: String,
-    pub database_pool_size: usize,
-    pub database_timeout: u32,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        DatabaseConfig {
-            functions_file: "./conf/atm-functions.lua".into(),
-            database_url: "redis://127.0.0.1/".into(),
-            database_pool_size: 10,
-            database_timeout: 2,
-        }
-    }
-}
-
-impl std::convert::TryFrom<DatabaseConfigRaw> for DatabaseConfig {
-    type Error = MediatorError;
-
-    fn try_from(raw: DatabaseConfigRaw) -> Result<Self, Self::Error> {
-        Ok(DatabaseConfig {
-            functions_file: raw.functions_file,
-            database_url: raw.database_url,
-            database_pool_size: raw.database_pool_size.parse().unwrap_or(10),
-            database_timeout: raw.database_timeout.parse().unwrap_or(2),
-        })
-    }
 }
 
 /// SecurityConfig Struct contains security related configuration details
@@ -274,13 +239,14 @@ pub struct LimitsConfig {
     pub http_size: usize,
     pub listed_messages: usize,
     pub local_max_acl: usize,
-    pub message_expiry_minutes: usize,
+    pub message_expiry_seconds: u64,
     pub message_size: usize,
     pub queued_messages: usize,
     pub to_keys_per_recipient: usize,
     pub to_recipients: usize,
     pub ws_size: usize,
     pub access_list_limit: usize,
+    pub oob_invite_ttl: usize,
 }
 
 impl Default for LimitsConfig {
@@ -293,13 +259,14 @@ impl Default for LimitsConfig {
             http_size: 10_485_760,
             listed_messages: 100,
             local_max_acl: 1_000,
-            message_expiry_minutes: 10_080,
+            message_expiry_seconds: 604_800,
             message_size: 1_048_576,
             queued_messages: 100,
             to_keys_per_recipient: 100,
             to_recipients: 100,
             ws_size: 10_485_760,
             access_list_limit: 1_000,
+            oob_invite_ttl: 86_400,
         }
     }
 }
@@ -313,13 +280,14 @@ struct LimitsConfigRaw {
     pub http_size: String,
     pub listed_messages: String,
     pub local_max_acl: String,
-    pub message_expiry_minutes: String,
+    pub message_expiry_seconds: String,
     pub message_size: String,
     pub queued_messages: String,
     pub to_keys_per_recipient: String,
     pub to_recipients: String,
     pub ws_size: String,
     pub access_list_limit: String,
+    pub oob_invite_ttl: String,
 }
 
 impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
@@ -337,13 +305,14 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             http_size: raw.http_size.parse().unwrap_or(10_485_760),
             listed_messages: raw.listed_messages.parse().unwrap_or(100),
             local_max_acl: raw.local_max_acl.parse().unwrap_or(1_000),
-            message_expiry_minutes: raw.message_expiry_minutes.parse().unwrap_or(10_080),
+            message_expiry_seconds: raw.message_expiry_seconds.parse().unwrap_or(10_080),
             message_size: raw.message_size.parse().unwrap_or(1_048_576),
             queued_messages: raw.queued_messages.parse().unwrap_or(100),
             to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
             access_list_limit: raw.access_list_limit.parse().unwrap_or(1_000),
+            oob_invite_ttl: raw.oob_invite_ttl.parse().unwrap_or(86_400),
         })
     }
 }
@@ -352,11 +321,13 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProcessorsConfig {
     pub forwarding: ForwardingConfig,
+    pub message_expiry_cleanup: MessageExpiryCleanupConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct ProcessorsConfigRaw {
     pub forwarding: ForwardingConfigRaw,
+    pub message_expiry_cleanup: MessageExpiryCleanupConfigRaw,
 }
 
 /// ForwardingConfig Struct contains configuration specific to DIDComm Routing/Forwarding
@@ -454,7 +425,7 @@ pub struct Config {
     pub security: SecurityConfig,
     #[serde(skip_serializing)]
     pub did_resolver_config: ClientConfig,
-    pub process_forwarding: ForwardingConfig,
+    pub processors: ProcessorsConfig,
     pub limits: LimitsConfig,
 }
 
@@ -474,7 +445,7 @@ impl fmt::Debug for Config {
             .field("DID Resolver config", &self.did_resolver_config)
             .field("api_prefix", &self.api_prefix)
             .field("security", &self.security)
-            .field("processor Forwarding", &self.process_forwarding)
+            .field("processors", &self.processors)
             .field("Limits", &self.limits)
             .finish()
     }
@@ -503,7 +474,10 @@ impl Default for Config {
             did_resolver_config,
             api_prefix: "/mediator/v1/".into(),
             security: SecurityConfig::default(),
-            process_forwarding: ForwardingConfig::default(),
+            processors: ProcessorsConfig {
+                forwarding: ForwardingConfig::default(),
+                message_expiry_cleanup: MessageExpiryCleanupConfig::default(),
+            },
             limits: LimitsConfig::default(),
         }
     }
@@ -542,7 +516,10 @@ impl TryFrom<ConfigRaw> for Config {
             did_resolver_config: raw.did_resolver.convert(),
             api_prefix: raw.server.api_prefix,
             security: raw.security.convert(&aws_config).await?,
-            process_forwarding: raw.processors.forwarding.clone().try_into()?,
+            processors: ProcessorsConfig {
+                forwarding: raw.processors.forwarding.clone().try_into()?,
+                message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
+            },
             limits: raw.limits.try_into()?,
             ..Default::default()
         };
@@ -600,7 +577,7 @@ impl TryFrom<ConfigRaw> for Config {
 
         load_forwarding_protection_blocks(
             &did_resolver,
-            &mut config.process_forwarding,
+            &mut config.processors.forwarding,
             &config.mediator_did,
             &raw.processors.forwarding.blocked_forwarding_dids,
         )

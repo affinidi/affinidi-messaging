@@ -6,11 +6,11 @@
 
 use std::sync::Arc;
 
-use crate::{errors::ATMError, profiles::Profile, ATM};
+use crate::{ATM, errors::ATMError, profiles::Profile};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
-use serde_json::{json, Number, Value};
-use tracing::{span, Instrument, Level};
+use serde_json::{Number, Value, json};
+use tracing::{Instrument, Level, span};
 use uuid::Uuid;
 #[derive(Default)]
 pub struct Routing {}
@@ -26,7 +26,7 @@ impl Routing {
     /// - next_did: The DID of the next agent to forward the message to
     /// - expires_time: The time at which the message expires if not delivered
     /// - delay_milli: The time to wait before delivering the message
-    ///                NOTE: If negative, picks a random delay between 0 and the absolute value
+    ///   NOTE: If negative, picks a random delay between 0 and the absolute value
     ///
     /// Returns:
     ///     (message_id, message)

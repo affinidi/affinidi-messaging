@@ -23,6 +23,16 @@ where
     }
 }
 
+#[derive(Clone, Error, Debug)]
+pub enum ProcessorError {
+    #[error("CommonError: {0}")]
+    CommonError(String),
+    #[error("ForwardingError: {0}")]
+    ForwardingError(String),
+    #[error("MessageExpiryCleanupError: {0}")]
+    MessageExpiryCleanupError(String),
+}
+
 /// MediatorError the first String is always the session_id
 #[derive(Error, Debug)]
 pub enum MediatorError {
@@ -64,6 +74,20 @@ pub enum MediatorError {
     AuthenticationError(String),
     #[error("ACL Denied: {0}")]
     ACLDenied(String),
+    #[error("Processor ({0}) error: {1}")]
+    ProcessorError(ProcessorError, String),
+}
+
+impl From<MediatorError> for ProcessorError {
+    fn from(error: MediatorError) -> Self {
+        ProcessorError::CommonError(error.to_string())
+    }
+}
+
+impl From<ProcessorError> for MediatorError {
+    fn from(error: ProcessorError) -> Self {
+        MediatorError::ProcessorError(error.clone(), error.to_string())
+    }
 }
 
 impl IntoResponse for AppError {
@@ -274,6 +298,17 @@ impl IntoResponse for AppError {
                     errorCode: 19,
                     errorCodeStr: "ACLDenied".to_string(),
                     message,
+                };
+                event!(Level::WARN, "{}", response.to_string());
+                response
+            }
+            MediatorError::ProcessorError(processor, message) => {
+                let response = ErrorResponse {
+                    httpCode: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    sessionId: "NO-SESSION".to_string(),
+                    errorCode: 20,
+                    errorCodeStr: "ACLDenied".to_string(),
+                    message: format!("Processor ({}): {}", processor, message),
                 };
                 event!(Level::WARN, "{}", response.to_string());
                 response

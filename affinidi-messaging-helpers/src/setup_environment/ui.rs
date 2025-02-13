@@ -1,5 +1,5 @@
 use crate::{
-    mediator::{read_config_file, MediatorConfig},
+    mediator::{MediatorConfig, read_config_file},
     network::fetch_well_known_did,
     ssl_certs::create_ssl_certs,
 };
@@ -9,7 +9,7 @@ use affinidi_messaging_helpers::common::{
 };
 use affinidi_messaging_sdk::profiles::ProfileConfig;
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use regex::Regex;
 use std::{collections::HashMap, error::Error, path::Path};
 use toml::Value;
@@ -97,31 +97,32 @@ fn save_profile(
     name: &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
     println!();
-    if let Ok(name) = Input::<String>::with_theme(theme)
+    match Input::<String>::with_theme(theme)
         .with_prompt("Save profile with name?")
         .with_initial_text(name)
         .interact_text()
     {
-        if Confirm::with_theme(theme)
-            .with_prompt(format!("Save Profile: {}?", name))
-            .default(true)
-            .interact()?
-        {
-            if profiles.add_profile(&name, profile) {
-                println!("  {}", style("Profile added").green());
-            } else {
-                println!("  {}", style("Profile replaced").color256(208));
-            }
+        Ok(name) => {
+            if Confirm::with_theme(theme)
+                .with_prompt(format!("Save Profile: {}?", name))
+                .default(true)
+                .interact()?
+            {
+                if profiles.add_profile(&name, profile) {
+                    println!("  {}", style("Profile added").green());
+                } else {
+                    println!("  {}", style("Profile replaced").color256(208));
+                }
 
-            profiles.save()?;
-            println!("  {}", style("Profiles saved...").green());
-            Ok(Some(name))
-        } else {
-            println!("  {}", style("Profile not saved").red());
-            Ok(None)
+                profiles.save()?;
+                println!("  {}", style("Profiles saved...").green());
+                Ok(Some(name))
+            } else {
+                println!("  {}", style("Profile not saved").red());
+                Ok(None)
+            }
         }
-    } else {
-        Err("Profile name not provided".into())
+        _ => Err("Profile name not provided".into()),
     }
 }
 

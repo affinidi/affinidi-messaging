@@ -1,9 +1,11 @@
+use std::time::SystemTime;
+
 use crate::database::session::Session;
+use crate::database::Database;
 use crate::messages::MessageHandler;
-use crate::{
-    common::errors::MediatorError, database::DatabaseHandler, messages::PackOptions, SharedData,
-};
+use crate::{messages::PackOptions, SharedData};
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use sha256::digest;
 use tracing::{debug, error, span, trace, warn, Instrument};
@@ -16,6 +18,7 @@ async fn _store_message(
     response: &ProcessMessageResponse,
     data: &str,
     to_did: &str,
+    expiry: u64,
 ) -> Result<String, MediatorError> {
     // Live stream the message?
     if let Some(stream_uuid) = state
@@ -40,6 +43,7 @@ async fn _store_message(
             data,
             to_did,
             Some(&state.config.mediator_did),
+            expiry,
         )
         .await
 }
@@ -87,6 +91,25 @@ pub(crate) async fn store_message(
                         ));
                     }
 
+                    let expires_at = if let Some(expires_at) = message.expires_time {
+                        let now = SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+
+                        if expires_at > now + state.config.limits.message_expiry_seconds {
+                            now + state.config.limits.message_expiry_seconds
+                        } else {
+                            expires_at
+                        }
+                    } else {
+                        SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                            + state.config.limits.message_expiry_seconds
+                    };
+
                     for recipient in to_dids {
                         let (packed, _): (String, PackEncryptedMetadata) = message
                             .pack(
@@ -103,11 +126,15 @@ pub(crate) async fn store_message(
                                         .to_keys_per_recipient,
                                     forward: true,
                                 },
-                                &state.config.process_forwarding.blocked_forwarding,
+                                &state.config.processors.forwarding.blocked_forwarding,
                             )
                             .await?;
 
-                        match _store_message(state, session, response, &packed, recipient).await {
+                        match _store_message(
+                            state, session, response, &packed, recipient, expires_at,
+                        )
+                        .await
+                        {
                             Ok(msg_id) => {
                                 debug!(
                                     "message id({}) stored successfully recipient({})",
@@ -126,9 +153,9 @@ pub(crate) async fn store_message(
                         }
                     }
                 }
-                WrapperType::Envelope(to_did, message) => {
+                WrapperType::Envelope(to_did, message, expiry) => {
                     // Message is already packed, likely a direct delivery from a client
-                    match _store_message(state, session, response, message, to_did).await {
+                    match _store_message(state, session, response, message, to_did, *expiry).await {
                         Ok(msg_id) => {
                             debug!(
                                 "message id({}) stored successfully recipient({})",
@@ -160,7 +187,7 @@ pub(crate) async fn store_message(
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,
                         forward: true,
                     },
-                    &state.config.process_forwarding.blocked_forwarding,
+                    &state.config.processors.forwarding.blocked_forwarding,
                 )
                 .await?;
             if meta.messaging_service.is_some() {
@@ -203,7 +230,7 @@ pub(crate) async fn store_message(
 /// If live streaming is enabled, this function will send the message to the live stream
 /// Ok to ignore errors here
 async fn _live_stream(
-    database: &DatabaseHandler,
+    database: &Database,
     did_hash: &str,
     stream_uuid: &str,
     message: &str,
@@ -224,14 +251,22 @@ async fn _live_stream(
 /// - session: Session
 /// - response: ProcessMessageResponse
 /// - metadata: UnpackMetadata
+/// - expires_at: Option<u64>
+///   - None: use default expiry
+///   - Some: use the provided expiry time in seconds
 pub(crate) async fn store_forwarded_message(
     state: &SharedData,
     session: &Session,
     message: &str,
     sender: Option<&str>,
     recipient: &str,
+    expires_at: Option<u64>,
 ) -> Result<(), MediatorError> {
-    let _span = span!(tracing::Level::DEBUG, "store_forwarded_message",);
+    let _span = span!(
+        tracing::Level::DEBUG,
+        "store_forwarded_message",
+        session = session.session_id
+    );
 
     async move {
         let did_hash = digest(recipient);
@@ -242,11 +277,31 @@ pub(crate) async fn store_forwarded_message(
             .await
         {
             _live_stream(&state.database, &did_hash, &stream_uuid, message, false).await;
+            debug!("Live streaming message to did_hash: {}", did_hash);
         }
+
+        let expires_at = if let Some(expires_at) = expires_at {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            if expires_at > now + state.config.limits.message_expiry_seconds {
+                now + state.config.limits.message_expiry_seconds
+            } else {
+                expires_at
+            }
+        } else {
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + state.config.limits.message_expiry_seconds
+        };
 
         match state
             .database
-            .store_message(&session.session_id, message, recipient, sender)
+            .store_message(&session.session_id, message, recipient, sender, expires_at)
             .await
         {
             Ok(msg_id) => {

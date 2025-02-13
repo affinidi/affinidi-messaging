@@ -28,7 +28,7 @@ use tokio_tungstenite::{
     },
     MaybeTlsStream, WebSocketStream,
 };
-use tracing::{debug, error, span, Instrument};
+use tracing::{debug, warn, error, span, Instrument};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -41,6 +41,7 @@ pub(crate) enum WsConnectionCommands {
     DisableDirectChannel,
     // To Handler
     Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
+    Disconnected(Arc<Profile>), // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
@@ -109,47 +110,54 @@ impl WsConnection {
             };
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
+           
             loop {
                 select! {
                     value = web_socket.next() => {
-                                    if let Some(msg) = value {
-                                        match msg {
-                                            Ok(payload) => {
-                                            if payload.is_text() {
-                                                if let Ok(msg) = payload.to_text() {
-                                                    debug!("Received text message ({})", msg);
-                                                    let unpack = match atm.unpack(msg).await {
-                                                        Ok(unpack) => unpack,
-                                                        Err(e) => {
-                                                            error!("Error unpacking message: {:?}", e);
-                                                            continue;
-                                                        }
-                                                    };
-                                                    if let Some(sender) = &direct_channel {
+                        match value { Some(msg) => {
+                            match msg {
+                                Ok(payload) => {
+                                    if payload.is_text() {
+                                        match payload.to_text() {
+                                            Ok(msg) => {
+                                                debug!("Received text message ({})", msg);
+                                                let unpack = match atm.unpack(msg).await {
+                                                    Ok(unpack) => unpack,
+                                                    Err(e) => {
+                                                        error!("Error unpacking message: {:?}", e);
+                                                        continue;
+                                                    }
+                                                };
+                                                match &direct_channel { 
+                                                    Some(sender) => {
                                                         let _ = sender.send(Box::new(unpack)).await;
-                                                    } else {
+                                                    } _ => {
                                                         let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
                                                     }
-                                            } else {
+                                                }
+                                            } _ => {
                                                 error!("Received non-text message");
                                             }
-                                        } else if payload.is_close() {
-                                            error!("Websocket closed");
-                                            web_socket = match self._handle_connection(&atm, &protocols, true).await {
-                                                Ok(ws) => ws,
-                                                Err(e) => {
-                                                    error!("Error creating websocket connection: {:?}", e);
-                                                    return;
-                                                }
-                                            };
-                                        } else {
-                                            error!("Error getting payload from message: {:?}", payload);
-                                            continue;
                                         }
+                                    } else if payload.is_close() {
+                                        error!("Websocket closed");
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                        web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                            Ok(ws) => ws,
+                                            Err(e) => {
+                                                error!("Error creating websocket connection: {:?}", e);
+                                                return;
+                                            }
+                                        };
+                                    } else {
+                                        error!("Error getting payload from message: {:?}", payload);
+                                        continue;
                                     }
-                                    Err(err) => match err {
-                                        ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
+                                }
+                                Err(err) => match err {
+                                    ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
                                         error!("Websocket reset without closing handshake");
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
                                         web_socket = match self._handle_connection(&atm, &protocols, true).await {
                                             Ok(ws) => ws,
                                             Err(e) => {
@@ -159,18 +167,21 @@ impl WsConnection {
                                         };
                                     }
                                     _ => {
+                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
                                         error!("Unknown WebSocket Error: {:?}", err);
                                         break;
                                     }
                                 }
-                                }
-                                } else {
-                                    error!("websocket error : {:?}", value);
-                                    break;
-                                }
+                            }
+                            } _ => {
+                                let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                error!("websocket error : {:?}", value);
+                                break;
+                            }
+                        }
                     }
                     value = self.from_handler.recv() => {
-                        if let Some(cmd) = value {
+                        match value { Some(cmd) => {
                             match cmd {
                                 WsConnectionCommands::Send(msg) => {
                                     debug!("Sending message ({}) to websocket", msg);
@@ -199,13 +210,14 @@ impl WsConnection {
                                     println!("Unhandled command");
                                 }
                             }
-                        } else {
+                        } _ => {
                             error!("Error getting command {:#?}", value);
-                            break;
-                        }
+                            continue;
+                        }}
                     }
                 }
             }
+            let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
             let _ = web_socket.close(None).await;
             debug!("Websocket connection closed");
         }
@@ -274,14 +286,18 @@ impl WsConnection {
         };
 
         if update_sdk {
-            let a = self
+            debug!("channel to SDK = capacity = {}", self.to_handler.capacity());
+            match self
                 .to_handler
-                .send(WsConnectionCommands::Connected(
+                .try_send(WsConnectionCommands::Connected(
                     self.profile.clone(),
                     status_id,
-                ))
-                .await;
-            debug!("Signaled handler that connection is ready: {:?}", a);
+                )) {
+                Ok(_) => {}
+                Err(e) => {
+                warn!("Channel to WS_handler is full: {:?}", e);
+                }
+            }
         }
 
         Ok(web_socket)

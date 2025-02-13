@@ -3,6 +3,7 @@
 use std::time::SystemTime;
 
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::administration::MediatorAdminRequest,
@@ -13,7 +14,6 @@ use tracing::{span, warn, Instrument};
 use uuid::Uuid;
 
 use crate::{
-    common::errors::MediatorError,
     database::session::Session,
     messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,

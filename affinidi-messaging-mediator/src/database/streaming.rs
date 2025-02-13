@@ -1,11 +1,13 @@
-use super::DatabaseHandler;
-use crate::{common::errors::MediatorError, tasks::websocket_streaming::PubSubRecord};
+use crate::tasks::websocket_streaming::PubSubRecord;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use redis::{from_redis_value, Value};
 use tracing::{debug, error, event, Level};
 
-impl DatabaseHandler {
+use super::Database;
+
+impl Database {
     pub async fn streaming_clean_start(&self, uuid: &str) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         let response: Vec<Value> = deadpool_redis::redis::pipe()
             .atomic()
@@ -62,11 +64,12 @@ impl DatabaseHandler {
         did_hash: &str,
         force_delivery: bool,
     ) -> Option<String> {
-        let mut conn = if let Ok(conn) = self.get_async_connection().await {
-            conn
-        } else {
-            error!("is_live_streaming(): Failed to get connection to Redis");
-            return None;
+        let mut conn = match self.0.get_async_connection().await {
+            Ok(conn) => conn,
+            _ => {
+                error!("is_live_streaming(): Failed to get connection to Redis");
+                return None;
+            }
         };
 
         match deadpool_redis::redis::cmd("HGET")
@@ -150,7 +153,7 @@ impl DatabaseHandler {
             }
         };
 
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         match deadpool_redis::redis::cmd("PUBLISH")
             .arg(["CHANNEL:", stream_uuid].concat())
@@ -192,7 +195,7 @@ impl DatabaseHandler {
         did_hash: &str,
         stream_uuid: &str,
     ) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         match deadpool_redis::redis::pipe()
             .atomic()
@@ -238,7 +241,7 @@ impl DatabaseHandler {
         did_hash: &str,
         stream_uuid: &str,
     ) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         match deadpool_redis::redis::cmd("HSET")
             .arg("GLOBAL_STREAMING")
@@ -282,7 +285,7 @@ impl DatabaseHandler {
         did_hash: &str,
         stream_uuid: &str,
     ) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         match deadpool_redis::redis::cmd("HSET")
             .arg("GLOBAL_STREAMING")
@@ -326,7 +329,7 @@ impl DatabaseHandler {
         did_hash: &str,
         stream_uuid: &str,
     ) -> Result<(), MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         match deadpool_redis::redis::pipe()
             .atomic()

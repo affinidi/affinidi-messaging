@@ -1,6 +1,5 @@
 //! Database routines to add/remove/list admin accounts
-use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
     accounts::AccountType,
     acls::MediatorACLSet,
@@ -9,7 +8,9 @@ use affinidi_messaging_sdk::protocols::mediator::{
 use redis::{from_redis_value, Value};
 use tracing::{debug, info, span, Instrument, Level};
 
-impl DatabaseHandler {
+use super::Database;
+
+impl Database {
     /// Ensures that the mediator admin account is correctly configured and set up.
     /// It does not do any cleanup or maintenance of other admin accounts.
     /// Updates both the DID role type and the global ADMIN Set in Redis.
@@ -24,7 +25,7 @@ impl DatabaseHandler {
             debug!("Admin account doesn't exist, creating: {}", admin_did_hash);
             self.account_add(admin_did_hash, acls).await?;
         }
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         debug!(
             "Admin DID ({}) == hash ({})",
@@ -61,7 +62,7 @@ impl DatabaseHandler {
     /// Checks if the provided DID is an admin level account
     /// Returns true if the DID is an admin account, false otherwise
     pub(crate) async fn check_admin_account(&self, did_hash: &str) -> Result<bool, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let (exists, role_type): (u32, u32) = deadpool_redis::redis::pipe()
             .atomic()
@@ -149,7 +150,7 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let mut tx = deadpool_redis::redis::pipe();
             let mut tx = tx.atomic().cmd("SREM").arg("ADMINS");
@@ -207,7 +208,7 @@ impl DatabaseHandler {
                 ));
             }
 
-            let mut con = self.get_async_connection().await?;
+            let mut con = self.0.get_async_connection().await?;
 
             let result: Vec<Value> = deadpool_redis::redis::pipe()
                 .atomic()

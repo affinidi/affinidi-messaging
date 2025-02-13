@@ -47,13 +47,13 @@ impl Message {
     /// # Params
     /// - `to` recipient DID or key ID the sender uses encryption.
     /// - `from` a sender DID or key ID. If set message will be repudiable authenticated or anonymous otherwise.
-    ///    Must match `from` header in Plaintext if the header is set.
+    ///   Must match `from` header in Plaintext if the header is set.
     /// - `sign_by` if `Some` message will be additionally signed to provide additional non-repudiable authentication
-    ///    by provided DID/Key. Signed messages are only necessary when the origin of plaintext must be provable
-    ///    to third parties, or when the sender can’t be proven to the recipient by authenticated encryption because
-    ///    the recipient is not known in advance (e.g., in a broadcast scenario).
-    ///    Adding a signature when one is not needed can degrade rather than enhance security because
-    ///    it relinquishes the sender’s ability to speak off the record.
+    ///   by provided DID/Key. Signed messages are only necessary when the origin of plaintext must be provable
+    ///   to third parties, or when the sender can’t be proven to the recipient by authenticated encryption because
+    ///   the recipient is not known in advance (e.g., in a broadcast scenario).
+    ///   Adding a signature when one is not needed can degrade rather than enhance security because
+    ///   it relinquishes the sender’s ability to speak off the record.
     /// - `did_resolver` instance of `DIDResolver` to resolve DIDs.
     /// - `secrets_resolver` instance of SecretsResolver` to resolve sender DID keys secrets.
     /// - `options` allow fine configuration of packing process and have implemented `Default`.

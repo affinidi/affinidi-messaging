@@ -234,10 +234,10 @@ listed_messages = "${LIMIT_LISTED_MESSAGES:100}"
 ### Default: 1_000
 local_max_acl = "${LIMIT_LOCAL_MAX_ACL:1000}"
 
-### message_expiry_minutes: Time to live in minutes for messages stored
+### message_expiry_seconds: Time to live in seconds for messages stored
 ### Messages will expire after this limit
-### Default: 10080 (7 days)
-message_expiry_minutes = "${LIMIT_MESSAGE_EXPIRY_MINUTES:10080}"
+### Default: 604_800 (7 days)
+message_expiry_seconds = "${LIMIT_MESSAGE_EXPIRY_SECONDS:604800}"
 
 ### message_size: Maximum size of a message in bytes
 ### Default: 1048576 (1MB)
@@ -266,6 +266,10 @@ ws_size = "${LIMIT_WS_SIZE:10485760}"
 ### access_list_limit: Maximum number of access list entries that each DID can have
 ### Default: 1000
 access_list_limit = "${ACCESS_LIST_LIMIT:1000}"
+
+### oob_invite_ttl: Time to live in seconds for OOB invites
+### Default 86_400
+oob_invite_ttl = "${OOB_INVITE_TTL:86_400}"
 
 ### ****************************************************************************************************************************
 ### Configuration specific to the forwarding processor
@@ -299,3 +303,8 @@ report_errors = "${PROCESSOR_FORWARDING_REPORT_ERRORS:true}"
 ###       so that you don't accidentally create a circular forwarding loop
 ### Format: ["did_1", "did_2"]
 blocked_forwarding_dids = "${PROCESSOR_FORWARDING_BLOCKED_DIDS:[]}"
+
+[processors.message_expiry_cleanup]
+### enabled: If true, the message expiry cleanup processor is enabled within the mediator locally
+### Default: true
+enabled = "${PROCESSOR_MESSAGE_EXPIRY_CLEANUP_ENABLED:true}"

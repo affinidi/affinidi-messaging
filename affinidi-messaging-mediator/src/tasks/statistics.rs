@@ -1,15 +1,13 @@
 use std::time::Duration;
 
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use tracing::{debug, info, span, Instrument, Level};
 
-use crate::{
-    common::errors::MediatorError,
-    database::{stats::MetadataStats, DatabaseHandler},
-};
+use crate::database::{stats::MetadataStats, Database};
 
 /// Periodically logs statistics about the database.
 /// Is spawned as a task from main().
-pub async fn statistics(database: DatabaseHandler) -> Result<(), MediatorError> {
+pub async fn statistics(database: Database) -> Result<(), MediatorError> {
     let _span = span!(Level::INFO, "statistics");
 
     async move {

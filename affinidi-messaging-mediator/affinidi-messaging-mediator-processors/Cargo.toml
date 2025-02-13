@@ -1,0 +1,33 @@
+[package]
+name = "affinidi-messaging-mediator-processors"
+version.workspace = true
+description = "Affinidi Messaging Mediator Processors"
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+publish.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "message_expiry_cleanup"
+path = "src/message_expiry_cleanup/main.rs"
+
+[dependencies]
+affinidi-messaging-mediator-common.workspace = true
+async-trait.workspace = true
+clap.workspace = true
+redis.workspace = true
+deadpool-redis.workspace = true
+rustls.workspace = true
+semver.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

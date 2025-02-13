@@ -1,13 +1,12 @@
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::{Folder, MessageList, MessageListElement};
 use itertools::Itertools;
 use redis::{from_redis_value, Value};
 use tracing::{event, span, Instrument, Level};
 
-use crate::common::errors::MediatorError;
+use super::Database;
 
-use super::DatabaseHandler;
-
-impl DatabaseHandler {
+impl Database {
     /// Retrieves list of messages for the specified DID and folder
     /// The folder can be either Inbox or Outbox
     /// - did_hash: The DID sha256 hash to retrieve messages for
@@ -27,7 +26,7 @@ impl DatabaseHandler {
             range = format!("{:?}", range)
         );
         async move {
-            let mut conn = self.get_async_connection().await?;
+            let mut conn = self.0.get_async_connection().await?;
 
             let key = match folder {
                 Folder::Inbox => format!("RECEIVE_Q:{}", did_hash),

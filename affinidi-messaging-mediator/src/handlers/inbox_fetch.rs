@@ -1,8 +1,5 @@
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
+use crate::{database::session::Session, SharedData};
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{fetch::FetchOptions, GetMessagesResponse};
 use axum::{extract::State, Json};
 use http::StatusCode;

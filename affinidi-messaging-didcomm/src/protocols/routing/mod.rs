@@ -320,8 +320,8 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
 /// - `headers` (optional) Additional headers to each Forward message of the onion.
 /// - `to` Recipient (a key identifier or DID) of the message being wrapped into Forward onion.
 /// - `routing_keys` Routing keys (each one is a key identifier or DID) to use for encryption of
-///    Forward messages in the onion. The keys must be ordered along the route (so in the opposite
-///    direction to the wrapping steps).
+///   Forward messages in the onion. The keys must be ordered along the route (so in the opposite
+///   direction to the wrapping steps).
 /// - `enc_alg_anon` Algorithm to use for wrapping into each Forward message of the onion.
 /// - `did_resolver` instance of `DIDResolver` to resolve DIDs.
 /// - `to_kids_limit` maximum number of kids in a single recipient did.

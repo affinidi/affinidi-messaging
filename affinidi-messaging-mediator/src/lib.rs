@@ -1,11 +1,10 @@
-use std::fmt::Debug;
-
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use axum::extract::{FromRef, FromRequestParts};
 use chrono::{DateTime, Utc};
 use common::{config::Config, jwt_auth::AuthError};
-use database::DatabaseHandler;
+use database::Database;
 use http::request::Parts;
+use std::fmt::Debug;
 use tasks::websocket_streaming::StreamingTask;
 
 pub mod common;
@@ -21,7 +20,7 @@ pub struct SharedData {
     pub config: Config,
     pub service_start_timestamp: DateTime<Utc>,
     pub did_resolver: DIDCacheClient,
-    pub database: DatabaseHandler,
+    pub database: Database,
     pub streaming_task: Option<StreamingTask>,
 }
 

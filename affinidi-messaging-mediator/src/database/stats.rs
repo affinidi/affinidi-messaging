@@ -1,5 +1,5 @@
-use super::DatabaseHandler;
-use crate::common::errors::MediatorError;
+use super::Database;
+use affinidi_messaging_mediator_common::errors::MediatorError;
 use itertools::Itertools;
 use num_format::{Locale, ToFormattedString};
 use redis::{from_redis_value, Value};
@@ -81,11 +81,11 @@ pub struct DidStats {
     pub receive_queue_count: u64,
 }
 
-impl DatabaseHandler {
+impl Database {
     /// Retrieves metadata statistics that are global to the mediator database
     /// This means it may include more than this mediator's messages
     pub async fn get_db_metadata(&self) -> Result<MetadataStats, MediatorError> {
-        let mut conn = self.get_async_connection().await?;
+        let mut conn = self.0.get_async_connection().await?;
 
         let mut stats = MetadataStats::default();
 
@@ -136,7 +136,7 @@ impl DatabaseHandler {
 
     /// Updates GLOBAL send metrics
     pub async fn update_send_stats(&self, sent_bytes: i64) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::pipe()
             .atomic()
@@ -161,7 +161,7 @@ impl DatabaseHandler {
 
     /// Increment WebSocket open count
     pub async fn global_stats_increment_websocket_open(&self) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
@@ -184,7 +184,7 @@ impl DatabaseHandler {
 
     /// Increment WebSocket close count
     pub async fn global_stats_increment_websocket_close(&self) -> Result<(), MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         deadpool_redis::redis::cmd("HINCRBY")
             .arg("GLOBAL")
@@ -208,7 +208,7 @@ impl DatabaseHandler {
     /// Get stats relating to a DID
     /// - `did_hash` - The hash of the DID to get stats for
     pub async fn get_did_stats(&self, did_hash: &str) -> Result<DidStats, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let result: Value = deadpool_redis::redis::cmd("HGETALL")
             .arg(["DID", did_hash].join(":"))
@@ -246,7 +246,7 @@ impl DatabaseHandler {
 
     /// Forward Task Queue length
     pub async fn get_forward_tasks_len(&self) -> Result<usize, MediatorError> {
-        let mut con = self.get_async_connection().await?;
+        let mut con = self.0.get_async_connection().await?;
 
         let result: usize = deadpool_redis::redis::cmd("XLEN")
             .arg("FORWARD_TASKS")

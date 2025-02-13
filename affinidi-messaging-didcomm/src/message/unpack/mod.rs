@@ -50,7 +50,7 @@ impl Message {
     /// - `did_resolver` instance of `DIDResolver` to resolve DIDs
     /// - `secrets_resolver` instance of SecretsResolver` to resolve sender DID keys secrets
     /// - `options` allow fine configuration of unpacking process and imposing additional restrictions
-    ///    to message to be trusted.
+    ///   to message to be trusted.
     ///
     /// # Returns
     /// Tuple `(message, metadata)`.

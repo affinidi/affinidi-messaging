@@ -43,14 +43,14 @@ impl CommonSettings {
         did_resolver: &DIDCacheClient,
     ) -> Result<(), std::io::Error> {
         if let Some(mediator_did) = self.mediator_did.as_ref() {
-            if let Err(e) = did_resolver.resolve(mediator_did).await {
+            match did_resolver.resolve(mediator_did).await { Err(e) => {
                 Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     format!("Mediator DID is invalid: {}", e),
                 ))
-            } else {
+            } _ => {
                 Ok(())
-            }
+            }}
         } else {
             Ok(()) // Empty is fine
         }
@@ -82,12 +82,12 @@ impl CommonSettings {
         } else {
             state.settings.avatar_path_error = None;
         }
-        if let Err(e) = self._check_mediator_did(did_resolver).await {
+        match self._check_mediator_did(did_resolver).await { Err(e) => {
             state.settings.mediator_did_error = Some(e.to_string());
             ok_flag = false;
-        } else {
+        } _ => {
             state.settings.mediator_did_error = None;
-        }
+        }}
 
         ok_flag
     }

@@ -13,12 +13,9 @@
  Alice and Bob then swap messages and create a confidential communication channel between themselves.
 */
 
-use crate::{
-    common::errors::{AppError, MediatorError, SuccessResponse},
-    database::session::Session,
-    SharedData,
-};
+use crate::{database::session::Session, SharedData};
 use affinidi_messaging_didcomm::Message;
+use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::protocols::oob_discovery::OOBInviteResponse;
 use axum::{
     extract::{Query, State},
@@ -51,7 +48,11 @@ pub async fn oob_invite_handler(
 
     let oob_id = state
         .database
-        .oob_discovery_store(&session.did_hash, &body)
+        .oob_discovery_store(
+            &session.did_hash,
+            &body,
+            state.config.limits.oob_invite_ttl as u64,
+        )
         .await?;
 
     Ok((
@@ -72,8 +73,8 @@ pub async fn oobid_handler(
     State(state): State<SharedData>,
     oobid: Query<Parameters>,
 ) -> Result<(StatusCode, Json<SuccessResponse<String>>), AppError> {
-    if let Some(invite) = state.database.oob_discovery_get(&oobid._oobid).await? {
-        Ok((
+    match state.database.oob_discovery_get(&oobid._oobid).await? {
+        Some(invite) => Ok((
             StatusCode::OK,
             Json(SuccessResponse {
                 sessionId: "NA".into(),
@@ -83,9 +84,8 @@ pub async fn oobid_handler(
                 message: "Success".to_string(),
                 data: Some(invite),
             }),
-        ))
-    } else {
-        Ok((
+        )),
+        _ => Ok((
             StatusCode::OK,
             Json(SuccessResponse {
                 sessionId: "NA".into(),
@@ -95,7 +95,7 @@ pub async fn oobid_handler(
                 message: "NO CONTENT".to_string(),
                 data: None,
             }),
-        ))
+        )),
     }
 }
 

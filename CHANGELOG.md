@@ -5,6 +5,35 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
+## 13th February 2025 (0.9.7)
+
+### All (0.9.7)
+
+* MAINTENANCE: Crate dependencies updated to latest
+  * Major: Redis 0.27 -> 0.28, Deadpool-redis 0.18 -> 0.19
+* MAINTENANCE: Workspace updated for Rust Edition 2024
+* FEATURE: affinidi-messaging-processor crate renamed to affinidi-messaging-processors
+  * Multiple binaries configured for processors
+
+### Mediator (0.9.7)
+
+* FEATURE: Config: oob_invite_ttl added allowing for customisable time to live (TTL) for OOB Invites
+* FEATURE: Message Expiry handling refactored and placed into Expiry Processor
+* CHANGE: Config: message_expiry_minutes changed to message_expiry_seconds
+* CHANGE: Workspace layout modified
+  * Processors moved under the Mediator Workspace
+  * Mediator-common created for shared code between Mediator and Processors
+
+### SDK (0.9.7)
+
+* FIX: SDK MPSC Channel when full causes a deadlock
+* FEATURE: WebSocket Activated/Disconnected state changes sent through to SDK
+  * NOTE: If the channels fill up, the SDK will throw these status updates away as the SDK is not clearing it's channel.
+
+### Helpers (0.9.7)
+
+* FEATURE: read_raw_didcomm example added to help with troubleshooting of DIDComm message errors
+
 ## 3rd February 2025 (0.9.6)
 
 ### All (0.9.6)
