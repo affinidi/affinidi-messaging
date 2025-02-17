@@ -69,12 +69,13 @@ async fn main() -> Result<(), ATMError> {
 
     let mut success_count = 0;
     let mediator = alice.inner.mediator.clone();
-    let mediator_did = match &*mediator { Some(mediator) => {
-        mediator.did.clone()
-    } _ => {
-        error!("No mediator found in Alice's profile");
-        return Ok(());
-    }};
+    let mediator_did = match &*mediator {
+        Some(mediator) => mediator.did.clone(),
+        _ => {
+            error!("No mediator found in Alice's profile");
+            return Ok(());
+        }
+    };
     println!("Mediator = {}", mediator_did);
 
     // Ready to send a trust-ping to ATM
@@ -141,10 +142,11 @@ async fn main() -> Result<(), ATMError> {
         after_get.duration_since(start).unwrap().as_millis()
     );
     info!(
-        "Unpack took {}ms :: total {}ms to complete",
-        after_unpack.duration_since(after_get).unwrap().as_millis(),
-        after_unpack.duration_since(start).unwrap().as_millis()
+        "Unpack took {:0.2}ms :: total {:0.2}ms to complete",
+        after_unpack.duration_since(after_get).unwrap().as_micros() as f64 / 1000.0,
+        after_unpack.duration_since(start).unwrap().as_micros() as f64 / 1000.0
     );
+
     info!(
         "Total trust-ping took {}ms to complete",
         after_unpack.duration_since(start).unwrap().as_millis()
@@ -194,12 +196,13 @@ async fn main() -> Result<(), ATMError> {
         after_connect.duration_since(start).unwrap().as_millis()
     );
     info!(
-        "Sending Ping took {}ms :: total {}ms to complete",
+        "Sending Ping took {:0.2}ms :: total {:0.2}ms to complete",
         after_ping_send
             .duration_since(after_connect)
             .unwrap()
-            .as_millis(),
-        after_ping_send.duration_since(start).unwrap().as_millis()
+            .as_micros() as f64
+            / 1000.0,
+        after_ping_send.duration_since(start).unwrap().as_micros() as f64 / 1000.0
     );
 
     info!(
@@ -254,12 +257,9 @@ async fn main() -> Result<(), ATMError> {
 
     // Print out timing information
     info!(
-        "Sending Ping took {}ms :: total {}ms to complete",
-        after_ping_send
-            .duration_since(after_connect)
-            .unwrap()
-            .as_millis(),
-        after_ping_send.duration_since(start).unwrap().as_millis()
+        "Sending Ping took {:0.2}ms :: total {:0.2}ms to complete",
+        after_ping_send.duration_since(start).unwrap().as_micros() as f64 / 1000.0,
+        after_ping_send.duration_since(start).unwrap().as_micros() as f64 / 1000.0
     );
 
     info!(

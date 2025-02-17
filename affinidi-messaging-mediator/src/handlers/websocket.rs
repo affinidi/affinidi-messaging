@@ -1,5 +1,4 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
 use crate::{
     database::session::Session,
     messages::inbound::handle_inbound,
@@ -100,31 +99,71 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                     match value { Some(msg) => {
                         debug!("ws: Received message: {:?}", msg);
                         if let Ok(msg) = msg {
-                            match msg { Message::Text(msg) => {
-                                debug!("ws: Received text message: {:?}", msg);
-                                if msg.len() > state.config.limits.ws_size {
-                                    warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.limits.ws_size, msg.len());
-                                    break;
-                                }
-
-                                // Process the message, which also takes care of any storing and live-streaming of the message
-                                match handle_inbound(&state, &session, &msg).await {
-                                    Ok(response) => {
-                                        debug!("Successful handling of message - finished processing");
-                                        response
-                                    }
-                                    Err(e) => {
-                                        warn!("Error processing message: {:?}", e);
+                            match msg { 
+                                Message::Text(msg) => {
+                                    debug!("ws: Received text message: {:?}", msg);
+                                    if msg.len() > state.config.limits.ws_size {
+                                        warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.limits.ws_size, msg.len());
                                         continue;
                                     }
-                                };
-                            } _ => { match msg { Message::Close(_) => {
-                                debug!("Received close message, closing connection");
-                                break;
-                            } _ => {
-                                warn!("Received non-text message, ignoring");
-                                continue;
-                            }}}}
+
+                                    // Process the message, which also takes care of any storing and live-streaming of the message
+                                    match handle_inbound(&state, &session, &msg).await {
+                                        Ok(response) => {
+                                            debug!("Successful handling of message - finished processing");
+                                            response
+                                        }
+                                        Err(e) => {
+                                            warn!("Error processing message: {:?}", e);
+                                            continue;
+                                        }
+                                    };
+                                }
+                                Message::Ping(_) => {
+                                    // Don't need to do anything, the library will automatically respond with a pong
+                                }
+                                Message::Pong(_) => {
+                                    // Don't need to do anything
+                                }
+                                Message::Binary(msg) => {
+                                    debug!("ws: Received binary message: {:?}", msg);
+                                    if msg.len() > state.config.limits.ws_size {
+                                        warn!("Error processing message, the size is too big. limit is {}, message size is {}", state.config.limits.ws_size, msg.len());
+                                        continue;
+                                    }
+
+                                    let msg = match String::from_utf8(msg.into()) {
+                                        Ok(msg) => msg,
+                                        Err(e) => {
+                                            warn!("Error processing binary message: {:?}", e);
+                                            continue;
+                                        }
+                                    };
+
+                                    // Process the message, which also takes care of any storing and live-streaming of the message
+                                    match handle_inbound(&state, &session, &msg).await {
+                                        Ok(response) => {
+                                            debug!("Successful handling of message - finished processing");
+                                            response
+                                        }
+                                        Err(e) => {
+                                            warn!("Error processing message: {:?}", e);
+                                            continue;
+                                        }
+                                    };
+                                }
+                                _ => { 
+                                    match msg {
+                                        Message::Close(_) => {
+                                            debug!("Received close message, closing connection");
+                                            break;
+                                        } _ => {
+                                            warn!("Received non-text message, ignoring");
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     } _ => {
                         debug!("Received None, closing connection");

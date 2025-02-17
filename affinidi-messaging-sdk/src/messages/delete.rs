@@ -20,6 +20,7 @@ impl ATM {
         profile: &Arc<Profile>,
         message_id: &str,
     ) -> Result<(), ATMError> {
+        debug!("Deleting message in the background: {}", message_id);
         self.inner
             .deletion_handler_send_stream
             .send(DeletionHandlerCommands::DeleteMessage(

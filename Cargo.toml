@@ -11,7 +11,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = '0.9.7'
+version = '0.10.0'
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
@@ -23,21 +23,21 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
-affinidi-messaging-sdk = { version = "0.9.7", path = "./affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.9.7", path = "./affinidi-messaging-didcomm" }
-affinidi-messaging-mediator = { version = "0.9.7", path = "./affinidi-messaging-mediator" }
-affinidi-messaging-mediator-processors = { version = "0.9.7", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
-affinidi-messaging-mediator-common = { version = "0.9.7", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
+affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-didcomm" }
+affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
+affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
+affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
 affinidi-did-resolver-cache-sdk = { version = "~0.2.9", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 async-trait = "0.1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.64"
-aws-sdk-memorydb = "1.60"
-aws-sdk-secretsmanager = "1.62"
-aws-sdk-ssm = "1.64"
+aws-sdk-dynamodb = "1.65"
+aws-sdk-memorydb = "1.61"
+aws-sdk-secretsmanager = "1.63"
+aws-sdk-ssm = "1.65"
 axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
@@ -88,6 +88,7 @@ semver = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde-enum-str = '0.4'
 serde_json = "1.0"
+sha1 = "0.10"
 sha2 = "0.10"
 sha256 = "1.5"
 ssi = { version = "0.10" }
@@ -95,6 +96,7 @@ textwrap = "0.16"
 thiserror = "2.0"
 time = "0.3"
 tokio = { version = "1.43", features = ["full"] }
+tokio-rustls = "0.26"
 tokio-stream = "0.1"
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
 toml = "0.8"
@@ -114,3 +116,4 @@ tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
 uuid = { version = "1.13", features = ["v4", "fast-rng"] }
 varint = "0.9"
+web-socket = "0.7"

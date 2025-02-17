@@ -5,6 +5,23 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
+## XX February 2025 (0.10.0)
+
+### All (0.10.0)
+
+* Rust 2024 Edition is now enabled for all crates
+
+### SDK (0.10.0)
+
+* FIX/CHANGE: Tungstenite WebSocket replaced with Web-Socket crate
+  * Lower-level implementation of WebSocket allows for more graceful handling of error conditions.
+  * Addresses the problem of a device going to sleep and missing Close()
+
+### Mediator (0.10.0)
+
+* FEATURE: Binary WebSocket messages are now converted and handled.
+  * Text and Binary Messages supported
+
 ## 13th February 2025 (0.9.7)
 
 ### All (0.9.7)
