@@ -26,7 +26,7 @@ use tracing::{debug, info, span, warn, Instrument};
 use uuid::Uuid;
 
 /// Handles the switching of the protocol to a websocket connection
-/// ACL_MODE: Rquires LOCAL access
+/// ACL_MODE: Requires LOCAL access
 pub async fn websocket_handler(
     session: Session,
     ws: WebSocketUpgrade,
