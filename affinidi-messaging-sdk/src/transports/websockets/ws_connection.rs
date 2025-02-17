@@ -107,9 +107,17 @@ impl WsConnection {
                         let _ = web_socket.send_ping(vec![]).await;
                         if missed_pings > 2 {
                             warn!("Missed 3 pings, restarting connection");
-                            //let _ = web_socket.close(CloseCode::ProtocolError).await;
+                            let _ = web_socket.close(CloseCode::ProtocolError).await;
                             missed_pings = 0;
-
+                            web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                Ok(ws) => ws,
+                                Err(e) => {
+                                    error!("Error creating websocket connection: {:?}", e);
+                                    return;
+                                }
+                            };
+                        } else {
+                            missed_pings += 1;
                         }
                     }
                     value = web_socket.recv() => {
@@ -149,7 +157,7 @@ impl WsConnection {
                                         let _ = web_socket.send_pong(data).await;
                                     }
                                     Event::Pong(..) => {
-                                        // Ignore
+                                        missed_pings -= 0;
                                     }
                                     Event::Error(err) => {
                                         warn!("WebSocket Error: {}", err);
@@ -161,6 +169,7 @@ impl WsConnection {
                                                 return;
                                             }
                                         };
+                                        missed_pings = 0;
                                     }
                                     Event::Close { .. } => {
                                         web_socket = match self._handle_connection(&atm, &protocols, true).await {
@@ -170,6 +179,7 @@ impl WsConnection {
                                                 return;
                                             }
                                         };
+                                        missed_pings = 0;
                                     }
                                 }
                                 Err(err) => {
@@ -182,6 +192,7 @@ impl WsConnection {
                                             return;
                                         }
                                     };
+                                    missed_pings = 0;
                                 }
                             }
                     }
