@@ -1,16 +1,16 @@
-use super::handshake;
+use super::{handshake, ws_connection::ReadWrite};
 use crate::errors::ATMError;
 use rustls::{
     pki_types::{DnsName, ServerName},
     ClientConfig,
 };
 use rustls_platform_verifier::ConfigVerifierExt;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
-use tokio_rustls::{client::TlsStream, TlsConnector};
+use tokio_rustls::TlsConnector;
 use tracing::error;
 use url::Url;
 use web_socket::WebSocket;
@@ -69,7 +69,7 @@ impl HttpRequest {
 pub async fn connect(
     url: &Url,
     authorization_token: &str,
-) -> Result<WebSocket<BufReader<TlsStream<TcpStream>>>, ATMError> {
+) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError> {
     let (host, path) = if let Some(host) = url.host() {
         (host.to_string(), url.path().to_string())
     } else {
@@ -78,17 +78,6 @@ pub async fn connect(
             "Websocket address {}: no valid host found",
             url
         )));
-    };
-
-    let dns_name = match DnsName::try_from_str(host.as_str()) {
-        Ok(dns_name) => dns_name.to_owned(),
-        Err(err) => {
-            error!("Websocket address {}: invalid host name: {}", url, err);
-            return Err(ATMError::TransportError(format!(
-                "Websocket address {}: invalid host name: {}",
-                url, err
-            )));
-        }
     };
 
     let address = match url.socket_addrs(|| None) {
@@ -114,15 +103,37 @@ pub async fn connect(
     let stream = TcpStream::connect(address).await.map_err(|err| {
         ATMError::TransportError(format!("TcpStream::Connect({}) failed: {}", address, err))
     })?;
-    let connector = TlsConnector::from(Arc::new(ClientConfig::with_platform_verifier()));
-    let mut tls = BufReader::new(
-        connector
-            .connect(ServerName::DnsName(dns_name), stream)
-            .await
-            .map_err(|err| {
-                ATMError::TransportError(format!("TlsConnector::connect({}) failed: {}", host, err))
-            })?,
-    );
+
+    let stream: Pin<Box<dyn ReadWrite>> = if url.scheme() == "wss" {
+        // SSL/TLS Connection
+        let dns_name = match DnsName::try_from_str(host.as_str()) {
+            Ok(dns_name) => dns_name.to_owned(),
+            Err(err) => {
+                error!("Websocket address {}: invalid host name: {}", host, err);
+                return Err(ATMError::TransportError(format!(
+                    "Websocket address {}: invalid host name: {}",
+                    host, err
+                )));
+            }
+        };
+
+        let connector = TlsConnector::from(Arc::new(ClientConfig::with_platform_verifier()));
+        Box::pin(
+            connector
+                .connect(ServerName::DnsName(dns_name), stream)
+                .await
+                .map_err(|err| {
+                    ATMError::TransportError(format!(
+                        "TlsConnector::connect({}) failed: {}",
+                        host, err
+                    ))
+                })?,
+        )
+    } else {
+        Box::pin(stream)
+    };
+
+    let mut stream = BufReader::new(stream);
 
     let (req, sec_key) = handshake::request(
         host,
@@ -130,11 +141,12 @@ pub async fn connect(
         [("Authorization", ["Bearer ", authorization_token].concat())],
     );
 
-    tls.write_all(req.as_bytes())
+    stream
+        .write_all(req.as_bytes())
         .await
         .map_err(|err| ATMError::TransportError(format!("websocket handshake failed: {}", err)))?;
 
-    let http = HttpRequest::parse(&mut tls).await?;
+    let http = HttpRequest::parse(&mut stream).await?;
 
     if !http.prefix.starts_with("HTTP/1.1 101 Switching Protocols") {
         return Err(ATMError::TransportError(
@@ -151,5 +163,5 @@ pub async fn connect(
         ));
     }
 
-    Ok(WebSocket::client(tls))
+    Ok(WebSocket::client(stream))
 }

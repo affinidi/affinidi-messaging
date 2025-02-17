@@ -9,12 +9,11 @@ Each WsConnection is a tokio parallel task, and responsible for unpacking incomi
 use super::SharedState;
 use crate::{errors::ATMError, profiles::Profile, protocols::Protocols, transports::websockets::utils::connect, ATM};
 use affinidi_messaging_didcomm::{Message as DidcommMessage, UnpackMetadata};
-use tokio_rustls::client::TlsStream;
 use url::Url;
 use web_socket::{CloseCode, DataType, Event, MessageType, WebSocket};
-use std::{sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 use tokio::{
-    io::BufReader, net::TcpStream, select, sync::mpsc::{Receiver, Sender}, task::JoinHandle, time::{interval_at, sleep}
+    io::{AsyncRead, AsyncWrite, BufReader}, select, sync::mpsc::{Receiver, Sender}, task::JoinHandle, time::{interval_at, sleep}
 };
 use tracing::{debug, warn, error, span, Instrument};
 
@@ -32,6 +31,10 @@ pub(crate) enum WsConnectionCommands {
     Disconnected(Arc<Profile>), // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
+
+/// The following is to help with handling of either TCP or TLS connections
+pub(crate) trait ReadWrite: AsyncRead + AsyncWrite + Send {}
+impl<T> ReadWrite for T where T: AsyncRead + AsyncWrite + Send {}
 
 #[derive(Clone, Debug)]
 enum State {
@@ -249,7 +252,7 @@ impl WsConnection {
         atm: &ATM,
         protocols: &Protocols,
         update_sdk: bool,
-    ) -> Result<WebSocket<BufReader<TlsStream<TcpStream>>>, ATMError> {
+    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError> {
         debug!("Starting websocket connection");
 
         self.state = State::Connecting;
@@ -319,13 +322,10 @@ impl WsConnection {
         Ok(web_socket)
     }
 
-    // WebSocket<BufReader<TlsStream<TcpStream>>>
-    // WebSocket<BufReader<TcpStream>>
-
     // Responsible for creating a websocket connection to the mediator
     async fn _create_socket(
         &mut self,
-    ) -> Result<WebSocket<BufReader<TlsStream<TcpStream>>>, ATMError> {
+    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError>  {
         // Check if authenticated
         let tokens = self.profile.authenticate(&self.shared).await?;
 
