@@ -22,6 +22,11 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 * FEATURE: Binary WebSocket messages are now converted and handled.
   * Text and Binary Messages supported
 
+### DIDComm Library (0.10.0)
+
+* Verification Method Type added
+  * EcdsaSecp256k1VerificationKey2019
+
 ## 13th February 2025 (0.9.7)
 
 ### All (0.9.7)

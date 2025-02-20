@@ -90,6 +90,21 @@ impl DIDCommVerificationMethodExt for DIDVerificationMethod {
                     None
                 }
             }
+
+            "EcdsaSecp256k1VerificationKey2019" => {
+                if let Some(key) = self.properties.get("publicKeyJwk") {
+                    match serde_json::from_value(key.clone()) {
+                        Ok(jwk) => Some(jwk),
+                        Err(_) => {
+                            warn!("Failed to parse JWK from {} ({})", self.type_, key);
+                            None
+                        }
+                    }
+                } else {
+                    warn!("{} missing publicKeyJwk", self.type_);
+                    None
+                }
+            }
             _ => {
                 warn!("Unsupported verification method type: {}", self.type_);
                 None

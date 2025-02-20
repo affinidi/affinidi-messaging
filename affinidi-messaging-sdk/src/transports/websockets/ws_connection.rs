@@ -32,7 +32,7 @@ pub(crate) enum WsConnectionCommands {
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
-/// The following is to help with handling of either TCP or TLS connections
+/// The following is to help with handling either TCP or TLS connections
 pub(crate) trait ReadWrite: AsyncRead + AsyncWrite + Send {}
 impl<T> ReadWrite for T where T: AsyncRead + AsyncWrite + Send {}
 
@@ -160,7 +160,7 @@ impl WsConnection {
                                         let _ = web_socket.send_pong(data).await;
                                     }
                                     Event::Pong(..) => {
-                                        missed_pings -= 0;
+                                        missed_pings -= 1;
                                     }
                                     Event::Error(err) => {
                                         warn!("WebSocket Error: {}", err);

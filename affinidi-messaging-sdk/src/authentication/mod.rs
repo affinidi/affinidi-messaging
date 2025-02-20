@@ -38,7 +38,9 @@ impl Profile {
         let mut timer = 1;
         loop {
             match self._authenticate(shared_state).await {
-                Ok(response) => return Ok(response),
+                Ok(response) => {
+                    return Ok(response);
+                }
                 Err(ATMError::ACLDenied(_)) => {
                     return Err(ATMError::ACLDenied("Authentication Denied".into()));
                 }
@@ -79,15 +81,18 @@ impl Profile {
                 }
             };
 
-            match &*self.inner.authorization.lock().await { Some(tokens) => {
-                debug!("Returning existing tokens");
-                return Ok(tokens.clone());
-            } _ => {
-                self.inner.authenticated.store(false, Ordering::Relaxed);
-                return Err(ATMError::AuthenticationError(
-                    "Authenticated but no tokens found".to_owned(),
-                ));
-            }}
+            match &*self.inner.authorization.lock().await {
+                Some(tokens) => {
+                    debug!("Returning existing tokens");
+                    return Ok(tokens.clone());
+                }
+                _ => {
+                    self.inner.authenticated.store(false, Ordering::Relaxed);
+                    return Err(ATMError::AuthenticationError(
+                        "Authenticated but no tokens found".to_owned(),
+                    ));
+                }
+            }
         }
 
         let _span = span!(Level::DEBUG, "authenticate",);
