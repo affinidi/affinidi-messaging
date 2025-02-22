@@ -360,7 +360,7 @@ impl WsConnection {
             Ok(web_socket) => web_socket,
             Err(err) => {
                 warn!("WebSocket failed. Reason: {}", err);
-                return Err(ATMError::TransportError(format!("Webocket connection failed: {}", err)));
+                return Err(ATMError::TransportError(format!("Websocket connection failed: {}", err)));
             }
         };
        

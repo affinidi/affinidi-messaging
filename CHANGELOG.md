@@ -10,12 +10,19 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 ### All (0.10.0)
 
 * Rust 2024 Edition is now enabled for all crates
-
+  * affinidi-did-resolver-cache updated to 0.3.x
+  
 ### SDK (0.10.0)
 
 * FIX/CHANGE: Tungstenite WebSocket replaced with Web-Socket crate
   * Lower-level implementation of WebSocket allows for more graceful handling of error conditions.
   * Addresses the problem of a device going to sleep and missing Close()
+* DIDComm Access Lists enabled
+  * access_list_list() - Lists DIDs that are allowed/denied for a given DID
+  * access_list_add() - Add one or more DIDs to the access list for a given DID
+  * access_list_remove() - Remove one or more DIDs from the access list for a given DID
+  * access_list_get() - Searches for one or more DIDs from the access list for a given DID
+  * access_list_clear() - Resets the Access List to empty for a given DID
 
 ### Mediator (0.10.0)
 

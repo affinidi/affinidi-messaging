@@ -152,16 +152,9 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                                         }
                                     };
                                 }
-                                _ => { 
-                                    match msg {
-                                        Message::Close(_) => {
-                                            debug!("Received close message, closing connection");
-                                            break;
-                                        } _ => {
-                                            warn!("Received non-text message, ignoring");
-                                            continue;
-                                        }
-                                    }
+                                Message::Close(_) => {
+                                    debug!("Received close message, closing connection");
+                                    break;
                                 }
                             }
                         }

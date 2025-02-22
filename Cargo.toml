@@ -8,11 +8,11 @@ members = [
     "affinidi-messaging-helpers",
     "affinidi-messaging-text-client",
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = '0.10.0'
-edition = "2021"
+edition = "2024"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
 description = "Affinidi Messaging"
 readme = "README.md"
@@ -28,7 +28,7 @@ affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-
 affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
 affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
 affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
-affinidi-did-resolver-cache-sdk = { version = "~0.2.9", features = ["network"] }
+affinidi-did-resolver-cache-sdk = { version = "~0.3", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
@@ -51,7 +51,7 @@ console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 dialoguer = "0.11"
-did-peer = { version = "0.2" }
+did-peer = { version = "0.3" }
 futures-util = "0.3"
 hostname = "0.4"
 http = "1"
@@ -59,7 +59,7 @@ image = "0.25.5"
 itertools = "0.14"
 jsonwebtoken = "9.3"
 lazy_static = "1.5"
-log = "0.4.25"
+log = "0.4"
 num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.9"
@@ -113,6 +113,6 @@ tracing-test = "0.2"
 tui-input = "0.11.0"
 tui-logger = { version = "0.14", features = ["tracing-support"] }
 url = "2.5"
-uuid = { version = "1.13", features = ["v4", "fast-rng"] }
+uuid = { version = "1.14", features = ["v4", "fast-rng"] }
 varint = "0.9"
 web-socket = "0.7"
