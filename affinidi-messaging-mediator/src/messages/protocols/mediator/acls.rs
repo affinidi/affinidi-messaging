@@ -9,7 +9,9 @@ use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
-    protocols::mediator::{accounts::AccountType, acls_handler::MediatorACLRequest},
+    protocols::mediator::{
+        accounts::AccountType, acls::MediatorACLSet, acls_handler::MediatorACLRequest,
+    },
 };
 use serde_json::{Value, json};
 use tracing::{Instrument, span, warn};
@@ -117,7 +119,11 @@ pub(crate) async fn process(
                     );
                 }
 
-                match state.database.set_did_acl(&did_hash, &acls).await {
+                match state
+                    .database
+                    .set_did_acl(&did_hash, &MediatorACLSet::from_u64(acls))
+                    .await
+                {
                     Ok(response) => _generate_response_message(
                         &msg.id,
                         &session.did,

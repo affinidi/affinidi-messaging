@@ -28,10 +28,7 @@ pub enum MediatorACLRequest {
     #[serde(rename = "acl_get")]
     GetACL(Vec<String>),
     #[serde(rename = "acl_set")]
-    SetACL {
-        did_hash: String,
-        acls: MediatorACLSet,
-    },
+    SetACL { did_hash: String, acls: u64 },
     #[serde(rename = "access_list_list")]
     AccessListList {
         did_hash: String,
