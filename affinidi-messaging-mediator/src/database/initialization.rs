@@ -80,12 +80,7 @@ impl Database {
                     "Database schema version ({}) doesn't match mediator version ({}).",
                     schema_version, mediator_version
                 );
-                // TODO: In the future this should call an update function
-                return Err(MediatorError::DatabaseError(
-                    "NA".into(),
-                    "Database schema version doesn't match mediator version, needs to be updated"
-                        .into(),
-                ));
+                self.upgrade_0_10_0().await?;
             }
         } else {
             warn!(
@@ -93,15 +88,8 @@ impl Database {
                 env!("CARGO_PKG_VERSION")
             );
             // Set the schema version
-            deadpool_redis::redis::Cmd::hset("GLOBAL", "SCHEMA_VERSION", env!("CARGO_PKG_VERSION"))
-                .exec_async(&mut conn)
-                .await
-                .map_err(|e| {
-                    MediatorError::DatabaseError(
-                        "NA".into(),
-                        format!("Couldn't set database SCHEMA_VERSION: {}", e),
-                    )
-                })?;
+            self.upgrade_change_schema_version(env!("CARGO_PKG_VERSION"))
+                .await?;
         }
         Ok(())
     }

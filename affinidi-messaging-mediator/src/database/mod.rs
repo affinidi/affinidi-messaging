@@ -16,6 +16,7 @@ pub mod session;
 pub mod stats;
 pub mod store;
 pub mod streaming;
+pub(crate) mod upgrades;
 
 #[derive(Clone)]
 pub struct Database(pub DatabaseHandler);

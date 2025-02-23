@@ -28,6 +28,10 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 * FEATURE: Binary WebSocket messages are now converted and handled.
   * Text and Binary Messages supported
+* AccessList functions (List, Add, Remove, Get, Clear) added (matches SDK)
+  * Database routines added
+  * Protocol handling implemented
+* Database upgrades will now automatically trigger when a new version of the mediator is started
 
 ### DIDComm Library (0.10.0)
 

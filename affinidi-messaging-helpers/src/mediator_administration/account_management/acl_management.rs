@@ -3,18 +3,18 @@
  */
 
 use affinidi_messaging_sdk::{
+    ATM,
     profiles::Profile,
     protocols::{
+        Protocols,
         mediator::{
             accounts::Account,
             acls::{AccessListModeType, MediatorACLSet},
         },
-        Protocols,
     },
-    ATM,
 };
 use console::style;
-use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use dialoguer::{MultiSelect, Select, theme::ColorfulTheme};
 use std::sync::Arc;
 
 use crate::SharedConfig;
@@ -29,10 +29,11 @@ pub(crate) async fn manage_account_acls(
 ) -> Result<Account, Box<dyn std::error::Error>> {
     let selections = &[
         "Modify ACL Flags",
-        "Show ACL List",
-        "Add to ACL List",
-        "Remove from ACL List",
-        "Search ACL List",
+        "Access List - List",
+        "Access List - Add",
+        "Access List - Remove",
+        "Access List - Search",
+        "Access List - Clear",
         "Back",
     ];
 
@@ -84,7 +85,8 @@ pub(crate) async fn manage_account_acls(
             2 => {}
             3 => {}
             4 => {}
-            5 => break,
+            5 => {}
+            6 => break,
             _ => println!("Invalid selection"),
         }
     }
@@ -92,9 +94,9 @@ pub(crate) async fn manage_account_acls(
 }
 
 async fn _modify_acl_flags(
-    _atm: &ATM,
-    _profile: &Arc<Profile>,
-    _protocols: &Protocols,
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
 ) -> Result<MediatorACLSet, Box<dyn std::error::Error>> {
@@ -188,5 +190,15 @@ async fn _modify_acl_flags(
         return Ok(acls);
     }
     println!("New ACLs: {:064b}", new_acls.to_u64());
-    todo!("Change the ACL on the mediator");
+
+    match protocols
+        .mediator
+        .acls_set(atm, profile, &account.did_hash, &new_acls)
+        .await
+    {
+        Ok(_) => println!("{}", style("ACLs updated").green()),
+        Err(e) => println!("{}", style(format!("Error updating ACLs: {}", e)).red()),
+    }
+
+    Ok(new_acls)
 }
