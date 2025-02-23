@@ -1,9 +1,9 @@
 use std::time::SystemTime;
 
 use crate::{
-    database::session::Session,
-    messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
+    database::session::Session,
+    messages::{ProcessMessageResponse, error_response::generate_error_response},
 };
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_mediator_common::errors::MediatorError;
@@ -11,8 +11,8 @@ use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::{accounts::AccountType, acls_handler::MediatorACLRequest},
 };
-use serde_json::{json, Value};
-use tracing::{span, warn, Instrument};
+use serde_json::{Value, json};
+use tracing::{Instrument, span, warn};
 use uuid::Uuid;
 
 pub(crate) async fn process(
@@ -135,6 +135,284 @@ pub(crate) async fn process(
                                 ProblemReportScope::Protocol,
                                 "database_error".into(),
                                 "Error setting ACLs {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorACLRequest::AccessListList { did_hash, cursor } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("List Access List from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error Listing Access List {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state
+                    .database
+                    .access_list_list(&did_hash, cursor.unwrap_or_default())
+                    .await
+                {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error Listing Access List. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error listing Access List {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorACLRequest::AccessListAdd { did_hash, hashes } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("Add Access List from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error Adding to Access List {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                if hashes.is_empty() || hashes.len() > 100 {
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Other("limits exceeded".into()),
+                            "limits_exceeded".into(),
+                            "Error Adding to Access List {1}".into(),
+                            vec!["limits exceeded (must be 0 < count <= 100)".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state
+                    .database
+                    .access_list_add(state.config.limits.access_list_limit, &did_hash, &hashes)
+                    .await
+                {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error Add to Access List. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error Add to Access List {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorACLRequest::AccessListRemove { did_hash, hashes } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!(
+                        "Remove Access List from DID ({}) failed. ",
+                        session.did_hash
+                    );
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error Remove from Access List {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                if hashes.is_empty() || hashes.len() > 100 {
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Other("limits exceeded".into()),
+                            "limits_exceeded".into(),
+                            "Error Removing from Access List {1}".into(),
+                            vec!["limits exceeded (must be 0 < count <= 100)".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state.database.access_list_remove(&did_hash, &hashes).await {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error Remove from Access List. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error Remove from Access List {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorACLRequest::AccessListClear { did_hash } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("Clear Access List for DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error Clearing Access List {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state.database.access_list_clear(&did_hash).await {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error Clearing Access List. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error Clearing Access List {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorACLRequest::AccessListGet { did_hash, hashes } => {
+                // Check permissions and ACLs
+                if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!(
+                        "Get from Access List for DID ({}) failed. ",
+                        session.did_hash
+                    );
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error Getting from Access List {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                        false,
+                    );
+                }
+
+                match state.database.access_list_get(&did_hash, &hashes).await {
+                    Ok(response) => _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(response),
+                    ),
+                    Err(err) => {
+                        warn!("Error Getting from Access List. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error Getting from Access List {1}".into(),
                                 vec![err.to_string()],
                                 None,
                             ),

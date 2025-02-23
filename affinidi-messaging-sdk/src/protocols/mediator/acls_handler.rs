@@ -2,21 +2,18 @@
  * DIDComm handling for ACLs
  */
 
-use std::{sync::Arc, time::SystemTime};
-
-use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sha256::digest;
-use tracing::{Instrument, Level, debug, span};
-use uuid::Uuid;
-
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
-
 use super::{
     acls::{AccessListModeType, MediatorACLSet},
     administration::Mediator,
 };
+use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use sha256::digest;
+use std::{sync::Arc, time::SystemTime};
+use tracing::{Instrument, Level, debug, span};
+use uuid::Uuid;
 
 /// Used in lists to show DID Hash and ACLs
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,6 +32,28 @@ pub enum MediatorACLRequest {
         did_hash: String,
         acls: MediatorACLSet,
     },
+    #[serde(rename = "access_list_list")]
+    AccessListList {
+        did_hash: String,
+        cursor: Option<u64>,
+    },
+    #[serde(rename = "access_list_get")]
+    AccessListGet {
+        did_hash: String,
+        hashes: Vec<String>,
+    },
+    #[serde(rename = "access_list_add")]
+    AccessListAdd {
+        did_hash: String,
+        hashes: Vec<String>,
+    },
+    #[serde(rename = "access_list_remove")]
+    AccessListRemove {
+        did_hash: String,
+        hashes: Vec<String>,
+    },
+    #[serde(rename = "access_list_clear")]
+    AccessListClear { did_hash: String },
 }
 
 /// DIDComm message body for responding with a set of ACLs for a list of DID Hashes
@@ -59,7 +78,17 @@ pub struct MediatorACLSetResponse {
 #[serde(rename = "access_list_list_response")]
 pub struct MediatorAccessListListResponse {
     pub did_hashes: Vec<String>,
-    pub cursor: Option<String>,
+    pub cursor: Option<u64>,
+}
+
+/// DIDComm message body for responding with Access List Add for a given DID
+/// `did_hashes`: List of DID Hashes that were added
+/// `truncated`: access_list is at limit, truncated is true
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename = "access_list_add_response")]
+pub struct MediatorAccessListAddResponse {
+    pub did_hashes: Vec<String>,
+    pub truncated: bool,
 }
 
 /// DIDComm message body for responding with Access List Get for a given DID
@@ -223,7 +252,7 @@ impl Mediator {
         atm: &ATM,
         profile: &Arc<Profile>,
         did_hash: Option<&str>,
-        cursor: Option<String>,
+        cursor: Option<u64>,
     ) -> Result<MediatorAccessListListResponse, ATMError> {
         let did_hash = if let Some(did_hash) = did_hash {
             did_hash.to_owned()
@@ -311,7 +340,7 @@ impl Mediator {
         profile: &Arc<Profile>,
         did_hash: Option<&str>,
         hashes: &[&str],
-    ) -> Result<(), ATMError> {
+    ) -> Result<MediatorAccessListAddResponse, ATMError> {
         let did_hash = if let Some(did_hash) = did_hash {
             did_hash.to_owned()
         } else {
@@ -331,6 +360,10 @@ impl Mediator {
             if hashes.len() > 100 {
                 return Err(ATMError::MsgSendError(
                     "Too many (max 100) DIDs to add to the access list".to_owned(),
+                ));
+            } else if hashes.is_empty() {
+                return Err(ATMError::MsgSendError(
+                    "No DIDs to add to the access list".to_owned(),
                 ));
             }
 
@@ -381,7 +414,10 @@ impl Mediator {
     }
 
     // Parses the response from the mediator for Access List Add
-    fn _parse_access_list_add_response(&self, message: &Message) -> Result<(), ATMError> {
+    fn _parse_access_list_add_response(
+        &self,
+        message: &Message,
+    ) -> Result<MediatorAccessListAddResponse, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Access List Add could not be parsed. Reason: {}",
@@ -421,6 +457,10 @@ impl Mediator {
             if hashes.len() > 100 {
                 return Err(ATMError::MsgSendError(
                     "Too many (max 100) DIDs to remove from the access list".to_owned(),
+                ));
+            } else if hashes.is_empty() {
+                return Err(ATMError::MsgSendError(
+                    "No DIDs to remove from the access list".to_owned(),
                 ));
             }
 
@@ -590,6 +630,10 @@ impl Mediator {
             if hashes.len() > 100 {
                 return Err(ATMError::MsgSendError(
                     "Too many (max 100) DIDs to get from the access list".to_owned(),
+                ));
+            } else if hashes.is_empty() {
+                return Err(ATMError::MsgSendError(
+                    "No DIDs to get from the access list".to_owned(),
                 ));
             }
 

@@ -2,10 +2,13 @@ use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{
     acls::{AccessListModeType, MediatorACLSet},
-    acls_handler::{MediatorACLExpanded, MediatorACLGetResponse},
+    acls_handler::{
+        MediatorACLExpanded, MediatorACLGetResponse, MediatorAccessListAddResponse,
+        MediatorAccessListGetResponse, MediatorAccessListListResponse,
+    },
 };
-use redis::{from_redis_value, Cmd, Pipeline, Value};
-use tracing::{debug, span, Instrument, Level};
+use redis::{Cmd, Pipeline, Value, from_redis_value};
+use tracing::{Instrument, Level, debug, span};
 
 impl Database {
     /// Replace the ACL for a given DID
@@ -193,5 +196,248 @@ impl Database {
                 _ => Ok(false),
             }
         }
+    }
+
+    /// Retrieves DID hashes from the Access List
+    /// - `did_hash` - DID Hash to retrieve the Access List for
+    /// - `cursor` - Cursor for pagination ("0" for beginning )
+    ///
+    /// - Returns a list of ACLs for the given DID
+    pub(crate) async fn access_list_list(
+        &self,
+        did_hash: &str,
+        cursor: u64,
+    ) -> Result<MediatorAccessListListResponse, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "access_list_list",
+            did_hash = did_hash,
+            cursor = cursor
+        );
+
+        async move {
+            debug!("Requesting Access List");
+
+            let mut con = self.0.get_async_connection().await?;
+            let (new_cursor, hashes): (u64, Vec<String>) = deadpool_redis::redis::cmd("SSCAN")
+                .arg(["ACCESS_LIST:", did_hash].concat())
+                .arg(cursor)
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("access_list_list failed. Reason: {}", err),
+                    )
+                })?;
+
+            Ok(MediatorAccessListListResponse {
+                cursor: Some(new_cursor),
+                did_hashes: hashes,
+            })
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Retrieves count of Access List members for given DID
+    /// - `did_hash` - DID Hash to retrieve the Access List for
+    ///
+    /// - Returns number of members in the Access List
+    pub(crate) async fn access_list_count(&self, did_hash: &str) -> Result<usize, MediatorError> {
+        let _span = span!(Level::DEBUG, "access_list_count", did_hash = did_hash,);
+
+        async move {
+            debug!("Requesting Access List Count");
+
+            let mut con = self.0.get_async_connection().await?;
+            deadpool_redis::redis::cmd("SCARD")
+                .arg(["ACCESS_LIST:", did_hash].concat())
+                .query_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("access_list_count failed. Reason: {}", err),
+                    )
+                })
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Adds a number of DID hashes to the Access List
+    /// - `did_hash` - DID Hash to add to
+    /// - `hashes` - Hashes to add
+    ///
+    /// - Whether the list was truncated and a list of hashes added
+    pub(crate) async fn access_list_add(
+        &self,
+        access_list_limit: usize,
+        did_hash: &str,
+        hashes: &Vec<String>,
+    ) -> Result<MediatorAccessListAddResponse, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "access_list_add",
+            did_hash = did_hash,
+            add_count = hashes.len()
+        );
+
+        async move {
+            debug!("Adding to Access List");
+
+            let count = self.access_list_count(did_hash).await?;
+            let mut truncated = false;
+
+            let hashes = if hashes.len() + count > access_list_limit {
+                truncated = true;
+                &hashes[0..(hashes.len() - (access_list_limit - count))]
+            } else {
+                hashes
+            };
+
+            let mut con = self.0.get_async_connection().await?;
+            let mut query = deadpool_redis::redis::cmd("SADD");
+            let mut query = query.arg(["ACCESS_LIST:", did_hash].concat());
+
+            for hash in hashes {
+                query = query.arg(hash);
+            }
+
+            query.exec_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("access_list_add failed. Reason: {}", err),
+                )
+            })?;
+
+            Ok(MediatorAccessListAddResponse {
+                did_hashes: hashes.to_vec(),
+                truncated,
+            })
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Removes a number of DID hashes from the Access List
+    /// - `did_hash` - DID Hash to remove from
+    /// - `hashes` - Hashes to be removed
+    ///
+    /// - Returns count of hashes removed
+    pub(crate) async fn access_list_remove(
+        &self,
+        did_hash: &str,
+        hashes: &Vec<String>,
+    ) -> Result<usize, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "access_list_remove",
+            did_hash = did_hash,
+            remove_count = hashes.len()
+        );
+
+        async move {
+            debug!("Removing from Access List");
+
+            let mut con = self.0.get_async_connection().await?;
+            let mut query = deadpool_redis::redis::cmd("SREM");
+            let mut query = query.arg(["ACCESS_LIST:", did_hash].concat());
+
+            for hash in hashes {
+                query = query.arg(hash);
+            }
+
+            query.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("access_list_remove failed. Reason: {}", err),
+                )
+            })
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Clears the Access List for a given DID
+    /// - `did_hash` - DID Hash to clear
+    ///
+    /// - Returns success (nothing) or Error
+    pub(crate) async fn access_list_clear(&self, did_hash: &str) -> Result<(), MediatorError> {
+        let _span = span!(Level::DEBUG, "access_list_clear", did_hash = did_hash,);
+
+        async move {
+            debug!("Clearing Access List");
+
+            let mut con = self.0.get_async_connection().await?;
+            deadpool_redis::redis::cmd("DEL")
+                .arg(["ACCESS_LIST:", did_hash].concat())
+                .exec_async(&mut con)
+                .await
+                .map_err(|err| {
+                    MediatorError::DatabaseError(
+                        "NA".to_string(),
+                        format!("access_list_clear failed. Reason: {}", err),
+                    )
+                })
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Check if a number of DID hashes exist in an Access List
+    /// - `did_hash` - DID Hash to get from
+    /// - `hashes` - Hashes to be checked
+    ///
+    /// - Returns array of Hashes that exist in the Access List
+    pub(crate) async fn access_list_get(
+        &self,
+        did_hash: &str,
+        hashes: &Vec<String>,
+    ) -> Result<MediatorAccessListGetResponse, MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "access_list_get",
+            did_hash = did_hash,
+            remove_count = hashes.len()
+        );
+
+        async move {
+            debug!("Getting from Access List");
+
+            let mut con = self.0.get_async_connection().await?;
+            let mut query = deadpool_redis::redis::cmd("SMISMEMBER");
+            let mut query = query.arg(["ACCESS_LIST:", did_hash].concat());
+
+            for hash in hashes {
+                query = query.arg(hash);
+            }
+
+            let results: Vec<u8> = query.query_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("access_list_remove failed. Reason: {}", err),
+                )
+            })?;
+
+            Ok(MediatorAccessListGetResponse {
+                did_hashes: hashes
+                    .iter()
+                    .zip(results.iter())
+                    .filter_map(|(hash, result)| {
+                        if *result == 1 {
+                            Some(hash.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            })
+        }
+        .instrument(_span)
+        .await
     }
 }
