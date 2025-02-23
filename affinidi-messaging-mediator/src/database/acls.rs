@@ -17,7 +17,7 @@ impl Database {
         &self,
         did_hash: &str,
         acls: &MediatorACLSet,
-    ) -> Result<(), MediatorError> {
+    ) -> Result<MediatorACLSet, MediatorError> {
         let _span = span!(Level::DEBUG, "set_acl");
 
         async move {
@@ -39,7 +39,7 @@ impl Database {
                 )
             })?;
 
-            Ok(())
+            Ok(acls.to_owned())
         }
         .instrument(_span)
         .await

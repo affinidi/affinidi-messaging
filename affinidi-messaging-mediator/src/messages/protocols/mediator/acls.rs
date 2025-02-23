@@ -111,7 +111,7 @@ pub(crate) async fn process(
                             ProblemReportSorter::Error,
                             ProblemReportScope::Protocol,
                             "permission_error".into(),
-                            "Error getting ACLs {1}".into(),
+                            "Error setting ACLs {1}".into(),
                             vec!["Permission denied".to_string()],
                             None,
                         ),
@@ -128,7 +128,7 @@ pub(crate) async fn process(
                         &msg.id,
                         &session.did,
                         &state.config.mediator_did,
-                        &json!(response),
+                        &json!({"acls": response}),
                     ),
                     Err(err) => {
                         warn!("Error setting ACLs. Reason: {}", err);
