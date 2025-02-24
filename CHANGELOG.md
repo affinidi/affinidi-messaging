@@ -38,6 +38,12 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 * Verification Method Type added
   * EcdsaSecp256k1VerificationKey2019
 
+### Helpers (0.10.0)
+
+* mediator_administration
+  * access list management added
+  * Pagination for Account List and Access List improved
+
 ## 13th February 2025 (0.9.7)
 
 ### All (0.9.7)

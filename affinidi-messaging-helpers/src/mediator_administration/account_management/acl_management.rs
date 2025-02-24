@@ -232,13 +232,22 @@ async fn _access_list_list(
     protocols: &Protocols,
     account: &Account,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let list = protocols
-        .mediator
-        .access_list_list(atm, profile, Some(&account.did_hash), None)
-        .await?;
+    let mut cursor: Option<u64> = None;
+    loop {
+        let list = protocols
+            .mediator
+            .access_list_list(atm, profile, Some(&account.did_hash), cursor)
+            .await?;
 
-    for hash in list.did_hashes {
-        println!("{}", style(hash).blue());
+        for hash in list.did_hashes {
+            println!("{}", style(hash).blue());
+        }
+
+        if let Some(_cursor) = list.cursor {
+            cursor = Some(_cursor);
+        } else {
+            break;
+        }
     }
     Ok(())
 }
