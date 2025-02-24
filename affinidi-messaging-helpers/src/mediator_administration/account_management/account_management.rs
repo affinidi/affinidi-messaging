@@ -1,20 +1,19 @@
+use crate::{SharedConfig, account_management::acl_management::manage_account_acls};
+use affinidi_messaging_helpers::common::did::manually_enter_did_or_hash;
 use affinidi_messaging_sdk::{
+    ATM,
     profiles::Profile,
     protocols::{
+        Protocols,
         mediator::{
             accounts::{Account, AccountType},
             acls::MediatorACLSet,
         },
-        Protocols,
     },
-    ATM,
 };
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input, Select};
-use sha256::digest;
+use dialoguer::{Select, theme::ColorfulTheme};
 use std::sync::Arc;
-
-use crate::{account_management::acl_management::manage_account_acls, SharedConfig};
 
 pub(crate) async fn account_management_menu(
     atm: &ATM,
@@ -58,7 +57,7 @@ pub(crate) async fn create_account_menu(
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(new_did_hash) = _manually_enter_did_or_hash(theme) else {
+    let Some(new_did_hash) = manually_enter_did_or_hash(theme) else {
         println!("No new account created...");
         return Ok(());
     };
@@ -107,11 +106,13 @@ pub(crate) async fn manage_account_menu(
     loop {
         println!();
         println!(
-            "{} {}  {} {:064b}",
+            "{} {}  {} {:064b} {} {}",
             style("Selected DID: ").yellow(),
             style(&account.did_hash).color256(208),
             style("ACL:").yellow(),
             style(account.acls).blue().bold(),
+            style("Access List Count:").yellow(),
+            style(account.access_list_count).blue().bold()
         );
 
         println!(
@@ -274,7 +275,7 @@ pub(crate) async fn select_did(
                 }
             }
             1 => {
-                if let Some(did_hash) = _manually_enter_did_or_hash(theme) {
+                if let Some(did_hash) = manually_enter_did_or_hash(theme) {
                     // Look up the Account for this DID
                     let account = protocols
                         .mediator
@@ -298,40 +299,6 @@ pub(crate) async fn select_did(
                 println!("Invalid selection");
             }
         }
-    }
-}
-
-fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
-    println!();
-    println!(
-        "{}",
-        style("Limited checks are done on the DID or Hash - be careful!").yellow()
-    );
-    println!("DID or SHA256 Hash of a DID (type exit to quit this dialog)");
-
-    let input: String = Input::with_theme(theme)
-        .with_prompt("DID or SHA256 Hash")
-        .interact_text()
-        .unwrap();
-
-    if input == "exit" {
-        return None;
-    }
-
-    if input.starts_with("did:") {
-        Some(digest(input))
-    } else if input.len() != 64 {
-        println!(
-            "{}",
-            style(format!(
-                "Invalid SHA256 Hash length. length({}) when expected(64)",
-                input.len()
-            ))
-            .red()
-        );
-        None
-    } else {
-        Some(input.to_ascii_lowercase())
     }
 }
 
@@ -394,7 +361,8 @@ async fn _select_from_existing_dids(
     did_list.push("Back".to_string());
 
     println!(
-        "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags");
+        "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags"
+    );
     let selected = Select::with_theme(theme)
         .with_prompt("Select DID (space to select, enter to continue)?")
         .items(&did_list)

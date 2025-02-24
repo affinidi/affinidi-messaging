@@ -428,13 +428,15 @@ impl Mediator {
     /// `profile`: Profile instance
     /// `did_hash`: DID Hash (If None, use profile DID)
     /// `hashes`: SHA256 hashes of DIDs to remove
+    ///
+    /// Returns: # of Hashes removed
     pub async fn access_list_remove(
         &self,
         atm: &ATM,
         profile: &Arc<Profile>,
         did_hash: Option<&str>,
         hashes: &[&str],
-    ) -> Result<(), ATMError> {
+    ) -> Result<usize, ATMError> {
         let did_hash = if let Some(did_hash) = did_hash {
             did_hash.to_owned()
         } else {
@@ -508,7 +510,7 @@ impl Mediator {
     }
 
     // Parses the response from the mediator for Access List Remove
-    fn _parse_access_list_remove_response(&self, message: &Message) -> Result<(), ATMError> {
+    fn _parse_access_list_remove_response(&self, message: &Message) -> Result<usize, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Access List Remove could not be parsed. Reason: {}",
