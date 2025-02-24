@@ -32,6 +32,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
   * Database routines added
   * Protocol handling implemented
 * Database upgrades will now automatically trigger when a new version of the mediator is started
+* Mediator Administration Protocol changes
+  * JSON fields changed from UpperCamelCase to snake_case
 
 ### DIDComm Library (0.10.0)
 
