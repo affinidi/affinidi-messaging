@@ -1,11 +1,11 @@
 //! UI Related functions
 use affinidi_messaging_sdk::{
-    profiles::Profile,
-    protocols::{mediator::accounts::AccountType, Protocols},
     ATM,
+    profiles::Profile,
+    protocols::{Protocols, mediator::accounts::AccountType},
 };
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
+use dialoguer::{Confirm, Input, MultiSelect, Select, theme::ColorfulTheme};
 use regex::Regex;
 use sha256::digest;
 use std::sync::Arc;
@@ -39,7 +39,7 @@ pub(crate) async fn administration_accounts_menu(
                 list_admins(atm, profile, protocols, shared_config).await;
             }
             1 => add_admin(atm, profile, protocols, theme).await,
-            2 => remove_admins(atm, profile, protocols, shared_config, theme).await,
+            2 => strip_admins(atm, profile, protocols, shared_config, theme).await,
             3 => {
                 break;
             }
@@ -154,7 +154,7 @@ pub(crate) async fn add_admin(
     }
 }
 
-pub(crate) async fn remove_admins(
+pub(crate) async fn strip_admins(
     atm: &ATM,
     profile: &Arc<Profile>,
     protocols: &Protocols,
@@ -182,7 +182,7 @@ pub(crate) async fn remove_admins(
                 .collect();
 
             if admins.is_empty() {
-                println!("{}", style("No Admin DIDs can be removed").red());
+                println!("{}", style("No Admin DIDs can be stripped").red());
                 println!();
                 return;
             }
@@ -199,13 +199,16 @@ pub(crate) async fn remove_admins(
             }
 
             println!();
-            println!("{}", style("Removing the following DIDs:").green());
+            println!(
+                "{}",
+                style("Stripping admin rights from the following DIDs:").green()
+            );
             for did in &dids {
                 println!("  {}", style(&admins[did.to_owned()]).yellow());
             }
 
             if Confirm::with_theme(theme)
-                .with_prompt("Do you want to remove the selected DIDs?")
+                .with_prompt("Do you want to strip admin access from the selected DIDs?")
                 .interact()
                 .unwrap()
             {
@@ -215,7 +218,10 @@ pub(crate) async fn remove_admins(
                     .collect::<Vec<_>>();
                 match protocols.mediator.strip_admins(atm, profile, &admins).await {
                     Ok(result) => {
-                        println!("{}", style(format!("Removed {} DIDs", result)).green());
+                        println!(
+                            "{}",
+                            style(format!("Stripped admin rights from {} DIDs", result)).green()
+                        );
                     }
                     Err(e) => {
                         println!("{}", style(format!("Error: {}", e)).red());

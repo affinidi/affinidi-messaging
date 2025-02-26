@@ -105,7 +105,7 @@ mediator_acl_mode = "${MEDIATOR_ACL_MODE:explicit_deny}"
 ###    - ANON_RECEIVE: DID can receive anonymous messages
 ###    - ANON_RECEIVE_CHANGE: Allows the DID owner to change the anon_receive ACL for their own DID
 ###    - SELF_MANAGE_LIST: DID can self manage their own ACL list (add/remove)
-###  NOTE: Can be comma seperated to allow multiple options
+###  NOTE: Can be comma separated to allow multiple options
 global_acl_default = "${GLOBAL_DEFAULT_ACL:ALLOW_ALL}"
 
 ### local_direct_delivery_allowed: If true, messages that are addressed to a local DID directly will be delivered

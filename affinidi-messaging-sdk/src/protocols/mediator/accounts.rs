@@ -15,16 +15,15 @@ use std::{
 
 #[derive(Serialize, Deserialize)]
 pub enum MediatorAccountRequest {
+    #[serde(rename = "account_get")]
     AccountGet(String),
-    AccountList {
-        cursor: u32,
-        limit: u32,
-    },
-    AccountAdd {
-        did_hash: String,
-        acls: Option<u64>,
-    },
+    #[serde(rename = "account_list")]
+    AccountList { cursor: u32, limit: u32 },
+    #[serde(rename = "account_add")]
+    AccountAdd { did_hash: String, acls: Option<u64> },
+    #[serde(rename = "account_remove")]
     AccountRemove(String),
+    #[serde(rename = "account_change_type")]
     AccountChangeType {
         did_hash: String,
         #[serde(alias = "type")]
@@ -127,6 +126,7 @@ impl From<AccountType> for String {
 pub struct Account {
     pub did_hash: String,
     pub acls: u64,
+    #[serde(rename = "type")]
     pub _type: AccountType,
     pub access_list_count: u32,
 }
@@ -164,7 +164,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountGet":  did_hash}),
+                json!({"account_get":  did_hash}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -241,7 +241,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountAdd": {"did_hash": did_hash, "acls": acls.map(|a| a.to_u64())}}),
+                json!({"account_add": {"did_hash": did_hash, "acls": acls.map(|a| a.to_u64())}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -311,7 +311,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountRemove":  did_hash}),
+                json!({"account_remove":  did_hash}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -391,7 +391,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
+                json!({"account_list": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -472,7 +472,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountChangeType": {"did_hash": did_hash, "type": new_type}}),
+                json!({"account_change_type": {"did_hash": did_hash, "type": new_type}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
