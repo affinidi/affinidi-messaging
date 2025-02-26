@@ -15,7 +15,7 @@ use affinidi_messaging_mediator_common::errors::MediatorError;
 use base64::prelude::*;
 use sha256::digest;
 use std::time::SystemTime;
-use tracing::{debug, error, info, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, info, span};
 
 // const HASH_KEY: &str = "OOB_INVITES";
 const HASH_KEY_PREFIX: &str = "OOB_INVITES";

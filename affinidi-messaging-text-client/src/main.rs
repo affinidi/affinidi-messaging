@@ -1,14 +1,14 @@
 use std::fs::OpenOptions;
 
-use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
 use log::LevelFilter;
 use state_store::StateStore;
-use termination::{create_termination, Interrupted};
+use termination::{Interrupted, create_termination};
 use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{filter, fmt, Layer};
+use tracing_subscriber::{Layer, filter, fmt};
 use ui_management::UiManager;
 
 mod state_store;
@@ -50,15 +50,16 @@ async fn main() -> anyhow::Result<()> {
         ui_manager.main_loop(state_rx, interrupt_rx.resubscribe()),
     )?;
 
-    match interrupt_rx.recv().await { Ok(reason) => {
-        match reason {
+    match interrupt_rx.recv().await {
+        Ok(reason) => match reason {
             Interrupted::UserInt => println!("exited per user request"),
             Interrupted::OsSigInt => println!("exited because of an os sig int"),
             Interrupted::SystemError => println!("exited because of a system error"),
+        },
+        _ => {
+            println!("exited because of an unexpected error");
         }
-    } _ => {
-        println!("exited because of an unexpected error");
-    }}
+    }
 
     Ok(())
 }

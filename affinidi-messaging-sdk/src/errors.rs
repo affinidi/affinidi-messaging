@@ -46,7 +46,7 @@ impl ATMError {
                     return ATMError::SDKError(format!(
                         "Internal error handling error. Could not parse Problem Report message. Reason: {}",
                         err
-                    ))
+                    ));
                 }
             };
 
@@ -59,7 +59,10 @@ impl ATMError {
             )
         } else {
             // Handling for non-Problem Report messages
-            ATMError::SDKError(format!("Internal error handling error. Expecting a DIDComm Problem Report message. Received instead ({})", message.type_))
+            ATMError::SDKError(format!(
+                "Internal error handling error. Expecting a DIDComm Problem Report message. Received instead ({})",
+                message.type_
+            ))
         }
     }
 }

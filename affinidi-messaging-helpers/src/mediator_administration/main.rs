@@ -6,16 +6,16 @@ use affinidi_messaging_helpers::common::{
     profiles::{Profile, Profiles},
 };
 use affinidi_messaging_sdk::{
+    ATM,
     config::Config,
     protocols::{
-        mediator::acls::{AccessListModeType, MediatorACLSet},
         Protocols,
+        mediator::acls::{AccessListModeType, MediatorACLSet},
     },
-    ATM,
 };
 use clap::Parser;
-use console::{style, Style, Term};
-use dialoguer::{theme::ColorfulTheme, Select};
+use console::{Style, Term, style};
+use dialoguer::{Select, theme::ColorfulTheme};
 use serde::Deserialize;
 use serde_json::Value;
 use sha256::digest;
@@ -42,6 +42,7 @@ struct SharedConfig {
     pub mediator_did_hash: String,
     pub acl_mode: AccessListModeType,
     pub global_acl_default: MediatorACLSet,
+    pub queued_messages_soft: u32,
 }
 
 impl SharedConfig {
@@ -83,7 +84,7 @@ impl SharedConfig {
             match serde_json::from_value::<AccessListModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
                 Err(_) => {
-                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())
+                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into());
                 }
             }
         } else {
@@ -104,12 +105,26 @@ impl SharedConfig {
             return Err("Couldn't find global_acl_default in Mediator Configuration".into());
         };
 
+        let queued_messages_soft = if let Some(queued_message_soft) = config
+            .get("limits")
+            .and_then(|limits| limits.get("queued_messages_soft"))
+        {
+            if let Some(queued_message_soft) = queued_message_soft.as_u64() {
+                queued_message_soft as u32
+            } else {
+                return Err("Couldn't find queued_messages_soft in Mediator Configuration".into());
+            }
+        } else {
+            return Err("Couldn't find queued_messages_soft in Mediator Configuration".into());
+        };
+
         Ok(SharedConfig {
             version,
             acl_mode,
             global_acl_default,
             our_admin_hash: String::new(),
             mediator_did_hash: digest(mediator_did),
+            queued_messages_soft,
         })
     }
 }

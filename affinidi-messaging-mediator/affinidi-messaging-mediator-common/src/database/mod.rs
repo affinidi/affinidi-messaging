@@ -4,7 +4,7 @@ use deadpool_redis::Connection;
 use redis::aio::PubSub;
 use semver::{Version, VersionReq};
 use std::{thread::sleep, time::Duration};
-use tracing::{error, event, info, Level};
+use tracing::{Level, error, event, info};
 
 pub mod config;
 pub mod delete;

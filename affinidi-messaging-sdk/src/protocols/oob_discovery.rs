@@ -5,10 +5,10 @@ Used to help discover 3rd party DID's while protecting your own privacy.
 */
 
 use crate::{
+    ATM,
     errors::ATMError,
     messages::{GenericDataStruct, SuccessResponse},
     profiles::Profile,
-    ATM,
 };
 use affinidi_messaging_didcomm::Message;
 use base64::prelude::*;

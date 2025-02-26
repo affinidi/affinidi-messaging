@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use affinidi_messaging_mediator_common::errors::MediatorError;
-use tracing::{debug, info, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, info, span};
 
-use crate::database::{stats::MetadataStats, Database};
+use crate::database::{Database, stats::MetadataStats};
 
 /// Periodically logs statistics about the database.
 /// Is spawned as a task from main().

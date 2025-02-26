@@ -4,12 +4,12 @@
 
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
+    ATM,
     config::Config,
     errors::ATMError,
-    messages::{sending::InboundMessageResponse, GetMessagesRequest},
+    messages::{GetMessagesRequest, sending::InboundMessageResponse},
     protocols::Protocols,
     transports::SendMessageResponse,
-    ATM,
 };
 use clap::Parser;
 use std::{

@@ -1,5 +1,5 @@
-use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
-use tracing::{debug, span, Instrument, Level};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::Profile};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Helper method to get the Mediators well-known DID

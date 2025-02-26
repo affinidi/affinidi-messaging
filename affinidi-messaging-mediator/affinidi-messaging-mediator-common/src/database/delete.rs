@@ -1,4 +1,4 @@
-use tracing::{debug, info, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, info, span};
 
 use crate::errors::MediatorError;
 

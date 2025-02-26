@@ -1,9 +1,9 @@
 use affinidi_messaging_didcomm::{
     Message, PackEncryptedMetadata, PackEncryptedOptions, PackSignedMetadata,
 };
-use tracing::{span, Instrument, Level};
+use tracing::{Instrument, Level, span};
 
-use crate::{errors::ATMError, SharedState, ATM};
+use crate::{ATM, SharedState, errors::ATMError};
 
 impl ATM {
     /// Pack a message for sending to a recipient

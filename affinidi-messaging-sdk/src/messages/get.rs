@@ -1,12 +1,12 @@
 use super::GetMessagesRequest;
 use crate::{
+    ATM,
     errors::ATMError,
     messages::{GetMessagesResponse, SuccessResponse},
     profiles::Profile,
-    ATM,
 };
 use std::sync::Arc;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Returns a list of messages that are stored in the ATM

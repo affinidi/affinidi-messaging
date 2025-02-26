@@ -1,8 +1,8 @@
 use super::{handshake, ws_connection::ReadWrite};
 use crate::errors::ATMError;
 use rustls::{
-    pki_types::{DnsName, ServerName},
     ClientConfig,
+    pki_types::{DnsName, ServerName},
 };
 use rustls_platform_verifier::ConfigVerifierExt;
 use std::{collections::HashMap, pin::Pin, sync::Arc};

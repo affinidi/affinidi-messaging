@@ -1,4 +1,4 @@
-use super::{actions::Action, State};
+use super::{State, actions::Action};
 use crate::{
     state_store::{
         actions::{
@@ -12,7 +12,7 @@ use crate::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{
-    config::ConfigBuilder, transports::websockets::ws_handler::WsHandlerMode, ATM,
+    ATM, config::ConfigBuilder, transports::websockets::ws_handler::WsHandlerMode,
 };
 use std::time::Duration;
 use tokio::sync::{
@@ -92,12 +92,13 @@ impl StateStore {
 
         state.initialization = false;
 
-        let mut inbound_message_channel = match atm.get_inbound_channel() { Some(channel) => {
-            channel
-        } _ => {
-            warn!("Failed to get inbound channel");
-            return Ok(Interrupted::SystemError);
-        }};
+        let mut inbound_message_channel = match atm.get_inbound_channel() {
+            Some(channel) => channel,
+            _ => {
+                warn!("Failed to get inbound channel");
+                return Ok(Interrupted::SystemError);
+            }
+        };
 
         let mut ticker = tokio::time::interval(Duration::from_secs(1));
 

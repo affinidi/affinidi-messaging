@@ -1,7 +1,7 @@
-use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackMetadata, UnpackOptions};
-use tracing::{debug, span, Instrument, Level};
+use affinidi_messaging_didcomm::{Message, UnpackMetadata, UnpackOptions, envelope::MetaEnvelope};
+use tracing::{Instrument, Level, debug, span};
 
-use crate::{errors::ATMError, SharedState, ATM};
+use crate::{ATM, SharedState, errors::ATMError};
 
 impl ATM {
     pub async fn unpack(&self, message: &str) -> Result<(Message, UnpackMetadata), ATMError> {

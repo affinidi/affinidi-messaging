@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
-    secrets::SecretsResolver, Attachment, Message, PackEncryptedOptions,
+    Attachment, Message, PackEncryptedOptions, secrets::SecretsResolver,
 };
 use affinidi_messaging_sdk::{
     messages::AuthenticationChallenge,
@@ -10,7 +10,7 @@ use affinidi_messaging_sdk::{
     transports::SendMessageResponse,
 };
 use base64::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha256::digest;
 use uuid::Uuid;
 

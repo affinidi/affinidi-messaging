@@ -3,11 +3,11 @@
 //! NOTE: This example requires that the resolver is running with `did_example` feature flag enabled!
 //! NOTE: The mediator is NOT used in this example.
 
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_messaging_didcomm::UnpackOptions;
 use affinidi_messaging_didcomm::envelope::MetaEnvelope;
 use affinidi_messaging_didcomm::secrets::SecretsResolver;
-use affinidi_messaging_didcomm::UnpackOptions;
-use affinidi_messaging_didcomm::{secrets::Secret, Message, PackEncryptedOptions};
+use affinidi_messaging_didcomm::{Message, PackEncryptedOptions, secrets::Secret};
 use affinidi_messaging_mediator::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_messaging_sdk::errors::ATMError;
 use clap::Parser;
@@ -121,12 +121,13 @@ async fn main() -> Result<(), ATMError> {
     did_resolver
         .add_example_did(alice_raw_doc)
         .expect("Couldn't add Alice's DID");
-    let (alice_did, _) = match did_resolver.resolve("did:example:alice").await { Ok(response) => {
-        (response.did, response.doc)
-    } _ => {
-        error!("Couldn't resolve Alice's DID");
-        return Ok(());
-    }};
+    let (alice_did, _) = match did_resolver.resolve("did:example:alice").await {
+        Ok(response) => (response.did, response.doc),
+        _ => {
+            error!("Couldn't resolve Alice's DID");
+            return Ok(());
+        }
+    };
     info!("Alice DID Created");
 
     // Create Alice Secrets
@@ -316,12 +317,13 @@ async fn main() -> Result<(), ATMError> {
     did_resolver
         .add_example_did(bob_raw_doc)
         .expect("Couldn't add Bob's DID");
-    let (bob_did, _) = match did_resolver.resolve("did:example:bob").await { Ok(response) => {
-        (response.did, response.doc)
-    } _ => {
-        error!("Couldn't resolve Bob's DID");
-        return Ok(());
-    }};
+    let (bob_did, _) = match did_resolver.resolve("did:example:bob").await {
+        Ok(response) => (response.did, response.doc),
+        _ => {
+            error!("Couldn't resolve Bob's DID");
+            return Ok(());
+        }
+    };
     info!("Bob DID Created");
 
     // Create Bob Secrets

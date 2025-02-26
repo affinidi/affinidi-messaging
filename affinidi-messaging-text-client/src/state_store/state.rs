@@ -3,7 +3,7 @@ use super::actions::{
     invitation::InvitePopupState,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_sdk::{protocols::oob_discovery::OOBDiscovery, ATM};
+use affinidi_messaging_sdk::{ATM, protocols::oob_discovery::OOBDiscovery};
 use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -43,14 +43,13 @@ impl CommonSettings {
         did_resolver: &DIDCacheClient,
     ) -> Result<(), std::io::Error> {
         if let Some(mediator_did) = self.mediator_did.as_ref() {
-            match did_resolver.resolve(mediator_did).await { Err(e) => {
-                Err(std::io::Error::new(
+            match did_resolver.resolve(mediator_did).await {
+                Err(e) => Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     format!("Mediator DID is invalid: {}", e),
-                ))
-            } _ => {
-                Ok(())
-            }}
+                )),
+                _ => Ok(()),
+            }
         } else {
             Ok(()) // Empty is fine
         }
@@ -82,12 +81,15 @@ impl CommonSettings {
         } else {
             state.settings.avatar_path_error = None;
         }
-        match self._check_mediator_did(did_resolver).await { Err(e) => {
-            state.settings.mediator_did_error = Some(e.to_string());
-            ok_flag = false;
-        } _ => {
-            state.settings.mediator_did_error = None;
-        }}
+        match self._check_mediator_did(did_resolver).await {
+            Err(e) => {
+                state.settings.mediator_did_error = Some(e.to_string());
+                ok_flag = false;
+            }
+            _ => {
+                state.settings.mediator_did_error = None;
+            }
+        }
 
         ok_flag
     }

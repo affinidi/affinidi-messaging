@@ -10,7 +10,7 @@ use affinidi_messaging_sdk::messages::problem_report::ProblemReport;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 
 use super::ProcessMessageResponse;
 

@@ -2,7 +2,7 @@
 
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{config::Config, errors::ATMError, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{ATM, config::Config, errors::ATMError, protocols::Protocols};
 use clap::Parser;
 use serde_json::json;
 use std::{

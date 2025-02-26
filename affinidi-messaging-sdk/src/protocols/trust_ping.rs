@@ -3,10 +3,10 @@ use std::{sync::Arc, time::SystemTime};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde_json::json;
 use sha256::digest;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
-use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
+use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
 
 #[derive(Default)]
 pub struct TrustPing {}

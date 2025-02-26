@@ -12,12 +12,12 @@ use rustls_platform_verifier::ConfigVerifierExt;
 use secrets::Secret;
 use ssi::dids::Document;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::Mutex;
-use tokio::sync::RwLock;
 use tracing::Instrument;
 use tracing::{debug, span};
 use transports::websockets::ws_handler::WsHandlerCommands;
@@ -101,7 +101,7 @@ impl ATM {
                 return Err(ATMError::TransportError(format!(
                     "Couldn't create HTTPS Client. Reason: {}",
                     e
-                )))
+                )));
             }
         };
 
@@ -119,7 +119,7 @@ impl ATM {
                         return Err(ATMError::DIDError(format!(
                             "Couldn't create DID resolver! Reason: {}",
                             err
-                        )))
+                        )));
                     }
                 }
             }

@@ -1,7 +1,7 @@
 use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use std::fs::read_to_string;
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 impl Database {
     // Load Redis scripts into the database

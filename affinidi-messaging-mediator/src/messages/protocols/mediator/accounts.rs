@@ -9,15 +9,15 @@ use affinidi_messaging_sdk::{
         acls::{AccessListModeType, MediatorACLSet},
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha256::digest;
-use tracing::{debug, info, span, warn, Instrument};
+use tracing::{Instrument, debug, info, span, warn};
 use uuid::Uuid;
 
 use crate::{
-    database::session::Session,
-    messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
+    database::session::Session,
+    messages::{ProcessMessageResponse, error_response::generate_error_response},
 };
 
 use super::acls::check_permissions;
@@ -182,7 +182,7 @@ pub(crate) async fn process(
 
                 match state
                     .database
-                    .account_add(&did_hash, &acls)
+                    .account_add(&did_hash, &acls, None)
                     .await
                 {
                     Ok(response) => _generate_response_message(
@@ -352,6 +352,66 @@ pub(crate) async fn process(
                         &session.did,
                         &state.config.mediator_did,
                         &json!(true),
+                    )}
+                    Err(err) => {
+                        warn!("Error Changing account type. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error changing account type. Reason: {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorAccountRequest::AccountChangeQueueLimit {did_hash, queue_limit } => {
+                 // Check permissions and ACLs
+                 if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("ACL Request from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error getting ACLs {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                    false,
+                    );
+                }
+
+                let queue_limit = if let Some(ql) = queue_limit {
+                    if session.account_type == AccountType::Admin || session.account_type == AccountType::RootAdmin {
+                        queue_limit
+                    } else  if ql > state.config.limits.queued_messages_hard {
+                        Some(state.config.limits.queued_messages_hard)
+                    } else {
+                        queue_limit
+                    }
+                } else {
+                    None
+                };
+
+                match state.database.account_change_queue_limit(&did_hash, queue_limit).await {
+                    Ok(_) => {
+                        info!("Changed account queue_limit for DID: ({}) to ({:?})", did_hash, queue_limit);
+                        _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(queue_limit),
                     )}
                     Err(err) => {
                         warn!("Error Changing account type. Reason: {}", err);

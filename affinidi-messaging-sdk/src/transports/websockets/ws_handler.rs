@@ -3,13 +3,13 @@
  */
 use super::SharedState;
 use crate::{
+    ATM,
     errors::ATMError,
     profiles::Profile,
     transports::{
-        websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
         WsConnectionCommands,
+        websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
     },
-    ATM,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use std::{
@@ -21,7 +21,7 @@ use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
-use tracing::{debug, info, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, info, span, warn};
 
 /// The mode in which the handler should operate
 /// Cached: Messages are cached and sent to the SDK when requested
@@ -95,7 +95,7 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
-           
+
             loop {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {

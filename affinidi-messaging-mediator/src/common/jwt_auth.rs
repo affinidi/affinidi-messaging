@@ -1,18 +1,18 @@
 use crate::{
-    database::session::{Session, SessionClaims},
     SharedData,
+    database::session::{Session, SessionClaims},
 };
 use affinidi_messaging_mediator_common::errors::ErrorResponse;
 use axum::{
+    Json, RequestPartsExt,
     extract::{FromRef, FromRequestParts},
     response::{IntoResponse, Response},
-    Json, RequestPartsExt,
 };
 use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
     TypedHeader,
+    headers::{Authorization, authorization::Bearer},
 };
-use http::{request::Parts, StatusCode};
+use http::{StatusCode, request::Parts};
 use jsonwebtoken::{TokenData, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -21,7 +21,7 @@ use std::{
     fmt::{Debug, Display},
     net::SocketAddr,
 };
-use tracing::{error, event, info, warn, Level};
+use tracing::{Level, error, event, info, warn};
 
 // Payload contents of the JWT
 // All times are in seconds since UNIX EPOCH

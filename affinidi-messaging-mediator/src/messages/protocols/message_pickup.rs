@@ -15,18 +15,18 @@ use affinidi_messaging_sdk::{
 };
 use base64::prelude::*;
 use itertools::Itertools;
-use redis::{from_redis_value, Value};
+use redis::{Value, from_redis_value};
 use serde_json::json;
 use sha256::digest;
 use std::time::SystemTime;
-use tracing::{debug, error, event, info, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, event, info, span, warn};
 use uuid::Uuid;
 
 use crate::{
+    SharedData,
     database::session::Session,
     messages::ProcessMessageResponse,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState},
-    SharedData,
 };
 
 const MAX_RETRIEVED_MSGS: usize = 100;
@@ -472,7 +472,7 @@ fn _parse_message_received_body(
                 return Err(MediatorError::RequestDataError(
                     session.session_id.clone(),
                     format!("messages-received body isn't valid. Reason: {}", e),
-                ))
+                ));
             }
         };
 
@@ -490,7 +490,7 @@ fn _parse_and_validate_delivery_request_body(
                 return Err(MediatorError::RequestDataError(
                     session.session_id.clone(),
                     format!("delivery-request body isn't valid. Reason: {}", e),
-                ))
+                ));
             }
         };
 
@@ -570,9 +570,13 @@ fn _validate_msg(
             "to: ({}) doesn't match ATM DID ({})",
             to, state.config.mediator_did
         );
-        return Err(MediatorError::RequestDataError(session.session_id.clone(),
-             format!("message to: ({}) didn't match ATM DID ({}). messages-received messages must be addressed directly to ATM!",
-              to, state.config.mediator_did)));
+        return Err(MediatorError::RequestDataError(
+            session.session_id.clone(),
+            format!(
+                "message to: ({}) didn't match ATM DID ({}). messages-received messages must be addressed directly to ATM!",
+                to, state.config.mediator_did
+            ),
+        ));
     }
 
     // Message can not be anonymous

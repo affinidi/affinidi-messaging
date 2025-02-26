@@ -23,6 +23,7 @@ Missing versions on the changelog simply reflect minor deployment changes on our
   * access_list_remove() - Remove one or more DIDs from the access list for a given DID
   * access_list_get() - Searches for one or more DIDs from the access list for a given DID
   * access_list_clear() - Resets the Access List to empty for a given DID
+* ACL Flag added SELF_MANAGE_QUEUE_LIMIT flag so a DID can change their queue limits
 
 ### Mediator (0.10.0)
 
@@ -35,6 +36,9 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 * JSON fields changed from UpperCamelCase to snake_case
   * Mediator Administration Protocol
   * Mediator Account Management
+* Queue limits can now be set per DID between a soft and hard limit
+  * Admin accounts can override and go above the hard limit as needed
+  * New ACL Flag enabled for can change queue_limit (SELF_MANAGE_QUEUE_LIMIT)
 
 ### DIDComm Library (0.10.0)
 
@@ -46,6 +50,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 * mediator_administration
   * access list management added
   * Pagination for Account List and Access List improved
+  * Queue Statistics shown in Account Info
+  * Can modify queue limits
 
 ## 13th February 2025 (0.9.7)
 

@@ -29,6 +29,11 @@ pub enum MediatorAccountRequest {
         #[serde(alias = "type")]
         _type: AccountType,
     },
+    #[serde(rename = "account_change_queue_limit")]
+    AccountChangeQueueLimit {
+        did_hash: String,
+        queue_limit: Option<u32>,
+    },
 }
 
 /// Different levels of accounts in the mediator
@@ -129,6 +134,28 @@ pub struct Account {
     #[serde(rename = "type")]
     pub _type: AccountType,
     pub access_list_count: u32,
+    /// Number of messages that can be in the queue for this account
+    pub queue_limit: Option<u32>,
+    pub send_queue_count: u32,
+    pub send_queue_bytes: u64,
+    pub receive_queue_count: u32,
+    pub receive_queue_bytes: u64,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Account {
+            did_hash: "".to_owned(),
+            acls: 0,
+            _type: AccountType::Standard,
+            access_list_count: 0,
+            queue_limit: None,
+            send_queue_count: 0,
+            send_queue_bytes: 0,
+            receive_queue_count: 0,
+            receive_queue_bytes: 0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -508,11 +535,93 @@ impl Mediator {
         .await
     }
 
-    /// Parses the response from the mediator for account_add
+    /// Parses the response from the mediator for account_change_type
     fn _parse_account_change_type_response(&self, message: &Message) -> Result<bool, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Account Change Type response could not be parsed. Reason: {}",
+                err
+            ))
+        })
+    }
+
+    /// Change the Queue Limit for a DID
+    /// - `atm` - The ATM client to use
+    /// - `profile` - The profile to use
+    /// - `did_hash` - The DID hash to change the type for
+    /// - `queue_limit` - If None, reset to default, otherwise Some(u32) to set the limit
+    ///
+    /// # Returns
+    /// true or false if the account was changed
+    pub async fn account_change_queue_limit(
+        &self,
+        atm: &ATM,
+        profile: &Arc<Profile>,
+        did_hash: &str,
+        queue_limit: Option<u32>,
+    ) -> Result<Option<u32>, ATMError> {
+        let _span = span!(Level::DEBUG, "account_change_queue_limit");
+
+        async move {
+            debug!(
+                "Changing account ({}) queue_limit to ({:?}).",
+                did_hash, queue_limit
+            );
+
+            let (profile_did, mediator_did) = profile.dids()?;
+
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let msg = Message::build(
+                Uuid::new_v4().into(),
+                "https://didcomm.org/mediator/1.0/account-management".to_owned(),
+                json!({"account_change_queue_limit": {"did_hash": did_hash, "queue_limit": queue_limit}}),
+            )
+            .to(mediator_did.into())
+            .from(profile_did.into())
+            .created_time(now)
+            .expires_time(now + 10)
+            .finalize();
+
+            let msg_id = msg.id.clone();
+
+            // Pack the message
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &atm.inner.did_resolver,
+                    &atm.inner.secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => {
+                    self._parse_account_change_queue_limit_response(&message)
+                }
+                _ => Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                )),
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Parses the response from the mediator for account_change_queue_limit
+    fn _parse_account_change_queue_limit_response(
+        &self,
+        message: &Message,
+    ) -> Result<Option<u32>, ATMError> {
+        serde_json::from_value(message.body.clone()).map_err(|err| {
+            ATMError::MsgReceiveError(format!(
+                "Mediator Account Change Queue Limit response could not be parsed. Reason: {}",
                 err
             ))
         })

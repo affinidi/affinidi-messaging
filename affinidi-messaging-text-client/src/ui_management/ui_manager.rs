@@ -7,7 +7,7 @@ use anyhow::Context;
 use crossterm::{
     event::{DisableMouseCapture, Event, EventStream},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::*;
 use tokio::sync::{
@@ -19,7 +19,7 @@ use tokio_stream::StreamExt;
 const RENDERING_TICK_RATE: Duration = Duration::from_millis(250);
 
 use crate::{
-    state_store::{actions::Action, State},
+    state_store::{State, actions::Action},
     termination::Interrupted,
     ui_management::components::ComponentRender,
 };
@@ -44,11 +44,12 @@ impl UiManager {
     ) -> anyhow::Result<Interrupted> {
         // consume the first state to initialize the ui app
         let mut app_router = {
-            match state_rx.recv().await { Some(state) => {
-                AppRouter::new(&state, self.action_tx.clone())
-            } _ => {
-                return Err(anyhow::anyhow!("could not get the initial state"));
-            }}
+            match state_rx.recv().await {
+                Some(state) => AppRouter::new(&state, self.action_tx.clone()),
+                _ => {
+                    return Err(anyhow::anyhow!("could not get the initial state"));
+                }
+            }
         };
 
         let mut terminal = setup_terminal()?;

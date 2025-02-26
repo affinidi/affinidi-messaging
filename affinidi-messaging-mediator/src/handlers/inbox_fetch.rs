@@ -1,10 +1,10 @@
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
-use affinidi_messaging_sdk::messages::{fetch::FetchOptions, GetMessagesResponse};
-use axum::{extract::State, Json};
+use affinidi_messaging_sdk::messages::{GetMessagesResponse, fetch::FetchOptions};
+use axum::{Json, extract::State};
 use http::StatusCode;
 use regex::Regex;
-use tracing::{span, Instrument, Level};
+use tracing::{Instrument, Level, span};
 
 /// Fetches available messages from the inbox
 /// ACL_MODE: Rquires LOCAL access

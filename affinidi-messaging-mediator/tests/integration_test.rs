@@ -1,7 +1,7 @@
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
 use affinidi_messaging_didcomm::{
-    secrets::{Secret, SecretsResolver},
     Message, PackEncryptedOptions,
+    secrets::{Secret, SecretsResolver},
 };
 use affinidi_messaging_mediator::{resolvers::affinidi_secrets::AffinidiSecrets, server::start};
 use affinidi_messaging_sdk::{
@@ -9,9 +9,9 @@ use affinidi_messaging_sdk::{
     conversions::secret_from_str,
     errors::ATMError,
     messages::{
-        fetch::FetchOptions, AuthenticationChallenge, AuthorizationResponse, DeleteMessageRequest,
+        AuthenticationChallenge, AuthorizationResponse, DeleteMessageRequest,
         DeleteMessageResponse, Folder, GetMessagesRequest, GetMessagesResponse, MessageList,
-        MessageListElement, SuccessResponse,
+        MessageListElement, SuccessResponse, fetch::FetchOptions,
     },
     transports::SendMessageResponse,
 };

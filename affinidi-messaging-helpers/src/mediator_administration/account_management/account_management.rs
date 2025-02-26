@@ -12,7 +12,8 @@ use affinidi_messaging_sdk::{
     },
 };
 use console::style;
-use dialoguer::{Select, theme::ColorfulTheme};
+use dialoguer::{Input, Select, theme::ColorfulTheme};
+use regex::Regex;
 use std::sync::Arc;
 
 pub(crate) async fn account_management_menu(
@@ -98,6 +99,7 @@ pub(crate) async fn manage_account_menu(
     let selections = &[
         "Modify ACLs",
         "Change Account Type",
+        "Change Queue Limits",
         "Delete Account",
         "Back",
     ];
@@ -126,6 +128,27 @@ pub(crate) async fn manage_account_menu(
                 "{:064b}",
                 &mediator_config.global_acl_default.to_u64()
             ))
+            .blue()
+            .bold()
+        );
+
+        println!(
+            "{} {} {} {} {} {} {} {} {} {} {}",
+            style("Stats").yellow(),
+            style("INBOX Count:").yellow(),
+            style(&account.receive_queue_count).blue().bold(),
+            style("INBOX bytes").yellow(),
+            style(&account.receive_queue_bytes).blue().bold(),
+            style("OUTBOX Count:").yellow(),
+            style(&account.receive_queue_count).blue().bold(),
+            style("OUTBOX bytes").yellow(),
+            style(&account.receive_queue_bytes).blue().bold(),
+            style("Queue Limit:").yellow(),
+            style(
+                &account
+                    .queue_limit
+                    .unwrap_or(mediator_config.queued_messages_soft)
+            )
             .blue()
             .bold()
         );
@@ -165,6 +188,18 @@ pub(crate) async fn manage_account_menu(
                 }
             }
             2 => {
+                // Change Queue Limits
+                match _change_account_queue_limit(atm, profile, protocols, theme, &account).await {
+                    Ok(queue_limit) => {
+                        account.queue_limit = queue_limit;
+                    }
+                    Err(err) => println!(
+                        "{}",
+                        style(format!("Error changing account queue_limit: {}", err)).red()
+                    ),
+                }
+            }
+            3 => {
                 // Delete Account
                 match protocols
                     .mediator
@@ -181,7 +216,7 @@ pub(crate) async fn manage_account_menu(
                     ),
                 }
             }
-            3 => {
+            4 => {
                 // Return to previous menu
                 return Ok(());
             }
@@ -232,6 +267,55 @@ async fn _change_account_type(
         println!("{}", style("Account type changed successfully").green());
         Ok(new_type)
     }
+}
+
+async fn _change_account_queue_limit(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<Option<u32>, Box<dyn std::error::Error>> {
+    let input: String = Input::with_theme(theme)
+        .with_prompt("New Queue Limit? (number, exit or RESET)")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            let re = Regex::new(r"\d*|exit|RESET").unwrap();
+            if re.is_match(input) || input == "exit" {
+                Ok(())
+            } else {
+                Err("Invalid queue limit")
+            }
+        })
+        .interact_text()
+        .unwrap();
+
+    if input == "exit" {
+        return Ok(None);
+    }
+
+    println!("Changing account queue_limit to: {}", input);
+    let queue_limit = if input == "RESET" {
+        None
+    } else {
+        match input.parse::<u32>() {
+            Ok(limit) => Some(limit),
+            Err(e) => {
+                println!("{}", style(format!("Couldn't parse number: {}", e)).red());
+                return Err("Couldn't parse queue_limit".into());
+            }
+        }
+    };
+
+    protocols
+        .mediator
+        .account_change_queue_limit(atm, profile, &account.did_hash, queue_limit)
+        .await
+        .map_err(|e| e.to_string())?;
+    println!(
+        "{}",
+        style("Account queue_limit changed successfully").green()
+    );
+    Ok(queue_limit)
 }
 
 /// Picks the target DID

@@ -5,20 +5,20 @@
  * There is no disovery occurring here - it is a point-to-point connection
  */
 use crate::{
-    state_store::{actions::Action, State},
-    ui_management::components::{Component, ComponentRender},
     InputType,
+    state_store::{State, actions::Action},
+    ui_management::components::{Component, ComponentRender},
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    Frame,
     layout::{Constraint, Flex, Layout, Position},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph, Widget},
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tui_input::{backend::crossterm::EventHandler, Input};
+use tui_input::{Input, backend::crossterm::EventHandler};
 
 pub struct Props {
     pub show: bool,

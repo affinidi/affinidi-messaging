@@ -1,5 +1,5 @@
 use super::components::{Component, ComponentRender};
-use crate::state_store::{actions::Action, State};
+use crate::state_store::{State, actions::Action};
 use crossterm::event::KeyEvent;
 use invite_popup::invite_popup::InvitePopup;
 use main_page::MainPage;

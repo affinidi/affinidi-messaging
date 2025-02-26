@@ -1,13 +1,13 @@
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 use affinidi_messaging_didcomm::UnpackMetadata;
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{
     DeleteMessageRequest, DeleteMessageResponse, GenericDataStruct,
 };
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, span, warn};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ResponseData {

@@ -1,12 +1,12 @@
 use affinidi_messaging_didcomm::MessageBuilder;
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
+    ATM,
     config::Config,
     errors::ATMError,
-    messages::{fetch::FetchOptions, DeleteMessageRequest, FetchDeletePolicy, Folder},
+    messages::{DeleteMessageRequest, FetchDeletePolicy, Folder, fetch::FetchOptions},
     profiles::ProfileConfig,
     protocols::Protocols,
-    ATM,
 };
 use clap::Parser;
 use serde_json::json;

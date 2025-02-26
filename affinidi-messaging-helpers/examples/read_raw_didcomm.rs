@@ -4,12 +4,12 @@
  * To read the DIDComm messages, you will need access to the Secrets for the DID Recipients
  */
 
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::{envelope::MetaEnvelope, AttachmentData};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
 use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, profiles::Profile, secrets::Secret, ATM,
+    ATM, config::Config, errors::ATMError, profiles::Profile, secrets::Secret,
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
 use console::style;
 use std::{

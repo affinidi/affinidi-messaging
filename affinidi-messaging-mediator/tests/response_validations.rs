@@ -1,16 +1,16 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
-    envelope::MetaEnvelope, secrets::SecretsResolver, AttachmentData, Message, UnpackMetadata,
-    UnpackOptions,
+    AttachmentData, Message, UnpackMetadata, UnpackOptions, envelope::MetaEnvelope,
+    secrets::SecretsResolver,
 };
 use affinidi_messaging_sdk::{
     messages::{
-        sending::InboundMessageResponse, GetMessagesResponse, MessageListElement, SuccessResponse,
+        GetMessagesResponse, MessageListElement, SuccessResponse, sending::InboundMessageResponse,
     },
     protocols::message_pickup::MessagePickupStatusReply,
     transports::SendMessageResponse,
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use sha256::digest;
 
 #[allow(dead_code)]

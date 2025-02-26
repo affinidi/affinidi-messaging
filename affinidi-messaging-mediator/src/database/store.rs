@@ -2,7 +2,7 @@ use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use tracing::{debug, event, info, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, event, info, span};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MessageMetaData {

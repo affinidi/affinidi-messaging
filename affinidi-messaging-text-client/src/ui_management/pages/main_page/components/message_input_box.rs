@@ -1,14 +1,14 @@
 use super::super::section::usage::{HasUsageInfo, UsageInfo, UsageInfoLine};
 use crate::ui_management::components::{
-    input_box::{self, InputBox},
     Component, ComponentRender,
+    input_box::{self, InputBox},
 };
 use crate::{
-    state_store::{actions::Action, State},
+    state_store::{State, actions::Action},
     ui_management::pages::main_page::section::SectionActivation,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{prelude::Rect, style::Color, Frame};
+use ratatui::{Frame, prelude::Rect, style::Color};
 use tokio::sync::mpsc::UnboundedSender;
 
 struct Props {

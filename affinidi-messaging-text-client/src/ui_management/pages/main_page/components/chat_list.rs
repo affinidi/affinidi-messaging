@@ -1,26 +1,26 @@
 use crossterm::event::KeyEvent;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState},
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     state_store::{
-        actions::{
-            chat_list::{Chat, ChatList},
-            Action,
-        },
         State,
+        actions::{
+            Action,
+            chat_list::{Chat, ChatList},
+        },
     },
     ui_management::{
         components::{Component, ComponentRender},
         pages::main_page::section::{
-            usage::{HasUsageInfo, UsageInfo},
             SectionActivation,
+            usage::{HasUsageInfo, UsageInfo},
         },
     },
 };

@@ -1,7 +1,7 @@
 use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::{
-    config::{ClientConfig, ClientConfigBuilder},
     DIDCacheClient,
+    config::{ClientConfig, ClientConfigBuilder},
 };
 use affinidi_messaging_mediator_common::{
     database::config::{DatabaseConfig, DatabaseConfigRaw},
@@ -11,21 +11,21 @@ use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
     MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
-use async_convert::{async_trait, TryFrom};
+use async_convert::{TryFrom, async_trait};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
 use http::{
-    header::{AUTHORIZATION, CONTENT_TYPE},
     HeaderValue, Method,
+    header::{AUTHORIZATION, CONTENT_TYPE},
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use ssi::dids::{document::service::Endpoint, Document};
+use ssi::dids::{Document, document::service::Endpoint};
 use std::{
     collections::HashSet,
     env,
@@ -36,7 +36,7 @@ use std::{
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use tracing_subscriber::{filter::LevelFilter, EnvFilter};
+use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -241,7 +241,8 @@ pub struct LimitsConfig {
     pub local_max_acl: usize,
     pub message_expiry_seconds: u64,
     pub message_size: usize,
-    pub queued_messages: usize,
+    pub queued_messages_soft: u32,
+    pub queued_messages_hard: u32,
     pub to_keys_per_recipient: usize,
     pub to_recipients: usize,
     pub ws_size: usize,
@@ -261,7 +262,8 @@ impl Default for LimitsConfig {
             local_max_acl: 1_000,
             message_expiry_seconds: 604_800,
             message_size: 1_048_576,
-            queued_messages: 100,
+            queued_messages_soft: 100,
+            queued_messages_hard: 1_000,
             to_keys_per_recipient: 100,
             to_recipients: 100,
             ws_size: 10_485_760,
@@ -282,7 +284,8 @@ struct LimitsConfigRaw {
     pub local_max_acl: String,
     pub message_expiry_seconds: String,
     pub message_size: String,
-    pub queued_messages: String,
+    pub queued_messages_soft: String,
+    pub queued_messages_hard: String,
     pub to_keys_per_recipient: String,
     pub to_recipients: String,
     pub ws_size: String,
@@ -307,7 +310,8 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             local_max_acl: raw.local_max_acl.parse().unwrap_or(1_000),
             message_expiry_seconds: raw.message_expiry_seconds.parse().unwrap_or(10_080),
             message_size: raw.message_size.parse().unwrap_or(1_048_576),
-            queued_messages: raw.queued_messages.parse().unwrap_or(100),
+            queued_messages_soft: raw.queued_messages_soft.parse().unwrap_or(100),
+            queued_messages_hard: raw.queued_messages_hard.parse().unwrap_or(1_000),
             to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
@@ -626,7 +630,7 @@ async fn load_secrets(
             return Err(MediatorError::ConfigError(
                 "NA".into(),
                 "Invalid `mediator_secrets` format! Expecting file:// or aws_secrets:// ...".into(),
-            ))
+            ));
         }
     };
 
@@ -746,7 +750,7 @@ async fn read_did_config(
                 "NA".into(),
                 "Invalid mediator_did format! Expecting file:// or aws_parameter_store:// ..."
                     .into(),
-            ))
+            ));
         }
     };
 
@@ -904,7 +908,7 @@ async fn read_document(
                 "NA".into(),
                 "Invalid document_path format! Expecting file:// or aws_parameter_store:// ..."
                     .into(),
-            ))
+            ));
         }
     };
 
@@ -960,7 +964,10 @@ async fn load_forwarding_protection_blocks(
                                     eprintln!("WARN: Couldn't parse URI as a string: {:#?}", uri);
                                 }
                             } else {
-                                eprintln!("WARN: Service endpoint map does not contain a URI. DID ({}), Service ({:#?}), Endpoint ({:#?})", did, service, map);
+                                eprintln!(
+                                    "WARN: Service endpoint map does not contain a URI. DID ({}), Service ({:#?}), Endpoint ({:#?})",
+                                    did, service, map
+                                );
                             }
                         }
                     }

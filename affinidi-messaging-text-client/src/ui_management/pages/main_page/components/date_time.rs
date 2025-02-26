@@ -1,5 +1,5 @@
 use chrono::Local;
-use ratatui::{layout::Rect, style::Stylize, widgets::Paragraph, Frame};
+use ratatui::{Frame, layout::Rect, style::Stylize, widgets::Paragraph};
 
 use crate::ui_management::components::ComponentRender;
 

@@ -1,9 +1,8 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::{
+    SharedData,
     database::session::Session,
     messages::inbound::handle_inbound,
     tasks::websocket_streaming::{StreamingUpdate, StreamingUpdateState, WebSocketCommands},
-    SharedData,
 };
 use affinidi_messaging_didcomm::{Message as DidcommMessage, PackEncryptedOptions};
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError};
@@ -12,17 +11,18 @@ use affinidi_messaging_sdk::messages::problem_report::{
 };
 use axum::{
     extract::{
-        ws::{Message, WebSocket},
         State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
     },
     response::IntoResponse,
 };
 use serde_json::json;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
-use tracing::{debug, info, span, warn, Instrument};
+use tracing::{Instrument, debug, info, span, warn};
 use uuid::Uuid;
 
 /// Handles the switching of the protocol to a websocket connection
@@ -99,7 +99,7 @@ async fn handle_socket(mut socket: WebSocket, state: SharedData, session: Sessio
                     match value { Some(msg) => {
                         debug!("ws: Received message: {:?}", msg);
                         if let Ok(msg) = msg {
-                            match msg { 
+                            match msg {
                                 Message::Text(msg) => {
                                     debug!("ws: Received text message: {:?}", msg);
                                     if msg.len() > state.config.limits.ws_size {

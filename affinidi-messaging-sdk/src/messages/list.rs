@@ -1,8 +1,8 @@
 use super::{Folder, MessageList};
-use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::Profile};
 use sha256::digest;
 use std::sync::Arc;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Returns a list of messages that are stored in the ATM

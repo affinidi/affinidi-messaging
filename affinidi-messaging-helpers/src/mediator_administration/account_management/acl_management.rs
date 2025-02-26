@@ -171,6 +171,10 @@ async fn _modify_acl_flags(
             acls.get_anon_receive().1,
         ),
         ("access_list self-change?", acls.get_self_manage_list()),
+        (
+            "queue limits self-change?",
+            acls.get_self_manage_queue_limit(),
+        ),
     ];
 
     // returns a vector of chosen indices
@@ -182,7 +186,7 @@ async fn _modify_acl_flags(
         .unwrap();
 
     // convert the selection to an array of bools
-    let mut flags = [false; 17];
+    let mut flags = [false; 18];
     for s in selection {
         flags[s] = true;
     }
@@ -207,6 +211,7 @@ async fn _modify_acl_flags(
     let _ = new_acls.set_create_invites(flags[12], flags[13], true);
     let _ = new_acls.set_anon_receive(flags[14], flags[15], true);
     new_acls.set_self_manage_list(flags[16]);
+    new_acls.set_self_manage_queue_limit(flags[17]);
 
     if new_acls == acls {
         println!("{}", style("No changes made").yellow());

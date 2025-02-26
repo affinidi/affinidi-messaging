@@ -1,7 +1,7 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
 use std::collections::HashMap;
 
-use super::{session::Session, Database};
+use super::{Database, session::Session};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::Folder,
@@ -11,7 +11,30 @@ use affinidi_messaging_sdk::{
     },
 };
 use redis::Pipeline;
-use tracing::{debug, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
+
+// Private helper function to translate HashMap into an Account
+fn _to_account(map: HashMap<String, String>, access_list_count: u32) -> Account {
+    let mut account = Account {
+        access_list_count,
+        ..Default::default()
+    };
+
+    for (key, value) in &map {
+        match key.as_str() {
+            "ROLE_TYPE" => account._type = AccountType::from(value.as_str()),
+            "ACLS" => account.acls = u64::from_str_radix(value, 16).unwrap_or(0_u64),
+            "QUEUE_LIMIT" => account.queue_limit = value.parse().ok(),
+            "SEND_QUEUE_BYTES" => account.send_queue_bytes = value.parse().unwrap_or(0),
+            "SEND_QUEUE_COUNT" => account.send_queue_count = value.parse().unwrap_or(0),
+            "RECEIVE_QUEUE_BYTES" => account.receive_queue_bytes = value.parse().unwrap_or(0),
+            "RECEIVE_QUEUE_COUNT" => account.receive_queue_count = value.parse().unwrap_or(0),
+            _ => {}
+        }
+    }
+
+    account
+}
 
 impl Database {
     /// Quick and efficient check if an account exists locally in the mediator
@@ -31,19 +54,20 @@ impl Database {
     }
 
     /// Grab Account information
+    /// Returns Ok<Some<Account>> if the account exists
+    /// Returns Ok<None> if the account does not exist
+    /// Returns Err if there is an error
     pub(crate) async fn account_get(
         &self,
         did_hash: &str,
     ) -> Result<Option<Account>, MediatorError> {
         let mut con = self.0.get_async_connection().await?;
 
-        let (account, access_list_count): (HashMap<String, String>, u32) =
+        let (details, access_list_count): (HashMap<String, String>, u32) =
             deadpool_redis::redis::pipe()
                 .atomic()
-                .cmd("HGETALL")
-                .arg(["DID:", did_hash].concat())
-                .cmd("SCARD")
-                .arg(["ACCESS_LIST:", did_hash].concat())
+                .hgetall(["DID:", did_hash].concat())
+                .scard(["ACCESS_LIST:", did_hash].concat())
                 .query_async(&mut con)
                 .await
                 .map_err(|err| {
@@ -53,45 +77,23 @@ impl Database {
                     )
                 })?;
 
-        if account.is_empty() {
+        if details.is_empty() {
             debug!("Account {} does not exist", did_hash);
             return Ok(None);
         }
 
-        let _type = if let Some(_type) = account.get("ROLE_TYPE") {
-            AccountType::from(_type.as_str())
-        } else {
-            warn!("Account {} does not have a role type", did_hash);
-            return Err(MediatorError::InternalError(
-                "NA".to_string(),
-                "DID is missing a role_type".to_string(),
-            ));
-        };
-
-        let acls = if let Some(acls) = account.get("ACLS") {
-            u64::from_str_radix(acls, 16).unwrap_or(0_u64)
-        } else {
-            warn!("Account {} does not have ACLs", did_hash);
-            return Err(MediatorError::InternalError(
-                "NA".to_string(),
-                "DID is missing ACLs".to_string(),
-            ));
-        };
-
-        Ok(Some(Account {
-            did_hash: did_hash.to_string(),
-            _type,
-            acls,
-            access_list_count,
-        }))
+        Ok(Some(_to_account(details, access_list_count)))
     }
 
     /// Add a DID account to the mediator
     /// - `did_hash` - SHA256 hash of the DID
+    /// - `acls` - ACLs to apply to the account
+    /// - `queue_limit` - Optional queue limit for the account
     pub(crate) async fn account_add(
         &self,
         did_hash: &str,
         acls: &MediatorACLSet,
+        queue_limit: Option<u32>,
     ) -> Result<Account, MediatorError> {
         let _span = span!(Level::DEBUG, "add_account", "did_hash" = did_hash,);
 
@@ -100,7 +102,8 @@ impl Database {
 
             let mut con = self.0.get_async_connection().await?;
 
-            deadpool_redis::redis::pipe()
+            let mut cmd = deadpool_redis::redis::pipe();
+            let mut cmd = cmd
                 .atomic()
                 .cmd("SADD")
                 .arg("KNOWN_DIDS")
@@ -118,22 +121,23 @@ impl Database {
                 .arg("ROLE_TYPE")
                 .arg::<String>(AccountType::Standard.into())
                 .arg("ACLS")
-                .arg(acls.to_hex_string())
-                .exec_async(&mut con)
-                .await
-                .map_err(|err| {
-                    MediatorError::DatabaseError(
-                        "NA".to_string(),
-                        format!("account_add() failed. Reason: {}", err),
-                    )
-                })?;
+                .arg(acls.to_hex_string());
+
+            if let Some(queue_limit) = queue_limit {
+                cmd = cmd.arg("QUEUE_LIMIT").arg(queue_limit);
+            }
+
+            cmd.exec_async(&mut con).await.map_err(|err| {
+                MediatorError::DatabaseError(
+                    "NA".to_string(),
+                    format!("account_add() failed. Reason: {}", err),
+                )
+            })?;
             debug!("Account added successfully");
 
             Ok(Account {
                 did_hash: did_hash.to_string(),
-                _type: AccountType::Standard,
-                acls: acls.to_u64(),
-                access_list_count: 0,
+                ..Default::default()
             })
         }
         .instrument(_span)
@@ -274,22 +278,19 @@ impl Database {
 
             // For each DID, fetch their details
             let mut did_query = Pipeline::new();
-            did_query.atomic();
+            let did_query = did_query.atomic();
             let mut access_list_query = Pipeline::new();
-            access_list_query.atomic();
+            let access_list_query = access_list_query.atomic();
             for did in &dids {
-                did_query.add_command(redis::Cmd::hget(
-                    ["DID:", did].concat(),
-                    &["ROLE_TYPE", "ACLS"],
-                ));
+                did_query.add_command(redis::Cmd::hgetall(["DID:", did].concat()));
                 access_list_query.add_command(redis::Cmd::scard(["ACCESS_LIST:", did].concat()));
             }
 
-            let did_results: Vec<(Option<String>, Option<String>)> =
+            let did_results: Vec<HashMap<String, String>> =
                 did_query.query_async(&mut con).await.map_err(|err| {
                     MediatorError::DatabaseError(
                         "NA".to_string(),
-                        format!("HMGET  failed. Reason: {}", err),
+                        format!("HGETALL  failed. Reason: {}", err),
                     )
                 })?;
 
@@ -304,25 +305,10 @@ impl Database {
                 })?;
 
             let mut accounts = Vec::new();
-            for (i, (role_type, acls)) in did_results.iter().enumerate() {
-                let _type = if let Some(role_type) = role_type {
-                    role_type.as_str().into()
-                } else {
-                    AccountType::Unknown
-                };
-
-                let acls = if let Some(acls) = acls {
-                    u64::from_str_radix(acls, 16).unwrap_or(0_u64)
-                } else {
-                    0_u64
-                };
-
-                accounts.push(Account {
-                    did_hash: dids[i].clone(),
-                    _type,
-                    acls,
-                    access_list_count: access_list_results[i],
-                });
+            for (i, map) in did_results.iter().enumerate() {
+                let mut account = _to_account(map.to_owned(), access_list_results[i]);
+                account.did_hash = dids[i].clone();
+                accounts.push(account);
             }
 
             Ok(MediatorAccountList {
@@ -367,6 +353,61 @@ impl Database {
                     )
                 })?;
             debug!("Account type changed successfully");
+
+            Ok(())
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Changes the queue limit of an account
+    /// Assumes that all checks have been done prior to this call
+    /// - `did_hash` - SHA256 hash of the DID
+    /// - `queue_limit` - New queue limit (deletes if set to None)
+    pub(crate) async fn account_change_queue_limit(
+        &self,
+        did_hash: &str,
+        queue_limit: Option<u32>,
+    ) -> Result<(), MediatorError> {
+        let _span = span!(
+            Level::DEBUG,
+            "account_change_queue_limit",
+            "did_hash" = did_hash,
+            "queue_limit" = queue_limit
+        );
+
+        async move {
+            debug!("Changing account queue_limit");
+
+            let mut con = self.0.get_async_connection().await?;
+
+            if let Some(queue_limit) = queue_limit {
+                deadpool_redis::redis::cmd("HSET")
+                    .arg(["DID:", did_hash].concat())
+                    .arg("QUEUE_LIMIT")
+                    .arg(queue_limit)
+                    .exec_async(&mut con)
+                    .await
+                    .map_err(|err| {
+                        MediatorError::DatabaseError(
+                            "NA".to_string(),
+                            format!("account_change_queue_limit() failed. Reason: {}", err),
+                        )
+                    })?;
+            } else {
+                deadpool_redis::redis::cmd("HDEL")
+                    .arg(["DID:", did_hash].concat())
+                    .arg("QUEUE_LIMIT")
+                    .exec_async(&mut con)
+                    .await
+                    .map_err(|err| {
+                        MediatorError::DatabaseError(
+                            "NA".to_string(),
+                            format!("account_change_queue_limit() failed. Reason: {}", err),
+                        )
+                    })?;
+            }
+            debug!("Account queue_limit changed successfully");
 
             Ok(())
         }

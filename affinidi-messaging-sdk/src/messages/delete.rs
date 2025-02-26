@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 use crate::{
-    delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
-    profiles::Profile, ATM,
+    ATM, delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
+    profiles::Profile,
 };
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};

@@ -93,23 +93,26 @@ impl ProblemReport {
         let mut output: Vec<String> = Vec::new();
         let re = Regex::new(r"^\{(\d*)\}$").unwrap();
         for part in self.comment.split(" ") {
-            match re.captures(part) { Some(cap) => {
-                if let Some(num) = cap.get(1) {
-                    if let Ok(idx) = num.as_str().parse::<usize>() {
-                        if let Some(arg) = self.args.get(idx - 1) {
-                            output.push(arg.to_string());
+            match re.captures(part) {
+                Some(cap) => {
+                    if let Some(num) = cap.get(1) {
+                        if let Ok(idx) = num.as_str().parse::<usize>() {
+                            if let Some(arg) = self.args.get(idx - 1) {
+                                output.push(arg.to_string());
+                            } else {
+                                output.push("?".to_string());
+                            }
                         } else {
                             output.push("?".to_string());
                         }
                     } else {
-                        output.push("?".to_string());
+                        output.push("?".to_string())
                     }
-                } else {
-                    output.push("?".to_string())
                 }
-            } _ => {
-                output.push(part.to_string());
-            }}
+                _ => {
+                    output.push(part.to_string());
+                }
+            }
         }
 
         output.join(" ")

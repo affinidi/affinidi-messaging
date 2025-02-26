@@ -2,12 +2,12 @@
 //! This helps to create consistency in the examples and also to avoid code duplication.
 use affinidi_messaging_helpers::common::{
     affinidi_logo, check_path,
-    profiles::{Profiles, PROFILES_PATH},
+    profiles::{PROFILES_PATH, Profiles},
 };
-use console::{style, Style, Term};
-use dialoguer::{theme::ColorfulTheme, Confirm};
+use console::{Style, Term, style};
+use dialoguer::{Confirm, theme::ColorfulTheme};
 use std::error::Error;
-use ui::{init_local_mediator, init_remote_mediator, local_remote_mediator, MediatorType};
+use ui::{MediatorType, init_local_mediator, init_remote_mediator, local_remote_mediator};
 
 mod mediator;
 mod network;
@@ -39,18 +39,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let profile_name;
     let type_;
     loop {
-        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? { Some(m_t) => {
-            match m_t {
+        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? {
+            Some(m_t) => match m_t {
                 MediatorType::Local => init_local_mediator(&theme, &mut profiles).await?,
                 MediatorType::Remote => init_remote_mediator(&theme, &mut profiles).await?,
                 MediatorType::Existing(profile) => {
                     (MediatorType::Existing(profile.clone()), Some(profile))
                 }
+            },
+            _ => {
+                println!("{}", style("Exiting...").color256(208));
+                return Ok(());
             }
-        } _ => {
-            println!("{}", style("Exiting...").color256(208));
-            return Ok(());
-        }};
+        };
 
         if let Some(profile) = profile {
             profile_name = profile;

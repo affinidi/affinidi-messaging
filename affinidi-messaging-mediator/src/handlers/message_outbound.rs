@@ -1,10 +1,10 @@
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::{GetMessagesRequest, GetMessagesResponse};
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http::StatusCode;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 
 /// Delivers messages to the client for given message_ids
 /// outbound refers to outbound from the mediator perspective

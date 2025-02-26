@@ -43,7 +43,7 @@ pub const MAGIC_STRING: &[u8; 36] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 ///
 /// ### Example
 ///
-/// ```rust
+/// ```no_compile
 /// use crate::utils::handshake::accept_key_from;
 /// assert_eq!(accept_key_from("dGhlIHNhbXBsZSBub25jZQ=="), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
 /// ```
@@ -59,7 +59,7 @@ pub fn accept_key_from(sec_ws_key: impl AsRef<[u8]>) -> String {
 ///
 /// ### Example
 ///
-/// ```no_run
+/// ```no_compile
 /// use crate::utils::handshake::request;
 /// let _ = request("example.com", "/path", [("key", "value")]);
 /// ```
@@ -85,14 +85,19 @@ pub fn request(
     let path = path.as_ref().trim_start_matches('/');
     let sec_key = base64_encode(42_u128.to_ne_bytes());
     let headers: String = headers.into_iter().map(|f| Header::fmt(&f)).collect();
-    (format!("GET /{path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {sec_key}\r\n{headers}\r\n"), sec_key)
+    (
+        format!(
+            "GET /{path} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {sec_key}\r\n{headers}\r\n"
+        ),
+        sec_key,
+    )
 }
 
 /// Provides a interface for formatting HTTP headers
 ///
 /// # Example
 ///
-/// ```rust
+/// ```no_compile
 /// use web_socket::http::Header;
 ///
 /// assert_eq!(Header::fmt(&("val", 2)), "val: 2\r\n");

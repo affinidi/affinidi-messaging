@@ -7,15 +7,22 @@ Each WsConnection is a tokio parallel task, and responsible for unpacking incomi
 
 */
 use super::SharedState;
-use crate::{errors::ATMError, profiles::Profile, protocols::Protocols, transports::websockets::utils::connect, ATM};
+use crate::{
+    ATM, errors::ATMError, profiles::Profile, protocols::Protocols,
+    transports::websockets::utils::connect,
+};
 use affinidi_messaging_didcomm::{Message as DidcommMessage, UnpackMetadata};
-use url::Url;
-use web_socket::{CloseCode, DataType, Event, MessageType, WebSocket};
 use std::{pin::Pin, sync::Arc, time::Duration};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, BufReader}, select, sync::mpsc::{Receiver, Sender}, task::JoinHandle, time::{interval_at, sleep}
+    io::{AsyncRead, AsyncWrite, BufReader},
+    select,
+    sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
+    time::{interval_at, sleep},
 };
-use tracing::{debug, warn, error, span, Instrument};
+use tracing::{Instrument, debug, error, span, warn};
+use url::Url;
+use web_socket::{CloseCode, DataType, Event, MessageType, WebSocket};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -28,7 +35,7 @@ pub(crate) enum WsConnectionCommands {
     DisableDirectChannel,
     // To Handler
     Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
-    Disconnected(Arc<Profile>), // WebSocket connection is disconnected
+    Disconnected(Arc<Profile>),      // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
@@ -102,7 +109,7 @@ impl WsConnection {
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
             let mut watchdog = interval_at(tokio::time::Instant::now()+Duration::from_secs(20), Duration::from_secs(20));
-            
+
             let mut missed_pings = 0;
             loop {
                 select! {
@@ -148,7 +155,7 @@ impl WsConnection {
                                                 continue;
                                             }
                                         };
-                                        match &direct_channel { 
+                                        match &direct_channel {
                                             Some(sender) => {
                                                 let _ = sender.send(Box::new(unpack)).await;
                                             } _ => {
@@ -306,15 +313,13 @@ impl WsConnection {
 
         if update_sdk {
             debug!("channel to SDK = capacity = {}", self.to_handler.capacity());
-            match self
-                .to_handler
-                .try_send(WsConnectionCommands::Connected(
-                    self.profile.clone(),
-                    status_id,
-                )) {
+            match self.to_handler.try_send(WsConnectionCommands::Connected(
+                self.profile.clone(),
+                status_id,
+            )) {
                 Ok(_) => {}
                 Err(e) => {
-                warn!("Channel to WS_handler is full: {:?}", e);
+                    warn!("Channel to WS_handler is full: {:?}", e);
                 }
             }
         }
@@ -325,7 +330,7 @@ impl WsConnection {
     // Responsible for creating a websocket connection to the mediator
     async fn _create_socket(
         &mut self,
-    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError>  {
+    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError> {
         // Check if authenticated
         let tokens = self.profile.authenticate(&self.shared).await?;
 
@@ -350,20 +355,27 @@ impl WsConnection {
         let url = match Url::parse(address) {
             Ok(url) => url,
             Err(err) => {
-                error!("Mediator {}: Invalid ServiceEndpoint address {}: {}", mediator.did, address, err);
-                return Err(ATMError::TransportError(format!("Mediator {}: Invalid ServiceEndpoint address {}: {}", mediator.did, address, err)));
+                error!(
+                    "Mediator {}: Invalid ServiceEndpoint address {}: {}",
+                    mediator.did, address, err
+                );
+                return Err(ATMError::TransportError(format!(
+                    "Mediator {}: Invalid ServiceEndpoint address {}: {}",
+                    mediator.did, address, err
+                )));
             }
         };
 
-        
         let web_socket = match connect(&url, &tokens.access_token).await {
             Ok(web_socket) => web_socket,
             Err(err) => {
                 warn!("WebSocket failed. Reason: {}", err);
-                return Err(ATMError::TransportError(format!("Websocket connection failed: {}", err)));
+                return Err(ATMError::TransportError(format!(
+                    "Websocket connection failed: {}",
+                    err
+                )));
             }
         };
-       
 
         debug!("Completed websocket connection");
 

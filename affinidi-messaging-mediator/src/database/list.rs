@@ -1,8 +1,8 @@
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::{Folder, MessageList, MessageListElement};
 use itertools::Itertools;
-use redis::{from_redis_value, Value};
-use tracing::{event, span, Instrument, Level};
+use redis::{Value, from_redis_value};
+use tracing::{Instrument, Level, event, span};
 
 use super::Database;
 

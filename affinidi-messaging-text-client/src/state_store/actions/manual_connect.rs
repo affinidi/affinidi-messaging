@@ -1,16 +1,16 @@
 use super::chat_list::ChatStatus;
 use crate::state_store::State;
 use affinidi_messaging_sdk::{
+    ATM,
     profiles::Profile,
     secrets::{Secret, SecretType},
-    ATM,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
-use ssi::{jwk::Params, JWK};
+use ssi::{JWK, jwk::Params};
 
 pub async fn manual_connect_setup(
     state: &mut State,

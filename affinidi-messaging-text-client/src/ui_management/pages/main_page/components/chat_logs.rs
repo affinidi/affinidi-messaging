@@ -1,8 +1,8 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style},
     widgets::Block,
-    Frame,
 };
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
 

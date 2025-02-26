@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 use crate::{
+    ATM,
     errors::ATMError,
     messages::{DeleteMessageRequest, SuccessResponse},
     profiles::Profile,
-    ATM,
 };
 
 use super::{FetchDeletePolicy, GetMessagesResponse};

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 use tokio::{select, sync::mpsc, task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
-use tracing::{debug, error, info, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, info, span, warn};
 
 use crate::database::Database;
 

@@ -3,19 +3,19 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::SystemTime,
 };
-use tracing::{debug, error, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, span};
 use uuid::Uuid;
 
 use crate::{
+    SharedState,
     errors::ATMError,
     messages::{
         AuthenticationChallenge, AuthorizationResponse, GenericDataStruct, SuccessResponse,
     },
     profiles::Profile,
-    SharedState,
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
