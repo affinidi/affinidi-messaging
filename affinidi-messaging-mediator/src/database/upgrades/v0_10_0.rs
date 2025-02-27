@@ -30,17 +30,15 @@ impl Database {
         let mut cursor: u32 = 0;
         let mut counter = 0;
         loop {
-            let dids = self.account_list(cursor, 1).await?;
+            let dids = self.account_list(cursor, 100).await?;
 
-            let Some(account) = dids.accounts.first() else {
-                break;
-            };
+            for account in dids.accounts {
+                counter += 1;
 
-            counter += 1;
-
-            let mut acls = MediatorACLSet::from_u64(account.acls);
-            acls.set_self_manage_queue_limit(true);
-            self.set_did_acl(&account.did_hash, &acls).await?;
+                let mut acls = MediatorACLSet::from_u64(account.acls);
+                acls.set_self_manage_queue_limit(true);
+                self.set_did_acl(&account.did_hash, &acls).await?;
+            }
 
             if dids.cursor == 0 {
                 break;
