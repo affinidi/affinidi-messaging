@@ -15,7 +15,7 @@ impl Database {
     pub(crate) async fn initialize(&self, config: &Config) -> Result<(), MediatorError> {
         // Check the schema version and update if necessary
         // TODO: Update is not implemented yet
-        self._check_schema_version().await?;
+        self._check_schema_version(config).await?;
 
         // Setup the mediator account if it doesn't exist
         // Set the ACL for the mediator account to deny_all by default
@@ -38,7 +38,7 @@ impl Database {
         Ok(())
     }
 
-    async fn _check_schema_version(&self) -> Result<(), MediatorError> {
+    async fn _check_schema_version(&self, config: &Config) -> Result<(), MediatorError> {
         let mut conn = self.0.get_async_connection().await?;
 
         let schema_version: Option<String> =
@@ -80,7 +80,9 @@ impl Database {
                     "Database schema version ({}) doesn't match mediator version ({}).",
                     schema_version, mediator_version
                 );
-                self.upgrade_0_10_0().await?;
+                self.upgrade_0_10_0(&config.security.global_acl_default)
+                    .await?;
+                info!("Database schema version updated to ({})", mediator_version);
             }
         } else {
             warn!(
