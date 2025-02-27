@@ -40,6 +40,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 * Queue limits can now be set per DID between a soft and hard limit
   * Admin accounts can override and go above the hard limit as needed
   * New ACL Flag enabled for can change queue_limit (SELF_MANAGE_QUEUE_LIMIT)
+* Ability to set an ephemeral header on messages that will not store the message
+  * Instead, if the client is live-streaming it will send only via the live stream
 
 ### DIDComm Library (0.10.0)
 

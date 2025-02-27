@@ -287,16 +287,42 @@ pub(crate) async fn process(
         debug!(" TO: {}", next);
         debug!(" FROM: {:?}", msg.from);
         debug!(" Forwarded message:\n{}", data);
+        debug!(" Ephemeral: {:?}", msg.extra_headers.get("ephemeral"));
         debug!(" *************************************** ");
-        store_forwarded_message(
-            state,
-            session,
-            &data,
-            msg.from.as_deref(),
-            &next,
-            Some(expires_at),
-        )
-        .await?;
+
+        let ephemeral = if let Some(ephemeral) = msg.extra_headers.get("ephemeral") {
+            ephemeral.as_bool().unwrap_or(false)
+        } else {
+            false
+        };
+
+        if ephemeral {
+            // Live stream the message?
+            if let Some(stream_uuid) = state
+                .database
+                .streaming_is_client_live(&next_did_hash, false)
+                .await
+            {
+                if state
+                    .database
+                    .streaming_publish_message(&next_did_hash, &stream_uuid, &data, false)
+                    .await
+                    .is_ok()
+                {
+                    debug!("Live streaming message to UUID: {}", stream_uuid);
+                }
+            }
+        } else {
+            store_forwarded_message(
+                state,
+                session,
+                &data,
+                msg.from.as_deref(),
+                &next,
+                Some(expires_at),
+            )
+            .await?;
+        }
 
         Ok(ProcessMessageResponse {
             store_message: false,
