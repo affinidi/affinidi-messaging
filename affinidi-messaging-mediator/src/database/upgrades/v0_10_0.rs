@@ -14,18 +14,22 @@ impl Database {
         &self,
         default_acl: &MediatorACLSet,
     ) -> Result<(), MediatorError> {
-        if default_acl.get_self_manage_queue_limit() {
-            // Set the self_change_queue_limit flag to true for all accounts
-            info!("Setting self_change_queue_limit flag to true for all accounts");
-            self.update_acl_flag_queue_limit().await?;
-        } else {
-            // ACL flag is not enabled by default, so do NOT add this to existing DID ACLs
+        let send_limit_flag = default_acl.get_self_manage_send_queue_limit();
+        let receive_limit_flag = default_acl.get_self_manage_receive_queue_limit();
+
+        if send_limit_flag || receive_limit_flag {
+            self.update_acl_flag_queue_limits(send_limit_flag, receive_limit_flag)
+                .await?;
         }
 
         self.upgrade_change_schema_version("0.10.0").await
     }
 
-    async fn update_acl_flag_queue_limit(&self) -> Result<(), MediatorError> {
+    async fn update_acl_flag_queue_limits(
+        &self,
+        send: bool,
+        receive: bool,
+    ) -> Result<(), MediatorError> {
         // Update all accounts to have the self_change_queue_limit flag set to true
         let mut cursor: u32 = 0;
         let mut counter = 0;
@@ -36,7 +40,12 @@ impl Database {
                 counter += 1;
 
                 let mut acls = MediatorACLSet::from_u64(account.acls);
-                acls.set_self_manage_queue_limit(true);
+                if send {
+                    acls.set_self_manage_send_queue_limit(true);
+                }
+                if receive {
+                    acls.set_self_manage_receive_queue_limit(true);
+                }
                 self.set_did_acl(&account.did_hash, &acls).await?;
             }
 

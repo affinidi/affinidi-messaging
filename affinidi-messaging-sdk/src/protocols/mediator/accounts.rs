@@ -29,10 +29,11 @@ pub enum MediatorAccountRequest {
         #[serde(alias = "type")]
         _type: AccountType,
     },
-    #[serde(rename = "account_change_queue_limit")]
-    AccountChangeQueueLimit {
+    #[serde(rename = "account_change_queue_limits")]
+    AccountChangeQueueLimits {
         did_hash: String,
-        queue_limit: Option<u32>,
+        send_queue_limit: Option<i32>,
+        receive_queue_limit: Option<i32>,
     },
 }
 
@@ -135,7 +136,8 @@ pub struct Account {
     pub _type: AccountType,
     pub access_list_count: u32,
     /// Number of messages that can be in the queue for this account
-    pub queue_limit: Option<u32>,
+    pub queue_send_limit: Option<i32>,
+    pub queue_receive_limit: Option<i32>,
     pub send_queue_count: u32,
     pub send_queue_bytes: u64,
     pub receive_queue_count: u32,
@@ -149,7 +151,8 @@ impl Default for Account {
             acls: 0,
             _type: AccountType::Standard,
             access_list_count: 0,
-            queue_limit: None,
+            queue_send_limit: None,
+            queue_receive_limit: None,
             send_queue_count: 0,
             send_queue_bytes: 0,
             receive_queue_count: 0,
@@ -162,6 +165,12 @@ impl Default for Account {
 pub struct MediatorAccountList {
     pub accounts: Vec<Account>,
     pub cursor: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountChangeQueueLimitsResponse {
+    pub send_queue_limit: Option<i32>,
+    pub receive_queue_limit: Option<i32>,
 }
 
 impl Mediator {
@@ -545,27 +554,35 @@ impl Mediator {
         })
     }
 
-    /// Change the Queue Limit for a DID
+    /// Change the Queue Limits for a DID
     /// - `atm` - The ATM client to use
     /// - `profile` - The profile to use
     /// - `did_hash` - The DID hash to change the type for
-    /// - `queue_limit` - If None, reset to default, otherwise Some(u32) to set the limit
+    /// - `send_queue_limit`
+    /// - `receive_queue_limit`
+    ///
+    /// NOTE: queue_limit values
+    ///       - None: No change
+    ///       - Some(-1): Unlimited
+    ///       - Some(-2): Reset to soft_limit
+    ///       - Some(n): Set to n
     ///
     /// # Returns
     /// true or false if the account was changed
-    pub async fn account_change_queue_limit(
+    pub async fn account_change_queue_limits(
         &self,
         atm: &ATM,
         profile: &Arc<Profile>,
         did_hash: &str,
-        queue_limit: Option<u32>,
-    ) -> Result<Option<u32>, ATMError> {
+        send_queue_limit: Option<i32>,
+        receive_queue_limit: Option<i32>,
+    ) -> Result<AccountChangeQueueLimitsResponse, ATMError> {
         let _span = span!(Level::DEBUG, "account_change_queue_limit");
 
         async move {
             debug!(
-                "Changing account ({}) queue_limit to ({:?}).",
-                did_hash, queue_limit
+                "Changing account ({}) queue_limits to send({:?}) receive({:?}).",
+                did_hash, send_queue_limit, receive_queue_limit
             );
 
             let (profile_did, mediator_did) = profile.dids()?;
@@ -578,7 +595,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"account_change_queue_limit": {"did_hash": did_hash, "queue_limit": queue_limit}}),
+                json!({"account_change_queue_limits": {"did_hash": did_hash, "send_queue_limit": send_queue_limit, "receive_queue_limit": receive_queue_limit}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -618,7 +635,7 @@ impl Mediator {
     fn _parse_account_change_queue_limit_response(
         &self,
         message: &Message,
-    ) -> Result<Option<u32>, ATMError> {
+    ) -> Result<AccountChangeQueueLimitsResponse, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Account Change Queue Limit response could not be parsed. Reason: {}",

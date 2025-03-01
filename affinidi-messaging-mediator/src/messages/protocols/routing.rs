@@ -140,12 +140,12 @@ pub(crate) async fn process(
 
         // ****************************************************
 
-        // forwarded messages are typically anonymous, so we don't know the sender
-        // Hence we will check against the session DID for sending checks
-        if from_account.send_queue_count as u32 + attachments.len() as u32
-            >= from_account
-                .queue_limit
-                .unwrap_or(state.config.limits.queued_messages_soft)
+        // Check against the limits
+        let send_limit = from_account
+            .queue_send_limit
+            .unwrap_or(state.config.limits.queued_send_messages_soft);
+        if send_limit != -1
+            && from_account.send_queue_count + attachments.len() as u32 >= send_limit as u32
         {
             warn!(
                 "Sender DID ({}) has too many messages waiting to be delivered",
@@ -162,10 +162,11 @@ pub(crate) async fn process(
         // Does the sender have too many messages in queue?
         // Too many attachments?
         // Forwarding task queue is full?
-        if next_account.receive_queue_count as u32 + attachments.len() as u32
-            >= next_account
-                .queue_limit
-                .unwrap_or(state.config.limits.queued_messages_soft)
+        let recv_limit = next_account
+            .queue_receive_limit
+            .unwrap_or(state.config.limits.queued_receive_messages_soft);
+        if recv_limit != -1
+            && next_account.receive_queue_count + attachments.len() as u32 >= recv_limit as u32
         {
             warn!(
                 "Next DID ({}) has too many messages waiting to be delivered",

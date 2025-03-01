@@ -54,7 +54,8 @@ pub struct MediatorACLSet {
        14: anon_receive (0 = no, 1 = yes)
        15: anon_receive_change (0 = admin_only, 1 = self)
        16: self_manage_list (0 = admin_only, 1 = self)
-       17: self_manage_queue_limit
+       17: self_manage_send_queue_limit
+       18: self_manage_receive_queue_limit
     */
     access_list_mode: AccessListModeType,
     access_list_mode_self_change: bool,
@@ -73,7 +74,8 @@ pub struct MediatorACLSet {
     anon_receive: bool,
     anon_receive_self_change: bool,
     self_manage_list: bool,
-    self_manage_queue_limit: bool,
+    self_manage_send_queue_limit: bool,
+    self_manage_receive_queue_limit: bool,
     /// Internal use only
     acl: u64,
 }
@@ -109,7 +111,8 @@ impl MediatorACLSet {
                     default_acl.set_create_invites(true, true, true)?;
                     default_acl.set_anon_receive(true, true, true)?;
                     default_acl.set_self_manage_list(true);
-                    default_acl.set_self_manage_queue_limit(true);
+                    default_acl.set_self_manage_send_queue_limit(true);
+                    default_acl.set_self_manage_receive_queue_limit(true);
                 }
                 "deny_all" => {
                     default_acl.set_access_list_mode(
@@ -125,7 +128,8 @@ impl MediatorACLSet {
                     default_acl.set_create_invites(false, false, true)?;
                     default_acl.set_anon_receive(false, false, true)?;
                     default_acl.set_self_manage_list(false);
-                    default_acl.set_self_manage_queue_limit(false);
+                    default_acl.set_self_manage_send_queue_limit(false);
+                    default_acl.set_self_manage_receive_queue_limit(false);
                 }
                 "mode_explicit_allow" => {
                     default_acl.set_access_list_mode(
@@ -225,8 +229,11 @@ impl MediatorACLSet {
                 "blocked" => {
                     default_acl.set_blocked(true);
                 }
-                "self_manage_queue_limit" => {
-                    default_acl.set_self_manage_queue_limit(true);
+                "self_manage_send_queue_limit" => {
+                    default_acl.set_self_manage_send_queue_limit(true);
+                }
+                "self_manage_receive_queue_limit" => {
+                    default_acl.set_self_manage_receive_queue_limit(true);
                 }
                 _ => {
                     return Err(ATMError::ConfigError(format!(
@@ -274,7 +281,8 @@ impl MediatorACLSet {
         acls.anon_receive = acls.get_anon_receive().0;
         acls.anon_receive_self_change = acls.get_anon_receive().1;
         acls.self_manage_list = acls.get_self_manage_list();
-        acls.self_manage_queue_limit = acls.get_self_manage_queue_limit();
+        acls.self_manage_send_queue_limit = acls.get_self_manage_send_queue_limit();
+        acls.self_manage_receive_queue_limit = acls.get_self_manage_receive_queue_limit();
 
         acls
     }
@@ -660,18 +668,32 @@ impl MediatorACLSet {
         self.self_manage_list = flag;
     }
 
-    /// Can this DID self manage their own queue limits?
-    pub fn get_self_manage_queue_limit(&self) -> bool {
+    /// Can this DID self manage their own queue send limits?
+    pub fn get_self_manage_send_queue_limit(&self) -> bool {
         // BIT Position 17
         self._generic_get(17)
     }
 
-    /// Set whether this DID can self manage their own queue limits
-    /// flag = true means the DID can self manage
-    pub fn set_self_manage_queue_limit(&mut self, flag: bool) {
-        // BIT 17 :: DID can self manage ACL list? (0 = no, 1 = yes)
+    /// Set whether this DID can self manage their own queue send limits
+    /// flag = true means the DID can self manage send queue limit
+    pub fn set_self_manage_send_queue_limit(&mut self, flag: bool) {
+        // BIT 17 :: DID can set send queue limit? (0 = no, 1 = yes)
         self._generic_set(17, flag);
-        self.self_manage_queue_limit = flag;
+        self.self_manage_send_queue_limit = flag;
+    }
+
+    /// Can this DID self manage their own queue receive limits?
+    pub fn get_self_manage_receive_queue_limit(&self) -> bool {
+        // BIT Position 18
+        self._generic_get(18)
+    }
+
+    /// Set whether this DID can self manage their own queue receive limits
+    /// flag = true means the DID can self manage receive queue limit
+    pub fn set_self_manage_receive_queue_limit(&mut self, flag: bool) {
+        // BIT 18 :: DID can set receive queue limit? (0 = no, 1 = yes)
+        self._generic_set(18, flag);
+        self.self_manage_receive_queue_limit = flag;
     }
 }
 
@@ -1057,23 +1079,44 @@ mod tests {
     }
 
     #[test]
-    fn test_self_manage_queue_limit_default() {
+    fn test_self_manage_send_queue_limit_default() {
         let acl = MediatorACLSet::default();
 
         // Should default to false/allowed
-        assert!(!acl.get_self_manage_queue_limit(),);
+        assert!(!acl.get_self_manage_send_queue_limit(),);
     }
 
     #[test]
-    fn test_self_manage_queue_limit_change() {
+    fn test_self_manage_send_queue_limit_change() {
         let mut acl = MediatorACLSet::default();
 
         // set to self_manage_queue_limit
-        acl.set_self_manage_queue_limit(true);
-        assert!(acl.get_self_manage_queue_limit());
+        acl.set_self_manage_send_queue_limit(true);
+        assert!(acl.get_self_manage_send_queue_limit());
 
         // set to unblocked
-        acl.set_self_manage_queue_limit(false);
-        assert!(!acl.get_self_manage_queue_limit());
+        acl.set_self_manage_send_queue_limit(false);
+        assert!(!acl.get_self_manage_send_queue_limit());
+    }
+
+    #[test]
+    fn test_self_manage_receive_queue_limit_default() {
+        let acl = MediatorACLSet::default();
+
+        // Should default to false/allowed
+        assert!(!acl.get_self_manage_receive_queue_limit(),);
+    }
+
+    #[test]
+    fn test_self_manage_receive_queue_limit_change() {
+        let mut acl = MediatorACLSet::default();
+
+        // set to self_manage_queue_limit
+        acl.set_self_manage_receive_queue_limit(true);
+        assert!(acl.get_self_manage_receive_queue_limit());
+
+        // set to unblocked
+        acl.set_self_manage_receive_queue_limit(false);
+        assert!(!acl.get_self_manage_receive_queue_limit());
     }
 }

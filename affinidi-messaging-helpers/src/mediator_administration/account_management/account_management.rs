@@ -6,7 +6,7 @@ use affinidi_messaging_sdk::{
     protocols::{
         Protocols,
         mediator::{
-            accounts::{Account, AccountType},
+            accounts::{Account, AccountChangeQueueLimitsResponse, AccountType},
             acls::MediatorACLSet,
         },
     },
@@ -133,7 +133,7 @@ pub(crate) async fn manage_account_menu(
         );
 
         println!(
-            "{} {} {} {} {} {} {} {} {} {} {}",
+            "{} {} {} {} {} {} {} {} {} {} {} {} {}",
             style("Stats").yellow(),
             style("INBOX Count:").yellow(),
             style(&account.receive_queue_count).blue().bold(),
@@ -143,11 +143,19 @@ pub(crate) async fn manage_account_menu(
             style(&account.receive_queue_count).blue().bold(),
             style("OUTBOX bytes").yellow(),
             style(&account.receive_queue_bytes).blue().bold(),
-            style("Queue Limit:").yellow(),
+            style("Send Q Limit:").yellow(),
             style(
                 &account
-                    .queue_limit
-                    .unwrap_or(mediator_config.queued_messages_soft)
+                    .queue_send_limit
+                    .unwrap_or(mediator_config.queued_send_messages_soft)
+            )
+            .blue()
+            .bold(),
+            style("Receive Q Limit:").yellow(),
+            style(
+                &account
+                    .queue_receive_limit
+                    .unwrap_or(mediator_config.queued_receive_messages_soft)
             )
             .blue()
             .bold()
@@ -190,8 +198,23 @@ pub(crate) async fn manage_account_menu(
             2 => {
                 // Change Queue Limits
                 match _change_account_queue_limit(atm, profile, protocols, theme, &account).await {
-                    Ok(queue_limit) => {
-                        account.queue_limit = queue_limit;
+                    Ok(response) => {
+                        if let Some(response) = response {
+                            if let Some(limit) = response.send_queue_limit {
+                                if limit == -2 {
+                                    account.queue_send_limit = None;
+                                } else {
+                                    account.queue_send_limit = response.send_queue_limit;
+                                }
+                            }
+                            if let Some(limit) = response.receive_queue_limit {
+                                if limit == -2 {
+                                    account.queue_receive_limit = None;
+                                } else {
+                                    account.queue_receive_limit = response.receive_queue_limit;
+                                }
+                            }
+                        }
                     }
                     Err(err) => println!(
                         "{}",
@@ -275,29 +298,42 @@ async fn _change_account_queue_limit(
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
-) -> Result<Option<u32>, Box<dyn std::error::Error>> {
-    let input: String = Input::with_theme(theme)
-        .with_prompt("New Queue Limit? (number, exit or RESET)")
+) -> Result<Option<AccountChangeQueueLimitsResponse>, Box<dyn std::error::Error>> {
+    let send_input = Input::with_theme(theme)
+        .with_prompt("New Send Queue Limit? (-2 = Reset, -1 = Unlimited, n = limit, blank = no change, exit = cancel")
         .validate_with(|input: &String| -> Result<(), &str> {
-            let re = Regex::new(r"\d*|exit|RESET").unwrap();
-            if re.is_match(input) || input == "exit" {
+            let re = Regex::new(r"\d*|exit").unwrap();
+            if input == "exit" || input.is_empty() {
                 Ok(())
+            } else if re.is_match(input) {
+                match input.parse::<i32>() {
+                    Ok(limit) => {
+                        if limit < -2 {
+                            Err("Invalid queue limit")
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(_) => {
+                        Err("Couldn't parse queue_limit")
+                    }
+                }
             } else {
                 Err("Invalid queue limit")
             }
-        })
+        }).allow_empty(true)
         .interact_text()
         .unwrap();
 
-    if input == "exit" {
+    if send_input == "exit" {
         return Ok(None);
     }
 
-    println!("Changing account queue_limit to: {}", input);
-    let queue_limit = if input == "RESET" {
+    println!("Changing account send queue_limit to: {}", send_input);
+    let send_queue_limit: Option<i32> = if send_input.is_empty() {
         None
     } else {
-        match input.parse::<u32>() {
+        match send_input.parse::<i32>() {
             Ok(limit) => Some(limit),
             Err(e) => {
                 println!("{}", style(format!("Couldn't parse number: {}", e)).red());
@@ -306,16 +342,69 @@ async fn _change_account_queue_limit(
         }
     };
 
-    protocols
+    let receive_input = Input::with_theme(theme)
+        .with_prompt("New Receive Queue Limit? (-2 = Reset, -1 = Unlimited, n = limit, blank = no change, exit = cancel")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            let re = Regex::new(r"\d*|exit").unwrap();
+            if input == "exit" || input.is_empty() {
+                Ok(())
+            } else if re.is_match(input) {
+                match input.parse::<i32>() {
+                    Ok(limit) => {
+                        if limit < -2 {
+                            Err("Invalid queue limit")
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(_) => {
+                        Err("Couldn't parse queue_limit")
+                    }
+                }
+            } else {
+                Err("Invalid queue limit")
+            }
+        }).allow_empty(true)
+        .interact_text()
+        .unwrap();
+
+    if receive_input == "exit" {
+        return Ok(None);
+    }
+
+    println!("Changing account receive queue_limit to: {}", receive_input);
+    let receive_queue_limit: Option<i32> = if receive_input.is_empty() {
+        None
+    } else {
+        match receive_input.parse::<i32>() {
+            Ok(limit) => Some(limit),
+            Err(e) => {
+                println!("{}", style(format!("Couldn't parse number: {}", e)).red());
+                return Err("Couldn't parse queue_limit".into());
+            }
+        }
+    };
+
+    let response = protocols
         .mediator
-        .account_change_queue_limit(atm, profile, &account.did_hash, queue_limit)
+        .account_change_queue_limits(
+            atm,
+            profile,
+            &account.did_hash,
+            send_queue_limit,
+            receive_queue_limit,
+        )
         .await
         .map_err(|e| e.to_string())?;
     println!(
         "{}",
-        style("Account queue_limit changed successfully").green()
+        style(format!(
+            "Account queue_limits changed successfully {:#?}",
+            response
+        ))
+        .green()
     );
-    Ok(queue_limit)
+    Ok(Some(response))
 }
 
 /// Picks the target DID

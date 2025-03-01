@@ -5,7 +5,7 @@ use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::{
-        accounts::{AccountType, MediatorAccountRequest},
+        accounts::{AccountChangeQueueLimitsResponse, AccountType, MediatorAccountRequest},
         acls::{AccessListModeType, MediatorACLSet},
     },
 };
@@ -372,7 +372,7 @@ pub(crate) async fn process(
                     }
                 }
             }
-            MediatorAccountRequest::AccountChangeQueueLimit {did_hash, queue_limit } => {
+            MediatorAccountRequest::AccountChangeQueueLimits {did_hash, send_queue_limit, receive_queue_limit } => {
                  // Check permissions and ACLs
                  if !check_permissions(session, &[did_hash.clone()]) {
                     warn!("ACL Request from DID ({}) failed. ", session.did_hash);
@@ -392,26 +392,55 @@ pub(crate) async fn process(
                     );
                 }
 
-                let queue_limit = if let Some(ql) = queue_limit {
-                    if session.account_type == AccountType::Admin || session.account_type == AccountType::RootAdmin {
-                        queue_limit
-                    } else  if ql > state.config.limits.queued_messages_hard {
-                        Some(state.config.limits.queued_messages_hard)
+                // Check ACL's
+                let (send_queue_limit, receive_queue_limit) = if session.account_type == AccountType::Standard {
+                    // Check send queue limit ACL and limits
+                    let send_queue_limit = if session.acls.get_self_manage_send_queue_limit() {
+                        if let Some(limit) = send_queue_limit {
+                            if limit == -1 || limit == -2 {
+                                send_queue_limit
+                            } else if limit > state.config.limits.queued_send_messages_hard {
+                                Some(state.config.limits.queued_send_messages_hard)
+                            } else {
+                                send_queue_limit
+                            }
+                        } else {
+                            None
+                        }
                     } else {
-                        queue_limit
-                    }
+                        None
+                    };
+
+                    let receive_queue_limit = if session.acls.get_self_manage_receive_queue_limit() {
+                        if let Some(limit) = receive_queue_limit {
+                            if limit == -1 || limit == -2 {
+                                receive_queue_limit
+                            } else if limit > state.config.limits.queued_receive_messages_hard {
+                                Some(state.config.limits.queued_receive_messages_hard)
+                            } else {
+                                receive_queue_limit
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    (send_queue_limit, receive_queue_limit)
                 } else {
-                    None
+                    // Admin account
+                    (send_queue_limit, receive_queue_limit)
                 };
 
-                match state.database.account_change_queue_limit(&did_hash, queue_limit).await {
+                match state.database.account_change_queue_limits(&did_hash, send_queue_limit, receive_queue_limit).await {
                     Ok(_) => {
-                        info!("Changed account queue_limit for DID: ({}) to ({:?})", did_hash, queue_limit);
+                        info!("Changed account queue_limits for DID: ({}) to send({:?}) receive({:?})", did_hash, send_queue_limit, receive_queue_limit);
                         _generate_response_message(
                         &msg.id,
                         &session.did,
                         &state.config.mediator_did,
-                        &json!(queue_limit),
+                        &json!(AccountChangeQueueLimitsResponse { send_queue_limit, receive_queue_limit}),
                     )}
                     Err(err) => {
                         warn!("Error Changing account type. Reason: {}", err);

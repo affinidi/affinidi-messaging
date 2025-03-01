@@ -1,6 +1,4 @@
 //! Handles scanning, adding and removing DID accounts from the mediator
-use std::collections::HashMap;
-
 use super::{Database, session::Session};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
@@ -11,6 +9,8 @@ use affinidi_messaging_sdk::{
     },
 };
 use redis::Pipeline;
+use std::collections::HashMap;
+use tokio::join;
 use tracing::{Instrument, Level, debug, span};
 
 // Private helper function to translate HashMap into an Account
@@ -24,7 +24,8 @@ fn _to_account(map: HashMap<String, String>, access_list_count: u32) -> Account 
         match key.as_str() {
             "ROLE_TYPE" => account._type = AccountType::from(value.as_str()),
             "ACLS" => account.acls = u64::from_str_radix(value, 16).unwrap_or(0_u64),
-            "QUEUE_LIMIT" => account.queue_limit = value.parse().ok(),
+            "SEND_QUEUE_LIMIT" => account.queue_send_limit = value.parse().ok(),
+            "RECEIVE_QUEUE_LIMIT" => account.queue_receive_limit = value.parse().ok(),
             "SEND_QUEUE_BYTES" => account.send_queue_bytes = value.parse().unwrap_or(0),
             "SEND_QUEUE_COUNT" => account.send_queue_count = value.parse().unwrap_or(0),
             "RECEIVE_QUEUE_BYTES" => account.receive_queue_bytes = value.parse().unwrap_or(0),
@@ -360,58 +361,95 @@ impl Database {
         .await
     }
 
-    /// Changes the queue limit of an account
+    /// Changes the queue limits of an account
     /// Assumes that all checks have been done prior to this call
     /// - `did_hash` - SHA256 hash of the DID
-    /// - `queue_limit` - New queue limit (deletes if set to None)
-    pub(crate) async fn account_change_queue_limit(
+    /// - `send_queue_limit` - New send queue limit
+    /// - `receive_queue_limit` - New receive queue limit
+    ///
+    /// NOTE: queue_limit values:
+    ///       - None: No change to the queue limit
+    ///       - Some(-1): Unlimited
+    ///       - Some(-2): Reset to soft limit
+    ///       - Some(n): set to n
+    pub(crate) async fn account_change_queue_limits(
         &self,
         did_hash: &str,
-        queue_limit: Option<u32>,
+        send_queue_limit: Option<i32>,
+        receive_queue_limit: Option<i32>,
     ) -> Result<(), MediatorError> {
         let _span = span!(
             Level::DEBUG,
             "account_change_queue_limit",
             "did_hash" = did_hash,
-            "queue_limit" = queue_limit
+            "send_queue_limit" = send_queue_limit,
+            "receive_queue_limit" = receive_queue_limit
         );
 
         async move {
-            debug!("Changing account queue_limit");
+            debug!("Changing account queue_limits");
+            let (send, receive) = join!(
+                self._change_queue_limit(did_hash, send_queue_limit, "SEND_QUEUE_LIMIT"),
+                self._change_queue_limit(did_hash, receive_queue_limit, "RECEIVE_QUEUE_LIMIT")
+            );
 
-            let mut con = self.0.get_async_connection().await?;
-
-            if let Some(queue_limit) = queue_limit {
-                deadpool_redis::redis::cmd("HSET")
-                    .arg(["DID:", did_hash].concat())
-                    .arg("QUEUE_LIMIT")
-                    .arg(queue_limit)
-                    .exec_async(&mut con)
-                    .await
-                    .map_err(|err| {
-                        MediatorError::DatabaseError(
-                            "NA".to_string(),
-                            format!("account_change_queue_limit() failed. Reason: {}", err),
-                        )
-                    })?;
-            } else {
-                deadpool_redis::redis::cmd("HDEL")
-                    .arg(["DID:", did_hash].concat())
-                    .arg("QUEUE_LIMIT")
-                    .exec_async(&mut con)
-                    .await
-                    .map_err(|err| {
-                        MediatorError::DatabaseError(
-                            "NA".to_string(),
-                            format!("account_change_queue_limit() failed. Reason: {}", err),
-                        )
-                    })?;
-            }
-            debug!("Account queue_limit changed successfully");
+            send?;
+            receive?;
 
             Ok(())
         }
         .instrument(_span)
         .await
+    }
+
+    async fn _change_queue_limit(
+        &self,
+        did_hash: &str,
+        queue_limit: Option<i32>,
+        queue_name: &str,
+    ) -> Result<(), MediatorError> {
+        let mut con = self.0.get_async_connection().await?;
+
+        match queue_limit {
+            None => return Ok(()),
+            Some(-2) => {
+                deadpool_redis::redis::cmd("HDEL")
+                    .arg(["DID:", did_hash].concat())
+                    .arg(queue_name)
+                    .exec_async(&mut con)
+                    .await
+                    .map_err(|err| {
+                        MediatorError::DatabaseError(
+                            "NA".to_string(),
+                            format!(
+                                "changing queue_limit ({}) failed. Reason: {}",
+                                queue_name, err
+                            ),
+                        )
+                    })?;
+            }
+            Some(n) => {
+                deadpool_redis::redis::cmd("HSET")
+                    .arg(["DID:", did_hash].concat())
+                    .arg(queue_name)
+                    .arg(n)
+                    .exec_async(&mut con)
+                    .await
+                    .map_err(|err| {
+                        MediatorError::DatabaseError(
+                            "NA".to_string(),
+                            format!(
+                                "changing queue_limit ({}) failed. Reason: {}",
+                                queue_name, err
+                            ),
+                        )
+                    })?;
+            }
+        }
+        debug!(
+            "Account queue_limit ({}) set to ({:?}) changed successfully",
+            queue_name, queue_limit
+        );
+        Ok(())
     }
 }

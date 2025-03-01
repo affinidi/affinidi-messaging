@@ -635,9 +635,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.12.4"
+version = "1.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd755adf9707cf671e31d944a189be3deaaeee11c8bc1d669bb8022ac90fbd0"
+checksum = "5e4e8200b9a4a5801a769d50eeabc05670fec7e959a8cb7a63a93e4e519942ae"
 dependencies = [
  "aws-lc-sys",
  "paste",
@@ -753,9 +753,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssm"
-version = "1.66.0"
+version = "1.66.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479c4a6787dadce70f29d6f71c26ad5ba51ac8fcc3d615009c90c787ab66ce9c"
+checksum = "49a09fedd385923922cb637a552cf57ae28b05c3933a4822550308cbf76433a5"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1295,9 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1230237285e3e10cde447185e8975408ae24deaa67205ce684805c25bc0c7937"
+checksum = "675f87afced0413c9bb02843499dbbd3882a237645883f71a2b59644a6d2f753"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.6",
@@ -1482,9 +1482,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.15"
+version = "1.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c736e259eea577f443d5c86c304f9f4ae0295c43f3ba05c21f1d66b5f06001af"
+checksum = "be714c154be609ec7f5dad223a33bf1482fff90472de28f7362806e6d4832b8c"
 dependencies = [
  "jobserver",
  "libc",
@@ -1563,9 +1563,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.39"
+version = "0.4.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e36cc9d416881d2e24f9a963be5fb1cd90966419ac844274161d10488b3e825"
+checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -1573,7 +1573,7 @@ dependencies = [
  "num-traits",
  "serde",
  "wasm-bindgen",
- "windows-targets 0.52.6",
+ "windows-link",
 ]
 
 [[package]]
@@ -2260,9 +2260,9 @@ dependencies = [
 
 [[package]]
 name = "deadpool-redis"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "011ead1ec511457e06577f438fbb3a8c3de6c65c669bca9c95ed4dca6c396f6f"
+checksum = "c136f185b3ca9d1f4e4e19c11570e1002f4bfdd592d589053e225716d613851f"
 dependencies = [
  "deadpool",
  "redis",
@@ -4345,9 +4345,9 @@ checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
 name = "litemap"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee93343901ab17bd981295f2cf0026d4ad018c7c31ba84549a4ddbb47a45104"
+checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "litrs"
@@ -5348,7 +5348,7 @@ checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.2",
- "zerocopy 0.8.20",
+ "zerocopy 0.8.21",
 ]
 
 [[package]]
@@ -5388,7 +5388,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a509b1a2ffbe92afab0e55c8fd99dea1c280e8171bd2d88682bb20bc41cbc2c"
 dependencies = [
  "getrandom 0.3.1",
- "zerocopy 0.8.20",
+ "zerocopy 0.8.21",
 ]
 
 [[package]]
@@ -5552,9 +5552,9 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.28.2"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37ec3fd44bea2ec947ba6cc7634d7999a6590aca7c35827c250bc0de502bda6"
+checksum = "9568894e8bdefd16512bca9e286a9d2abc27773609aa4eb7f428497d64df4373"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -5566,8 +5566,6 @@ dependencies = [
  "pin-project-lite",
  "rustls 0.23.23",
  "rustls-native-certs 0.7.3",
- "rustls-pemfile 2.2.0",
- "rustls-pki-types",
  "ryu",
  "sha1_smol",
  "socket2",
@@ -8492,6 +8490,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "windows-link"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dccfd733ce2b1753b03b6d3c65edf020262ea35e20ccdf3e288043e6dd620e3"
+
+[[package]]
 name = "windows-registry"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8864,11 +8868,11 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.20"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dde3bb8c68a8f3f1ed4ac9221aad6b10cece3e60a8e2ea54a6a2dec806d0084c"
+checksum = "dcf01143b2dd5d134f11f545cf9f1431b13b749695cb33bcce051e7568f99478"
 dependencies = [
- "zerocopy-derive 0.8.20",
+ "zerocopy-derive 0.8.21",
 ]
 
 [[package]]
@@ -8884,9 +8888,9 @@ dependencies = [
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.20"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eea57037071898bf96a6da35fd626f4f27e9cee3ead2a6c703cf09d472b2e700"
+checksum = "712c8386f4f4299382c9abee219bee7084f78fb939d88b6840fcc1320d5f6da2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8895,18 +8899,18 @@ dependencies = [
 
 [[package]]
 name = "zerofrom"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cff3ee08c995dee1859d998dea82f7374f2826091dd9cd47def953cae446cd2e"
+checksum = "50cc42e0333e05660c3587f3bf9d0478688e15d870fab3346451ce7f8c9fbea5"
 dependencies = [
  "zerofrom-derive",
 ]
 
 [[package]]
 name = "zerofrom-derive"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595eed982f7d355beb85837f651fa22e90b3c044842dc7f2c2842c086f295808"
+checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",

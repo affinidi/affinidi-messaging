@@ -105,7 +105,8 @@ mediator_acl_mode = "${MEDIATOR_ACL_MODE:explicit_deny}"
 ###    - ANON_RECEIVE: DID can receive anonymous messages
 ###    - ANON_RECEIVE_CHANGE: Allows the DID owner to change the anon_receive ACL for their own DID
 ###    - SELF_MANAGE_LIST: DID can self manage their own ACL list (add/remove)
-###    - SELF_MANAGE_QUEUE_LIMIT: DID can set their queue limits (between the queued_messages_soft and queued_messages_hard)
+###    - SELF_MANAGE_SEND_QUEUE_LIMIT: DID can set their send queue limits (between the queued_messages_soft and queued_messages_hard)
+###    - SELF_MANAGE_RECEIVE_QUEUE_LIMIT: DID can set their receive queue limits (between the queued_messages_soft and queued_messages_hard)
 ###  NOTE: Can be comma separated to allow multiple options
 global_acl_default = "${GLOBAL_DEFAULT_ACL:ALLOW_ALL}"
 
@@ -244,16 +245,27 @@ message_expiry_seconds = "${LIMIT_MESSAGE_EXPIRY_SECONDS:604800}"
 ### Default: 1048576 (1MB)
 message_size = "${LIMIT_MESSAGE_SIZE:1048576}"
 
-### queued_messages_soft: Default number of messages that can queued for a single recipient or a single sender
-### Default: 100
-### NOTE: This is a per-recipient or per-sender limit
-queued_messages_soft = "${LIMIT_QUEUED_MESSAGES_SOFT:100}"
+### queued_send_messages_soft: Default number of messages that can queued for outbound delivery for a DID
+### Default: 200
+### NOTE: -1 means no limit
+queued_send_messages_soft = "${LIMIT_QUEUED_SEND_MESSAGES_SOFT:200}"
 
-### queued_messages_hard: Maximum number of messages will the mediator will allow a non-admin account to set their queue limit
+### queued_messages_hard: Maximum number of messages that a non-admin account can set the queue_send_messages to (upper bound)
 ### Default: 1000
-### NOTE: This is a per-recipient or per-sender limit
+### NOTE: -1 means no limit
 ### NOTE: Admin accounts can set higher limits beyond the hard limit. Be careful though as this can be used to DoS the mediator
-queued_messages_hard = "${LIMIT_QUEUED_MESSAGES_HARD:1000}"
+queued_send_messages_hard = "${LIMIT_QUEUED_SEND_MESSAGES_HARD:1000}"
+
+### queued_receive_messages_soft: Default number of messages that can queued for inbound delivery for a DID
+### Default: 200
+### NOTE: -1 means no limit
+queued_receive_messages_soft = "${LIMIT_QUEUED_RECEIVE_MESSAGES_SOFT:200}"
+
+### queued_messages_hard: Maximum number of messages that a non-admin account can set the queue_receive_messages to (upper bound)
+### Default: 1000
+### NOTE: -1 means no limit
+### NOTE: Admin accounts can set higher limits beyond the hard limit. Be careful though as this can be used to DoS the mediator
+queued_receive_messages_hard = "${LIMIT_QUEUED_RECEIVE_MESSAGES_HARD:1000}"
 
 ### to_keys_per_recipient: Maximum number of keys in a single recipient did
 ### Default: 100
