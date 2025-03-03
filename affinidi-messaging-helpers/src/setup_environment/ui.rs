@@ -135,7 +135,7 @@ pub(crate) async fn init_remote_mediator(
     fn _ask_for_remote_address(theme: &ColorfulTheme) -> Result<String, Box<dyn Error>> {
         let address = Input::with_theme(theme)
             .with_prompt("Remote Mediator Address")
-            .default("https://localhost:7037/msg/v1/mediator".to_string())
+            .default("https://localhost:7037/v1/mediator".to_string())
             .interact_text()?;
 
         Ok(address)
@@ -370,7 +370,7 @@ pub(crate) async fn init_local_mediator(
             }
         }
 
-        let response = create_did(Some("https://localhost:7037/".into()))?;
+        let response = create_did(Some("https://localhost:7037/v1/mediator".into()))?;
         new_config.mediator_did = Some(response.0.clone());
         new_config.mediator_secrets = Some(response.1.into_iter().map(|s| s.into()).collect());
         println!(
