@@ -1,13 +1,13 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
 
 use crate::{
+    FromPrior,
     document::{did_or_url, is_did},
-    error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
+    error::{ErrorKind, Result, ResultContext, ResultExt, err_msg},
     jws::{self, Algorithm},
     message::from_prior::JWT_TYP,
-    secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
-    FromPrior,
 };
 
 impl FromPrior {
@@ -30,11 +30,11 @@ impl FromPrior {
     /// - `SecretNotFound` Issuer secret is not found.
     /// - `Unsupported` Used crypto or method is unsupported.
     /// - `InvalidState` Indicates a library error.
-    pub async fn pack<'sr>(
+    pub async fn pack(
         &self,
         issuer_kid: Option<&str>,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+        secrets_resolver: &SecretsResolver,
     ) -> Result<(String, String)> {
         self.validate_pack(issuer_kid)?;
 
@@ -92,8 +92,7 @@ impl FromPrior {
 
         let kid = secrets_resolver
             .find_secrets(&authentication_kids)
-            .await
-            .context("Unable to find secrets")?
+            .await?
             .first()
             .ok_or_else(|| {
                 err_msg(
@@ -103,16 +102,12 @@ impl FromPrior {
             })?
             .to_string();
 
-        let secret = secrets_resolver
-            .get_secret(&kid)
-            .await
-            .context("Unable to find secret")?
-            .ok_or_else(|| {
-                err_msg(
-                    ErrorKind::SecretNotFound,
-                    "from_prior issuer secret not found",
-                )
-            })?;
+        let secret = secrets_resolver.get_secret(&kid).await?.ok_or_else(|| {
+            err_msg(
+                ErrorKind::SecretNotFound,
+                "from_prior issuer secret not found",
+            )
+        })?;
 
         let sign_key = secret
             .as_key_pair()
@@ -192,19 +187,19 @@ impl FromPrior {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+    use affinidi_secrets_resolver::SecretsResolver;
 
     use crate::{
+        FromPrior,
         document::did_or_url,
         error::ErrorKind,
-        secrets::resolvers::ExampleSecretsResolver,
         test_vectors::{
-            ALICE_DID, ALICE_SECRETS, ALICE_SECRET_AUTH_KEY_ED25519, CHARLIE_DID,
+            ALICE_DID, ALICE_SECRET_AUTH_KEY_ED25519, ALICE_SECRETS, CHARLIE_DID,
             CHARLIE_ROTATED_TO_ALICE_SECRETS, CHARLIE_SECRET_AUTH_KEY_ED25519, FROM_PRIOR_FULL,
             FROM_PRIOR_INVALID_EQUAL_ISS_AND_SUB, FROM_PRIOR_INVALID_ISS, FROM_PRIOR_INVALID_SUB,
             FROM_PRIOR_MINIMAL,
         },
-        FromPrior,
     };
 
     #[tokio::test]
@@ -217,7 +212,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
 
             let (from_prior_jwt, pack_kid) = from_prior
                 .pack(
@@ -250,7 +245,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
 
             let (from_prior_jwt, pack_kid) = from_prior
                 .pack(
@@ -310,7 +305,7 @@ mod tests {
             let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
                 .await
                 .unwrap();
-            let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+            let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
 
             let err = from_prior
                 .pack(Some(issuer_kid), &did_resolver, &alice_secrets_resolver)
@@ -354,7 +349,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
 
             let err = from_prior
                 .pack(

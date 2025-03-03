@@ -1,15 +1,15 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_didcomm::UnpackMetadata;
+use affinidi_secrets_resolver::SecretsResolver;
+use affinidi_secrets_resolver::secrets::Secret;
 use config::Config;
 use delete_handler::DeletionHandlerCommands;
 use errors::ATMError;
 use profiles::Profiles;
 use reqwest::{Certificate, Client};
-use resolvers::secrets_resolver::AffinidiSecrets;
 use rustls::ClientConfig as TlsClientConfig;
 use rustls_platform_verifier::ConfigVerifierExt;
-use secrets::Secret;
 use ssi::dids::Document;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -32,8 +32,6 @@ pub mod messages;
 pub mod profiles;
 pub mod protocols;
 pub mod public;
-mod resolvers;
-pub mod secrets;
 pub mod transports;
 
 #[derive(Clone)]
@@ -45,7 +43,7 @@ pub struct ATM {
 pub(crate) struct SharedState {
     pub(crate) config: Config,
     pub(crate) did_resolver: DIDCacheClient,
-    pub(crate) secrets_resolver: AffinidiSecrets,
+    pub(crate) secrets_resolver: SecretsResolver,
     pub(crate) client: Client,
     pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the WebSocket handler
     pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>, // Receives MPSC messages from the WebSocket handler
@@ -149,7 +147,7 @@ impl ATM {
         let shared_state = SharedState {
             config: config.clone(),
             did_resolver,
-            secrets_resolver: AffinidiSecrets::new(vec![]),
+            secrets_resolver: SecretsResolver::new(vec![]),
             client,
             ws_handler_send_stream: sdk_tx,
             ws_handler_recv_stream: Mutex::new(sdk_rx),

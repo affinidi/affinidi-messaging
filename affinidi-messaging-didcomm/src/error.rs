@@ -1,5 +1,6 @@
 use std::fmt;
 
+use affinidi_secrets_resolver::errors::SecretsResolverError;
 use serde::Serialize;
 use serde_json::error::Category;
 
@@ -34,6 +35,9 @@ pub enum ErrorKind {
 
     #[error("Too many crypto operations")]
     TooManyCryptoOperations,
+
+    #[error("Secrets Resolver error")]
+    SecretsResolverError,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -191,6 +195,12 @@ impl From<bs58::decode::Error> for Error {
 impl From<bs58::encode::Error> for Error {
     fn from(err: bs58::encode::Error) -> Self {
         Error::msg(ErrorKind::InvalidState, err.to_string())
+    }
+}
+
+impl From<SecretsResolverError> for Error {
+    fn from(err: SecretsResolverError) -> Self {
+        Error::msg(ErrorKind::SecretsResolverError, err.to_string())
     }
 }
 

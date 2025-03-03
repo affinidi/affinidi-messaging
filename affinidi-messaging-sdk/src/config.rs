@@ -1,5 +1,6 @@
-use crate::{errors::ATMError, secrets::Secret, transports::websockets::ws_handler::WsHandlerMode};
+use crate::{errors::ATMError, transports::websockets::ws_handler::WsHandlerMode};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::secrets::Secret;
 use rustls::pki_types::CertificateDer;
 use std::{fs::File, io::BufReader};
 use tracing::error;

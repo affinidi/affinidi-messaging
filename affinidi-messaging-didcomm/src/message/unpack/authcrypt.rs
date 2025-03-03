@@ -1,4 +1,5 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Kw, AesKey},
@@ -17,14 +18,13 @@ use crate::{
     algorithms::AuthCryptAlg,
     error::{ErrorKind, Result, ResultExt, err_msg},
     jwe,
-    secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
 };
 
 pub(crate) async fn _try_unpack_authcrypt(
     jwe: &ParsedEnvelope,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &dyn SecretsResolver,
+    secrets_resolver: &SecretsResolver,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
     present_crypto_operations_count: usize,

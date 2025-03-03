@@ -23,6 +23,8 @@ license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
 
 [workspace.dependencies]
+affinidi-tdk-common = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common" }
+affinidi-secrets-resolver = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common/affinidi-secrets-resolver" }
 affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-didcomm" }
 affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
@@ -32,7 +34,6 @@ affinidi-did-resolver-cache-sdk = { version = "~0.3", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
-async-trait = "0.1"
 aws-config = "1.5"
 aws-sdk-dynamodb = "1.66"
 aws-sdk-memorydb = "1.62"

@@ -1,13 +1,13 @@
-use affinidi_did_resolver_cache_sdk::{document::DocumentExt, DIDCacheClient};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, document::DocumentExt};
+use affinidi_secrets_resolver::SecretsResolver;
 use serde::Serialize;
 
 use crate::{
-    document::{did_or_url, is_did},
-    error::{err_msg, ErrorKind, Result, ResultContext},
-    jws::{self, Algorithm},
-    secrets::SecretsResolver,
-    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
     Message,
+    document::{did_or_url, is_did},
+    error::{ErrorKind, Result, err_msg},
+    jws::{self, Algorithm},
+    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
 };
 
 impl Message {
@@ -41,11 +41,11 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving
     ///
     /// TODO: verify and update errors list
-    pub async fn pack_signed<'sr>(
+    pub async fn pack_signed(
         &self,
         sign_by: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+        secrets_resolver: &SecretsResolver,
     ) -> Result<(String, PackSignedMetadata)> {
         self._validate_pack_signed(sign_by)?;
 
@@ -57,7 +57,7 @@ impl Message {
                 return Err(err_msg(
                     ErrorKind::DIDNotResolved,
                     format!("Couldn't resolve ({}). Reason: {}", did, e),
-                ))
+                ));
             }
         };
 
@@ -82,21 +82,17 @@ impl Message {
 
         let key_id = secrets_resolver
             .find_secrets(&authentications)
-            .await
-            .context("Unable find secrets")?
+            .await?
             .first()
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "No signer secrets found"))?
             .to_string();
 
         let secret = secrets_resolver
             .get_secret(&key_id)
-            .await
-            .context("Unable get secret")?
+            .await?
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "Signer secret not found"))?;
 
-        let sign_key = secret
-            .as_key_pair()
-            .context("Unable instantiate sign key")?;
+        let sign_key = secret.as_key_pair()?;
 
         let payload = self.pack_plaintext(did_resolver).await?;
 
@@ -111,8 +107,7 @@ impl Message {
                 jws::sign(payload.as_bytes(), (&key_id, key), Algorithm::Es256K)
             }
             _ => Err(err_msg(ErrorKind::Unsupported, "Unsupported signature alg"))?,
-        }
-        .context("Unable produce signature")?;
+        }?;
 
         let metadata = PackSignedMetadata {
             sign_by_kid: key_id.to_owned(),

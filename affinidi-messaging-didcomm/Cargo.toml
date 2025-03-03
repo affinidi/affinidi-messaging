@@ -13,10 +13,10 @@ readme = 'README.md'
 publish = true
 
 [dependencies]
+affinidi-secrets-resolver.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 anyhow.workspace = true
 base64.workspace = true
-async-trait.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

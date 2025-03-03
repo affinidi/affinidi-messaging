@@ -113,9 +113,9 @@ name = "affinidi-messaging-didcomm"
 version = "0.10.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
+ "affinidi-secrets-resolver",
  "anyhow",
  "askar-crypto",
- "async-trait",
  "base64 0.22.1",
  "bs58 0.5.1",
  "criterion",
@@ -176,7 +176,6 @@ dependencies = [
  "affinidi-messaging-mediator-processors",
  "affinidi-messaging-sdk",
  "async-convert",
- "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-memorydb",
@@ -238,7 +237,6 @@ name = "affinidi-messaging-mediator-processors"
 version = "0.10.0"
 dependencies = [
  "affinidi-messaging-mediator-common",
- "async-trait",
  "clap",
  "deadpool-redis",
  "redis",
@@ -258,7 +256,8 @@ version = "0.10.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
- "async-trait",
+ "affinidi-secrets-resolver",
+ "affinidi-tdk-common",
  "base64 0.22.1",
  "clap",
  "console",
@@ -299,6 +298,7 @@ dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
  "affinidi-messaging-sdk",
+ "affinidi-secrets-resolver",
  "anyhow",
  "base64 0.22.1",
  "chrono",
@@ -324,6 +324,27 @@ dependencies = [
  "tui-input",
  "tui-logger",
  "uuid",
+]
+
+[[package]]
+name = "affinidi-secrets-resolver"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
+name = "affinidi-tdk-common"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.12.12",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tracing",
 ]
 
 [[package]]

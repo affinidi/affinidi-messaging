@@ -1,10 +1,7 @@
 use super::chat_list::ChatStatus;
 use crate::state_store::State;
-use affinidi_messaging_sdk::{
-    ATM,
-    profiles::Profile,
-    secrets::{Secret, SecretType},
-};
+use affinidi_messaging_sdk::{ATM, profiles::Profile};
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use anyhow::{Context, Result, anyhow};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
@@ -94,7 +91,7 @@ pub fn create_did_peer(mediator_did: &str) -> Result<(String, Vec<Secret>)> {
         secrets.push(Secret {
             id: [&did_peer, "#key-1"].concat(),
             type_: SecretType::JsonWebKey2020,
-            secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
+            secret_material: SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
                      "crv": map.curve, "kty": "OKP", "x": String::from(map.public_key.clone()), "d": String::from(map.private_key.clone().unwrap())}
                 ),
@@ -106,7 +103,7 @@ pub fn create_did_peer(mediator_did: &str) -> Result<(String, Vec<Secret>)> {
         secrets.push(Secret {
             id: [&did_peer, "#key-2"].concat(),
             type_: SecretType::JsonWebKey2020,
-            secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
+            secret_material: SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
                      "crv": map.curve, "kty": "EC", "x": String::from(map.x_coordinate.clone().unwrap()), "y": String::from(map.y_coordinate.clone().unwrap()), "d": String::from(map.ecc_private_key.clone().unwrap())
                 }),

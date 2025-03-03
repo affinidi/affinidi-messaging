@@ -1,14 +1,12 @@
 //! Extension trait for SSI Document
 //! Contains various helper functions to work with DIDComm
 
-use std::io::Cursor;
-
 use crate::{
     error::{Error, ErrorKind, Result, ResultExt, ToResult, err_msg},
     jwk::FromJwkValue,
-    secrets::{Secret, SecretMaterial, SecretType},
     utils::crypto::{AsKnownKeyPair, AsKnownKeyPairSecret, KnownKeyAlg, KnownKeyPair},
 };
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use askar_crypto::{
     alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair, x25519::X25519KeyPair},
     repr::{KeyPublicBytes, KeySecretBytes},
@@ -19,6 +17,7 @@ use ssi::{
     JWK, dids::document::DIDVerificationMethod, jwk::Params, multicodec::MultiEncodedBuf,
     security::MultibaseBuf,
 };
+use std::io::Cursor;
 use tracing::warn;
 use varint::{VarintRead, VarintWrite};
 

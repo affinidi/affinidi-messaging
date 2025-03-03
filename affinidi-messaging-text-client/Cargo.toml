@@ -11,6 +11,7 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
+affinidi-secrets-resolver.workspace = true
 affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true

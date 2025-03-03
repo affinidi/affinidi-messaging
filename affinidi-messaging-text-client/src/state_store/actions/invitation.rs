@@ -1,16 +1,8 @@
-use std::{
-    fmt::{self, Debug, Formatter},
-    sync::Arc,
-};
-
 use affinidi_messaging_didcomm::{Attachment, Message, MessageBuilder};
 use affinidi_messaging_sdk::{
-    ATM,
-    messages::SuccessResponse,
-    profiles::Profile,
-    protocols::Protocols,
-    secrets::{Secret, SecretMaterial, SecretType},
+    ATM, messages::SuccessResponse, profiles::Profile, protocols::Protocols,
 };
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use image::Luma;
 use qrcode::QrCode;
@@ -20,6 +12,10 @@ use ratatui::{
 };
 use serde_json::json;
 use ssi::{JWK, dids::DIDKey, jwk::Params};
+use std::{
+    fmt::{self, Debug, Formatter},
+    sync::Arc,
+};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 use uuid::Uuid;

@@ -1,3 +1,4 @@
+use affinidi_secrets_resolver::SecretsResolver;
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
@@ -11,19 +12,18 @@ use askar_crypto::{
 use std::str::FromStr;
 
 use crate::{
+    UnpackOptions,
     algorithms::AnonCryptAlg,
     document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jwe,
-    secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
-    UnpackOptions,
 };
 
 pub(crate) async fn _try_unpack_anoncrypt(
     jwe: &ParsedEnvelope,
-    secrets_resolver: &dyn SecretsResolver,
+    secrets_resolver: &SecretsResolver,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
 ) -> Result<Option<ParsedEnvelope>> {

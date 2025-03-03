@@ -11,13 +11,13 @@ use crate::{
     errors::ATMError,
     messages::AuthorizationResponse,
     protocols::message_pickup::MessagePickup,
-    secrets::Secret,
     transports::websockets::{
         ws_connection::WsConnectionCommands,
         ws_handler::{WsHandlerCommands, WsHandlerMode},
     },
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
+use affinidi_secrets_resolver::secrets::Secret;
 use serde::{Deserialize, Serialize};
 use ssi::dids::{
     Document,

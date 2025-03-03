@@ -21,7 +21,6 @@ affinidi-messaging-mediator-processors.workspace = true
 affinidi-messaging-mediator-common.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 async-convert.workspace = true
-async-trait.workspace = true
 aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 aws-sdk-memorydb.workspace = true

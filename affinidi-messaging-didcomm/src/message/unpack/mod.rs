@@ -1,4 +1,5 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
 use serde::{Deserialize, Serialize};
 
 use anoncrypt::_try_unpack_anoncrypt;
@@ -8,15 +9,14 @@ use std::str::FromStr;
 use tracing::debug;
 
 use crate::{
+    FromPrior, Message,
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jws::Jws,
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
-    secrets::SecretsResolver,
-    FromPrior, Message,
 };
 
 mod anoncrypt;
@@ -25,15 +25,12 @@ mod plaintext;
 mod sign;
 
 impl Message {
-    pub async fn unpack_string<S>(
+    pub async fn unpack_string(
         msg: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &S,
+        secrets_resolver: &SecretsResolver,
         options: &UnpackOptions,
-    ) -> Result<(Message, UnpackMetadata)>
-    where
-        S: SecretsResolver,
-    {
+    ) -> Result<(Message, UnpackMetadata)> {
         let mut envelope = MetaEnvelope::new(msg, did_resolver).await?;
 
         Self::unpack(&mut envelope, did_resolver, secrets_resolver, options).await
@@ -68,15 +65,12 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving.
     ///
     /// TODO: verify and update errors list
-    pub async fn unpack<S>(
+    pub async fn unpack(
         envelope: &mut MetaEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &S,
+        secrets_resolver: &SecretsResolver,
         options: &UnpackOptions,
-    ) -> Result<(Message, UnpackMetadata)>
-    where
-        S: SecretsResolver,
-    {
+    ) -> Result<(Message, UnpackMetadata)> {
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
 
@@ -163,7 +157,7 @@ impl Message {
     async fn _try_unwrap_forwarded_message(
         msg: &ParsedEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &dyn SecretsResolver,
+        secrets_resolver: &SecretsResolver,
     ) -> Result<Option<String>> {
         let plaintext = match msg {
             ParsedEnvelope::Message(m) => m.clone(),
@@ -269,7 +263,7 @@ pub struct UnpackMetadata {
 async fn has_key_agreement_secret(
     did_or_kid: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &dyn SecretsResolver,
+    secrets_resolver: &SecretsResolver,
 ) -> Result<bool> {
     let kids = match did_or_url(did_or_kid) {
         (_, Some(kid)) => {
@@ -282,7 +276,7 @@ async fn has_key_agreement_secret(
                     return Err(err_msg(
                         ErrorKind::DIDNotResolved,
                         format!("Couldn't resolve did({}). Reason: {}", did, e),
-                    ))
+                    ));
                 }
             };
             did_doc
