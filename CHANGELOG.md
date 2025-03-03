@@ -11,6 +11,8 @@ Missing versions on the changelog simply reflect minor deployment changes on our
 
 * Rust 2024 Edition is now enabled for all crates
   * affinidi-did-resolver-cache updated to 0.3.x
+* Major refactoring of crate namespace and linking into the Affinidi Trust Development Kit (TDK) Libraries
+  * Secrets Resolver now part of TDK Crate
   
 ### SDK (0.10.0)
 
