@@ -9,16 +9,16 @@ use askar_crypto::{
     kdf::ecdh_1pu::Ecdh1PU,
 };
 use std::str::FromStr;
-use tracing::{debug, event, Level};
+use tracing::{Level, debug, event};
 
 use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
+    UnpackOptions,
     algorithms::AuthCryptAlg,
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jwe,
     secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
-    UnpackOptions,
 };
 
 pub(crate) async fn _try_unpack_authcrypt(
@@ -88,8 +88,8 @@ pub(crate) async fn _try_unpack_authcrypt(
             &jwe.protected.enc,
         ) {
             (
-                KnownKeyPair::X25519(ref from_key),
-                KnownKeyPair::X25519(ref to_key),
+                KnownKeyPair::X25519(from_key),
+                KnownKeyPair::X25519(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);
@@ -102,8 +102,8 @@ pub(crate) async fn _try_unpack_authcrypt(
                 >(Some((envelope.from_kid.as_ref().unwrap(), from_key)), (to_kid, to_key))?
             }
             (
-                KnownKeyPair::P256(ref from_key),
-                KnownKeyPair::P256(ref to_key),
+                KnownKeyPair::P256(from_key),
+                KnownKeyPair::P256(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);
@@ -124,8 +124,8 @@ pub(crate) async fn _try_unpack_authcrypt(
                 "Incompatible sender and recipient key agreement curves",
             ))?,
             (
-                KnownKeyPair::K256(ref from_key),
-                KnownKeyPair::K256(ref to_key),
+                KnownKeyPair::K256(from_key),
+                KnownKeyPair::K256(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);

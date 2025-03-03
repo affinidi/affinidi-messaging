@@ -7,12 +7,12 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::{
+    Message, PackSignedMetadata,
     algorithms::{AnonCryptAlg, AuthCryptAlg},
     document::{did_or_url, is_did},
-    error::{err_msg, ErrorKind, Result, ResultContext},
+    error::{ErrorKind, Result, ResultContext, err_msg},
     protocols::routing::wrap_in_forward_if_needed,
     secrets::SecretsResolver,
-    Message, PackSignedMetadata,
 };
 
 pub(crate) use self::anoncrypt::anoncrypt;
@@ -195,7 +195,7 @@ impl Message {
         }
 
         match (from, &self.from) {
-            (Some(from), Some(ref sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
+            (Some(from), Some(sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
                 ErrorKind::IllegalArgument,
                 "`message.from` value is not equal to `from` value's DID",
             ))?,
@@ -288,7 +288,7 @@ pub struct MessagingServiceMetadata {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
     use base64::prelude::*;
     use ssi::dids::document::DIDVerificationMethod;
 
@@ -302,7 +302,7 @@ mod tests {
             x25519::X25519KeyPair,
         },
         encrypt::KeyAeadInPlace,
-        kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
+        kdf::{FromKeyDerivation, KeyExchange, ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
         repr::{KeyGen, KeySecretBytes},
         sign::KeySigVerify,
     };
@@ -310,13 +310,14 @@ mod tests {
     use serde_json::Value;
 
     use crate::{
+        PackEncryptedMetadata, PackEncryptedOptions,
         algorithms::AnonCryptAlg,
         document::DIDCommVerificationMethodExt,
         error::ErrorKind,
         jwe,
         jwk::{FromJwkValue, ToJwkValue},
         jws,
-        secrets::{resolvers::ExampleSecretsResolver, Secret, SecretMaterial},
+        secrets::{Secret, SecretMaterial, resolvers::ExampleSecretsResolver},
         test_vectors::{
             ALICE_DID, ALICE_SECRETS, BOB_DID, BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
             BOB_SECRET_KEY_AGREEMENT_KEY_P256_2, BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
@@ -324,7 +325,6 @@ mod tests {
             CHARLIE_DID, MESSAGE_SIMPLE, PLAINTEXT_MSG_SIMPLE,
         },
         utils::crypto::{JoseKDF, KeyWrap},
-        PackEncryptedMetadata, PackEncryptedOptions,
     };
 
     #[tokio::test]

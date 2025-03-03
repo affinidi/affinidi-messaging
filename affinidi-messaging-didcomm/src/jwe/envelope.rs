@@ -92,7 +92,7 @@ impl Algorithm {
         match self {
             Algorithm::Ecdh1puA256kw => "ECDH-1PU+A256KW",
             Algorithm::EcdhEsA256kw => "ECDH-ES+A256KW",
-            Algorithm::Other(ref s) => s,
+            Algorithm::Other(s) => s,
         }
     }
 }

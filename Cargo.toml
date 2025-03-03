@@ -64,7 +64,7 @@ num-format = "0.4.4"
 qrcode = "0.14"
 rand = "0.9"
 ratatui = "0.29"
-ratatui-image = { version = "4", features = ["crossterm", "image-defaults"] }
+ratatui-image = { version = "5", features = ["crossterm", "image-defaults"] }
 rcgen = { version = "0.13", default-features = false, features = [
     "aws_lc_rs",
     "pem",
@@ -90,7 +90,7 @@ serde-enum-str = '0.4'
 serde_json = "1.0"
 sha1 = "0.10"
 sha2 = "0.10"
-sha256 = "1.5"
+sha256 = "1.6"
 ssi = { version = "0.10" }
 textwrap = "0.16"
 thiserror = "2.0"
