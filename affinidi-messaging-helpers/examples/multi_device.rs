@@ -6,10 +6,10 @@
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
 use affinidi_messaging_didcomm::UnpackOptions;
 use affinidi_messaging_didcomm::envelope::MetaEnvelope;
-use affinidi_messaging_didcomm::secrets::SecretsResolver;
-use affinidi_messaging_didcomm::{Message, PackEncryptedOptions, secrets::Secret};
-use affinidi_messaging_mediator::resolvers::affinidi_secrets::AffinidiSecrets;
+use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use affinidi_messaging_sdk::errors::ATMError;
+use affinidi_secrets_resolver::SecretsResolver;
+use affinidi_secrets_resolver::secrets::Secret;
 use clap::Parser;
 use serde_json::json;
 use std::time::SystemTime;
@@ -440,7 +440,7 @@ async fn main() -> Result<(), ATMError> {
     .expect("Couldn't create Bob Secrets");
     info!("Bob Secrets Created");
 
-    let secrets = AffinidiSecrets::new([alice_secrets, bob_secrets].concat());
+    let secrets = SecretsResolver::new([alice_secrets, bob_secrets].concat());
 
     let r = secrets.get_secret("did:example:alice#key-x25519-1").await;
 
@@ -492,15 +492,6 @@ async fn main() -> Result<(), ATMError> {
         .await
         .expect("Couldn't create MetaEnvelope");
 
-    info!(
-        "KNOWN Secrets: {:#?}",
-        secrets
-            .known_secrets()
-            .iter()
-            .map(|s| s.id.clone())
-            .collect::<Vec<String>>()
-    );
-
     let unpack = Message::unpack(
         &mut envelope,
         &did_resolver,
@@ -527,16 +518,8 @@ async fn main() -> Result<(), ATMError> {
     )
     .expect("Couldn't create Bob Secrets 2");
 
-    let secrets2 = AffinidiSecrets::new(vec![bob_secrets2]);
+    let secrets2 = SecretsResolver::new(vec![bob_secrets2]);
 
-    info!(
-        "KNOWN Secrets: {:#?}",
-        secrets2
-            .known_secrets()
-            .iter()
-            .map(|s| s.id.clone())
-            .collect::<Vec<String>>()
-    );
     let unpack2 = Message::unpack(
         &mut envelope,
         &did_resolver,

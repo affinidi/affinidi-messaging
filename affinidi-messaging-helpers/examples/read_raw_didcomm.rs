@@ -6,9 +6,8 @@
 
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
 use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
-use affinidi_messaging_sdk::{
-    ATM, config::ATMConfig, errors::ATMError, profiles::Profile, secrets::Secret,
-};
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::Profile};
+use affinidi_secrets_resolver::secrets::Secret;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
 use console::style;

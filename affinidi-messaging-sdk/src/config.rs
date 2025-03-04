@@ -40,12 +40,12 @@ impl ATMConfig {
     }
 }
 
-/// Builder for `Config`.
+/// Builder for `ATMConfig`.
 /// Example:
 /// ```
 /// use affinidi_messaging_sdk::config::ATMConfig;
 ///
-/// // Create a new `Config` with defaults
+/// // Create a new `ATMConfig` with defaults
 /// let config = ATMConfig::builder().build();
 /// ```
 pub struct ATMConfigBuilder {
@@ -71,7 +71,7 @@ impl Default for ATMConfigBuilder {
 }
 
 impl ATMConfigBuilder {
-    /// Basic starting constructor for `ConfigBuilder`
+    /// Default starting constructor for `ATMConfigBuilder`
     pub fn new() -> ATMConfigBuilder {
         ATMConfigBuilder::default()
     }

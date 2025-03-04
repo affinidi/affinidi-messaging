@@ -1,7 +1,7 @@
 //! Methods relating to working with DID's
 
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
-use affinidi_messaging_sdk::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use console::style;
 use dialoguer::{Input, theme::ColorfulTheme};
 use did_peer::{

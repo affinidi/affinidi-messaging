@@ -142,6 +142,7 @@ dependencies = [
  "affinidi-messaging-didcomm",
  "affinidi-messaging-mediator",
  "affinidi-messaging-sdk",
+ "affinidi-secrets-resolver",
  "askar-crypto",
  "base64 0.22.1",
  "clap",
