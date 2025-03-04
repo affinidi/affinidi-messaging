@@ -2,7 +2,7 @@ use affinidi_messaging_didcomm::MessageBuilder;
 use affinidi_messaging_helpers::common::profiles::Profiles;
 use affinidi_messaging_sdk::{
     ATM,
-    config::Config,
+    config::ATMConfig,
     errors::ATMError,
     messages::{DeleteMessageRequest, FetchDeletePolicy, Folder, fetch::FetchOptions},
     profiles::ProfileConfig,
@@ -54,7 +54,7 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let mut config = Config::builder();
+    let mut config = ATMConfig::builder();
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
         config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);

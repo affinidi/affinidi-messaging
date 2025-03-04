@@ -12,7 +12,7 @@ use crate::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{
-    ATM, config::ConfigBuilder, transports::websockets::ws_handler::WsHandlerMode,
+    ATM, config::ATMConfigBuilder, transports::websockets::ws_handler::WsHandlerMode,
 };
 use std::time::Duration;
 use tokio::sync::{
@@ -43,7 +43,7 @@ impl StateStore {
     ) -> anyhow::Result<Interrupted> {
         // Setup the initial state
         let atm = match ATM::new(
-            ConfigBuilder::default()
+            ATMConfigBuilder::default()
                 .with_external_did_resolver(&did_resolver)
                 .with_ws_handler_mode(WsHandlerMode::DirectChannel)
                 .build()?,

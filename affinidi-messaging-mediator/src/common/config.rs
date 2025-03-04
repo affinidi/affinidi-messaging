@@ -1,4 +1,3 @@
-use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::{
     DIDCacheClient,
     config::{ClientConfig, ClientConfigBuilder},
@@ -11,6 +10,7 @@ use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
     MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
+use affinidi_secrets_resolver::SecretsResolver;
 use async_convert::{TryFrom, async_trait};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -68,7 +68,7 @@ pub struct SecurityConfig {
     pub global_acl_default: MediatorACLSet,
     pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
-    pub mediator_secrets: AffinidiSecrets,
+    pub mediator_secrets: SecretsResolver,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     #[serde(skip_serializing)]
@@ -114,7 +114,7 @@ impl Default for SecurityConfig {
             mediator_acl_mode: AccessListModeType::ExplicitDeny,
             global_acl_default: MediatorACLSet::default(),
             local_direct_delivery_allowed: false,
-            mediator_secrets: AffinidiSecrets::new(vec![]),
+            mediator_secrets: SecretsResolver::new(vec![]),
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -603,7 +603,7 @@ impl TryFrom<ConfigRaw> for Config {
 async fn load_secrets(
     secrets: &str,
     aws_config: &SdkConfig,
-) -> Result<AffinidiSecrets, MediatorError> {
+) -> Result<SecretsResolver, MediatorError> {
     let parts: Vec<&str> = secrets.split("://").collect();
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
@@ -642,7 +642,7 @@ async fn load_secrets(
         }
     };
 
-    Ok(AffinidiSecrets::new(
+    Ok(SecretsResolver::new(
         serde_json::from_str(&content).map_err(|err| {
             eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
             MediatorError::ConfigError(

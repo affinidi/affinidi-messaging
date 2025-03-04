@@ -1,14 +1,13 @@
 use std::time::SystemTime;
 
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_messaging_didcomm::{
-    Attachment, Message, PackEncryptedOptions, secrets::SecretsResolver,
-};
+use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use affinidi_messaging_sdk::{
     messages::AuthenticationChallenge,
     protocols::{message_pickup::MessagePickupDeliveryRequest, trust_ping::TrustPingSent},
     transports::SendMessageResponse,
 };
+use affinidi_secrets_resolver::SecretsResolver;
 use base64::prelude::*;
 use serde_json::{Value, json};
 use sha256::digest;
@@ -35,13 +34,13 @@ pub fn create_auth_challenge_response(
 }
 
 #[allow(dead_code)]
-pub async fn build_ping_message<'sr>(
+pub async fn build_ping_message(
     to_did: &str,
     actor_did: String,
     signed: bool,
     expect_response: bool,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &SecretsResolver,
 ) -> (String, TrustPingSent) {
     let now = _get_time_now();
 
@@ -85,11 +84,11 @@ pub async fn build_ping_message<'sr>(
 }
 
 #[allow(dead_code)]
-pub async fn build_status_request_message<'sr>(
+pub async fn build_status_request_message(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &SecretsResolver,
 ) -> String {
     let mut msg = Message::build(
         Uuid::new_v4().into(),
@@ -123,11 +122,11 @@ pub async fn build_status_request_message<'sr>(
 }
 
 #[allow(dead_code)]
-pub async fn build_delivery_request_message<'sr>(
+pub async fn build_delivery_request_message(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &SecretsResolver,
 ) -> String {
     let body = MessagePickupDeliveryRequest {
         recipient_did: recipient_did.clone(),
@@ -165,11 +164,11 @@ pub async fn build_delivery_request_message<'sr>(
 }
 
 #[allow(dead_code)]
-pub async fn build_message_received_message<'sr>(
+pub async fn build_message_received_message(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &SecretsResolver,
     to_delete_list: Vec<String>,
 ) -> String {
     let mut msg = Message::build(
@@ -206,12 +205,12 @@ pub async fn build_message_received_message<'sr>(
 }
 
 #[allow(dead_code)]
-pub async fn build_forward_request_message<'sr>(
+pub async fn build_forward_request_message(
     mediator_did: &str,
     recipient_did: String,
     actor_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &SecretsResolver,
 ) -> String {
     let now = _get_time_now();
 

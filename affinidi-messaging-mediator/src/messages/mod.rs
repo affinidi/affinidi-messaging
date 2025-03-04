@@ -2,10 +2,11 @@ use self::protocols::ping;
 use crate::{SharedData, database::session::Session};
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
-    Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata, secrets::SecretsResolver,
+    Message, PackEncryptedMetadata, PackEncryptedOptions, UnpackMetadata,
 };
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
+use affinidi_secrets_resolver::SecretsResolver;
 use protocols::{
     mediator::{accounts, acls, administration},
     message_pickup, routing,
@@ -124,19 +125,17 @@ pub(crate) trait MessageHandler {
 
     /// Uses the incoming unpack metadata to determine best way to pack the message
     #[allow(clippy::too_many_arguments)]
-    async fn pack<S>(
+    async fn pack(
         &self,
         session_id: &str,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
-        secrets_resolver: &S,
+        secrets_resolver: &SecretsResolver,
         did_resolver: &DIDCacheClient,
         pack_options: &PackOptions,
         forward_locals: &HashSet<String>,
-    ) -> Result<(String, PackEncryptedMetadata), MediatorError>
-    where
-        S: SecretsResolver;
+    ) -> Result<(String, PackEncryptedMetadata), MediatorError>;
 }
 
 impl MessageHandler for Message {
@@ -173,20 +172,17 @@ impl MessageHandler for Message {
         msg_type.process(self, state, session).await
     }
 
-    async fn pack<S>(
+    async fn pack(
         &self,
         session_id: &str,
         to_did: &str,
         mediator_did: &str,
         metadata: &UnpackMetadata,
-        secrets_resolver: &S,
+        secrets_resolver: &SecretsResolver,
         did_resolver: &DIDCacheClient,
         pack_options: &PackOptions,
         forward_locals: &HashSet<String>,
-    ) -> Result<(String, PackEncryptedMetadata), MediatorError>
-    where
-        S: SecretsResolver,
-    {
+    ) -> Result<(String, PackEncryptedMetadata), MediatorError> {
         // Check if this message would route back to the mediator based on potential next hops
         let to_doc = did_resolver.resolve(to_did).await.map_err(|e| {
             MediatorError::DIDError(session_id.into(), to_did.into(), e.to_string())

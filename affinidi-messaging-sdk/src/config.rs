@@ -14,7 +14,7 @@ use tracing::error;
 /// let config = Config::builder().build();
 /// ```
 #[derive(Clone)]
-pub struct Config {
+pub struct ATMConfig {
     pub(crate) ssl_certificates: Vec<CertificateDer<'static>>,
     pub(crate) fetch_cache_limit_count: u32,
     pub(crate) fetch_cache_limit_bytes: u64,
@@ -23,16 +23,16 @@ pub struct Config {
     pub(crate) ws_handler_mode: WsHandlerMode,
 }
 
-impl Config {
+impl ATMConfig {
     /// Returns a builder for `Config`
     /// Example:
     /// ```
-    /// use affinidi_messaging_sdk::config::Config;
+    /// use affinidi_messaging_sdk::config::ATMConfig;
     ///
     /// let config = Config::builder().build();
     /// ```
-    pub fn builder() -> ConfigBuilder {
-        ConfigBuilder::default()
+    pub fn builder() -> ATMConfigBuilder {
+        ATMConfigBuilder::default()
     }
 
     pub fn get_ssl_certificates(&self) -> &Vec<CertificateDer> {
@@ -43,12 +43,12 @@ impl Config {
 /// Builder for `Config`.
 /// Example:
 /// ```
-/// use affinidi_messaging_sdk::config::Config;
+/// use affinidi_messaging_sdk::config::ATMConfig;
 ///
 /// // Create a new `Config` with defaults
-/// let config = Config::builder().build();
+/// let config = ATMConfig::builder().build();
 /// ```
-pub struct ConfigBuilder {
+pub struct ATMConfigBuilder {
     ssl_certificates: Vec<String>,
     fetch_cache_limit_count: u32,
     fetch_cache_limit_bytes: u64,
@@ -57,9 +57,9 @@ pub struct ConfigBuilder {
     ws_handler_mode: WsHandlerMode,
 }
 
-impl Default for ConfigBuilder {
+impl Default for ATMConfigBuilder {
     fn default() -> Self {
-        ConfigBuilder {
+        ATMConfigBuilder {
             ssl_certificates: vec![],
             fetch_cache_limit_count: 100,
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
@@ -70,10 +70,10 @@ impl Default for ConfigBuilder {
     }
 }
 
-impl ConfigBuilder {
+impl ATMConfigBuilder {
     /// Basic starting constructor for `ConfigBuilder`
-    pub fn new() -> ConfigBuilder {
-        ConfigBuilder::default()
+    pub fn new() -> ATMConfigBuilder {
+        ATMConfigBuilder::default()
     }
 
     /// Add a list of SSL certificates to the configuration
@@ -130,7 +130,7 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Config, ATMError> {
+    pub fn build(self) -> Result<ATMConfig, ATMError> {
         // Process any custom SSL certificates
         let mut certs = vec![];
         let mut failed_certs = false;
@@ -159,7 +159,7 @@ impl ConfigBuilder {
             ));
         }
 
-        Ok(Config {
+        Ok(ATMConfig {
             ssl_certificates: certs,
             fetch_cache_limit_count: self.fetch_cache_limit_count,
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,

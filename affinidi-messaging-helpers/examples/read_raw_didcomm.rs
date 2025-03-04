@@ -7,7 +7,7 @@
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
 use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
 use affinidi_messaging_sdk::{
-    ATM, config::Config, errors::ATMError, profiles::Profile, secrets::Secret,
+    ATM, config::ATMConfig, errors::ATMError, profiles::Profile, secrets::Secret,
 };
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
@@ -28,7 +28,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
     // Create a new ATM Client
-    let config = Config::builder();
+    let config = ATMConfig::builder();
     let atm = ATM::new(config.build()?).await?;
 
     // Local DID Resolver

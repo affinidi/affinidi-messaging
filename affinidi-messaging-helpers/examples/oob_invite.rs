@@ -2,7 +2,7 @@
 //! Does not show the next steps of creating the connection, this is outside of the scope of this example
 
 use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{ATM, config::Config, errors::ATMError, protocols::Protocols};
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, protocols::Protocols};
 use clap::Parser;
 use std::env;
 use tracing::debug;
@@ -39,7 +39,7 @@ async fn main() -> Result<(), ATMError> {
         ));
     };
 
-    let mut config = Config::builder();
+    let mut config = ATMConfig::builder();
 
     if let Some(ssl_cert) = &profile.ssl_certificate {
         config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);

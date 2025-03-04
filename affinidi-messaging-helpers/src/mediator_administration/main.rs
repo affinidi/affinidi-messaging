@@ -7,7 +7,7 @@ use affinidi_messaging_helpers::common::{
 };
 use affinidi_messaging_sdk::{
     ATM,
-    config::Config,
+    config::ATMConfig,
     protocols::{
         Protocols,
         mediator::acls::{AccessListModeType, MediatorACLSet},
@@ -150,7 +150,7 @@ impl SharedConfig {
     }
 }
 
-async fn init() -> Result<(ColorfulTheme, Config, Profile), Box<dyn Error>> {
+async fn init() -> Result<(ColorfulTheme, ATMConfig, Profile), Box<dyn Error>> {
     let args: Args = Args::parse();
 
     let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())?;
@@ -191,7 +191,7 @@ async fn init() -> Result<(ColorfulTheme, Config, Profile), Box<dyn Error>> {
     }
 
     // Connect to the Mediator
-    let config = Config::builder()
+    let config = ATMConfig::builder()
         .with_ssl_certificates(&mut ssl_certificates)
         .build()?;
 

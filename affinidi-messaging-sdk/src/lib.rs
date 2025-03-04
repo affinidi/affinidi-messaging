@@ -3,7 +3,7 @@ use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_didcomm::UnpackMetadata;
 use affinidi_secrets_resolver::SecretsResolver;
 use affinidi_secrets_resolver::secrets::Secret;
-use config::Config;
+use config::ATMConfig;
 use delete_handler::DeletionHandlerCommands;
 use errors::ATMError;
 use profiles::Profiles;
@@ -41,7 +41,7 @@ pub struct ATM {
 
 /// Private SharedState struct for the ATM to be used across tasks
 pub(crate) struct SharedState {
-    pub(crate) config: Config,
+    pub(crate) config: ATMConfig,
     pub(crate) did_resolver: DIDCacheClient,
     pub(crate) secrets_resolver: SecretsResolver,
     pub(crate) client: Client,
@@ -56,7 +56,7 @@ pub(crate) struct SharedState {
 }
 
 /// Affinidi Trusted Messaging SDK
-/// This is the top level struct for the SSK
+/// This is the top level struct for the SDK
 ///
 /// Example:
 /// ```ignore
@@ -74,7 +74,7 @@ pub(crate) struct SharedState {
 impl ATM {
     /// Creates a new instance of the SDK with a given configuration
     /// You need to add at least the DID Method for the SDK DID to work
-    pub async fn new(config: Config) -> Result<ATM, ATMError> {
+    pub async fn new(config: ATMConfig) -> Result<ATM, ATMError> {
         // Set a process wide default crypto provider.
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let tls_config = TlsClientConfig::with_platform_verifier();
