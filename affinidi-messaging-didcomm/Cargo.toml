@@ -11,6 +11,7 @@ license = 'Apache-2.0'
 repository.workspace = true
 readme = 'README.md'
 publish = true
+rust-version.workspace = true
 
 [dependencies]
 affinidi-secrets-resolver.workspace = true

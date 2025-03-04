@@ -3,7 +3,8 @@
 //! NOTE: This example requires that the resolver is running with `did_example` feature flag enabled!
 //! NOTE: The mediator is NOT used in this example.
 
-use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_did_resolver_cache_sdk::config::DIDCacheConfigBuilder;
 use affinidi_messaging_didcomm::UnpackOptions;
 use affinidi_messaging_didcomm::envelope::MetaEnvelope;
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
@@ -34,7 +35,7 @@ async fn main() -> Result<(), ATMError> {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
-    let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .expect("Couldn't create DID Resolver");
     info!("Local DID Resolver created");

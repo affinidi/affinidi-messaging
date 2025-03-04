@@ -1,9 +1,9 @@
 use crate::{
-    document::{did_or_url, DIDCommVerificationMethodExt},
-    error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
+    FromPrior,
+    document::{DIDCommVerificationMethodExt, did_or_url},
+    error::{ErrorKind, Result, ResultContext, ResultExt, err_msg},
     jws,
     utils::crypto::AsKnownKeyPair,
-    FromPrior,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
@@ -152,20 +152,20 @@ impl FromPrior {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 
     use crate::{
+        FromPrior,
         error::ErrorKind,
         test_vectors::{
             CHARLIE_SECRET_AUTH_KEY_ED25519, FROM_PRIOR_FULL, FROM_PRIOR_JWT_FULL,
             FROM_PRIOR_JWT_INVALID, FROM_PRIOR_JWT_INVALID_SIGNATURE,
         },
-        FromPrior,
     };
 
     #[tokio::test]
     async fn from_prior_unpack_works() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn from_prior_unpack_works_invalid() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -196,7 +196,7 @@ mod tests {
 
     #[tokio::test]
     async fn from_prior_unpack_works_invalid_signature() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -205,6 +205,9 @@ mod tests {
             .expect_err("res is ok");
 
         assert_eq!(err.kind(), ErrorKind::Malformed);
-        assert_eq!(format!("{}", err), "Malformed: Unable to verify from_prior signature: Unable decode signature: Invalid last symbol 104, offset 85.");
+        assert_eq!(
+            format!("{}", err),
+            "Malformed: Unable to verify from_prior signature: Unable decode signature: Invalid last symbol 104, offset 85."
+        );
     }
 }

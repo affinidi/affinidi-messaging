@@ -31,8 +31,7 @@ pub use message::{
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-    use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
     use affinidi_secrets_resolver::SecretsResolver;
     use serde_json::json;
 
@@ -57,7 +56,7 @@ mod tests {
 
         // --- Packing message ---
 
-        let sender_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let sender_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
         let sender_secrets_resolver = SecretsResolver::new(vec![]);
@@ -88,7 +87,7 @@ mod tests {
 
         // --- Unpacking message ---
 
-        let recipient_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let recipient_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
         let recipient_secrets_resolver = SecretsResolver::new(vec![]);

@@ -1,6 +1,6 @@
 use affinidi_did_resolver_cache_sdk::{
     DIDCacheClient,
-    config::{ClientConfig, ClientConfigBuilder},
+    config::{DIDCacheConfig, DIDCacheConfigBuilder},
 };
 use affinidi_messaging_mediator_common::{
     database::config::{DatabaseConfig, DatabaseConfigRaw},
@@ -388,8 +388,8 @@ impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
 }
 
 impl DIDResolverConfig {
-    pub fn convert(&self) -> ClientConfig {
-        let mut config = ClientConfigBuilder::default()
+    pub fn convert(&self) -> DIDCacheConfig {
+        let mut config = DIDCacheConfigBuilder::default()
             .with_cache_capacity(self.cache_capacity.parse().unwrap_or(1000))
             .with_cache_ttl(self.cache_ttl.parse().unwrap_or(300))
             .with_network_timeout(self.network_timeout.parse().unwrap_or(5))
@@ -436,7 +436,7 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
     #[serde(skip_serializing)]
-    pub did_resolver_config: ClientConfig,
+    pub did_resolver_config: DIDCacheConfig,
     pub processors: ProcessorsConfig,
     pub limits: LimitsConfig,
 }
@@ -465,7 +465,7 @@ impl fmt::Debug for Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let did_resolver_config = ClientConfigBuilder::default()
+        let did_resolver_config = DIDCacheConfigBuilder::default()
             .with_cache_capacity(1000)
             .with_cache_ttl(300)
             .with_network_timeout(5)

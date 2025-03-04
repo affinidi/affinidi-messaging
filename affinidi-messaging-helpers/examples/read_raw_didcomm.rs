@@ -4,7 +4,7 @@
  * To read the DIDComm messages, you will need access to the Secrets for the DID Recipients
  */
 
-use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
 use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::Profile};
 use affinidi_secrets_resolver::secrets::Secret;
@@ -31,7 +31,7 @@ async fn main() -> Result<(), ATMError> {
     let atm = ATM::new(config.build()?).await?;
 
     // Local DID Resolver
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .map_err(|e| {
             ATMError::DIDError(format!("Couldn't instantiate DID Resolver. Reason: {}", e))

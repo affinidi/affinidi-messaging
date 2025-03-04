@@ -187,7 +187,7 @@ impl FromPrior {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
     use affinidi_secrets_resolver::SecretsResolver;
 
     use crate::{
@@ -208,7 +208,7 @@ mod tests {
         _from_prior_pack_works_with_issuer_kid(&FROM_PRIOR_FULL).await;
 
         async fn _from_prior_pack_works_with_issuer_kid(from_prior: &FromPrior) {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
@@ -241,7 +241,7 @@ mod tests {
         _from_prior_pack_works_without_issuer_kid(&FROM_PRIOR_FULL).await;
 
         async fn _from_prior_pack_works_without_issuer_kid(from_prior: &FromPrior) {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
@@ -302,7 +302,7 @@ mod tests {
             err_kind: ErrorKind,
             err_mgs: &str,
         ) {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
@@ -345,7 +345,7 @@ mod tests {
             err_kind: ErrorKind,
             err_mgs: &str,
         ) {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =

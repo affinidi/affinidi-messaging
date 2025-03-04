@@ -1,9 +1,8 @@
-use std::fs::OpenOptions;
-
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
+use affinidi_did_resolver_cache_sdk::config::DIDCacheConfigBuilder;
 use log::LevelFilter;
 use state_store::StateStore;
+use std::fs::OpenOptions;
 use termination::{Interrupted, create_termination};
 use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -34,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     tui_logger::init_logger(LevelFilter::Info).unwrap();
 
     // Setup the initial state
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build()).await?;
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build()).await?;
 
     let (terminator, mut interrupt_rx) = create_termination();
     let (state_store, state_rx) = StateStore::new();

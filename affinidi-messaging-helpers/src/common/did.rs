@@ -1,6 +1,6 @@
 //! Methods relating to working with DID's
 
-use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use console::style;
 use dialoguer::{Input, theme::ColorfulTheme};
@@ -122,7 +122,7 @@ pub fn create_did(service: Option<String>) -> Result<(String, Vec<Secret>), Box<
 
 /// Helper function to resolve a DID and retrieve the URI address of the service endpoint
 pub async fn get_service_address(did: &str) -> Result<String, Box<dyn Error>> {
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build()).await?;
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build()).await?;
 
     let resolve_response = did_resolver
         .resolve(DIDBuf::from_string(did.into())?.as_did())

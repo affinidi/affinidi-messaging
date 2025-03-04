@@ -288,7 +288,7 @@ pub struct MessagingServiceMetadata {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
     use affinidi_secrets_resolver::{
         SecretsResolver,
         secrets::{Secret, SecretMaterial},
@@ -397,7 +397,7 @@ mod tests {
             KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             KW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
@@ -633,7 +633,7 @@ mod tests {
             AKE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             AKW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let from_did_doc = match did_resolver.resolve(from).await {
@@ -786,7 +786,7 @@ mod tests {
             AKW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
@@ -925,7 +925,7 @@ mod tests {
             KW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
@@ -980,7 +980,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1011,7 +1011,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1042,7 +1042,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1073,7 +1073,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_differs_msg_from() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1106,7 +1106,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_differs_msg_to() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1139,7 +1139,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_presented_in_msg_to() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1164,7 +1164,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url_in_msg() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1197,7 +1197,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url_in_msg() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1230,7 +1230,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_url_from_msg_did_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1253,7 +1253,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_url_to_msg_did_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1278,7 +1278,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_differs_msg_from_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1301,7 +1301,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_from_msg_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1335,7 +1335,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_to_msg_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1368,7 +1368,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1398,7 +1398,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
         let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
@@ -1426,7 +1426,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1458,7 +1458,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1486,7 +1486,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_in_secrets_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -1730,7 +1730,7 @@ mod tests {
                KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
                KW: KeyWrap + FromKeyDerivation,
            {
-               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
@@ -1984,7 +1984,7 @@ mod tests {
                from: Option<&str>,
                sign_by: Option<&str>,
            ) {
-               let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
@@ -2539,7 +2539,7 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_sign_by_unknown_did_url() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
@@ -2570,7 +2570,7 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_from_not_in_secrets() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
@@ -2601,7 +2601,7 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_sign_by_not_in_secrets() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
@@ -2664,7 +2664,7 @@ mod tests {
            .await;
 
            async fn _pack_encrypted_works_to_from_different_curves(from: Option<&str>, to: &str) {
-               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
@@ -2695,7 +2695,7 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_from_prior() {
-           let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 

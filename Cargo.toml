@@ -21,6 +21,7 @@ keywords = ["did", "ssi", "ATM", "affinidi"]
 publish = true
 license = "Apache-2.0"
 repository = "https://github.com/affinidi/affinidi-messaging"
+rust-version = "1.85"
 
 [workspace.dependencies]
 affinidi-tdk-common = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common" }
@@ -30,7 +31,7 @@ affinidi-messaging-didcomm = { version = "0.10.0", path = "./affinidi-messaging-
 affinidi-messaging-mediator = { version = "0.10.0", path = "./affinidi-messaging-mediator" }
 affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-processors" }
 affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
-affinidi-did-resolver-cache-sdk = { version = "~0.3", features = ["network"] }
+affinidi-did-resolver-cache-sdk = { version = "~0.4", features = ["network"] }
 anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
@@ -52,7 +53,7 @@ console = "0.15"
 criterion = "0.5"
 crossterm = { version = "0.28", features = ["event-stream"] }
 dialoguer = "0.11"
-did-peer = { version = "0.3" }
+did-peer = { version = "0.4" }
 futures-util = "0.3"
 hostname = "0.4"
 http = "1"

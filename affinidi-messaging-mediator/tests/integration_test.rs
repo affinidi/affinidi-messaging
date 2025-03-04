@@ -1,4 +1,4 @@
-use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::ClientConfigBuilder};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use affinidi_messaging_mediator::server::start;
 use affinidi_messaging_sdk::{
@@ -67,7 +67,7 @@ async fn test_mediator_server() {
         .build()
         .unwrap();
 
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .unwrap();
     let alice_secrets_resolver = SecretsResolver::new(vec![

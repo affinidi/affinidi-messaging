@@ -1,8 +1,8 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 
 use crate::{
-    error::{err_msg, ErrorKind, Result, ResultExt},
     FromPrior, Message,
+    error::{ErrorKind, Result, ResultExt, err_msg},
 };
 
 impl Message {
@@ -67,10 +67,11 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
     use serde_json::Value;
 
     use crate::{
+        Message,
         error::ErrorKind,
         test_vectors::{
             MESSAGE_ATTACHMENT_BASE64, MESSAGE_ATTACHMENT_JSON, MESSAGE_ATTACHMENT_LINKS,
@@ -80,7 +81,6 @@ mod tests {
             PLAINTEXT_MSG_ATTACHMENT_LINKS, PLAINTEXT_MSG_ATTACHMENT_MULTI_1,
             PLAINTEXT_MSG_ATTACHMENT_MULTI_2, PLAINTEXT_MSG_MINIMAL, PLAINTEXT_MSG_SIMPLE,
         },
-        Message,
     };
 
     #[tokio::test]
@@ -106,7 +106,7 @@ mod tests {
         .await;
 
         async fn _pack_plaintext_works(msg: &Message, exp_msg: &str) {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
@@ -123,7 +123,7 @@ mod tests {
 
     #[tokio::test]
     async fn pack_plaintext_works_mismatched_from_prior_sub_and_message_from() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
@@ -140,7 +140,7 @@ mod tests {
     }
     // #[tokio::test]
     // async fn pack_plaintext_works_from_prior() {
-    //     let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    //     let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
     //         .await
     //         .unwrap();
     //     let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());

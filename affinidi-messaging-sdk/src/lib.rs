@@ -1,4 +1,5 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_did_resolver_cache_sdk::config::DIDCacheConfigBuilder;
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_didcomm::UnpackMetadata;
 use affinidi_secrets_resolver::SecretsResolver;
@@ -106,21 +107,15 @@ impl ATM {
         // Set up the DID Resolver
         let did_resolver = match &config.did_resolver {
             Some(did_resolver) => did_resolver.clone(),
-            _ => {
-                match DIDCacheClient::new(
-                    affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder::default().build(),
-                )
-                .await
-                {
-                    Ok(config) => config,
-                    Err(err) => {
-                        return Err(ATMError::DIDError(format!(
-                            "Couldn't create DID resolver! Reason: {}",
-                            err
-                        )));
-                    }
+            _ => match DIDCacheClient::new(DIDCacheConfigBuilder::default().build()).await {
+                Ok(config) => config,
+                Err(err) => {
+                    return Err(ATMError::DIDError(format!(
+                        "Couldn't create DID resolver! Reason: {}",
+                        err
+                    )));
                 }
-            }
+            },
         };
 
         // Set up the channels for the WebSocket handler

@@ -79,9 +79,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "083958a57f57857eefa0fed3dacb7f907f037a820eb794ae1b3c547f3da8dc50"
+checksum = "e8fb0b6b1864dd74432efff7854d72ae20aa2e5aada7b967db40c443c385c753"
 dependencies = [
  "base64 0.22.1",
  "blake2",
@@ -2380,9 +2380,9 @@ dependencies = [
 
 [[package]]
 name = "did-example"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5895c55d1cd7c7b7c3444c6eb7149c72d43f97c739791c7ea651b3568f3bf945"
+checksum = "b3aa32381028c6de1c5a36af3ec4aa88e2c0f1f11fe9d24cdd1e04a9db1e8026"
 dependencies = [
  "ssi",
  "thiserror 2.0.12",
@@ -2452,9 +2452,9 @@ dependencies = [
 
 [[package]]
 name = "did-peer"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf750ba102547992e2a5c656cec805b235adf584d9b9787c58f67784596ce6c6"
+checksum = "2ee015489cfe5cc06d322fafe05d3324bc2a4cda4bbe07949a26b3b982243934"
 dependencies = [
  "base64 0.22.1",
  "iref",
