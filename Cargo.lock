@@ -334,6 +334,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "ssi",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -342,6 +343,9 @@ dependencies = [
 name = "affinidi-tdk-common"
 version = "0.1.0"
 dependencies = [
+ "affinidi-did-resolver-cache-sdk",
+ "affinidi-secrets-resolver",
+ "did-peer",
  "reqwest 0.12.12",
  "serde",
  "serde_json",
