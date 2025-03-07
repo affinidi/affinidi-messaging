@@ -2,7 +2,7 @@ use crate::{SharedConfig, account_management::acl_management::manage_account_acl
 use affinidi_messaging_helpers::common::did::manually_enter_did_or_hash;
 use affinidi_messaging_sdk::{
     ATM,
-    profiles::Profile,
+    profiles::ATMProfile,
     protocols::{
         Protocols,
         mediator::{
@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 pub(crate) async fn account_management_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -53,7 +53,7 @@ pub(crate) async fn account_management_menu(
 
 pub(crate) async fn create_account_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -90,7 +90,7 @@ pub(crate) async fn create_account_menu(
 
 pub(crate) async fn manage_account_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -252,7 +252,7 @@ pub(crate) async fn manage_account_menu(
 
 async fn _change_account_type(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -294,7 +294,7 @@ async fn _change_account_type(
 
 async fn _change_account_queue_limit(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -412,7 +412,7 @@ async fn _change_account_queue_limit(
 /// returns None if the user cancels the selection
 pub(crate) async fn select_did(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -477,7 +477,7 @@ pub(crate) async fn select_did(
 
 async fn _select_from_existing_dids(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     cursor: Option<u32>,

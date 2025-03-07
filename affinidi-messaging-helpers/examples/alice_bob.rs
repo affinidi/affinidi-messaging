@@ -1,8 +1,10 @@
 //! Sends a message from Alice to Bob and then retrieves it.
 
 use affinidi_messaging_didcomm::Message;
-use affinidi_messaging_helpers::common::profiles::Profiles;
-use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, protocols::Protocols};
+use affinidi_messaging_sdk::{
+    ATM, config::ATMConfig, errors::ATMError, profiles::ATMProfile, protocols::Protocols,
+};
+use affinidi_tdk::common::environments::TDKEnvironments;
 use clap::Parser;
 use serde_json::json;
 use std::{
@@ -16,17 +18,30 @@ use uuid::Uuid;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Environment to use
     #[arg(short, long)]
-    profile: Option<String>,
+    environment: Option<String>,
+
+    /// Path to the environments file (defaults to environments.json)
+    #[arg(short, long)]
+    environments_path: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
     let args: Args = Args::parse();
 
-    let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())
-        .map_err(|err| ATMError::ConfigError(err.to_string()))?;
-    println!("Using Profile: {}", profile_name);
+    let environment_name = if let Some(environment_name) = &args.environment {
+        environment_name.to_string()
+    } else if let Ok(environment_name) = env::var("TDK_ENVIRONMENT") {
+        environment_name
+    } else {
+        "default".to_string()
+    };
+
+    let mut environment =
+        TDKEnvironments::fetch_from_file(args.environments_path.as_deref(), &environment_name)?;
+    println!("Using Environment: {}", environment_name);
 
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
@@ -36,28 +51,25 @@ async fn main() -> Result<(), ATMError> {
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).expect("Logging failed, exiting...");
 
-    let alice = if let Some(alice) = profile.friends.get("Alice") {
+    let alice = if let Some(alice) = environment.profiles.get("Alice") {
         alice
     } else {
         return Err(ATMError::ConfigError(
-            format!("Alice not found in Profile: {}", profile_name).to_string(),
+            format!("Alice not found in Environment: {}", environment_name).to_string(),
         ));
     };
 
-    let bob = if let Some(bob) = profile.friends.get("Bob") {
+    let bob = if let Some(bob) = environment.profiles.get("Bob") {
         bob
     } else {
         return Err(ATMError::ConfigError(
-            format!("Bob not found in Profile: {}", profile_name).to_string(),
+            format!("Bob not found in Environment: {}", environment_name).to_string(),
         ));
     };
 
     let mut config = ATMConfig::builder();
 
-    if let Some(ssl_cert) = &profile.ssl_certificate {
-        config = config.with_ssl_certificates(&mut vec![ssl_cert.to_string()]);
-        println!("Using SSL Certificate: {}", ssl_cert);
-    }
+    config = config.with_ssl_certificates(&mut environment.ssl_certificates);
 
     // Create a new ATM Client
     let atm = ATM::new(config.build()?).await?;
@@ -65,22 +77,22 @@ async fn main() -> Result<(), ATMError> {
 
     debug!("Enabling Alice's Profile");
     let alice = atm
-        .profile_add(&alice.into_profile(&atm).await?, true)
+        .profile_add(&ATMProfile::from_tdk_profile(&atm, alice).await?, true)
         .await?;
 
     debug!("Enabling Bob's Profile");
     let bob = atm
-        .profile_add(&bob.into_profile(&atm).await?, true)
+        .profile_add(&ATMProfile::from_tdk_profile(&atm, bob).await?, true)
         .await?;
 
     let start = SystemTime::now();
 
-    // Ensure Profile has a valid mediator to forward through
-    let mediator_did = if let Some(mediator) = profile.default_mediator {
+    // Ensure Environment has a valid mediator to forward through
+    let mediator_did = if let Some(mediator) = environment.default_mediator {
         mediator.clone()
     } else {
         return Err(ATMError::ConfigError(
-            "Profile Mediator not found".to_string(),
+            "Environment Mediator not found".to_string(),
         ));
     };
 

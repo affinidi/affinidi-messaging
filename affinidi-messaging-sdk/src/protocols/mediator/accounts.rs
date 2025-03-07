@@ -6,7 +6,7 @@ use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
 use super::{acls::MediatorACLSet, administration::Mediator};
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,
@@ -181,7 +181,7 @@ impl Mediator {
     pub async fn account_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<String>,
     ) -> Result<Option<Account>, ATMError> {
         let _span = span!(Level::DEBUG, "account_get");
@@ -258,7 +258,7 @@ impl Mediator {
     pub async fn account_add(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         acls: Option<MediatorACLSet>,
     ) -> Result<Account, ATMError> {
@@ -328,7 +328,7 @@ impl Mediator {
     pub async fn account_remove(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<String>,
     ) -> Result<bool, ATMError> {
         let _span = span!(Level::DEBUG, "account_remove");
@@ -404,7 +404,7 @@ impl Mediator {
     pub async fn accounts_list(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAccountList, ATMError> {
@@ -489,7 +489,7 @@ impl Mediator {
     pub async fn account_change_type(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         new_type: AccountType,
     ) -> Result<bool, ATMError> {
@@ -572,7 +572,7 @@ impl Mediator {
     pub async fn account_change_queue_limits(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         send_queue_limit: Option<i32>,
         receive_queue_limit: Option<i32>,

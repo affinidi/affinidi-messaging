@@ -5,7 +5,7 @@ use super::SharedState;
 use crate::{
     ATM,
     errors::ATMError,
-    profiles::Profile,
+    profiles::ATMProfile,
     transports::{
         WsConnectionCommands,
         websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
@@ -46,12 +46,12 @@ impl Debug for WsHandlerMode {
 pub enum WsHandlerCommands {
     // Messages sent from SDK to the Handler
     Exit,
-    Activate(Arc<Profile>),
-    Deactivate(Arc<Profile>),
+    Activate(Arc<ATMProfile>),
+    Deactivate(Arc<ATMProfile>),
     Next,                                   // Gets the next message from the cache
     CancelNext,                             // Cancels the next message request
     Get(String, Sender<WsHandlerCommands>), // Gets the message with the specified ID from the cache
-    TimeOut(Arc<Profile>, String), // SDK request timed out, contains msg_id we were looking for
+    TimeOut(Arc<ATMProfile>, String), // SDK request timed out, contains msg_id we were looking for
     // Messages sent from Handler to the SDK
     Started, // WsHandler has started and is ready to work
     MessageReceived(Message, Box<UnpackMetadata>), // Message received from the websocket
@@ -83,7 +83,7 @@ impl ATM {
                 ..Default::default()};
 
             // A list of all the active connections
-            let mut connections: HashMap<String, Arc<Profile>> = HashMap::new();
+            let mut connections: HashMap<String, Arc<ATMProfile>> = HashMap::new();
 
             // Set up the channel for WS_Connections to communicate to the handler
             // Create a new channel with a capacity of at most 32. This communicates from WS_Connections to the WS_Handler

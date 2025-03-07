@@ -1,18 +1,16 @@
 //! Example of how to manage administration accounts for the mediator
 use account_management::account_management::account_management_menu;
-use affinidi_messaging_helpers::common::{
-    affinidi_logo::print_logo,
-    check_path,
-    profiles::{Profile, Profiles},
-};
+use affinidi_messaging_helpers::common::{affinidi_logo::print_logo, check_path};
 use affinidi_messaging_sdk::{
     ATM,
     config::ATMConfig,
+    profiles::ATMProfile,
     protocols::{
         Protocols,
         mediator::acls::{AccessListModeType, MediatorACLSet},
     },
 };
+use affinidi_tdk::common::environments::{TDKEnvironment, TDKEnvironments};
 use clap::Parser;
 use console::{Style, Term, style};
 use dialoguer::{Select, theme::ColorfulTheme};
@@ -27,11 +25,17 @@ use ui::administration_accounts_menu;
 mod account_management;
 mod ui;
 
+/// Affinidi Mediator Administration
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Environment to use
     #[arg(short, long)]
-    profile: Option<String>,
+    environment: Option<String>,
+
+    /// Path to the environments file (defaults to environments.json)
+    #[arg(short, long)]
+    environments_path: Option<String>,
 }
 
 /// Holds information from the mediator configuration
@@ -150,11 +154,20 @@ impl SharedConfig {
     }
 }
 
-async fn init() -> Result<(ColorfulTheme, ATMConfig, Profile), Box<dyn Error>> {
+async fn init() -> Result<(ColorfulTheme, ATMConfig, TDKEnvironment), Box<dyn Error>> {
     let args: Args = Args::parse();
 
-    let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())?;
-    println!("Using Profile: {}", profile_name);
+    let environment_name = if let Some(environment_name) = &args.environment {
+        environment_name.to_string()
+    } else if let Ok(environment_name) = env::var("TDK_ENVIRONMENT") {
+        environment_name
+    } else {
+        "default".to_string()
+    };
+
+    let environment =
+        TDKEnvironments::fetch_from_file(args.environments_path.as_deref(), &environment_name)?;
+    println!("Using Environment: {}", environment_name);
 
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
@@ -181,13 +194,13 @@ async fn init() -> Result<(ColorfulTheme, ATMConfig, Profile), Box<dyn Error>> {
         style("Welcome to the Affinidi Messaging Mediator Administration wizard").green(),
     );
 
-    if profile.admin_did.is_none() {
-        return Err("Admin DID not found in Profile".into());
+    if environment.admin_did.is_none() {
+        return Err("Admin DID not found in Environment".into());
     }
 
     let mut ssl_certificates = Vec::new();
-    if let Some(ssl_certificate) = &profile.ssl_certificate {
-        ssl_certificates.push(ssl_certificate.to_string());
+    for certificate in &environment.ssl_certificates {
+        ssl_certificates.push(certificate.to_string());
     }
 
     // Connect to the Mediator
@@ -195,17 +208,17 @@ async fn init() -> Result<(ColorfulTheme, ATMConfig, Profile), Box<dyn Error>> {
         .with_ssl_certificates(&mut ssl_certificates)
         .build()?;
 
-    Ok((theme, config, profile))
+    Ok((theme, config, environment))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let (theme, config, profile) = init().await?;
+    let (theme, config, environment) = init().await?;
 
-    let admin = if let Some(admin) = profile.admin_did {
+    let admin = if let Some(admin) = environment.admin_did {
         admin
     } else {
-        return Err("Admin DID not found in Profile".into());
+        return Err("Admin DID not found in Environment".into());
     };
 
     // Create a new ATM Client
@@ -213,7 +226,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let protocols = Protocols::new();
 
     // Create the admin profile and enable it
-    let admin_profile = admin.into_profile(&atm).await?;
+    let admin_profile = ATMProfile::from_tdk_profile(&atm, &admin).await?;
     let admin = atm.profile_add(&admin_profile, true).await?;
 
     println!("{}", style("Admin account connected...").green());

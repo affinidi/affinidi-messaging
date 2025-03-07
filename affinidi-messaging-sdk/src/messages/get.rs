@@ -3,7 +3,7 @@ use crate::{
     ATM,
     errors::ATMError,
     messages::{GetMessagesResponse, SuccessResponse},
-    profiles::Profile,
+    profiles::ATMProfile,
 };
 use std::sync::Arc;
 use tracing::{Instrument, Level, debug, span};
@@ -13,7 +13,7 @@ impl ATM {
     /// - messages : List of message IDs to retrieve
     pub async fn get_messages(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         messages: &GetMessagesRequest,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(Level::DEBUG, "get_messages");

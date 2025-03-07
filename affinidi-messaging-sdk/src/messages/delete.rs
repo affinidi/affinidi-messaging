@@ -4,7 +4,7 @@ use tracing::{Instrument, Level, debug, span};
 
 use crate::{
     ATM, delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
-    profiles::Profile,
+    profiles::ATMProfile,
 };
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
@@ -17,7 +17,7 @@ impl ATM {
     /// You can choose to use `delete_message_direct` for a more immediate deletion
     pub async fn delete_message_background(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message_id: &str,
     ) -> Result<(), ATMError> {
         debug!("Deleting message in the background: {}", message_id);
@@ -42,7 +42,7 @@ impl ATM {
     /// - messages: List of message_ids to delete
     pub async fn delete_messages_direct(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         messages: &DeleteMessageRequest,
     ) -> Result<DeleteMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "delete_messages");

@@ -301,7 +301,7 @@ dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
  "affinidi-messaging-sdk",
- "affinidi-secrets-resolver",
+ "affinidi-tdk",
  "anyhow",
  "base64 0.22.1",
  "chrono",

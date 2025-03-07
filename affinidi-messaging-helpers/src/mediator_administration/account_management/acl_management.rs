@@ -5,7 +5,7 @@
 use affinidi_messaging_helpers::common::did::manually_enter_did_or_hash;
 use affinidi_messaging_sdk::{
     ATM,
-    profiles::Profile,
+    profiles::ATMProfile,
     protocols::{
         Protocols,
         mediator::{
@@ -22,7 +22,7 @@ use crate::SharedConfig;
 
 pub(crate) async fn manage_account_acls(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -118,7 +118,7 @@ pub(crate) async fn manage_account_acls(
 
 async fn _modify_acl_flags(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -238,7 +238,7 @@ async fn _modify_acl_flags(
 
 async fn _access_list_list(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     account: &Account,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -264,7 +264,7 @@ async fn _access_list_list(
 
 async fn _access_list_add(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -282,7 +282,7 @@ async fn _access_list_add(
 
 async fn _access_list_remove(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -299,7 +299,7 @@ async fn _access_list_remove(
 
 async fn _access_list_get(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -323,7 +323,7 @@ async fn _access_list_get(
 
 async fn _access_list_clear(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     account: &Account,
 ) -> Result<(), Box<dyn std::error::Error>> {

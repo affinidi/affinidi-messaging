@@ -1,7 +1,7 @@
 //! UI Related functions
 use affinidi_messaging_sdk::{
     ATM,
-    profiles::Profile,
+    profiles::ATMProfile,
     protocols::{Protocols, mediator::accounts::AccountType},
 };
 use console::style;
@@ -14,7 +14,7 @@ use crate::SharedConfig;
 
 pub(crate) async fn administration_accounts_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     shared_config: &SharedConfig,
@@ -53,7 +53,7 @@ pub(crate) async fn administration_accounts_menu(
 /// List first 100 Administration DIDs
 pub(crate) async fn list_admins(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     config: &SharedConfig,
 ) {
@@ -96,7 +96,7 @@ pub(crate) async fn list_admins(
 /// Add new Administration DID
 pub(crate) async fn add_admin(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
 ) {
@@ -156,7 +156,7 @@ pub(crate) async fn add_admin(
 
 pub(crate) async fn strip_admins(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     config: &SharedConfig,
     theme: &ColorfulTheme,

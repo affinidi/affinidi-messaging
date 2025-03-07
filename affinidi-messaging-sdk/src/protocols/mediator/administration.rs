@@ -2,7 +2,7 @@
 //! Admin account management
 //! Global ACL management
 
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ pub struct AdminAccount {
 }
 
 impl Mediator {
-    pub async fn get_config(&self, atm: &ATM, profile: &Arc<Profile>) -> Result<Value, ATMError> {
+    pub async fn get_config(&self, atm: &ATM, profile: &Arc<ATMProfile>) -> Result<Value, ATMError> {
         let _span = span!(Level::DEBUG, "get_config");
 
         async move {
@@ -116,7 +116,7 @@ impl Mediator {
     pub async fn add_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "add_admins");
@@ -215,7 +215,7 @@ impl Mediator {
     pub async fn strip_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "strip_admins");
@@ -310,7 +310,7 @@ impl Mediator {
     pub async fn list_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAdminList, ATMError> {

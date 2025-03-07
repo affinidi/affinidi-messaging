@@ -1,5 +1,5 @@
 use super::{Folder, MessageList};
-use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::Profile};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::ATMProfile};
 use sha256::digest;
 use std::sync::Arc;
 use tracing::{Instrument, Level, debug, span};
@@ -11,7 +11,7 @@ impl ATM {
     /// - `folder`: The folder to list messages from
     pub async fn list_messages(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         folder: Folder,
     ) -> Result<MessageList, ATMError> {
         let _span = span!(Level::DEBUG, "list_messages", folder = folder.to_string());

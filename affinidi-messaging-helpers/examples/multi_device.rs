@@ -9,8 +9,8 @@ use affinidi_messaging_didcomm::UnpackOptions;
 use affinidi_messaging_didcomm::envelope::MetaEnvelope;
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use affinidi_messaging_sdk::errors::ATMError;
-use affinidi_secrets_resolver::SecretsResolver;
-use affinidi_secrets_resolver::secrets::Secret;
+use affinidi_tdk::secrets_resolver::SecretsResolver;
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use clap::Parser;
 use serde_json::json;
 use std::time::SystemTime;
@@ -21,8 +21,13 @@ use uuid::Uuid;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Environment to use
     #[arg(short, long)]
-    profile: Option<String>,
+    environment: Option<String>,
+
+    /// Path to the environments file (defaults to environments.json)
+    #[arg(short, long)]
+    environments_path: Option<String>,
 }
 
 #[tokio::main]

@@ -12,7 +12,7 @@
  */
 
 use crate::{
-    ATM, SharedState, errors::ATMError, messages::DeleteMessageRequest, profiles::Profile,
+    ATM, SharedState, errors::ATMError, messages::DeleteMessageRequest, profiles::ATMProfile,
 };
 use std::sync::Arc;
 use tokio::{
@@ -23,7 +23,7 @@ use tokio::{
 use tracing::{Instrument, Level, debug, span};
 
 pub enum DeletionHandlerCommands {
-    DeleteMessage(Arc<Profile>, String),
+    DeleteMessage(Arc<ATMProfile>, String),
     Exit,
 }
 

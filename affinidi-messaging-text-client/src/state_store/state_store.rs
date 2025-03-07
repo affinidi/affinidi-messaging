@@ -12,7 +12,8 @@ use crate::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{
-    ATM, config::ATMConfigBuilder, transports::websockets::ws_handler::WsHandlerMode,
+    ATM, config::ATMConfigBuilder, profiles::ATMProfile,
+    transports::websockets::ws_handler::WsHandlerMode,
 };
 use std::time::Duration;
 use tokio::sync::{
@@ -71,7 +72,7 @@ impl StateStore {
 
         info!("Activating ({}) profiles", state.chat_list.chats.len());
         for chat in state.chat_list.chats.values() {
-            let profile = match chat.our_profile.into_profile(&atm).await {
+            let profile = match ATMProfile::from_tdk_profile(&atm, &chat.our_profile).await {
                 Ok(profile) => profile,
                 Err(e) => {
                     warn!("Failed to load profile for chat {}: {}", chat.name, e);

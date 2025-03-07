@@ -1,8 +1,8 @@
 use affinidi_messaging_didcomm::{Attachment, Message, MessageBuilder};
 use affinidi_messaging_sdk::{
-    ATM, messages::SuccessResponse, profiles::Profile, protocols::Protocols,
+    ATM, messages::SuccessResponse, profiles::ATMProfile, protocols::Protocols,
 };
-use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_tdk::secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use image::Luma;
 use qrcode::QrCode;
@@ -30,7 +30,7 @@ use super::chat_list::ChatStatus;
 #[derive(Clone, Default)]
 pub struct Invite {
     pub invite_url: String,
-    pub invite_profile: Option<Arc<Profile>>,
+    pub invite_profile: Option<Arc<ATMProfile>>,
     pub qr_code: Option<image::ImageBuffer<Luma<u8>, Vec<u8>>>,
 }
 
@@ -61,7 +61,8 @@ pub async fn create_new_profile(
     mediator_did: &str,
     alias: Option<String>,
     alias_suffix: bool,
-) -> anyhow::Result<Profile> {
+    state: &mut State,
+) -> anyhow::Result<ATMProfile> {
     let p256_key = JWK::generate_p256();
     let did_key = DIDKey::generate(&p256_key).unwrap();
 
@@ -106,12 +107,13 @@ pub async fn create_new_profile(
         ));
     }
 
-    match Profile::new(
+    atm.add_secret(&secret);
+    state.add_secret(secret);
+    match ATMProfile::new(
         atm,
         Some(alias),
         did_key.to_string(),
         Some(mediator_did.to_string()),
-        vec![secret],
     )
     .await
     {
@@ -202,6 +204,7 @@ pub async fn send_invitation_accept(
         &mediator_did,
         Some(format!("Ephemeral Accept {}", invite_did_suffix)),
         true,
+        state,
     )
     .await?;
     let accept_temp_profile = atm.profile_add(&accept_temp_profile, true).await?;
@@ -259,6 +262,7 @@ pub async fn send_invitation_accept(
         &mediator_did,
         Some(format!("Secure Accept {}", invite_did_suffix)),
         true,
+        state,
     )
     .await?;
     let accept_secure_profile = atm.profile_add(&accept_secure_profile, true).await?;
@@ -394,7 +398,7 @@ pub async fn create_invitation(
     // Send the state immediately so we render the popup while waiting for the rest to complete
     state_tx.send(state.clone())?;
     if let Some(mediator_did) = state.settings.mediator_did.clone() {
-        match create_new_profile(atm, &mediator_did, None, false).await {
+        match create_new_profile(atm, &mediator_did, None, false, state).await {
             Ok(profile) => {
                 state.invite_popup.messages.push(Line::from(vec![
                     Span::styled(
