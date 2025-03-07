@@ -23,7 +23,7 @@ mod ui;
 struct Args {
     /// Path to the environments file (defaults to environments.json)
     #[arg(short, long)]
-    environments_path: Option<String>,
+    path_environments: Option<String>,
 }
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Load environments if they already exist
     let mut environments = TDKEnvironments::load_file(
         &args
-            .environments_path
+            .path_environments
             .unwrap_or("environments.json".to_string()),
     )?;
 

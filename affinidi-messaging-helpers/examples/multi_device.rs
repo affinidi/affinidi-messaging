@@ -27,7 +27,7 @@ struct Args {
 
     /// Path to the environments file (defaults to environments.json)
     #[arg(short, long)]
-    environments_path: Option<String>,
+    path_environments: Option<String>,
 }
 
 #[tokio::main]

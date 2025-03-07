@@ -30,7 +30,7 @@ struct Args {
 
     /// Path to the environments file (defaults to environments.json)
     #[arg(short, long)]
-    environments_path: Option<String>,
+    path_environments: Option<String>,
 }
 
 #[tokio::main]
@@ -46,7 +46,7 @@ async fn main() -> Result<(), ATMError> {
     };
 
     let mut environment =
-        TDKEnvironments::fetch_from_file(args.environments_path.as_deref(), &environment_name)?;
+        TDKEnvironments::fetch_from_file(args.path_environments.as_deref(), &environment_name)?;
     println!("Using Environment: {}", environment_name);
 
     // construct a subscriber that prints formatted traces to stdout
@@ -64,6 +64,8 @@ async fn main() -> Result<(), ATMError> {
             format!("Alice not found in Profile: {}", environment_name).to_string(),
         ));
     };
+
+    info!("TIMTAM Alice = {:#?}", alice);
 
     let mut config = ATMConfig::builder();
 

@@ -35,7 +35,7 @@ struct Args {
 
     /// Path to the environments file (defaults to environments.json)
     #[arg(short, long)]
-    environments_path: Option<String>,
+    path_environments: Option<String>,
 }
 
 /// Holds information from the mediator configuration
@@ -166,7 +166,7 @@ async fn init() -> Result<(ColorfulTheme, ATMConfig, TDKEnvironment), Box<dyn Er
     };
 
     let environment =
-        TDKEnvironments::fetch_from_file(args.environments_path.as_deref(), &environment_name)?;
+        TDKEnvironments::fetch_from_file(args.path_environments.as_deref(), &environment_name)?;
     println!("Using Environment: {}", environment_name);
 
     // construct a subscriber that prints formatted traces to stdout

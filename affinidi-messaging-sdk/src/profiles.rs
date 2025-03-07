@@ -98,6 +98,8 @@ impl ATMProfile {
 
     /// Convert TDK Profile to an ATM Profile
     pub async fn from_tdk_profile(atm: &ATM, tdk_profile: &TDKProfile) -> Result<Self, ATMError> {
+        atm.add_secrets(&tdk_profile.secrets).await;
+
         ATMProfile::new(
             atm,
             Some(tdk_profile.alias.clone()),
