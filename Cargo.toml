@@ -98,7 +98,7 @@ ssi = { version = "0.10" }
 textwrap = "0.16"
 thiserror = "2.0"
 time = "0.3"
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.44", features = ["full"] }
 tokio-rustls = "0.26"
 tokio-stream = "0.1"
 toml = "0.8"

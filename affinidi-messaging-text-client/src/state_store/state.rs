@@ -140,7 +140,7 @@ pub struct State {
     pub manual_connect_popup: ManualConnectPopupState,
     #[serde(skip)]
     pub initialization: bool,
-    secrets: Vec<Secret>,
+    pub(crate) secrets: Vec<Secret>,
 }
 
 impl State {

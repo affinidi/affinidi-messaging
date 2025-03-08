@@ -62,6 +62,8 @@ impl StateStore {
         let mut state = State::read_from_file("config.json").unwrap_or_default();
         state.initialization = true;
 
+        atm.add_secrets(&state.secrets).await;
+
         if !state.chat_list.chats.is_empty() {
             // Set the first chat as the active chat
             state.chat_list.active_chat = state.chat_list.chats.keys().next().cloned();
