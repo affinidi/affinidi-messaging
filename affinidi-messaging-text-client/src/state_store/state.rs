@@ -4,6 +4,7 @@ use super::actions::{
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{ATM, protocols::oob_discovery::OOBDiscovery};
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use ratatui::text::Line;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -139,11 +140,21 @@ pub struct State {
     pub manual_connect_popup: ManualConnectPopupState,
     #[serde(skip)]
     pub initialization: bool,
+    pub(crate) secrets: Vec<Secret>,
 }
 
 impl State {
+    pub fn add_secret(&mut self, secret: Secret) {
+        self.secrets.push(secret);
+    }
+
+    pub fn add_secrets(&mut self, secrets: &mut Vec<Secret>) {
+        self.secrets.append(secrets);
+    }
+
     pub fn save_to_file(&self, file_path: &str) -> Result<(), std::io::Error> {
         let file = std::fs::File::create(file_path)?;
+
         serde_json::to_writer_pretty(file, self)?;
         Ok(())
     }

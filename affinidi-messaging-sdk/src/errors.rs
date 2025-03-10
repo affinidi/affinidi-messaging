@@ -1,4 +1,5 @@
 use affinidi_messaging_didcomm::Message;
+use affinidi_tdk_common::errors::TDKError;
 use thiserror::Error;
 
 use crate::messages::{known::MessageType, problem_report::ProblemReport};
@@ -30,6 +31,8 @@ pub enum ATMError {
     DidcommError(String, String),
     #[error("SDK Error: {0}")]
     SDKError(String),
+    #[error("TDK Error: {0}")]
+    TDKError(String),
     #[error("DIDComm Problem Report: code: ({0}), comment: ({1}), escalate?: ({2})")]
     ProblemReport(String, String, String),
     #[error("DIDComm Mediator error: code({0}), message: ({1})")]
@@ -64,6 +67,18 @@ impl ATMError {
                 message.type_
             ))
         }
+    }
+}
+
+impl From<ATMError> for TDKError {
+    fn from(err: ATMError) -> Self {
+        TDKError::ATM(err.to_string())
+    }
+}
+
+impl From<TDKError> for ATMError {
+    fn from(err: TDKError) -> Self {
+        ATMError::TDKError(err.to_string())
     }
 }
 

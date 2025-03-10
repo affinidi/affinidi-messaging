@@ -6,7 +6,7 @@ use sha256::digest;
 use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 
 #[derive(Default)]
 pub struct TrustPing {}
@@ -35,7 +35,7 @@ impl TrustPing {
     pub async fn send_ping(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         to_did: &str,
         signed: bool,
         expect_pong: bool,

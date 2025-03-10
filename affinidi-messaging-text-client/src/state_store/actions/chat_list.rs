@@ -4,7 +4,8 @@
 
 use std::{collections::HashMap, fmt, hash::Hasher};
 
-use affinidi_messaging_sdk::profiles::{Profile, ProfileConfig};
+use affinidi_messaging_sdk::profiles::ATMProfile;
+use affinidi_tdk::common::environments::TDKProfile;
 use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -23,7 +24,7 @@ impl ChatList {
         &mut self,
         name: &str,
         description: &str,
-        our_profile: &Profile,
+        our_profile: &ATMProfile,
         remote_did: Option<String>,
         invitation_link: Option<String>,
         status: ChatStatus,
@@ -31,7 +32,7 @@ impl ChatList {
         let chat = Chat {
             name: name.to_string(),
             description: description.to_string(),
-            our_profile: ProfileConfig::from(our_profile).await,
+            our_profile: our_profile.to_tdk_profile(),
             remote_did,
             invitation_link,
             status,
@@ -83,7 +84,7 @@ pub struct Chat {
     pub status: ChatStatus,
     pub description: String,
     pub messages: CircularQueue<ChatMessage>,
-    pub our_profile: ProfileConfig,
+    pub our_profile: TDKProfile,
     pub remote_did: Option<String>,
     pub has_unread: bool,
     // This is used to store the invitation link for the chat
@@ -114,7 +115,7 @@ impl Default for Chat {
             status: ChatStatus::AwaitingInvitationAcceptance,
             description: String::new(),
             messages: CircularQueue::with_capacity(50),
-            our_profile: ProfileConfig::default(),
+            our_profile: TDKProfile::default(),
             remote_did: None,
             has_unread: false,
             invitation_link: None,

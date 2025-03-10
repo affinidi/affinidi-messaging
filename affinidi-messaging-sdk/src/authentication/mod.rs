@@ -15,7 +15,7 @@ use crate::{
     messages::{
         AuthenticationChallenge, AuthorizationResponse, GenericDataStruct, SuccessResponse,
     },
-    profiles::Profile,
+    profiles::ATMProfile,
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -25,7 +25,7 @@ pub struct AuthRefreshResponse {
 }
 impl GenericDataStruct for AuthRefreshResponse {}
 
-impl Profile {
+impl ATMProfile {
     /// Authenticate the SDK against Affinidi Trusted Messaging
     ///
     /// Will loop until successful authentication

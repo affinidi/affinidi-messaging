@@ -1,9 +1,9 @@
-use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::Profile};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::ATMProfile};
 use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Helper method to get the Mediators well-known DID
-    pub async fn well_known_did(&mut self, profile: &Profile) -> Result<String, ATMError> {
+    pub async fn well_known_did(&mut self, profile: &ATMProfile) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did");
         async move {
             debug!("Sending well_known_did request");

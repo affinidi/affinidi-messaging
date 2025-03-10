@@ -6,8 +6,8 @@
 
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
-use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::Profile};
-use affinidi_secrets_resolver::secrets::Secret;
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::ATMProfile};
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
 use console::style;
@@ -135,8 +135,9 @@ async fn main() -> Result<(), ATMError> {
             return Ok(());
         }
     };
+    atm.add_secrets(&secrets).await;
 
-    let profile = Profile::new(&atm, None, to_did.clone(), None, secrets).await?;
+    let profile = ATMProfile::new(&atm, None, to_did.clone(), None).await?;
     atm.profile_add(&profile, false).await?;
     println!("{}", style("DIDComm Profile created...").green());
 

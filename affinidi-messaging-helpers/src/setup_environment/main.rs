@@ -1,11 +1,14 @@
 //! Helps configure the various configuration options, DIDs and keys for the actors in the examples.
 //! This helps to create consistency in the examples and also to avoid code duplication.
-use affinidi_messaging_helpers::common::{
-    affinidi_logo, check_path,
-    profiles::{PROFILES_PATH, Profiles},
+use affinidi_messaging_helpers::common::{affinidi_logo, check_path};
+use affinidi_tdk::{
+    common::environments::{TDKEnvironments, TDKProfile},
+    dids::{DID, KeyType},
 };
+use clap::Parser;
 use console::{Style, Term, style};
 use dialoguer::{Confirm, theme::ColorfulTheme};
+use did_peer::DIDPeerKeys;
 use std::error::Error;
 use ui::{MediatorType, init_local_mediator, init_remote_mediator, local_remote_mediator};
 
@@ -14,6 +17,15 @@ mod network;
 mod ssl_certs;
 mod ui;
 
+/// Setups the environment for Affinidi Messaging
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Path to the environments file (defaults to environments.json)
+    #[arg(short, long)]
+    path_environments: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let term = Term::stdout();
@@ -21,6 +33,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     affinidi_logo::print_logo();
     // Ensure we are somewhere we should be...
     check_path()?;
+
+    let args: Args = Args::parse();
 
     let theme = ColorfulTheme {
         values_style: Style::new().yellow().dim(),
@@ -32,17 +46,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         style("Welcome to the Affinidi Messaging setup wizard").green(),
     );
 
-    // Load profiles if they already exist
-    let mut profiles = Profiles::load_file(PROFILES_PATH)?;
+    // Load environments if they already exist
+    let mut environments = TDKEnvironments::load_file(
+        &args
+            .path_environments
+            .unwrap_or("environments.json".to_string()),
+    )?;
 
     // ************ Local or Remote? ************
-    let profile_name;
+    let environment_name;
     let type_;
     loop {
-        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? {
+        let (t_, environment) = match local_remote_mediator(&theme, &environments)? {
             Some(m_t) => match m_t {
-                MediatorType::Local => init_local_mediator(&theme, &mut profiles).await?,
-                MediatorType::Remote => init_remote_mediator(&theme, &mut profiles).await?,
+                MediatorType::Local => init_local_mediator(&theme, &mut environments).await?,
+                MediatorType::Remote => init_remote_mediator(&theme, &mut environments).await?,
                 MediatorType::Existing(profile) => {
                     (MediatorType::Existing(profile.clone()), Some(profile))
                 }
@@ -53,24 +71,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         };
 
-        if let Some(profile) = profile {
-            profile_name = profile;
+        if let Some(environment) = environment {
+            environment_name = environment;
             type_ = t_;
             break;
         }
     }
 
-    let mut profile = if let Some(profile) = profiles.profiles.get(&profile_name) {
-        profile.to_owned()
+    let mut environment = if let Some(environment) = environments.get(&environment_name) {
+        environment.to_owned()
     } else {
-        return Err("Profile not found".into());
+        return Err("Environment not found".into());
     };
 
     println!();
     println!(
         "  {}{}",
-        style("Selected Profile: ").blue(),
-        style(&profile_name).color256(208)
+        style("Selected Environment: ").blue(),
+        style(&environment_name).color256(208)
     );
     println!();
 
@@ -83,23 +101,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .default(true)
         .interact()?
     {
-        profile.insert_new_friend( "Alice", profile.default_mediator.clone(), None)?;
-        println!("  {}{}", style("Friend Alice created with DID: ").blue(), style(&profile.find_friend("Alice").unwrap().did).color256(208));
-        profile.insert_new_friend( "Bob", profile.default_mediator.clone(), None)?;
-        println!("  {}{}", style("Friend Bob created with DID: ").blue(), style(&profile.find_friend("Bob").unwrap().did).color256(208));
-        profile.insert_new_friend( "Charlie", profile.default_mediator.clone(), None)?;
-        println!("  {}{}", style("Friend Charlie created with DID: ").blue(), style(&profile.find_friend("Charlie").unwrap().did).color256(208));
-        profile.insert_new_friend( "Malorie", profile.default_mediator.clone(), None)?;
-        println!("  {}{}{}{}", style("Friend(?) ").blue(), style("Malorie").red(), style(" created with DID: ").blue(), style(&profile.find_friend("Malorie").unwrap().did).color256(208));
+
+        fn _create_friend(alias: &str, mediator: Option<&str>) -> TDKProfile {
+            let (did, secrets) = DID::generate_did_peer(vec![(DIDPeerKeys::Verification, KeyType::Ed25519), (DIDPeerKeys::Encryption, KeyType::Secp256k1)], None).unwrap();
+            TDKProfile {
+                alias: alias.to_string(),
+                did,
+                secrets,
+                mediator: mediator.map(|m| m.to_string()),
+            }
+
+        }
+
+        environment.profiles.insert("Alice".into(), _create_friend("Alice", environment.default_mediator.as_deref()));
+        println!("  {}{}", style("Friend Alice created with DID: ").blue(), style(&environment.profiles.get("Alice").unwrap().did).color256(208));
+        environment.profiles.insert("Bob".into(), _create_friend("Bob", environment.default_mediator.as_deref()));
+        println!("  {}{}", style("Friend Bob created with DID: ").blue(), style(&environment.profiles.get("Bob").unwrap().did).color256(208));
+        environment.profiles.insert("Charlie".into(), _create_friend("Charlie", environment.default_mediator.as_deref()));
+        println!("  {}{}", style("Friend Charlie created with DID: ").blue(), style(&environment.profiles.get("Charlie").unwrap().did).color256(208));
+        environment.profiles.insert("Malorie".into(), _create_friend("Malorie", environment.default_mediator.as_deref()));
+        println!("  {}{}{}{}", style("Friend(?) ").blue(), style("Malorie").red(), style(" created with DID: ").blue(), style(&environment.profiles.get("Malorie").unwrap().did).color256(208));
     }
 
     if Confirm::with_theme(&theme)
-        .with_prompt(format!("Save friends to profile: {}?", profile_name))
+        .with_prompt(format!("Save friends to profile: {}?", environment_name))
         .default(true)
         .interact()?
     {
-        profiles.add_profile(&profile_name, profile);
-        profiles.save()?;
+        environments.add(&environment_name, environment);
+        environments.save()?;
     }
 
     if type_ == MediatorType::Local {
@@ -118,13 +148,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "{}",
         style(
-            "You can set the environment variable AM_PROFILE to use this profile in the examples."
+            "You can set the environment variable TDK_ENVIRONMENT to use this profile in the examples."
         )
         .blue()
     );
     println!(
         "  {}",
-        style(format!("export AM_PROFILE={}", profile_name)).color256(208)
+        style(format!("export TDK_ENVIRONMENT={}", environment_name)).color256(208)
     );
     println!();
     Ok(())

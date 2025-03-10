@@ -8,7 +8,7 @@ Each WsConnection is a tokio parallel task, and responsible for unpacking incomi
 */
 use super::SharedState;
 use crate::{
-    ATM, errors::ATMError, profiles::Profile, protocols::Protocols,
+    ATM, errors::ATMError, profiles::ATMProfile, protocols::Protocols,
     transports::websockets::utils::connect,
 };
 use affinidi_messaging_didcomm::{Message as DidcommMessage, UnpackMetadata};
@@ -34,8 +34,8 @@ pub(crate) enum WsConnectionCommands {
     EnableDirectChannel(Sender<Box<(DidcommMessage, UnpackMetadata)>>),
     DisableDirectChannel,
     // To Handler
-    Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
-    Disconnected(Arc<Profile>),      // WebSocket connection is disconnected
+    Connected(Arc<ATMProfile>, String), // Connection is ready for profile (and status message to retrieve)
+    Disconnected(Arc<ATMProfile>),      // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
@@ -51,7 +51,7 @@ enum State {
 }
 
 pub struct WsConnection {
-    profile: Arc<Profile>,
+    profile: Arc<ATMProfile>,
     shared: Arc<SharedState>,
     state: State,
     to_handler: Sender<WsConnectionCommands>,
@@ -62,7 +62,7 @@ pub struct WsConnection {
 impl WsConnection {
     pub(crate) async fn activate(
         shared_state: Arc<SharedState>,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         to_handler: Sender<WsConnectionCommands>,
         from_handler: Receiver<WsConnectionCommands>,
         to_connection: Sender<WsConnectionCommands>,

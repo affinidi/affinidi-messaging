@@ -144,9 +144,10 @@ async fn _handle_connection_setup(
     // Create the new DID for this chat
     let our_new_did = create_new_profile(
         atm,
-        state.settings.mediator_did.as_ref().unwrap(),
+        &state.settings.mediator_did.clone().unwrap(),
         Some(new_chat_name.clone()),
         true,
+        state,
     )
     .await
     .unwrap();

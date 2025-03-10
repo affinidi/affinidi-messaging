@@ -38,7 +38,7 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
 ###       This causes more use cases where the secrets of the mediator itself can be exposed in administration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
-admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MksaHPuhNEewaJTywkDdBWnHWe2xpW6hva2KSkuvKBKys3.EzQ3shX5rNyeLJXqiBoYq9UFGPpi8sSoBqB5VgDS1LA4CyFAZs}"
+admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkjWWrhrr7MsEQubzsggWnYSAHCBRJ28PSt2VfiZco7Tso.EzQ3shXQNfDkt6Yn85zAy28ZtbE4zngxRMCsf6cMCrcQ2gR9CC}"
 
 ### did_web_self_hosted: <DID Document Path> Path to the self-hosted DID Document
 ### Default: None

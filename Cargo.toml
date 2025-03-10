@@ -24,6 +24,7 @@ repository = "https://github.com/affinidi/affinidi-messaging"
 rust-version = "1.85"
 
 [workspace.dependencies]
+affinidi-tdk = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk" }
 affinidi-tdk-common = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common" }
 affinidi-secrets-resolver = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common/affinidi-secrets-resolver" }
 affinidi-messaging-sdk = { version = "0.10.0", path = "./affinidi-messaging-sdk" }
@@ -36,10 +37,10 @@ anyhow = '1.0'
 askar-crypto = "0.3.3"
 async-convert = "1"
 aws-config = "1.5"
-aws-sdk-dynamodb = "1.66"
-aws-sdk-memorydb = "1.62"
-aws-sdk-secretsmanager = "1.64"
-aws-sdk-ssm = "1.66"
+aws-sdk-dynamodb = "1.67"
+aws-sdk-memorydb = "1.63"
+aws-sdk-secretsmanager = "1.65"
+aws-sdk-ssm = "1.67"
 axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
@@ -97,7 +98,7 @@ ssi = { version = "0.10" }
 textwrap = "0.16"
 thiserror = "2.0"
 time = "0.3"
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.44", features = ["full"] }
 tokio-rustls = "0.26"
 tokio-stream = "0.1"
 toml = "0.8"

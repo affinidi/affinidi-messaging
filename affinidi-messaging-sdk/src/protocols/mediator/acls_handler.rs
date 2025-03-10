@@ -6,7 +6,7 @@ use super::{
     acls::{AccessListModeType, MediatorACLSet},
     administration::Mediator,
 };
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -114,7 +114,7 @@ impl Mediator {
     pub async fn acls_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         dids: &Vec<String>,
     ) -> Result<MediatorACLGetResponse, ATMError> {
         let _span = span!(Level::DEBUG, "acls_get");
@@ -173,7 +173,7 @@ impl Mediator {
     pub async fn acls_set(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         acls: &MediatorACLSet,
     ) -> Result<MediatorACLSetResponse, ATMError> {
@@ -247,7 +247,7 @@ impl Mediator {
     pub async fn access_list_list(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<&str>,
         cursor: Option<u64>,
     ) -> Result<MediatorAccessListListResponse, ATMError> {
@@ -334,7 +334,7 @@ impl Mediator {
     pub async fn access_list_add(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<&str>,
         hashes: &[&str],
     ) -> Result<MediatorAccessListAddResponse, ATMError> {
@@ -433,7 +433,7 @@ impl Mediator {
     pub async fn access_list_remove(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<&str>,
         hashes: &[&str],
     ) -> Result<usize, ATMError> {
@@ -526,7 +526,7 @@ impl Mediator {
     pub async fn access_list_clear(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<&str>,
     ) -> Result<(), ATMError> {
         let did_hash = if let Some(did_hash) = did_hash {
@@ -606,7 +606,7 @@ impl Mediator {
     pub async fn access_list_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<&str>,
         hashes: &[&str],
     ) -> Result<MediatorAccessListGetResponse, ATMError> {

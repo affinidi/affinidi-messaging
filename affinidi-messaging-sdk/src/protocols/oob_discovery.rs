@@ -8,7 +8,7 @@ use crate::{
     ATM,
     errors::ATMError,
     messages::{GenericDataStruct, SuccessResponse},
-    profiles::Profile,
+    profiles::ATMProfile,
 };
 use affinidi_messaging_didcomm::Message;
 use base64::prelude::*;
@@ -38,7 +38,7 @@ impl OOBDiscovery {
     pub async fn create_invite(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         expiry: Option<Duration>,
     ) -> Result<String, ATMError> {
         // Check if authenticated
@@ -191,7 +191,7 @@ impl OOBDiscovery {
     pub async fn delete_invite(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         oobid: &str,
     ) -> Result<String, ATMError> {
         // Check if authenticated

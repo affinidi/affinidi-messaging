@@ -22,7 +22,7 @@ use crate::{
     ATM,
     errors::ATMError,
     messages::GenericDataStruct,
-    profiles::Profile,
+    profiles::ATMProfile,
     transports::{SendMessageResponse, websockets::ws_handler::WsHandlerCommands},
 };
 
@@ -90,7 +90,7 @@ impl MessagePickup {
     pub async fn send_status_request(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         wait_for_response: bool,
         wait: Option<Duration>,
     ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
@@ -174,7 +174,7 @@ impl MessagePickup {
     pub async fn toggle_live_delivery(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         live_delivery: bool,
     ) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "toggle_live_delivery",);
@@ -299,7 +299,7 @@ impl MessagePickup {
     pub async fn live_stream_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         use_profile_channel: bool,
         msg_id: &str,
         wait: Duration,
@@ -380,7 +380,7 @@ impl MessagePickup {
     pub async fn send_delivery_request(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         limit: Option<usize>,
         wait_for_response: bool,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
@@ -513,7 +513,7 @@ impl MessagePickup {
     pub async fn send_messages_received(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         list: &Vec<String>,
         wait_for_response: bool,
     ) -> Result<Option<MessagePickupStatusReply>, ATMError> {

@@ -7,7 +7,7 @@ use crate::{
     ATM,
     errors::ATMError,
     messages::{DeleteMessageRequest, SuccessResponse},
-    profiles::Profile,
+    profiles::ATMProfile,
 };
 
 use super::{FetchDeletePolicy, GetMessagesResponse};
@@ -55,7 +55,7 @@ impl ATM {
     /// ```
     pub async fn fetch_messages(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         options: &FetchOptions,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(
