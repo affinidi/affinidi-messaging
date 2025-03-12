@@ -2,11 +2,11 @@ use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha256::digest;
-use tracing::{Instrument, Level, debug, span};
+use tracing::{debug, span, Instrument, Level};
 use uuid::Uuid;
 
 use super::{acls::MediatorACLSet, administration::Mediator};
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
 use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,

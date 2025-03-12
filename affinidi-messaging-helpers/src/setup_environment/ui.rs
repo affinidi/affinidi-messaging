@@ -1,5 +1,5 @@
 use crate::{
-    mediator::{MediatorConfig, read_config_file},
+    mediator::{read_config_file, MediatorConfig},
     network::fetch_well_known_did,
     ssl_certs::create_ssl_certs,
 };
@@ -9,7 +9,7 @@ use affinidi_messaging_helpers::common::{
 };
 use affinidi_messaging_sdk::profiles::ProfileConfig;
 use console::style;
-use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use regex::Regex;
 use std::{collections::HashMap, error::Error, path::Path};
 use toml::Value;

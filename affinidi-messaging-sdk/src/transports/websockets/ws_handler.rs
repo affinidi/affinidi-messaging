@@ -95,7 +95,7 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
-           
+
             loop {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {

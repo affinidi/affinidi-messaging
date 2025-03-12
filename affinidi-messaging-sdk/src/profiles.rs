@@ -165,11 +165,10 @@ impl Profile {
 
     /// Return the REST endpoint for this profile if it exists
     pub fn get_mediator_rest_endpoint(&self) -> Option<String> {
-        match &*self.inner.mediator { Some(mediator) => {
-            mediator.rest_endpoint.clone()
-        } _ => {
-            None
-        }}
+        match &*self.inner.mediator {
+            Some(mediator) => mediator.rest_endpoint.clone(),
+            _ => None,
+        }
     }
 
     /// Sets up a direct channel to a provided MPSC Receiver
@@ -178,48 +177,50 @@ impl Profile {
         &self,
         channel_tx: Sender<Box<(Message, UnpackMetadata)>>,
     ) -> Result<(), ATMError> {
-        match &*self.inner.mediator { Some(mediator) => {
-            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
-                channel
-                    .send(WsConnectionCommands::EnableDirectChannel(channel_tx))
-                    .await
-                    .map_err(|err| {
-                        ATMError::TransportError(format!(
-                            "Could not send websocket message: {:?}",
-                            err
-                        ))
-                    })?;
-            }
+        match &*self.inner.mediator {
+            Some(mediator) => {
+                if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                    channel
+                        .send(WsConnectionCommands::EnableDirectChannel(channel_tx))
+                        .await
+                        .map_err(|err| {
+                            ATMError::TransportError(format!(
+                                "Could not send websocket message: {:?}",
+                                err
+                            ))
+                        })?;
+                }
 
-            Ok(())
-        } _ => {
-            Err(ATMError::TransportError(
+                Ok(())
+            }
+            _ => Err(ATMError::TransportError(
                 "There is no mediator configured for this profile".to_string(),
-            ))
-        }}
+            )),
+        }
     }
 
     /// Disables the direct channel to the provided MPSC Receiver
     pub async fn disable_direct_channel(&self) -> Result<(), ATMError> {
-        match &*self.inner.mediator { Some(mediator) => {
-            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
-                channel
-                    .send(WsConnectionCommands::DisableDirectChannel)
-                    .await
-                    .map_err(|err| {
-                        ATMError::TransportError(format!(
-                            "Could not send websocket message: {:?}",
-                            err
-                        ))
-                    })?;
-            }
+        match &*self.inner.mediator {
+            Some(mediator) => {
+                if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                    channel
+                        .send(WsConnectionCommands::DisableDirectChannel)
+                        .await
+                        .map_err(|err| {
+                            ATMError::TransportError(format!(
+                                "Could not send websocket message: {:?}",
+                                err
+                            ))
+                        })?;
+                }
 
-            Ok(())
-        } _ => {
-            Err(ATMError::TransportError(
+                Ok(())
+            }
+            _ => Err(ATMError::TransportError(
                 "There is no mediator configured for this profile".to_string(),
-            ))
-        }}
+            )),
+        }
     }
 }
 
@@ -392,19 +393,20 @@ impl ATM {
     ///
     /// Returns true if the profile was removed
     pub async fn profile_remove(&self, profile: &str) -> Result<bool, ATMError> {
-        match self.inner.profiles.write().await.0.remove(profile) { Some(profile) => {
-            // Send a signal to the WsHandler to Remove this Profile
-            let _ = self
-                .inner
-                .ws_handler_send_stream
-                .send(WsHandlerCommands::Deactivate(profile.clone()))
-                .await;
+        match self.inner.profiles.write().await.0.remove(profile) {
+            Some(profile) => {
+                // Send a signal to the WsHandler to Remove this Profile
+                let _ = self
+                    .inner
+                    .ws_handler_send_stream
+                    .send(WsHandlerCommands::Deactivate(profile.clone()))
+                    .await;
 
-            debug!("Profile({}): Removed from profiles", &profile.inner.alias);
-            Ok(true)
-        } _ => {
-            Ok(false)
-        }}
+                debug!("Profile({}): Removed from profiles", &profile.inner.alias);
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     /// Will create a websocket connection for the profile if one doesn't already exist

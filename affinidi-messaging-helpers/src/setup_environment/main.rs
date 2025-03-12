@@ -39,18 +39,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let profile_name;
     let type_;
     loop {
-        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? { Some(m_t) => {
-            match m_t {
+        let (t_, profile) = match local_remote_mediator(&theme, &profiles)? {
+            Some(m_t) => match m_t {
                 MediatorType::Local => init_local_mediator(&theme, &mut profiles).await?,
                 MediatorType::Remote => init_remote_mediator(&theme, &mut profiles).await?,
                 MediatorType::Existing(profile) => {
                     (MediatorType::Existing(profile.clone()), Some(profile))
                 }
+            },
+            _ => {
+                println!("{}", style("Exiting...").color256(208));
+                return Ok(());
             }
-        } _ => {
-            println!("{}", style("Exiting...").color256(208));
-            return Ok(());
-        }};
+        };
 
         if let Some(profile) = profile {
             profile_name = profile;

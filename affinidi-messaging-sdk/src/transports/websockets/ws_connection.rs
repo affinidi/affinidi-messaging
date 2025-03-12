@@ -28,7 +28,7 @@ use tokio_tungstenite::{
     },
     MaybeTlsStream, WebSocketStream,
 };
-use tracing::{debug, warn, error, span, Instrument};
+use tracing::{debug, error, span, warn, Instrument};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -41,7 +41,7 @@ pub(crate) enum WsConnectionCommands {
     DisableDirectChannel,
     // To Handler
     Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
-    Disconnected(Arc<Profile>), // WebSocket connection is disconnected
+    Disconnected(Arc<Profile>),      // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
 
@@ -110,7 +110,7 @@ impl WsConnection {
             };
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
-           
+
             loop {
                 select! {
                     value = web_socket.next() => {
@@ -128,7 +128,7 @@ impl WsConnection {
                                                         continue;
                                                     }
                                                 };
-                                                match &direct_channel { 
+                                                match &direct_channel {
                                                     Some(sender) => {
                                                         let _ = sender.send(Box::new(unpack)).await;
                                                     } _ => {
@@ -287,15 +287,13 @@ impl WsConnection {
 
         if update_sdk {
             debug!("channel to SDK = capacity = {}", self.to_handler.capacity());
-            match self
-                .to_handler
-                .try_send(WsConnectionCommands::Connected(
-                    self.profile.clone(),
-                    status_id,
-                )) {
+            match self.to_handler.try_send(WsConnectionCommands::Connected(
+                self.profile.clone(),
+                status_id,
+            )) {
                 Ok(_) => {}
                 Err(e) => {
-                warn!("Channel to WS_handler is full: {:?}", e);
+                    warn!("Channel to WS_handler is full: {:?}", e);
                 }
             }
         }

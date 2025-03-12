@@ -141,17 +141,18 @@ impl MessagePickup {
             match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            { SendMessageResponse::Message(message) => {
-                if wait_for_response {
-                    self._parse_status_response(&message).await
-                } else {
-                    Ok(None)
+            {
+                SendMessageResponse::Message(message) => {
+                    if wait_for_response {
+                        self._parse_status_response(&message).await
+                    } else {
+                        Ok(None)
+                    }
                 }
-            } _ => {
-                Err(ATMError::MsgReceiveError(
+                _ => Err(ATMError::MsgReceiveError(
                     "Invalid response from API".into(),
-                ))
-            }}
+                )),
+            }
         }
         .instrument(_span)
         .await
@@ -280,7 +281,6 @@ impl MessagePickup {
                         }}
                     }
                 }
-            
         }
         .instrument(_span)
         .await
@@ -439,11 +439,10 @@ impl MessagePickup {
             match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            { SendMessageResponse::Message(message) => {
-                self._handle_delivery(atm, &message).await
-            } _ => {
-                Err(ATMError::MsgReceiveError("No Messages from API".into()))
-            }}
+            {
+                SendMessageResponse::Message(message) => self._handle_delivery(atm, &message).await,
+                _ => Err(ATMError::MsgReceiveError("No Messages from API".into())),
+            }
         }
         .instrument(_span)
         .await

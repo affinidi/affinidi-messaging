@@ -92,12 +92,13 @@ impl StateStore {
 
         state.initialization = false;
 
-        let mut inbound_message_channel = match atm.get_inbound_channel() { Some(channel) => {
-            channel
-        } _ => {
-            warn!("Failed to get inbound channel");
-            return Ok(Interrupted::SystemError);
-        }};
+        let mut inbound_message_channel = match atm.get_inbound_channel() {
+            Some(channel) => channel,
+            _ => {
+                warn!("Failed to get inbound channel");
+                return Ok(Interrupted::SystemError);
+            }
+        };
 
         let mut ticker = tokio::time::interval(Duration::from_secs(1));
 

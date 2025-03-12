@@ -28,11 +28,10 @@ pub struct Props {
 
 impl From<&State> for Props {
     fn from(state: &State) -> Self {
-        let qr_code = match &state.invite_popup.invite { Some(invite) => {
-            invite.qr_code.clone()
-        } _ => {
-            None
-        }};
+        let qr_code = match &state.invite_popup.invite {
+            Some(invite) => invite.qr_code.clone(),
+            _ => None,
+        };
 
         Props {
             invite_state: state.invite_popup.clone(),
@@ -153,64 +152,70 @@ impl ComponentRender<()> for InvitePopup {
             .render(invite_url, frame.buffer_mut());
         }
 
-        match &self.props.mediator_did { Some(mediator_did) => {
-            let mut lines = vec![
-                Line::default(),
-                Line::styled(
-                    "Generating new OOB invitation from the mediator...",
-                    Style::default().bold(),
-                ),
-                Line::styled(
-                    format!("Using Mediator: {}", mediator_did),
-                    Style::default().bold().fg(Color::LightBlue),
-                ),
-                Line::default(),
-            ];
-            for m in self.props.invite_state.messages.iter() {
-                lines.push(m.to_owned());
-            }
+        match &self.props.mediator_did {
+            Some(mediator_did) => {
+                let mut lines = vec![
+                    Line::default(),
+                    Line::styled(
+                        "Generating new OOB invitation from the mediator...",
+                        Style::default().bold(),
+                    ),
+                    Line::styled(
+                        format!("Using Mediator: {}", mediator_did),
+                        Style::default().bold().fg(Color::LightBlue),
+                    ),
+                    Line::default(),
+                ];
+                for m in self.props.invite_state.messages.iter() {
+                    lines.push(m.to_owned());
+                }
 
-            if let Some(err) = &self.props.invite_state.invite_error {
-                lines.push(Line::styled(err, Style::default().bold().fg(Color::Red)));
+                if let Some(err) = &self.props.invite_state.invite_error {
+                    lines.push(Line::styled(err, Style::default().bold().fg(Color::Red)));
+                }
+                Paragraph::new(lines)
+                    .alignment(Alignment::Left)
+                    .wrap(Wrap { trim: true })
+                    .render(text_area, frame.buffer_mut());
             }
-            Paragraph::new(lines)
+            _ => {
+                Paragraph::new(vec![
+                    Line::default(),
+                    Line::styled(
+                        "You must specify a mediator DID to generate an invitation.",
+                        Style::default().bold().fg(Color::LightRed),
+                    ),
+                    Line::styled(
+                        "You can do this in Setup",
+                        Style::default().bold().fg(Color::LightRed),
+                    ),
+                ])
                 .alignment(Alignment::Left)
                 .wrap(Wrap { trim: true })
                 .render(text_area, frame.buffer_mut());
-        } _ => {
-            Paragraph::new(vec![
-                Line::default(),
-                Line::styled(
-                    "You must specify a mediator DID to generate an invitation.",
-                    Style::default().bold().fg(Color::LightRed),
-                ),
-                Line::styled(
-                    "You can do this in Setup",
-                    Style::default().bold().fg(Color::LightRed),
-                ),
-            ])
-            .alignment(Alignment::Left)
-            .wrap(Wrap { trim: true })
-            .render(text_area, frame.buffer_mut());
-        }}
+            }
+        }
 
-        match &self.props.qr_code { Some(qr_code) => {
-            // Render QR Code
-            //let image =
-            //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
-            let image = StatefulImage::default();
-            //println!("Inner Block {}", inner_blocks[0]);
-            let picker = self.picker.lock().unwrap();
-            let mut a = picker.new_resize_protocol(DynamicImage::ImageLuma8(qr_code.clone()));
-            StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut a);
-        } _ => {
-            // Render Affinidi Logo
-            //let image =
-            //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
-            let image = StatefulImage::default();
-            //println!("Inner Block {}", inner_blocks[0]);
-            let mut image2 = self.image.lock().unwrap();
-            StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut *image2);
-        }}
+        match &self.props.qr_code {
+            Some(qr_code) => {
+                // Render QR Code
+                //let image =
+                //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+                let image = StatefulImage::default();
+                //println!("Inner Block {}", inner_blocks[0]);
+                let picker = self.picker.lock().unwrap();
+                let mut a = picker.new_resize_protocol(DynamicImage::ImageLuma8(qr_code.clone()));
+                StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut a);
+            }
+            _ => {
+                // Render Affinidi Logo
+                //let image =
+                //  StatefulImage::new(Some(image::Rgb([255, 255, 255]))).resize(Resize::Fit(None));
+                let image = StatefulImage::default();
+                //println!("Inner Block {}", inner_blocks[0]);
+                let mut image2 = self.image.lock().unwrap();
+                StatefulWidget::render(image, qr_code_area, frame.buffer_mut(), &mut *image2);
+            }
+        }
     }
 }

@@ -6,11 +6,11 @@
 
 use std::sync::Arc;
 
-use crate::{ATM, errors::ATMError, profiles::Profile};
+use crate::{errors::ATMError, profiles::Profile, ATM};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
-use serde_json::{Number, Value, json};
-use tracing::{Instrument, Level, span};
+use serde_json::{json, Number, Value};
+use tracing::{span, Instrument, Level};
 use uuid::Uuid;
 #[derive(Default)]
 pub struct Routing {}

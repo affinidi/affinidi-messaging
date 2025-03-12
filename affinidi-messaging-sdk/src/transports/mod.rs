@@ -1,9 +1,9 @@
 use crate::{
-    ATM,
     errors::ATMError,
-    messages::{GenericDataStruct, GetMessagesRequest, known::MessageType},
+    messages::{known::MessageType, GenericDataStruct, GetMessagesRequest},
     profiles::Profile,
     protocols::{message_pickup::MessagePickup, routing::Routing},
+    ATM,
 };
 use affinidi_messaging_didcomm::Message;
 use serde_json::Value;

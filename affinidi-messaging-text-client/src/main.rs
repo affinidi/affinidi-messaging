@@ -50,15 +50,16 @@ async fn main() -> anyhow::Result<()> {
         ui_manager.main_loop(state_rx, interrupt_rx.resubscribe()),
     )?;
 
-    match interrupt_rx.recv().await { Ok(reason) => {
-        match reason {
+    match interrupt_rx.recv().await {
+        Ok(reason) => match reason {
             Interrupted::UserInt => println!("exited per user request"),
             Interrupted::OsSigInt => println!("exited because of an os sig int"),
             Interrupted::SystemError => println!("exited because of a system error"),
+        },
+        _ => {
+            println!("exited because of an unexpected error");
         }
-    } _ => {
-        println!("exited because of an unexpected error");
-    }}
+    }
 
     Ok(())
 }

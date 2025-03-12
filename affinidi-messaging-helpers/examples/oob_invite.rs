@@ -63,11 +63,12 @@ async fn main() -> Result<(), ATMError> {
     println!("oob_id = {}", oob_id);
     println!();
 
-    let endpoint = match &*alice.inner.mediator { Some(mediator) => {
-        mediator.rest_endpoint.as_ref().unwrap().to_string()
-    } _ => {
-        panic!("Alice's mediator is not set");
-    }};
+    let endpoint = match &*alice.inner.mediator {
+        Some(mediator) => mediator.rest_endpoint.as_ref().unwrap().to_string(),
+        _ => {
+            panic!("Alice's mediator is not set");
+        }
+    };
 
     let url = [&endpoint, "/oob?_oobid=", &oob_id].concat();
     println!("Attempting to retrieve an invitation: {}", url);
