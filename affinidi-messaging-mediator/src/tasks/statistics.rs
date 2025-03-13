@@ -27,6 +27,7 @@ pub async fn statistics(database: Database) -> Result<(), MediatorError> {
             let delta = stats.delta(&previous_stats);
             info!(
                 event_type = "UpdateStats",
+                mediator_id = mediator_id,
                 received_bytes = stats.received_bytes,
                 sent_bytes = stats.sent_bytes,
                 deleted_bytes = stats.deleted_bytes,
@@ -43,6 +44,7 @@ pub async fn statistics(database: Database) -> Result<(), MediatorError> {
 
             info!(
                 event_type = "UpdateDeltaStats",
+                mediator_id = mediator_id,
                 received_bytes = delta.received_bytes,
                 sent_bytes = delta.sent_bytes,
                 deleted_bytes = delta.deleted_bytes,
