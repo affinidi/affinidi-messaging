@@ -48,7 +48,11 @@ pub struct AdminAccount {
 }
 
 impl Mediator {
-    pub async fn get_config(&self, atm: &ATM, profile: &Arc<ATMProfile>) -> Result<Value, ATMError> {
+    pub async fn get_config(
+        &self,
+        atm: &ATM,
+        profile: &Arc<ATMProfile>,
+    ) -> Result<Value, ATMError> {
         let _span = span!(Level::DEBUG, "get_config");
 
         async move {

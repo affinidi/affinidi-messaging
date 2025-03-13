@@ -2,7 +2,7 @@ use askar_crypto::sign::SignatureType;
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 
-use crate::error::{err_msg, ErrorKind, Result};
+use crate::error::{ErrorKind, Result, err_msg};
 
 /// Subset of JWS in generic json serialization used for signed message type.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

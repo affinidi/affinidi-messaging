@@ -1,7 +1,7 @@
 use askar_crypto::sign::KeySigVerify;
 
 use crate::{
-    error::{err_msg, Error, ErrorKind, Result, ResultExt},
+    error::{Error, ErrorKind, Result, ResultExt, err_msg},
     jws::{ParsedCompactJWS, ParsedJWS},
 };
 use base64::prelude::*;
@@ -581,8 +581,7 @@ mod tests {
     }
     "#;
 
-    const ALICE_COMPACT_MSG_ED25519: &str =
-        "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+    const ALICE_COMPACT_MSG_ED25519: &str = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
          ZSNrZXktMSJ9\
          .\
          eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -594,8 +593,7 @@ mod tests {
          iMi3kOWHTWoKiuTT4JxD9CkcUwSby9ekpOQk0Xdm9_H6jDpLPuhfX4U2EYgdPIJERl95MIecEhrufvO4\
          bHgtCg";
 
-    const ALICE_COMPACT_MSG_ED25519_CHANGED_PAYLOAD: &str =
-        "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+    const ALICE_COMPACT_MSG_ED25519_CHANGED_PAYLOAD: &str = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
          ZSNrZXktMSJ9\
          .\
          eyJpZCI6IjAyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -607,8 +605,7 @@ mod tests {
          iMi3kOWHTWoKiuTT4JxD9CkcUwSby9ekpOQk0Xdm9_H6jDpLPuhfX4U2EYgdPIJERl95MIecEhrufvO4\
          bHgtCg";
 
-    const ALICE_COMPACT_MSG_ED25519_UNDECODABLE_SIG: &str =
-        "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+    const ALICE_COMPACT_MSG_ED25519_UNDECODABLE_SIG: &str = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
          ZSNrZXktMSJ9\
          .\
          eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\

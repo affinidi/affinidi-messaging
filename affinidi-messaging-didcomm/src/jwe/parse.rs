@@ -1,13 +1,13 @@
-use crate::document::{did_or_url, DIDCommVerificationMethodExt};
+use crate::document::{DIDCommVerificationMethodExt, did_or_url};
 use crate::envelope::MetaEnvelope;
 use crate::error::ToResult;
 use crate::utils::crypto::AsKnownKeyPair;
 use crate::{
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jwe::envelope::{Jwe, ProtectedHeader},
 };
-use affinidi_did_resolver_cache_sdk::document::DocumentExt;
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_did_resolver_cache_sdk::document::DocumentExt;
 use base64::prelude::*;
 use sha2::{Digest, Sha256};
 use tracing::debug;

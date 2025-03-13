@@ -13,6 +13,7 @@ Missing versions on the changelog simply reflect minor deployment changes on our
   * affinidi-did-resolver-cache updated to 0.3.x
 * Major refactoring of crate namespace and linking into the Affinidi Trust Development Kit (TDK) Libraries
   * Secrets Resolver now part of TDK Crate
+  * DID Authentication added to TDK, stripped from Messaging SDK
   
 ### SDK (0.10.0)
 

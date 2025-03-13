@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use super::Attachment;
-use crate::error::{err_msg, ErrorKind, Result};
+use crate::error::{ErrorKind, Result, err_msg};
 
 /// Wrapper for plain message. Provides helpers for message building and packing/unpacking.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

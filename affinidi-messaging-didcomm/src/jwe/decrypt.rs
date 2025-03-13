@@ -1,5 +1,5 @@
 use crate::{
-    error::{err_msg, Error, ErrorKind, Result, ResultContext, ResultExt},
+    error::{Error, ErrorKind, Result, ResultContext, ResultExt, err_msg},
     jwe::ParsedJWE,
     jwk::{FromJwkValue, ToJwkValue},
     utils::crypto::{JoseKDF, KeyWrap},
@@ -110,7 +110,7 @@ mod tests {
             x25519::X25519KeyPair,
         },
         encrypt::KeyAeadInPlace,
-        kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
+        kdf::{FromKeyDerivation, KeyExchange, ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
         repr::{KeyGen, KeySecretBytes},
     };
 

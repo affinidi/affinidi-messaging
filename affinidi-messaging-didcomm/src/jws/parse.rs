@@ -1,6 +1,6 @@
 use crate::error::ToResult;
 use crate::{
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jws::envelope::{CompactHeader, Jws, ProtectedHeader},
 };
 use base64::prelude::*;
@@ -97,9 +97,8 @@ mod tests {
     use crate::{
         error::ErrorKind,
         jws::{
-            self,
+            self, ParsedJWS,
             envelope::{Algorithm, Header, Jws, ProtectedHeader, Signature},
-            ParsedJWS,
         },
     };
 
@@ -417,8 +416,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works() {
-        let msg =
-            "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+        let msg = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
              ZSNrZXktMSJ9\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -455,8 +453,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works_header_unknown_fields() {
-        let msg =
-            "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+        let msg = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
              ZSNrZXktMSIsImV4dHJhIjoidmFsdWUifQ\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -493,8 +490,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works_too_few_segments() {
-        let msg =
-            "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+        let msg = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
              ZSNrZXktMSJ9\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -516,8 +512,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works_too_many_segments() {
-        let msg =
-            "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+        let msg = "eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
              ZSNrZXktMSJ9\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -545,8 +540,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works_undecodable_header() {
-        let msg =
-            "!eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
+        let msg = "!eyJ0eXAiOiJleGFtcGxlLXR5cC0xIiwiYWxnIjoiRWREU0EiLCJraWQiOiJkaWQ6ZXhhbXBsZTphbGlj\
              ZSNrZXktMSJ9\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\
@@ -571,8 +565,7 @@ mod tests {
 
     #[test]
     fn parse_compact_works_unparsable_header() {
-        let msg =
-            "ey4idHlwIjoiZXhhbXBsZS10eXAtMSIsImFsZyI6IkVkRFNBIiwia2lkIjoiZGlkOmV4YW1wbGU6YWxp\
+        let msg = "ey4idHlwIjoiZXhhbXBsZS10eXAtMSIsImFsZyI6IkVkRFNBIiwia2lkIjoiZGlkOmV4YW1wbGU6YWxp\
              Y2Uja2V5LTEifQ\
              .\
              eyJpZCI6IjEyMzQ1Njc4OTAiLCJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJ0\

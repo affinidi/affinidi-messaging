@@ -1,16 +1,16 @@
-use affinidi_did_resolver_cache_sdk::document::DocumentExt;
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_did_resolver_cache_sdk::document::DocumentExt;
 use askar_crypto::alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair};
 use tracing::debug;
 
-use crate::document::{did_or_url, DIDCommVerificationMethodExt};
+use crate::document::{DIDCommVerificationMethodExt, did_or_url};
 use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
+    UnpackOptions,
     algorithms::SignAlg,
-    error::{err_msg, ErrorKind, Result, ResultContext, ResultExt},
+    error::{ErrorKind, Result, ResultContext, ResultExt, err_msg},
     jws,
     utils::crypto::AsKnownKeyPair,
-    UnpackOptions,
 };
 use base64::prelude::*;
 use std::str::FromStr;
