@@ -223,10 +223,16 @@ pub async fn authentication_response(
         // Turn message body into Challenge
         let challenge: AuthenticationChallenge =
             serde_json::from_value(msg.body).map_err(|err| {
-                warn!("Couldn't parse body into ChallengeBody. Reason: {}", err);
+                warn!(
+                    "Couldn't parse body into AuthenticationChallenge. Reason: {}",
+                    err
+                );
                 MediatorError::SessionError(
                     "UNKNOWN".into(),
-                    format!("Couldn't parse body into ChallengeBody. Reason: {}", err),
+                    format!(
+                        "Couldn't parse body into AuthenticationChallenge. Reason: {}",
+                        err
+                    ),
                 )
             })?;
 

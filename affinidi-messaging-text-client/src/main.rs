@@ -8,6 +8,7 @@ use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{Layer, filter, fmt};
+use tui_logger::TuiTracingSubscriberLayer;
 use ui_management::UiManager;
 
 mod state_store;
@@ -21,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .create(true)
         .open("log.txt")?;
     tracing_subscriber::registry()
-        .with(tui_logger::tracing_subscriber_layer())
+        .with(TuiTracingSubscriberLayer)
         .with(
             fmt::layer()
                 .with_ansi(true)

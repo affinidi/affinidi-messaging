@@ -505,7 +505,7 @@ impl TryFrom<ConfigRaw> for Config {
             Ok(region) => Region::new(region),
             Err(_) => Region::new("ap-southeast-1"),
         };
-        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+        let aws_config = aws_config::defaults(BehaviorVersion::v2025_01_17())
             .region(region)
             .load()
             .await;

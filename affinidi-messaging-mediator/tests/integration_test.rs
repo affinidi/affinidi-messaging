@@ -3,7 +3,6 @@ use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use affinidi_messaging_mediator::server::start;
 use affinidi_messaging_sdk::{
     config::ATMConfig,
-    conversions::secret_from_str,
     errors::ATMError,
     messages::{
         AuthenticationChallenge, AuthorizationResponse, DeleteMessageRequest,
@@ -71,12 +70,12 @@ async fn test_mediator_server() {
         .await
         .unwrap();
     let alice_secrets_resolver = SecretsResolver::new(vec![
-        secret_from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
-        secret_from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
+        Secret::from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
+        Secret::from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
     ]);
     let bob_secrets_resolver = SecretsResolver::new(vec![
-        secret_from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
-        secret_from_str(&format!("{}#key-2", BOB_DID), &BOB_E1),
+        Secret::from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
+        Secret::from_str(&format!("{}#key-2", BOB_DID), &BOB_E1),
     ]);
 
     let client = init_client(config.clone());

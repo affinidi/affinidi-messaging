@@ -26,7 +26,6 @@ use transports::websockets::ws_handler::WsHandlerMode;
 
 pub mod authentication;
 pub mod config;
-pub mod conversions;
 pub mod delete_handler;
 pub mod errors;
 pub mod messages;
