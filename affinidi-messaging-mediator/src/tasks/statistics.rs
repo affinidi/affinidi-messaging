@@ -16,6 +16,11 @@ pub async fn statistics(database: Database) -> Result<(), MediatorError> {
 
         let mut previous_stats = MetadataStats::default();
 
+        let mediator_id = match env::var("MEDIATOR_ID") {
+            Ok(val) => val,
+            Err(_e) => "NA".to_string(),
+        };
+
         loop {
             interval.tick().await;
             let stats = database.get_db_metadata().await?;
