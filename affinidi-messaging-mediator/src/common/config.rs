@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 use ssi::dids::{Document, document::service::Endpoint};
 use std::{
+    collections::HashMap,
     collections::HashSet,
     env,
     fmt::{self, Debug},
@@ -439,6 +440,7 @@ pub struct Config {
     pub did_resolver_config: DIDCacheConfig,
     pub processors: ProcessorsConfig,
     pub limits: LimitsConfig,
+    pub tags: HashMap<String, String>,
 }
 
 impl fmt::Debug for Config {
@@ -459,6 +461,7 @@ impl fmt::Debug for Config {
             .field("security", &self.security)
             .field("processors", &self.processors)
             .field("Limits", &self.limits)
+            .field("tags", &self.tags)
             .finish()
     }
 }
@@ -491,6 +494,7 @@ impl Default for Config {
                 message_expiry_cleanup: MessageExpiryCleanupConfig::default(),
             },
             limits: LimitsConfig::default(),
+            tags: HashMap::from([("app".to_string(), "mediator".to_string())]),
         }
     }
 }
@@ -509,6 +513,13 @@ impl TryFrom<ConfigRaw> for Config {
             .region(region)
             .load()
             .await;
+
+        let mut tags = HashMap::from([("app".to_string(), "mediator".to_string())]);
+        for (key, value) in env::vars() {
+            if key.get(..13) == Some("MEDIATOR_TAG_") {
+                tags.insert(key.get(13..).unwrap().to_lowercase(), value);
+            }
+        }
 
         let mut config = Config {
             log_level: match raw.log_level.as_str() {
@@ -533,6 +544,7 @@ impl TryFrom<ConfigRaw> for Config {
                 message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
             },
             limits: raw.limits.try_into()?,
+            tags: tags,
             ..Default::default()
         };
 

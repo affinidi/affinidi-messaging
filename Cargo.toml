@@ -106,11 +106,13 @@ tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_info",
+    "valuable",
 ] }
 tracing-subscriber = { version = "0.3", features = [
     "env-filter",
     "fmt",
     "json",
+    "valuable",
 ] }
 tracing-test = "0.2"
 tui-input = "0.11.0"
