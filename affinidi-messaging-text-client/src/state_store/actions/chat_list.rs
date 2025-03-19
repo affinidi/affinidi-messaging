@@ -2,15 +2,15 @@
  * State for managing the list of chats
  */
 
-use std::{collections::HashMap, fmt, hash::Hasher};
-
+use crate::state_store::chat_message::ChatMessage;
 use affinidi_messaging_sdk::profiles::ATMProfile;
 use affinidi_tdk::common::profiles::TDKProfile;
+use ahash::AHashMap as HashMap;
 use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::hash::Hash;
-
-use crate::state_store::chat_message::ChatMessage;
+use std::hash::Hasher;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ChatList {

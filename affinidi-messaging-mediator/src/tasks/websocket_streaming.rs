@@ -8,15 +8,15 @@
  Any status on the existing websocket channel for a DID will need to be reset on the new channel.
 
 */
+use crate::database::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
+use ahash::AHashMap as HashMap;
 use redis::aio::PubSub;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use tokio::{select, sync::mpsc, task::JoinHandle, time::sleep};
 use tokio_stream::StreamExt;
 use tracing::{Instrument, Level, debug, error, info, span, warn};
-
-use crate::database::Database;
 
 // Useful links on redis pub/sub in Rust:
 // https://github.com/redis-rs/redis-rs/issues/509

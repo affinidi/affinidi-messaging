@@ -3,10 +3,10 @@
  */
 use super::ws_handler::WsHandlerCommands;
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use std::{collections::HashMap, mem::size_of_val};
+use ahash::AHashMap as HashMap;
+use std::mem::size_of_val;
 use tokio::sync::mpsc::Sender;
 use tracing::{debug, warn};
-
 /// Message cache struct
 /// Holds live-stream messages in a cache so we can get the first available or by a specific message ID
 #[derive(Default)]

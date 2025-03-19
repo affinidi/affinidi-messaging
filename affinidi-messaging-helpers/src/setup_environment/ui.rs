@@ -15,7 +15,7 @@ use console::style;
 use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use did_peer::DIDPeerKeys;
 use regex::Regex;
-use std::{collections::HashMap, error::Error, path::Path};
+use std::{error::Error, path::Path};
 use toml::Value;
 
 /// Local or Remote mediator
@@ -299,7 +299,7 @@ pub(crate) async fn init_remote_mediator(
 
     let environment = TDKEnvironment {
         default_mediator: Some(mediator_did.clone()),
-        profiles: HashMap::new(),
+        profiles: std::collections::HashMap::new(),
         admin_did,
         ssl_certificates,
     };
@@ -457,7 +457,7 @@ pub(crate) async fn init_local_mediator(
 
     let environment = TDKEnvironment {
         default_mediator: new_mediator_config.mediator_did.clone(),
-        profiles: HashMap::new(),
+        profiles: std::collections::HashMap::new(),
         admin_did: Some(admin_did),
         ssl_certificates: vec!["./affinidi-messaging-mediator/conf/keys/client.chain".to_string()],
     };

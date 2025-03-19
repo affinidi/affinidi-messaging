@@ -1,9 +1,8 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
-
 use super::Attachment;
 use crate::error::{ErrorKind, Result, err_msg};
+use ahash::AHashMap as HashMap;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Wrapper for plain message. Provides helpers for message building and packing/unpacking.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -48,7 +47,7 @@ pub struct Message {
 
     /// Custom message headers.
     #[serde(flatten)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(skip_serializing_if = "check_extra_headers")]
     pub extra_headers: HashMap<String, Value>,
 
     /// The attribute is used for the sender
@@ -72,6 +71,11 @@ pub struct Message {
     /// Message attachments
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<Attachment>>,
+}
+
+// A hack to get around AHashMap not supporting is_empty? for serde
+fn check_extra_headers(map: &HashMap<String, Value>) -> bool {
+    map.is_empty()
 }
 
 const PLAINTEXT_TYP: &str = "application/didcomm-plain+json";

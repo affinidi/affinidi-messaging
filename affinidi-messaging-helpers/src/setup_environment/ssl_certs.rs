@@ -1,5 +1,11 @@
 //! Create a local SSL Certificate Authority (CA) for use in testing and local development
-use std::collections::HashMap;
+use ahash::AHashMap as HashMap;
+use rcgen::{
+    BasicConstraints, CertificateParams, CertificateRevocationListParams, CertifiedKey,
+    DistinguishedName, DnType, ExtendedKeyUsagePurpose, Ia5String, IsCa, KeyIdMethod, KeyPair,
+    KeyUsagePurpose, PKCS_ED25519, PKCS_RSA_SHA256, PKCS_RSA_SHA384, PKCS_RSA_SHA512,
+    RevocationReason, RevokedCertParams, RsaKeySize, SanType, SerialNumber, SignatureAlgorithm,
+};
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
@@ -8,13 +14,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-
-use rcgen::{
-    BasicConstraints, CertificateParams, CertificateRevocationListParams, CertifiedKey,
-    DistinguishedName, DnType, ExtendedKeyUsagePurpose, Ia5String, IsCa, KeyIdMethod, KeyPair,
-    KeyUsagePurpose, PKCS_ED25519, PKCS_RSA_SHA256, PKCS_RSA_SHA384, PKCS_RSA_SHA512,
-    RevocationReason, RevokedCertParams, RsaKeySize, SanType, SerialNumber, SignatureAlgorithm,
-};
 use time::OffsetDateTime;
 
 /*

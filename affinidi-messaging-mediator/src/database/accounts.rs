@@ -8,8 +8,8 @@ use affinidi_messaging_sdk::{
         acls::MediatorACLSet,
     },
 };
+use ahash::AHashMap as HashMap;
 use redis::Pipeline;
-use std::collections::HashMap;
 use tokio::join;
 use tracing::{Instrument, Level, debug, span};
 

@@ -6,7 +6,7 @@
 use super::{Database, session::Session};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::Folder;
-use std::collections::HashMap;
+use ahash::AHashMap as HashMap;
 use tracing::{Instrument, Level, debug, span, warn};
 
 impl Database {

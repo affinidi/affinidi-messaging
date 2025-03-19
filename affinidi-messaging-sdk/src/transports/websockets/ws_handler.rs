@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
+use ahash::AHashMap as HashMap;
 use std::{
-    collections::HashMap,
     fmt::{self, Debug, Formatter},
     sync::Arc,
 };

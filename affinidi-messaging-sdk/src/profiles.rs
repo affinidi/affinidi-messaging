@@ -18,12 +18,12 @@ use crate::{
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use affinidi_tdk_common::profiles::TDKProfile;
+use ahash::AHashMap as HashMap;
 use ssi::dids::{
     Document,
     document::{Service, service::Endpoint},
 };
 use std::{
-    collections::HashMap,
     sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };

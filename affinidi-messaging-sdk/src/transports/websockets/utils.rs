@@ -1,11 +1,12 @@
 use super::{handshake, ws_connection::ReadWrite};
 use crate::errors::ATMError;
+use ahash::AHashMap as HashMap;
 use rustls::{
     ClientConfig,
     pki_types::{DnsName, ServerName},
 };
 use rustls_platform_verifier::ConfigVerifierExt;
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,

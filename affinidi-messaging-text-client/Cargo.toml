@@ -17,6 +17,7 @@ affinidi-messaging-sdk.workspace = true
 affinidi-messaging-didcomm.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 anyhow.workspace = true
+ahash.workspace = true
 base64.workspace = true
 chrono.workspace = true
 circular-queue.workspace = true

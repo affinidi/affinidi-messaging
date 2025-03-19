@@ -11,6 +11,7 @@ use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
 use affinidi_secrets_resolver::{SecretsResolver, ThreadedSecretsResolver, secrets::Secret};
+use ahash::AHashSet as HashSet;
 use async_convert::{TryFrom, async_trait};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -27,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use sha256::digest;
 use ssi::dids::{Document, document::service::Endpoint};
 use std::{
-    collections::HashSet,
     env,
     fmt::{self, Debug},
     fs::File,
@@ -38,7 +38,6 @@ use std::{
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 use tracing_subscriber::{EnvFilter, filter::LevelFilter};
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
     pub listen_address: String,

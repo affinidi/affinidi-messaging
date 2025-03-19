@@ -7,12 +7,12 @@ use affinidi_messaging_didcomm::{
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::known::MessageType as SDKMessageType;
 use affinidi_secrets_resolver::SecretsResolver;
+use ahash::AHashSet as HashSet;
 use protocols::{
     mediator::{accounts, acls, administration},
     message_pickup, routing,
 };
 use ssi::dids::document::service::Endpoint;
-use std::collections::HashSet;
 use std::time::SystemTime;
 
 pub mod error_response;

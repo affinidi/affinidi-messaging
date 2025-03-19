@@ -3,9 +3,9 @@ mod authcrypt;
 
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_secrets_resolver::SecretsResolver;
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 use crate::{
     Message, PackSignedMetadata,
