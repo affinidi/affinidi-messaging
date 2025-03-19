@@ -25,12 +25,15 @@ mod plaintext;
 mod sign;
 
 impl Message {
-    pub async fn unpack_string(
+    pub async fn unpack_string<T>(
         msg: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
+        secrets_resolver: &T,
         options: &UnpackOptions,
-    ) -> Result<(Message, UnpackMetadata)> {
+    ) -> Result<(Message, UnpackMetadata)>
+    where
+        T: SecretsResolver,
+    {
         let mut envelope = MetaEnvelope::new(msg, did_resolver).await?;
 
         Self::unpack(&mut envelope, did_resolver, secrets_resolver, options).await
@@ -65,12 +68,15 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving.
     ///
     /// TODO: verify and update errors list
-    pub async fn unpack(
+    pub async fn unpack<T>(
         envelope: &mut MetaEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
+        secrets_resolver: &T,
         options: &UnpackOptions,
-    ) -> Result<(Message, UnpackMetadata)> {
+    ) -> Result<(Message, UnpackMetadata)>
+    where
+        T: SecretsResolver,
+    {
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
 
@@ -154,11 +160,14 @@ impl Message {
         Ok((msg, envelope.metadata.to_owned()))
     }
 
-    async fn _try_unwrap_forwarded_message(
+    async fn _try_unwrap_forwarded_message<T>(
         msg: &ParsedEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
-    ) -> Result<Option<String>> {
+        secrets_resolver: &T,
+    ) -> Result<Option<String>>
+    where
+        T: SecretsResolver,
+    {
         let plaintext = match msg {
             ParsedEnvelope::Message(m) => m.clone(),
             _ => return Ok(None),
@@ -260,11 +269,14 @@ pub struct UnpackMetadata {
     pub from_prior: Option<FromPrior>,
 }
 
-async fn has_key_agreement_secret(
+async fn has_key_agreement_secret<T>(
     did_or_kid: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> Result<bool> {
+    secrets_resolver: &T,
+) -> Result<bool>
+where
+    T: SecretsResolver,
+{
     let kids = match did_or_url(did_or_kid) {
         (_, Some(kid)) => {
             vec![kid.to_owned()]
@@ -290,9 +302,9 @@ async fn has_key_agreement_secret(
 
     let kids = kids.iter().map(|k| k.to_owned()).collect::<Vec<_>>();
 
-    let secrets_ids = secrets_resolver.find_secrets(&kids).await?;
+    let secrets_ids = secrets_resolver.find_secrets(&kids);
 
-    Ok(!secrets_ids.is_empty())
+    Ok(!secrets_ids.await.is_empty())
 }
 
 /*

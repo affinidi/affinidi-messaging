@@ -2,7 +2,7 @@
 //! This helps to create consistency in the examples and also to avoid code duplication.
 use affinidi_messaging_helpers::common::{affinidi_logo, check_path};
 use affinidi_tdk::{
-    common::environments::{TDKEnvironments, TDKProfile},
+    common::{environments::TDKEnvironments, profiles::TDKProfile},
     dids::{DID, KeyType},
 };
 use clap::Parser;
@@ -110,7 +110,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 secrets,
                 mediator: mediator.map(|m| m.to_string()),
             }
-
         }
 
         environment.profiles.insert("Alice".into(), _create_friend("Alice", environment.default_mediator.as_deref()));

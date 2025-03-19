@@ -11,7 +11,7 @@ use affinidi_messaging_sdk::{
     },
     transports::SendMessageResponse,
 };
-use affinidi_secrets_resolver::{SecretsResolver, secrets::Secret};
+use affinidi_secrets_resolver::{SecretsResolver, SimpleSecretsResolver, secrets::Secret};
 use common::{
     ALICE_DID, ALICE_E1, ALICE_V1, BOB_DID, BOB_E1, BOB_V1, CONFIG_PATH, MEDIATOR_API, SECRETS_PATH,
 };
@@ -69,14 +69,16 @@ async fn test_mediator_server() {
     let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .unwrap();
-    let alice_secrets_resolver = SecretsResolver::new(vec![
+    let alice_secrets_resolver = SimpleSecretsResolver::new(&[
         Secret::from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
         Secret::from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
-    ]);
-    let bob_secrets_resolver = SecretsResolver::new(vec![
+    ])
+    .await;
+    let bob_secrets_resolver = SimpleSecretsResolver::new(&[
         Secret::from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
         Secret::from_str(&format!("{}#key-2", BOB_DID), &BOB_E1),
-    ]);
+    ])
+    .await;
 
     let client = init_client(config.clone());
 
@@ -464,14 +466,17 @@ async fn _authenticate_challenge(client: Client, did: &str) -> AuthenticationCha
     challenge
 }
 
-async fn _authenticate(
+async fn _authenticate<S>(
     client: Client,
     auth_response: Message,
     actor_did: &str,
     atm_did: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> AuthorizationResponse {
+    secrets_resolver: &S,
+) -> AuthorizationResponse
+where
+    S: SecretsResolver,
+{
     let (auth_msg, _) = auth_response
         .pack_encrypted(
             atm_did,

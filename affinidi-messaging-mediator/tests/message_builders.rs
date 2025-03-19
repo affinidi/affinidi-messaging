@@ -34,14 +34,17 @@ pub fn create_auth_challenge_response(
 }
 
 #[allow(dead_code)]
-pub async fn build_ping_message(
+pub async fn build_ping_message<S>(
     to_did: &str,
     actor_did: String,
     signed: bool,
     expect_response: bool,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> (String, TrustPingSent) {
+    secrets_resolver: &S,
+) -> (String, TrustPingSent)
+where
+    S: SecretsResolver,
+{
     let now = _get_time_now();
 
     let mut msg = Message::build(
@@ -84,12 +87,15 @@ pub async fn build_ping_message(
 }
 
 #[allow(dead_code)]
-pub async fn build_status_request_message(
+pub async fn build_status_request_message<S>(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> String {
+    secrets_resolver: &S,
+) -> String
+where
+    S: SecretsResolver,
+{
     let mut msg = Message::build(
         Uuid::new_v4().into(),
         "https://didcomm.org/messagepickup/3.0/status-request".to_owned(),
@@ -122,12 +128,15 @@ pub async fn build_status_request_message(
 }
 
 #[allow(dead_code)]
-pub async fn build_delivery_request_message(
+pub async fn build_delivery_request_message<S>(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> String {
+    secrets_resolver: &S,
+) -> String
+where
+    S: SecretsResolver,
+{
     let body = MessagePickupDeliveryRequest {
         recipient_did: recipient_did.clone(),
         limit: 10,
@@ -164,13 +173,16 @@ pub async fn build_delivery_request_message(
 }
 
 #[allow(dead_code)]
-pub async fn build_message_received_message(
+pub async fn build_message_received_message<S>(
     mediator_did: &str,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
+    secrets_resolver: &S,
     to_delete_list: Vec<String>,
-) -> String {
+) -> String
+where
+    S: SecretsResolver,
+{
     let mut msg = Message::build(
         Uuid::new_v4().into(),
         "https://didcomm.org/messagepickup/3.0/messages-received".to_owned(),
@@ -205,13 +217,16 @@ pub async fn build_message_received_message(
 }
 
 #[allow(dead_code)]
-pub async fn build_forward_request_message(
+pub async fn build_forward_request_message<S>(
     mediator_did: &str,
     recipient_did: String,
     actor_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> String {
+    secrets_resolver: &S,
+) -> String
+where
+    S: SecretsResolver,
+{
     let now = _get_time_now();
 
     let msg = Message::build(

@@ -14,12 +14,14 @@ use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use sha256::digest;
 
 #[allow(dead_code)]
-pub async fn validate_status_reply(
+pub async fn validate_status_reply<S>(
     status_reply: SendMessageResponse,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) {
+    secrets_resolver: &S,
+) where
+    S: SecretsResolver,
+{
     if let SendMessageResponse::RestAPI(value) = status_reply {
         let j: SuccessResponse<InboundMessageResponse> =
             serde_json::from_str(value.as_str().unwrap()).unwrap();
@@ -50,12 +52,15 @@ pub async fn validate_status_reply(
 }
 
 #[allow(dead_code)]
-pub async fn validate_message_delivery(
+pub async fn validate_message_delivery<S>(
     message_delivery: SendMessageResponse,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
+    secrets_resolver: &S,
     pong_msg_id: &str,
-) -> Vec<String> {
+) -> Vec<String>
+where
+    S: SecretsResolver,
+{
     if let SendMessageResponse::RestAPI(value) = message_delivery {
         let j: SuccessResponse<InboundMessageResponse> =
             serde_json::from_str(value.as_str().unwrap()).unwrap();
@@ -91,11 +96,14 @@ pub async fn validate_message_delivery(
     }
 }
 
-async fn _handle_delivery(
+async fn _handle_delivery<S>(
     message: &Message,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) -> Vec<(Message, UnpackMetadata)> {
+    secrets_resolver: &S,
+) -> Vec<(Message, UnpackMetadata)>
+where
+    S: SecretsResolver,
+{
     let mut response: Vec<(Message, UnpackMetadata)> = Vec::new();
 
     if let Some(attachments) = &message.attachments {
@@ -150,12 +158,14 @@ async fn _handle_delivery(
 }
 
 #[allow(dead_code)]
-pub async fn validate_message_received_status_reply(
+pub async fn validate_message_received_status_reply<S>(
     status_reply: SendMessageResponse,
     recipient_did: String,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) {
+    secrets_resolver: &S,
+) where
+    S: SecretsResolver,
+{
     if let SendMessageResponse::RestAPI(value) = status_reply {
         let j: SuccessResponse<InboundMessageResponse> =
             serde_json::from_str(value.as_str().unwrap()).unwrap();
@@ -202,12 +212,14 @@ pub async fn validate_forward_request_response(
 }
 
 #[allow(dead_code)]
-pub async fn validate_get_message_response(
+pub async fn validate_get_message_response<S>(
     list: GetMessagesResponse,
     actor_did: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
-) {
+    secrets_resolver: &S,
+) where
+    S: SecretsResolver,
+{
     for msg in list.success {
         assert_eq!(msg.to_address.unwrap(), digest(actor_did));
         let _ = Message::unpack_string(

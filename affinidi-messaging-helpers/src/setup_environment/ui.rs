@@ -5,7 +5,10 @@ use crate::{
 };
 use affinidi_messaging_helpers::common::did::{create_did, get_service_address};
 use affinidi_tdk::{
-    common::environments::{TDKEnvironment, TDKEnvironments, TDKProfile},
+    common::{
+        environments::{TDKEnvironment, TDKEnvironments},
+        profiles::TDKProfile,
+    },
     dids::{DID, KeyType},
 };
 use console::style;

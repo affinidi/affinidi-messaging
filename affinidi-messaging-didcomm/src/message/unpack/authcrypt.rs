@@ -21,14 +21,17 @@ use crate::{
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
 };
 
-pub(crate) async fn _try_unpack_authcrypt(
+pub(crate) async fn _try_unpack_authcrypt<T>(
     jwe: &ParsedEnvelope,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
+    secrets_resolver: &T,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
     present_crypto_operations_count: usize,
-) -> Result<Option<ParsedEnvelope>> {
+) -> Result<Option<ParsedEnvelope>>
+where
+    T: SecretsResolver,
+{
     let jwe = match jwe {
         ParsedEnvelope::Jwe(jwe) => jwe,
         _ => return Ok(None),
@@ -53,7 +56,7 @@ pub(crate) async fn _try_unpack_authcrypt(
 
     envelope.to_kids_found = secrets_resolver
         .find_secrets(&envelope.metadata.encrypted_to_kids)
-        .await?;
+        .await;
 
     if envelope.to_kids_found.is_empty() {
         Err(err_msg(
@@ -74,12 +77,16 @@ pub(crate) async fn _try_unpack_authcrypt(
                 ),
             ));
         }
-        let to_key = secrets_resolver.get_secret(to_kid).await?.ok_or_else(|| {
-            err_msg(
-                ErrorKind::InvalidState,
-                "Recipient secret not found after existence checking",
-            )
-        })?;
+        let to_key = secrets_resolver
+            .get_secret(to_kid)
+            .await
+            .ok_or_else(|| {
+                err_msg(
+                    ErrorKind::InvalidState,
+                    "Recipient secret not found after existence checking",
+                )
+            })?
+            .to_owned();
         let to_key = to_key.as_key_pair()?;
 
         let _payload = match (

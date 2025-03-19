@@ -1,9 +1,7 @@
-use std::fmt;
-
 use affinidi_secrets_resolver::errors::SecretsResolverError;
-use affinidi_tdk_common::errors::TDKError;
 use serde::Serialize;
 use serde_json::error::Category;
+use std::fmt;
 
 #[derive(thiserror::Error, Debug, Copy, Clone, Eq, PartialEq, Serialize)]
 pub enum ErrorKind {
@@ -202,12 +200,6 @@ impl From<bs58::encode::Error> for Error {
 impl From<SecretsResolverError> for Error {
     fn from(err: SecretsResolverError) -> Self {
         Error::msg(ErrorKind::SecretsResolverError, err.to_string())
-    }
-}
-
-impl From<Error> for TDKError {
-    fn from(err: Error) -> Self {
-        TDKError::DIDComm(format!("kind ({}): {}", err.kind, err))
     }
 }
 

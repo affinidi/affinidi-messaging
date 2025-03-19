@@ -246,7 +246,7 @@ async fn _generate_duplicate_connection_problem_report(
             Some(&state.config.mediator_did),
             Some(&state.config.mediator_did),
             &state.did_resolver,
-            &state.config.security.mediator_secrets,
+            &*state.config.security.mediator_secrets,
             &PackEncryptedOptions {
                 to_kids_limit: state.config.limits.to_keys_per_recipient,
                 ..PackEncryptedOptions::default()

@@ -107,7 +107,7 @@ pub async fn create_new_profile(
         ));
     }
 
-    atm.add_secret(&secret);
+    atm.add_secret(&secret).await;
     state.add_secret(secret);
     match ATMProfile::new(
         atm,

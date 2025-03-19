@@ -32,7 +32,7 @@ pub use message::{
 #[cfg(test)]
 mod tests {
     use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
-    use affinidi_secrets_resolver::SecretsResolver;
+    use affinidi_secrets_resolver::SimpleSecretsResolver;
     use serde_json::json;
 
     use crate::{Message, PackEncryptedOptions, UnpackOptions};
@@ -59,7 +59,7 @@ mod tests {
         let sender_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let sender_secrets_resolver = SecretsResolver::new(vec![]);
+        let sender_secrets_resolver = SimpleSecretsResolver::new(&[]).await;
 
         let (packed_msg, metadata) = msg
             .pack_encrypted(
@@ -90,7 +90,7 @@ mod tests {
         let recipient_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let recipient_secrets_resolver = SecretsResolver::new(vec![]);
+        let recipient_secrets_resolver = SimpleSecretsResolver::new(&[]).await;
 
         let (msg, metadata) = Message::unpack_string(
             &packed_msg,

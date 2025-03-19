@@ -175,7 +175,7 @@ pub async fn authentication_response(
         let (msg, _) = match Message::unpack(
             &mut envelope,
             &state.did_resolver,
-            &state.config.security.mediator_secrets,
+            &*state.config.security.mediator_secrets,
             &UnpackOptions::default(),
         )
         .await
@@ -392,7 +392,7 @@ pub async fn authentication_refresh(
         let (msg, _) = match Message::unpack(
             &mut envelope,
             &state.did_resolver,
-            &state.config.security.mediator_secrets,
+            &*state.config.security.mediator_secrets,
             &UnpackOptions::default(),
         )
         .await

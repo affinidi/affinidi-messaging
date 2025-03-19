@@ -5,7 +5,7 @@
 use std::{collections::HashMap, fmt, hash::Hasher};
 
 use affinidi_messaging_sdk::profiles::ATMProfile;
-use affinidi_tdk::common::environments::TDKProfile;
+use affinidi_tdk::common::profiles::TDKProfile;
 use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;

@@ -41,12 +41,15 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving
     ///
     /// TODO: verify and update errors list
-    pub async fn pack_signed(
+    pub async fn pack_signed<T>(
         &self,
         sign_by: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
-    ) -> Result<(String, PackSignedMetadata)> {
+        secrets_resolver: &T,
+    ) -> Result<(String, PackSignedMetadata)>
+    where
+        T: SecretsResolver,
+    {
         self._validate_pack_signed(sign_by)?;
 
         let (did, key_id) = did_or_url(sign_by);
@@ -82,14 +85,14 @@ impl Message {
 
         let key_id = secrets_resolver
             .find_secrets(&authentications)
-            .await?
+            .await
             .first()
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "No signer secrets found"))?
             .to_string();
 
         let secret = secrets_resolver
             .get_secret(&key_id)
-            .await?
+            .await
             .ok_or_else(|| err_msg(ErrorKind::SecretNotFound, "Signer secret not found"))?;
 
         let sign_key = secret.as_key_pair()?;

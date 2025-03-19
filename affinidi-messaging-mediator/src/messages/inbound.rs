@@ -39,7 +39,7 @@ pub(crate) async fn handle_inbound(
                     let (msg, metadata) = match Message::unpack(
                         &mut envelope,
                         &state.did_resolver,
-                        &state.config.security.mediator_secrets,
+                        &*state.config.security.mediator_secrets,
                         &UnpackOptions {
                             crypto_operations_limit_per_message: state
                                 .config

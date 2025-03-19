@@ -10,7 +10,7 @@ use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
     MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
-use affinidi_secrets_resolver::SecretsResolver;
+use affinidi_secrets_resolver::{SecretsResolver, ThreadedSecretsResolver, secrets::Secret};
 use async_convert::{TryFrom, async_trait};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
@@ -33,6 +33,7 @@ use std::{
     fs::File,
     io::{self, BufRead},
     path::Path,
+    sync::Arc,
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
@@ -68,7 +69,7 @@ pub struct SecurityConfig {
     pub global_acl_default: MediatorACLSet,
     pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
-    pub mediator_secrets: SecretsResolver,
+    pub mediator_secrets: Arc<ThreadedSecretsResolver>,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     #[serde(skip_serializing)]
@@ -92,10 +93,6 @@ impl Debug for SecurityConfig {
                 "local_direct_delivery_allowed",
                 &self.local_direct_delivery_allowed,
             )
-            .field(
-                "mediator_secrets",
-                &format!("({}) secrets loaded", self.mediator_secrets.len()),
-            )
             .field("use_ssl", &self.use_ssl)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
@@ -108,13 +105,13 @@ impl Debug for SecurityConfig {
     }
 }
 
-impl Default for SecurityConfig {
-    fn default() -> Self {
+impl SecurityConfig {
+    async fn default() -> Self {
         SecurityConfig {
             mediator_acl_mode: AccessListModeType::ExplicitDeny,
             global_acl_default: MediatorACLSet::default(),
             local_direct_delivery_allowed: false,
-            mediator_secrets: SecretsResolver::new(vec![]),
+            mediator_secrets: Arc::new(ThreadedSecretsResolver::new(None).await.0),
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -167,7 +164,7 @@ impl SecurityConfigRaw {
             ssl_key_file: self.ssl_key_file.clone(),
             jwt_access_expiry: self.jwt_access_expiry.parse().unwrap_or(900),
             jwt_refresh_expiry: self.jwt_refresh_expiry.parse().unwrap_or(86_400),
-            ..Default::default()
+            ..SecurityConfig::default().await
         };
 
         // Convert the default ACL Set into a GlobalACLSet
@@ -192,7 +189,7 @@ impl SecurityConfigRaw {
         }
 
         // Load mediator secrets
-        config.mediator_secrets = load_secrets(&self.mediator_secrets, aws_config).await?;
+        config.mediator_secrets = Arc::new(load_secrets(&self.mediator_secrets, aws_config).await?);
 
         // Create the JWT encoding and decoding keys
         let jwt_secret = config_jwt_secret(&self.jwt_authorization_secret, aws_config).await?;
@@ -463,8 +460,8 @@ impl fmt::Debug for Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    async fn default() -> Self {
         let did_resolver_config = DIDCacheConfigBuilder::default()
             .with_cache_capacity(1000)
             .with_cache_ttl(300)
@@ -485,7 +482,7 @@ impl Default for Config {
             streaming_uuid: "".into(),
             did_resolver_config,
             api_prefix: "/mediator/v1/".into(),
-            security: SecurityConfig::default(),
+            security: SecurityConfig::default().await,
             processors: ProcessorsConfig {
                 forwarding: ForwardingConfig::default(),
                 message_expiry_cleanup: MessageExpiryCleanupConfig::default(),
@@ -533,7 +530,7 @@ impl TryFrom<ConfigRaw> for Config {
                 message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
             },
             limits: raw.limits.try_into()?,
-            ..Default::default()
+            ..Config::default().await
         };
 
         config.mediator_did_hash = digest(&config.mediator_did);
@@ -603,7 +600,7 @@ impl TryFrom<ConfigRaw> for Config {
 async fn load_secrets(
     secrets: &str,
     aws_config: &SdkConfig,
-) -> Result<SecretsResolver, MediatorError> {
+) -> Result<ThreadedSecretsResolver, MediatorError> {
     let parts: Vec<&str> = secrets.split("://").collect();
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
@@ -642,15 +639,23 @@ async fn load_secrets(
         }
     };
 
-    Ok(SecretsResolver::new(
-        serde_json::from_str(&content).map_err(|err| {
-            eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
-            MediatorError::ConfigError(
-                "NA".into(),
-                format!("Could not parse `mediator_secrets` JSON content. {}", err),
-            )
-        })?,
-    ))
+    let (secrets_resolver, _) = ThreadedSecretsResolver::new(None).await;
+    let secrets: Vec<Secret> = serde_json::from_str(&content).map_err(|err| {
+        eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
+        MediatorError::ConfigError(
+            "NA".into(),
+            format!("Could not parse `mediator_secrets` JSON content. {}", err),
+        )
+    })?;
+
+    info!(
+        "Loading {} mediatior Secret{}",
+        secrets.len(),
+        if secrets.is_empty() { "" } else { "s" }
+    );
+    secrets_resolver.insert_vec(&secrets).await;
+
+    Ok(secrets_resolver)
 }
 
 /// Read the primary configuration file for the mediator

@@ -3,6 +3,7 @@ use affinidi_did_resolver_cache_sdk::config::DIDCacheConfigBuilder;
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_didcomm::UnpackMetadata;
 use affinidi_secrets_resolver::SecretsResolver;
+use affinidi_secrets_resolver::ThreadedSecretsResolver;
 use affinidi_secrets_resolver::secrets::Secret;
 use config::ATMConfig;
 use delete_handler::DeletionHandlerCommands;
@@ -43,7 +44,7 @@ pub struct ATM {
 pub(crate) struct SharedState {
     pub(crate) config: ATMConfig,
     pub(crate) did_resolver: DIDCacheClient,
-    pub(crate) secrets_resolver: SecretsResolver,
+    pub(crate) secrets_resolver: ThreadedSecretsResolver,
     pub(crate) client: Client,
     pub(crate) ws_handler_send_stream: Sender<WsHandlerCommands>, // Sends MPSC messages to the WebSocket handler
     pub(crate) ws_handler_recv_stream: Mutex<Receiver<WsHandlerCommands>>, // Receives MPSC messages from the WebSocket handler
@@ -141,7 +142,7 @@ impl ATM {
         let shared_state = SharedState {
             config: config.clone(),
             did_resolver,
-            secrets_resolver: SecretsResolver::new(vec![]),
+            secrets_resolver: ThreadedSecretsResolver::new(None).await.0,
             client,
             ws_handler_send_stream: sdk_tx,
             ws_handler_recv_stream: Mutex::new(sdk_rx),
@@ -157,9 +158,7 @@ impl ATM {
         };
 
         // Add any pre-loaded secrets
-        for secret in &config.secrets {
-            atm.add_secret(secret);
-        }
+        atm.add_secrets(&config.secrets).await;
 
         // Start the websocket handler
         atm.start_websocket_handler(ws_handler_rx, ws_handler_tx)
@@ -216,15 +215,13 @@ impl ATM {
 
     /// Adds secret to the secrets resolver
     /// You need to add the private keys of the DIDs you want to sign and encrypt messages with
-    pub fn add_secret(&self, secret: &Secret) {
-        self.inner.secrets_resolver.insert(secret.to_owned());
+    pub async fn add_secret(&self, secret: &Secret) {
+        self.inner.secrets_resolver.insert(secret.to_owned()).await;
     }
 
     /// Adds a Vec of secrets to the secrets resolver
-    pub async fn add_secrets(&self, secrets: &Vec<Secret>) {
-        for secret in secrets {
-            self.inner.secrets_resolver.insert(secret.clone());
-        }
+    pub async fn add_secrets(&self, secrets: &[Secret]) {
+        self.inner.secrets_resolver.insert_vec(secrets).await;
     }
 
     /// If you have set the ATM SDK to be in DirectChannel mode, you can get the inbound channel here

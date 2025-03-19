@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_tdk_common::environments::TDKProfile;
+use affinidi_tdk_common::profiles::TDKProfile;
 use ssi::dids::{
     Document,
     document::{Service, service::Endpoint},

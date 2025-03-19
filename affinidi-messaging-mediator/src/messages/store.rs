@@ -117,7 +117,7 @@ pub(crate) async fn store_message(
                                 recipient,
                                 &state.config.mediator_did,
                                 metadata,
-                                &state.config.security.mediator_secrets,
+                                &*state.config.security.mediator_secrets,
                                 &state.did_resolver,
                                 &PackOptions {
                                     to_keys_per_recipient_limit: state
@@ -181,7 +181,7 @@ pub(crate) async fn store_message(
                     &session.did,
                     &state.config.mediator_did,
                     metadata,
-                    &state.config.security.mediator_secrets,
+                    &*state.config.security.mediator_secrets,
                     &state.did_resolver,
                     &PackOptions {
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,

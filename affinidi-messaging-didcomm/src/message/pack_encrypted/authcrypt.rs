@@ -20,17 +20,21 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn authcrypt(
+pub(crate) async fn authcrypt<T>(
     to: &str,
     from: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &SecretsResolver,
+    secrets_resolver: &T,
     msg: &[u8],
     enc_alg_auth: &AuthCryptAlg,
     enc_alg_anon: &AnonCryptAlg,
     protect_sender: bool,
     to_kids_limit: usize,
-) -> Result<(String, String, Vec<String>)> /* (msg, from_kid, to_kids) */ {
+) -> Result<(String, String, Vec<String>)>
+/* (msg, from_kid, to_kids) */
+where
+    T: SecretsResolver,
+{
     let (to_did, to_kid) = did_or_url(to);
 
     // TODO: Avoid resolving of same dids multiple times
@@ -66,7 +70,7 @@ pub(crate) async fn authcrypt(
     }
 
     // Keep only sender keys present in the wallet
-    let from_kids = secrets_resolver.find_secrets(&from_kids).await?;
+    let from_kids = secrets_resolver.find_secrets(&from_kids).await;
 
     if from_kids.is_empty() {
         Err(err_msg(
@@ -190,7 +194,7 @@ pub(crate) async fn authcrypt(
     // Resolve secret for found sender key
     let from_priv_key = secrets_resolver
         .get_secret(&from_key.id)
-        .await?
+        .await
         .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Sender secret not found"))?;
 
     let from_jwk = from_key.get_jwk().unwrap();

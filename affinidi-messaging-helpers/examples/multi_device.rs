@@ -9,8 +9,8 @@ use affinidi_messaging_didcomm::UnpackOptions;
 use affinidi_messaging_didcomm::envelope::MetaEnvelope;
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use affinidi_messaging_sdk::errors::ATMError;
-use affinidi_tdk::secrets_resolver::SecretsResolver;
 use affinidi_tdk::secrets_resolver::secrets::Secret;
+use affinidi_tdk::secrets_resolver::{SecretsResolver, SimpleSecretsResolver};
 use clap::Parser;
 use serde_json::json;
 use std::time::SystemTime;
@@ -446,7 +446,7 @@ async fn main() -> Result<(), ATMError> {
     .expect("Couldn't create Bob Secrets");
     info!("Bob Secrets Created");
 
-    let secrets = SecretsResolver::new([alice_secrets, bob_secrets].concat());
+    let secrets = SimpleSecretsResolver::new(&[alice_secrets, bob_secrets].concat()).await;
 
     let r = secrets.get_secret("did:example:alice#key-x25519-1").await;
 
@@ -524,7 +524,7 @@ async fn main() -> Result<(), ATMError> {
     )
     .expect("Couldn't create Bob Secrets 2");
 
-    let secrets2 = SecretsResolver::new(vec![bob_secrets2]);
+    let secrets2 = SimpleSecretsResolver::new(&[bob_secrets2]).await;
 
     let unpack2 = Message::unpack(
         &mut envelope,

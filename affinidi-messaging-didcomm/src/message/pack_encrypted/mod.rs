@@ -74,15 +74,18 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving
     ///
     /// TODO: verify and update errors list
-    pub async fn pack_encrypted(
+    pub async fn pack_encrypted<T>(
         &self,
         to: &str,
         from: Option<&str>,
         sign_by: Option<&str>,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
+        secrets_resolver: &T,
         options: &PackEncryptedOptions,
-    ) -> Result<(String, PackEncryptedMetadata)> {
+    ) -> Result<(String, PackEncryptedMetadata)>
+    where
+        T: SecretsResolver,
+    {
         self._validate_pack_encrypted(to, from, sign_by)?;
         // TODO: Think how to avoid resolving of did multiple times
         // and perform async operations in parallel
@@ -290,7 +293,7 @@ pub struct MessagingServiceMetadata {
 mod tests {
     use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
     use affinidi_secrets_resolver::{
-        SecretsResolver,
+        SimpleSecretsResolver,
         secrets::{Secret, SecretMaterial},
     };
     use base64::prelude::*;
@@ -409,7 +412,7 @@ mod tests {
             };
             let from_key = alice_did_doc.verification_method.first().unwrap();
 
-            let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -645,7 +648,7 @@ mod tests {
 
             let from_key = from_did_doc.verification_method.first().unwrap();
 
-            let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -790,7 +793,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
@@ -929,7 +932,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
@@ -984,7 +987,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1015,7 +1018,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1046,7 +1049,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1077,7 +1080,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = CHARLIE_DID.to_string().into();
@@ -1110,7 +1113,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![CHARLIE_DID.to_string()]);
@@ -1143,7 +1146,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![CHARLIE_DID.to_string(), BOB_DID.to_string()]);
@@ -1168,7 +1171,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "not-a-did".to_string().into();
@@ -1201,7 +1204,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["not-a-did".to_string()]);
@@ -1234,7 +1237,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let _ = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1257,7 +1260,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![ALICE_DID.to_string(), BOB_DID.to_string()]);
@@ -1282,7 +1285,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let _ = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1305,7 +1308,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "did:example:alice#key-x25519-1".to_string().into();
@@ -1339,7 +1342,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["did:example:bob#key-x25519-1".into()]);
@@ -1372,7 +1375,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "did:example:unknown".to_string().into();
@@ -1401,7 +1404,7 @@ mod tests {
         let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let from = ALICE_DID.to_string() + "#unknown-key";
         let res = MESSAGE_SIMPLE
@@ -1430,7 +1433,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["did:key:unknown".into()]);
@@ -1462,7 +1465,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let to = BOB_DID.to_string() + "#unknown-key";
         let res = MESSAGE_SIMPLE
@@ -1490,7 +1493,7 @@ mod tests {
             .await
             .unwrap();
 
-        let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let to = "did:key:bob#key-x25519-not-secrets-1";
         let _ = MESSAGE_SIMPLE
@@ -1734,7 +1737,7 @@ mod tests {
                    .await
                    .unwrap();
 
-               let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
                // let to_did_doc = match did_resolver.resolve(to).await {
                //     Ok(response) => response.doc,
                //     Err(err) => {
@@ -1907,7 +1910,7 @@ mod tests {
                let did_resolver =
                    ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
 
-               let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
                let (msg, metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -1988,11 +1991,11 @@ mod tests {
                    .await
                    .unwrap();
 
-               let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let bob_secrets_resolver = SecretsResolver::new(BOB_SECRETS.clone());
+               let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
-               let mediator1_secrets_resolver = SecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
                let (msg, pack_metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2169,15 +2172,15 @@ mod tests {
                    MEDIATOR3_DID_DOC.clone(),
                ]);
 
-               let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let charlie_secrets_resolver = SecretsResolver::new(CHARLIE_SECRETS.clone());
+               let charlie_secrets_resolver = SimpleSecretsResolver::new(CHARLIE_SECRETS.clone());
 
-               let mediator1_secrets_resolver = SecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-               let mediator2_secrets_resolver = SecretsResolver::new(MEDIATOR2_SECRETS.clone());
+               let mediator2_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
-               let mediator3_secrets_resolver = SecretsResolver::new(MEDIATOR3_SECRETS.clone());
+               let mediator3_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
 
                let (packed_msg, pack_metadata) = msg
                    .pack_encrypted(
@@ -2420,13 +2423,13 @@ mod tests {
                    MEDIATOR2_DID_DOC.clone(),
                ]);
 
-               let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let bob_secrets_resolver = SecretsResolver::new(BOB_SECRETS.clone());
+               let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
-               let mediator1_secrets_resolver = SecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-               let mediator2_secrets_resolver = SecretsResolver::new(MEDIATOR2_SECRETS.clone());
+               let mediator2_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
                let (msg, pack_metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2543,7 +2546,7 @@ mod tests {
                .await
                .unwrap();
 
-           let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let sign_by = ALICE_DID.to_string() + "#unknown-key";
            let res = MESSAGE_SIMPLE
@@ -2574,7 +2577,7 @@ mod tests {
                .await
                .unwrap();
 
-           let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let res = MESSAGE_SIMPLE
                .pack_encrypted(
@@ -2605,7 +2608,7 @@ mod tests {
                .await
                .unwrap();
 
-           let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let res = MESSAGE_SIMPLE
                .pack_encrypted(
@@ -2668,7 +2671,7 @@ mod tests {
                    .await
                    .unwrap();
 
-               let secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
                let res = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2700,8 +2703,8 @@ mod tests {
                .unwrap();
 
            let charlie_rotated_to_alice_secrets_resolver =
-               SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
-           let bob_secrets_resolver = SecretsResolver::new(BOB_SECRETS.clone());
+               SimpleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+           let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
            let (packed_msg, _pack_metadata) = MESSAGE_FROM_PRIOR_FULL
                .pack_encrypted(

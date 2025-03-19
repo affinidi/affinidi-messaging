@@ -30,12 +30,15 @@ impl FromPrior {
     /// - `SecretNotFound` Issuer secret is not found.
     /// - `Unsupported` Used crypto or method is unsupported.
     /// - `InvalidState` Indicates a library error.
-    pub async fn pack(
+    pub async fn pack<T>(
         &self,
         issuer_kid: Option<&str>,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &SecretsResolver,
-    ) -> Result<(String, String)> {
+        secrets_resolver: &T,
+    ) -> Result<(String, String)>
+    where
+        T: SecretsResolver,
+    {
         self.validate_pack(issuer_kid)?;
 
         let from_prior_str = serde_json::to_string(self)
@@ -92,7 +95,7 @@ impl FromPrior {
 
         let kid = secrets_resolver
             .find_secrets(&authentication_kids)
-            .await?
+            .await
             .first()
             .ok_or_else(|| {
                 err_msg(
@@ -102,7 +105,7 @@ impl FromPrior {
             })?
             .to_string();
 
-        let secret = secrets_resolver.get_secret(&kid).await?.ok_or_else(|| {
+        let secret = secrets_resolver.get_secret(&kid).await.ok_or_else(|| {
             err_msg(
                 ErrorKind::SecretNotFound,
                 "from_prior issuer secret not found",
@@ -188,7 +191,7 @@ impl FromPrior {
 #[cfg(test)]
 mod tests {
     use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
-    use affinidi_secrets_resolver::SecretsResolver;
+    use affinidi_secrets_resolver::SimpleSecretsResolver;
 
     use crate::{
         FromPrior,
@@ -212,7 +215,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SimpleSecretsResolver::new(&CHARLIE_ROTATED_TO_ALICE_SECRETS.clone()).await;
 
             let (from_prior_jwt, pack_kid) = from_prior
                 .pack(
@@ -245,7 +248,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SimpleSecretsResolver::new(&CHARLIE_ROTATED_TO_ALICE_SECRETS.clone()).await;
 
             let (from_prior_jwt, pack_kid) = from_prior
                 .pack(
@@ -305,7 +308,7 @@ mod tests {
             let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
-            let alice_secrets_resolver = SecretsResolver::new(ALICE_SECRETS.clone());
+            let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let err = from_prior
                 .pack(Some(issuer_kid), &did_resolver, &alice_secrets_resolver)
@@ -349,7 +352,7 @@ mod tests {
                 .await
                 .unwrap();
             let charlie_rotated_to_alice_secrets_resolver =
-                SecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+                SimpleSecretsResolver::new(&CHARLIE_ROTATED_TO_ALICE_SECRETS.clone()).await;
 
             let err = from_prior
                 .pack(

@@ -15,7 +15,7 @@ rust-version.workspace = true
 
 [dependencies]
 affinidi-secrets-resolver.workspace = true
-affinidi-tdk-common.workspace = true
+#affinidi-tdk-common.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
 anyhow.workspace = true
 base64.workspace = true
