@@ -1,18 +1,18 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    Frame,
     layout::{Constraint, Flex, Layout, Position},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph, Widget},
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
-use tui_input::{backend::crossterm::EventHandler, Input};
+use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    state_store::{actions::Action, CommonSettings, State},
-    ui_management::components::{Component, ComponentRender},
     InputType,
+    state_store::{CommonSettings, State, actions::Action},
+    ui_management::components::{Component, ComponentRender},
 };
 
 pub struct Props {

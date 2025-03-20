@@ -22,7 +22,6 @@ pub(crate) mod document;
 pub mod envelope;
 pub mod error;
 pub mod protocols;
-pub mod secrets;
 
 pub use message::{
     Attachment, AttachmentBuilder, AttachmentData, Base64AttachmentData, FromPrior,
@@ -32,13 +31,11 @@ pub use message::{
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::config::ClientConfigBuilder;
-    use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
+    use affinidi_secrets_resolver::SimpleSecretsResolver;
     use serde_json::json;
 
-    use crate::{
-        secrets::resolvers::ExampleSecretsResolver, Message, PackEncryptedOptions, UnpackOptions,
-    };
+    use crate::{Message, PackEncryptedOptions, UnpackOptions};
 
     #[tokio::test]
     #[ignore = "will be fixed after https://github.com/sicpa-dlab/didcomm-gemini/issues/71"]
@@ -59,10 +56,10 @@ mod tests {
 
         // --- Packing message ---
 
-        let sender_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let sender_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let sender_secrets_resolver = ExampleSecretsResolver::new(vec![]);
+        let sender_secrets_resolver = SimpleSecretsResolver::new(&[]).await;
 
         let (packed_msg, metadata) = msg
             .pack_encrypted(
@@ -90,10 +87,10 @@ mod tests {
 
         // --- Unpacking message ---
 
-        let recipient_did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let recipient_did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let recipient_secrets_resolver = ExampleSecretsResolver::new(vec![]);
+        let recipient_secrets_resolver = SimpleSecretsResolver::new(&[]).await;
 
         let (msg, metadata) = Message::unpack_string(
             &packed_msg,

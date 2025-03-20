@@ -166,7 +166,7 @@ mod tests {
         },
         encrypt::{KeyAeadInPlace, KeyAeadMeta},
         jwk::FromJwk,
-        kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
+        kdf::{FromKeyDerivation, KeyExchange, ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
         repr::{KeyGen, KeyPublicBytes, KeySecretBytes, ToPublicBytes, ToSecretBytes},
     };
 
@@ -456,6 +456,9 @@ mod tests {
 
         let err = res.expect_err("res is ok");
         assert_eq!(err.kind(), ErrorKind::InvalidState);
-        assert_eq!(format!("{}", err), "Invalid state: Unable derive kw: Invalid state: No sender key for ecdh-1pu: No sender key for ecdh-1pu");
+        assert_eq!(
+            format!("{}", err),
+            "Invalid state: Unable derive kw: Invalid state: No sender key for ecdh-1pu: No sender key for ecdh-1pu"
+        );
     }
 }

@@ -9,21 +9,21 @@
 use affinidi_messaging_didcomm::{AttachmentData, Message, PackEncryptedOptions, UnpackMetadata};
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
 use tokio::select;
-use tracing::{debug, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, span, warn};
 use uuid::Uuid;
 
 use crate::{
+    ATM,
     errors::ATMError,
     messages::GenericDataStruct,
-    profiles::Profile,
-    transports::{websockets::ws_handler::WsHandlerCommands, SendMessageResponse},
-    ATM,
+    profiles::ATMProfile,
+    transports::{SendMessageResponse, websockets::ws_handler::WsHandlerCommands},
 };
 
 #[derive(Default)]
@@ -90,7 +90,7 @@ impl MessagePickup {
     pub async fn send_status_request(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         wait_for_response: bool,
         wait: Option<Duration>,
     ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
@@ -131,8 +131,8 @@ impl MessagePickup {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -141,17 +141,18 @@ impl MessagePickup {
             match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            { SendMessageResponse::Message(message) => {
-                if wait_for_response {
-                    self._parse_status_response(&message).await
-                } else {
-                    Ok(None)
+            {
+                SendMessageResponse::Message(message) => {
+                    if wait_for_response {
+                        self._parse_status_response(&message).await
+                    } else {
+                        Ok(None)
+                    }
                 }
-            } _ => {
-                Err(ATMError::MsgReceiveError(
+                _ => Err(ATMError::MsgReceiveError(
                     "Invalid response from API".into(),
-                ))
-            }}
+                )),
+            }
         }
         .instrument(_span)
         .await
@@ -173,7 +174,7 @@ impl MessagePickup {
     pub async fn toggle_live_delivery(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         live_delivery: bool,
     ) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "toggle_live_delivery",);
@@ -205,8 +206,8 @@ impl MessagePickup {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -280,7 +281,6 @@ impl MessagePickup {
                         }}
                     }
                 }
-            
         }
         .instrument(_span)
         .await
@@ -299,7 +299,7 @@ impl MessagePickup {
     pub async fn live_stream_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         use_profile_channel: bool,
         msg_id: &str,
         wait: Duration,
@@ -380,7 +380,7 @@ impl MessagePickup {
     pub async fn send_delivery_request(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         limit: Option<usize>,
         wait_for_response: bool,
     ) -> Result<Vec<(Message, UnpackMetadata)>, ATMError> {
@@ -426,8 +426,8 @@ impl MessagePickup {
                         mediator_did,
                         Some(profile_did),
                         Some(profile_did),
-                        &atm.inner.did_resolver,
-                        &atm.inner.secrets_resolver,
+                        &atm.inner.tdk_common.did_resolver,
+                        &atm.inner.tdk_common.secrets_resolver,
                         &PackEncryptedOptions::default(),
                     )
                     .await
@@ -439,11 +439,10 @@ impl MessagePickup {
             match atm
                 .send_message(profile, &msg, &msg_id, wait_for_response, false)
                 .await?
-            { SendMessageResponse::Message(message) => {
-                self._handle_delivery(atm, &message).await
-            } _ => {
-                Err(ATMError::MsgReceiveError("No Messages from API".into()))
-            }}
+            {
+                SendMessageResponse::Message(message) => self._handle_delivery(atm, &message).await,
+                _ => Err(ATMError::MsgReceiveError("No Messages from API".into())),
+            }
         }
         .instrument(_span)
         .await
@@ -466,9 +465,9 @@ impl MessagePickup {
                                 Ok(decoded) => decoded,
                                 Err(e) => {
                                     warn!(
-                                            "Error encoding vec[u8] to string: ({:?}). Attachment ID ({:?})",
-                                            e, attachment.id
-                                        );
+                                        "Error encoding vec[u8] to string: ({:?}). Attachment ID ({:?})",
+                                        e, attachment.id
+                                    );
                                     continue;
                                 }
                             },
@@ -514,7 +513,7 @@ impl MessagePickup {
     pub async fn send_messages_received(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         list: &Vec<String>,
         wait_for_response: bool,
     ) -> Result<Option<MessagePickupStatusReply>, ATMError> {
@@ -556,8 +555,8 @@ impl MessagePickup {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

@@ -1,14 +1,14 @@
 use affinidi_messaging_sdk::messages::GenericDataStruct;
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
-use rand::{distr::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 type SessId = String;
 

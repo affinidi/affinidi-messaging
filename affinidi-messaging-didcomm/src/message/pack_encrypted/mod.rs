@@ -2,17 +2,17 @@ mod anoncrypt;
 mod authcrypt;
 
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 use crate::{
+    Message, PackSignedMetadata,
     algorithms::{AnonCryptAlg, AuthCryptAlg},
     document::{did_or_url, is_did},
-    error::{err_msg, ErrorKind, Result, ResultContext},
+    error::{ErrorKind, Result, ResultContext, err_msg},
     protocols::routing::wrap_in_forward_if_needed,
-    secrets::SecretsResolver,
-    Message, PackSignedMetadata,
 };
 
 pub(crate) use self::anoncrypt::anoncrypt;
@@ -74,15 +74,18 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving
     ///
     /// TODO: verify and update errors list
-    pub async fn pack_encrypted<'sr>(
+    pub async fn pack_encrypted<T>(
         &self,
         to: &str,
         from: Option<&str>,
         sign_by: Option<&str>,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+        secrets_resolver: &T,
         options: &PackEncryptedOptions,
-    ) -> Result<(String, PackEncryptedMetadata)> {
+    ) -> Result<(String, PackEncryptedMetadata)>
+    where
+        T: SecretsResolver,
+    {
         self._validate_pack_encrypted(to, from, sign_by)?;
         // TODO: Think how to avoid resolving of did multiple times
         // and perform async operations in parallel
@@ -195,7 +198,7 @@ impl Message {
         }
 
         match (from, &self.from) {
-            (Some(from), Some(ref sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
+            (Some(from), Some(sfrom)) if did_or_url(from).0 != sfrom => Err(err_msg(
                 ErrorKind::IllegalArgument,
                 "`message.from` value is not equal to `from` value's DID",
             ))?,
@@ -288,7 +291,11 @@ pub struct MessagingServiceMetadata {
 
 #[cfg(test)]
 mod tests {
-    use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
+    use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
+    use affinidi_secrets_resolver::{
+        SimpleSecretsResolver,
+        secrets::{Secret, SecretMaterial},
+    };
     use base64::prelude::*;
     use ssi::dids::document::DIDVerificationMethod;
 
@@ -302,7 +309,7 @@ mod tests {
             x25519::X25519KeyPair,
         },
         encrypt::KeyAeadInPlace,
-        kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
+        kdf::{FromKeyDerivation, KeyExchange, ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
         repr::{KeyGen, KeySecretBytes},
         sign::KeySigVerify,
     };
@@ -310,13 +317,13 @@ mod tests {
     use serde_json::Value;
 
     use crate::{
+        PackEncryptedMetadata, PackEncryptedOptions,
         algorithms::AnonCryptAlg,
         document::DIDCommVerificationMethodExt,
         error::ErrorKind,
         jwe,
         jwk::{FromJwkValue, ToJwkValue},
         jws,
-        secrets::{resolvers::ExampleSecretsResolver, Secret, SecretMaterial},
         test_vectors::{
             ALICE_DID, ALICE_SECRETS, BOB_DID, BOB_SECRET_KEY_AGREEMENT_KEY_P256_1,
             BOB_SECRET_KEY_AGREEMENT_KEY_P256_2, BOB_SECRET_KEY_AGREEMENT_KEY_X25519_1,
@@ -324,7 +331,6 @@ mod tests {
             CHARLIE_DID, MESSAGE_SIMPLE, PLAINTEXT_MSG_SIMPLE,
         },
         utils::crypto::{JoseKDF, KeyWrap},
-        PackEncryptedMetadata, PackEncryptedOptions,
     };
 
     #[tokio::test]
@@ -394,7 +400,7 @@ mod tests {
             KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             KW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
@@ -406,7 +412,7 @@ mod tests {
             };
             let from_key = alice_did_doc.verification_method.first().unwrap();
 
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -630,7 +636,7 @@ mod tests {
             AKE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
             AKW: KeyWrap + FromKeyDerivation,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
             let from_did_doc = match did_resolver.resolve(from).await {
@@ -642,7 +648,7 @@ mod tests {
 
             let from_key = from_did_doc.verification_method.first().unwrap();
 
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let (msg, metadata) = MESSAGE_SIMPLE
                 .pack_encrypted(
@@ -783,11 +789,11 @@ mod tests {
             AKW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
@@ -922,11 +928,11 @@ mod tests {
             KW: KeyWrap + FromKeyDerivation,
             SK: KeySigVerify + FromJwkValue,
         {
-            let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+            let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                 .await
                 .unwrap();
 
-            let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+            let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
             let from_did_doc = match did_resolver.resolve(from).await {
                 Ok(response) => response.doc,
@@ -977,11 +983,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1008,11 +1014,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1039,11 +1045,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_not_did_or_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let res = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1070,11 +1076,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_differs_msg_from() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = CHARLIE_DID.to_string().into();
@@ -1103,11 +1109,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_differs_msg_to() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![CHARLIE_DID.to_string()]);
@@ -1136,11 +1142,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_presented_in_msg_to() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![CHARLIE_DID.to_string(), BOB_DID.to_string()]);
@@ -1161,11 +1167,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_not_did_or_did_url_in_msg() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "not-a-did".to_string().into();
@@ -1194,11 +1200,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_did_or_did_url_in_msg() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["not-a-did".to_string()]);
@@ -1227,11 +1233,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_url_from_msg_did_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let _ = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1250,11 +1256,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_url_to_msg_did_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec![ALICE_DID.to_string(), BOB_DID.to_string()]);
@@ -1275,11 +1281,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_sign_by_differs_msg_from_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let _ = MESSAGE_SIMPLE
             .pack_encrypted(
@@ -1298,11 +1304,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_did_from_msg_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "did:example:alice#key-x25519-1".to_string().into();
@@ -1332,11 +1338,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_did_to_msg_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["did:example:bob#key-x25519-1".into()]);
@@ -1365,11 +1371,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.from = "did:example:unknown".to_string().into();
@@ -1395,10 +1401,10 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_from_unknown_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let from = ALICE_DID.to_string() + "#unknown-key";
         let res = MESSAGE_SIMPLE
@@ -1423,11 +1429,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let mut msg = MESSAGE_SIMPLE.clone();
         msg.to = Some(vec!["did:key:unknown".into()]);
@@ -1455,11 +1461,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_unknown_did_url() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let to = BOB_DID.to_string() + "#unknown-key";
         let res = MESSAGE_SIMPLE
@@ -1483,11 +1489,11 @@ mod tests {
 
     #[tokio::test]
     async fn pack_encrypted_works_to_not_in_secrets_positive() {
-        let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+        let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
             .await
             .unwrap();
 
-        let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+        let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone()).await;
 
         let to = "did:key:bob#key-x25519-not-secrets-1";
         let _ = MESSAGE_SIMPLE
@@ -1727,11 +1733,11 @@ mod tests {
                KE: KeyExchange + KeyGen + ToJwkValue + FromJwkValue,
                KW: KeyWrap + FromKeyDerivation,
            {
-               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
-               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
                // let to_did_doc = match did_resolver.resolve(to).await {
                //     Ok(response) => response.doc,
                //     Err(err) => {
@@ -1904,7 +1910,7 @@ mod tests {
                let did_resolver =
                    ExampleDIDResolver::new(vec![ALICE_DID_DOC.clone(), BOB_DID_DOC.clone()]);
 
-               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
                let (msg, metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -1981,15 +1987,15 @@ mod tests {
                from: Option<&str>,
                sign_by: Option<&str>,
            ) {
-               let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
-               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+               let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
-               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
                let (msg, pack_metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2166,15 +2172,15 @@ mod tests {
                    MEDIATOR3_DID_DOC.clone(),
                ]);
 
-               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let charlie_secrets_resolver = ExampleSecretsResolver::new(CHARLIE_SECRETS.clone());
+               let charlie_secrets_resolver = SimpleSecretsResolver::new(CHARLIE_SECRETS.clone());
 
-               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-               let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
+               let mediator2_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
-               let mediator3_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
+               let mediator3_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR3_SECRETS.clone());
 
                let (packed_msg, pack_metadata) = msg
                    .pack_encrypted(
@@ -2417,13 +2423,13 @@ mod tests {
                    MEDIATOR2_DID_DOC.clone(),
                ]);
 
-               let alice_secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let alice_secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
-               let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+               let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
-               let mediator1_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
+               let mediator1_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR1_SECRETS.clone());
 
-               let mediator2_secrets_resolver = ExampleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
+               let mediator2_secrets_resolver = SimpleSecretsResolver::new(MEDIATOR2_SECRETS.clone());
 
                let (msg, pack_metadata) = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2536,11 +2542,11 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_sign_by_unknown_did_url() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
-           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let sign_by = ALICE_DID.to_string() + "#unknown-key";
            let res = MESSAGE_SIMPLE
@@ -2567,11 +2573,11 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_from_not_in_secrets() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
-           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let res = MESSAGE_SIMPLE
                .pack_encrypted(
@@ -2598,11 +2604,11 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_sign_by_not_in_secrets() {
-           let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
-           let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+           let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
            let res = MESSAGE_SIMPLE
                .pack_encrypted(
@@ -2661,11 +2667,11 @@ mod tests {
            .await;
 
            async fn _pack_encrypted_works_to_from_different_curves(from: Option<&str>, to: &str) {
-               let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+               let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                    .await
                    .unwrap();
 
-               let secrets_resolver = ExampleSecretsResolver::new(ALICE_SECRETS.clone());
+               let secrets_resolver = SimpleSecretsResolver::new(&ALICE_SECRETS.clone());
 
                let res = MESSAGE_SIMPLE
                    .pack_encrypted(
@@ -2692,13 +2698,13 @@ mod tests {
 
        #[tokio::test]
        async fn pack_encrypted_works_from_prior() {
-           let mut did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+           let mut did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
                .await
                .unwrap();
 
            let charlie_rotated_to_alice_secrets_resolver =
-               ExampleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
-           let bob_secrets_resolver = ExampleSecretsResolver::new(BOB_SECRETS.clone());
+               SimpleSecretsResolver::new(CHARLIE_ROTATED_TO_ALICE_SECRETS.clone());
+           let bob_secrets_resolver = SimpleSecretsResolver::new(BOB_SECRETS.clone());
 
            let (packed_msg, _pack_metadata) = MESSAGE_FROM_PRIOR_FULL
                .pack_encrypted(

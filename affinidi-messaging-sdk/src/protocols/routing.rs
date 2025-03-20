@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use crate::{ATM, errors::ATMError, profiles::Profile};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile};
 use affinidi_messaging_didcomm::{Attachment, Message, PackEncryptedOptions};
 use base64::prelude::*;
 use serde_json::{Number, Value, json};
@@ -34,7 +34,7 @@ impl Routing {
     pub async fn forward_message(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message: &str,
         target_did: &str,
         next_did: &str,
@@ -74,8 +74,8 @@ impl Routing {
                     target_did,
                     Some(&profile.inner.did),
                     Some(&profile.inner.did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

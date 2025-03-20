@@ -1,11 +1,11 @@
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 use affinidi_messaging_mediator_common::errors::AppError;
 use affinidi_messaging_sdk::messages::SuccessResponse;
 use axum::{
+    Json, Router,
     extract::State,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
 use http::StatusCode;
 

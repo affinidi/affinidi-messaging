@@ -1,17 +1,12 @@
-use std::{
-    fmt::{self, Debug, Formatter},
-    sync::Arc,
-};
-
 use affinidi_messaging_didcomm::{Attachment, Message, MessageBuilder};
 use affinidi_messaging_sdk::{
-    messages::SuccessResponse,
-    profiles::Profile,
-    protocols::Protocols,
-    secrets::{Secret, SecretMaterial, SecretType},
-    ATM,
+    ATM, messages::SuccessResponse, profiles::ATMProfile, protocols::Protocols,
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use affinidi_tdk::secrets_resolver::{
+    SecretsResolver,
+    secrets::{Secret, SecretMaterial, SecretType},
+};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use image::Luma;
 use qrcode::QrCode;
 use ratatui::{
@@ -19,14 +14,18 @@ use ratatui::{
     text::{Line, Span},
 };
 use serde_json::json;
-use ssi::{dids::DIDKey, jwk::Params, JWK};
+use ssi::{JWK, dids::DIDKey, jwk::Params};
+use std::{
+    fmt::{self, Debug, Formatter},
+    sync::Arc,
+};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::state_store::{
-    inbound_messages::{Name, VCard},
     State,
+    inbound_messages::{Name, VCard},
 };
 
 use super::chat_list::ChatStatus;
@@ -34,7 +33,7 @@ use super::chat_list::ChatStatus;
 #[derive(Clone, Default)]
 pub struct Invite {
     pub invite_url: String,
-    pub invite_profile: Option<Arc<Profile>>,
+    pub invite_profile: Option<Arc<ATMProfile>>,
     pub qr_code: Option<image::ImageBuffer<Luma<u8>, Vec<u8>>>,
 }
 
@@ -65,19 +64,21 @@ pub async fn create_new_profile(
     mediator_did: &str,
     alias: Option<String>,
     alias_suffix: bool,
-) -> anyhow::Result<Profile> {
+    state: &mut State,
+) -> anyhow::Result<ATMProfile> {
     let p256_key = JWK::generate_p256();
     let did_key = DIDKey::generate(&p256_key).unwrap();
 
-    let (d, x, y) = match p256_key.clone().params { Params::EC(map) => {
-        (
+    let (d, x, y) = match p256_key.clone().params {
+        Params::EC(map) => (
             String::from(map.ecc_private_key.clone().unwrap()),
             String::from(map.x_coordinate.clone().unwrap()),
             String::from(map.y_coordinate.clone().unwrap()),
-        )
-    } _ => {
-        panic!("Failed to generate P256 key")
-    }};
+        ),
+        _ => {
+            panic!("Failed to generate P256 key")
+        }
+    };
 
     let secret = Secret {
         id: format!("{}#{}", did_key, did_key.to_string().split_at(8).1),
@@ -109,12 +110,13 @@ pub async fn create_new_profile(
         ));
     }
 
-    match Profile::new(
+    atm.get_tdk().secrets_resolver.insert(secret.clone()).await;
+    state.add_secret(secret);
+    match ATMProfile::new(
         atm,
         Some(alias),
         did_key.to_string(),
         Some(mediator_did.to_string()),
-        vec![secret],
     )
     .await
     {
@@ -205,6 +207,7 @@ pub async fn send_invitation_accept(
         &mediator_did,
         Some(format!("Ephemeral Accept {}", invite_did_suffix)),
         true,
+        state,
     )
     .await?;
     let accept_temp_profile = atm.profile_add(&accept_temp_profile, true).await?;
@@ -262,6 +265,7 @@ pub async fn send_invitation_accept(
         &mediator_did,
         Some(format!("Secure Accept {}", invite_did_suffix)),
         true,
+        state,
     )
     .await?;
     let accept_secure_profile = atm.profile_add(&accept_secure_profile, true).await?;
@@ -397,7 +401,7 @@ pub async fn create_invitation(
     // Send the state immediately so we render the popup while waiting for the rest to complete
     state_tx.send(state.clone())?;
     if let Some(mediator_did) = state.settings.mediator_did.clone() {
-        match create_new_profile(atm, &mediator_did, None, false).await {
+        match create_new_profile(atm, &mediator_did, None, false, state).await {
             Ok(profile) => {
                 state.invite_popup.messages.push(Line::from(vec![
                     Span::styled(

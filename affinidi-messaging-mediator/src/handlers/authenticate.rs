@@ -8,28 +8,28 @@
 
 use super::message_inbound::InboundMessage;
 use crate::{
+    SharedData,
     common::acl_checks::ACLCheck,
     database::session::{Session, SessionClaims, SessionState},
-    SharedData,
 };
-use affinidi_messaging_didcomm::{envelope::MetaEnvelope, Message, UnpackOptions};
+use affinidi_messaging_didcomm::{Message, UnpackOptions, envelope::MetaEnvelope};
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::{
     authentication::AuthRefreshResponse,
-    messages::{known::MessageType, AuthorizationResponse, GenericDataStruct},
+    messages::{AuthorizationResponse, GenericDataStruct, known::MessageType},
     protocols::mediator::{
         accounts::AccountType,
         acls::{AccessListModeType, MediatorACLSet},
     },
 };
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http::StatusCode;
-use jsonwebtoken::{encode, EncodingKey, Header, Validation};
-use rand::{distr::Alphanumeric, Rng};
+use jsonwebtoken::{EncodingKey, Header, Validation, encode};
+use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use std::time::SystemTime;
-use tracing::{debug, info, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, info, span, warn};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct AuthenticationChallenge {
@@ -92,7 +92,11 @@ pub async fn authentication_challenge(
                     // Register the DID as a local DID
                     state
                         .database
-                        .account_add(&session.did_hash, &state.config.security.global_acl_default)
+                        .account_add(
+                            &session.did_hash,
+                            &state.config.security.global_acl_default,
+                            None,
+                        )
                         .await?;
                 }
             }
@@ -171,7 +175,7 @@ pub async fn authentication_response(
         let (msg, _) = match Message::unpack(
             &mut envelope,
             &state.did_resolver,
-            &state.config.security.mediator_secrets,
+            &*state.config.security.mediator_secrets,
             &UnpackOptions::default(),
         )
         .await
@@ -196,7 +200,7 @@ pub async fn authentication_response(
                     "UNKNOWN".to_string(),
                     "Only accepts Affinidi Authentication protocol messages".to_string(),
                 )
-                .into())
+                .into());
             }
         }
 
@@ -219,10 +223,16 @@ pub async fn authentication_response(
         // Turn message body into Challenge
         let challenge: AuthenticationChallenge =
             serde_json::from_value(msg.body).map_err(|err| {
-                warn!("Couldn't parse body into ChallengeBody. Reason: {}", err);
+                warn!(
+                    "Couldn't parse body into AuthenticationChallenge. Reason: {}",
+                    err
+                );
                 MediatorError::SessionError(
                     "UNKNOWN".into(),
-                    format!("Couldn't parse body into ChallengeBody. Reason: {}", err),
+                    format!(
+                        "Couldn't parse body into AuthenticationChallenge. Reason: {}",
+                        err
+                    ),
                 )
             })?;
 
@@ -346,7 +356,7 @@ async fn _register_did_and_setup(state: &SharedData, did_hash: &str) -> Result<(
         // Register the DID as a local DID
         state
             .database
-            .account_add(did_hash, &state.config.security.global_acl_default)
+            .account_add(did_hash, &state.config.security.global_acl_default, None)
             .await?;
     }
 
@@ -382,7 +392,7 @@ pub async fn authentication_refresh(
         let (msg, _) = match Message::unpack(
             &mut envelope,
             &state.did_resolver,
-            &state.config.security.mediator_secrets,
+            &*state.config.security.mediator_secrets,
             &UnpackOptions::default(),
         )
         .await
@@ -410,7 +420,7 @@ pub async fn authentication_refresh(
                     "UNKNOWN".to_string(),
                     "Only accepts Affinidi Authentication protocol messages".to_string(),
                 )
-                .into())
+                .into());
             }
         }
 

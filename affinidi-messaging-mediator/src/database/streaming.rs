@@ -1,7 +1,7 @@
 use crate::tasks::websocket_streaming::PubSubRecord;
 use affinidi_messaging_mediator_common::errors::MediatorError;
-use redis::{from_redis_value, Value};
-use tracing::{debug, error, event, Level};
+use redis::{Value, from_redis_value};
+use tracing::{Level, debug, error, event};
 
 use super::Database;
 
@@ -146,8 +146,7 @@ impl Database {
                     "NA".into(),
                     format!(
                         "publish_live_message() for did_hash({}) failed to serialize message. Reason: {}",
-                        did_hash,
-                        err
+                        did_hash, err
                     ),
                 ));
             }
@@ -180,9 +179,7 @@ impl Database {
                     "NA".into(),
                     format!(
                         "publish_live_message() for did_hash({}) channel(CHANNEL:{}) failed. Reason: {}",
-                        did_hash,
-                        stream_uuid,
-                        err
+                        did_hash, stream_uuid, err
                     ),
                 ))
             }
@@ -226,9 +223,7 @@ impl Database {
                     "NA".into(),
                     format!(
                         "streaming_register_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
-                        did_hash,
-                        stream_uuid,
-                        err
+                        did_hash, stream_uuid, err
                     ),
                 ))
             }
@@ -270,9 +265,7 @@ impl Database {
                     "NA".into(),
                     format!(
                         "streaming_start_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
-                        did_hash,
-                        stream_uuid,
-                        err
+                        did_hash, stream_uuid, err
                     ),
                 ))
             }
@@ -304,21 +297,19 @@ impl Database {
             }
             Err(err) => {
                 event!(
-                Level::ERROR,
-                "streaming_stop_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
-                did_hash,
-                stream_uuid,
-                err
-            );
-                Err(MediatorError::DatabaseError(
-                "NA".into(),
-                format!(
+                    Level::ERROR,
                     "streaming_stop_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                     did_hash,
                     stream_uuid,
                     err
-                ),
-            ))
+                );
+                Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!(
+                        "streaming_stop_live() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                        did_hash, stream_uuid, err
+                    ),
+                ))
             }
         }
     }
@@ -349,21 +340,19 @@ impl Database {
             }
             Err(err) => {
                 event!(
-                Level::ERROR,
-                "streaming_deregister_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
-                did_hash,
-                stream_uuid,
-                err
-            );
-                Err(MediatorError::DatabaseError(
-                "NA".into(),
-                format!(
+                    Level::ERROR,
                     "streaming_deregister_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
                     did_hash,
                     stream_uuid,
                     err
-                ),
-            ))
+                );
+                Err(MediatorError::DatabaseError(
+                    "NA".into(),
+                    format!(
+                        "streaming_deregister_client() for did_hash({}) stream_uuid(STREAMING_SESSIONS:{}) failed. Reason: {}",
+                        did_hash, stream_uuid, err
+                    ),
+                ))
             }
         }
     }

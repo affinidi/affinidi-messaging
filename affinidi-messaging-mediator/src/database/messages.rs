@@ -3,11 +3,11 @@
  *
  */
 
-use super::{session::Session, Database};
+use super::{Database, session::Session};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::Folder;
-use std::collections::HashMap;
-use tracing::{debug, span, warn, Instrument, Level};
+use ahash::AHashMap as HashMap;
+use tracing::{Instrument, Level, debug, span, warn};
 
 impl Database {
     /// Will purge/delete all messages from the database for the given DID and folder

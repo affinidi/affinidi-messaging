@@ -3,19 +3,19 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::SystemTime,
 };
-use tracing::{debug, error, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, span};
 use uuid::Uuid;
 
 use crate::{
+    SharedState,
     errors::ATMError,
     messages::{
         AuthenticationChallenge, AuthorizationResponse, GenericDataStruct, SuccessResponse,
     },
-    profiles::Profile,
-    SharedState,
+    profiles::ATMProfile,
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -25,7 +25,7 @@ pub struct AuthRefreshResponse {
 }
 impl GenericDataStruct for AuthRefreshResponse {}
 
-impl Profile {
+impl ATMProfile {
     /// Authenticate the SDK against Affinidi Trusted Messaging
     ///
     /// Will loop until successful authentication
@@ -38,7 +38,9 @@ impl Profile {
         let mut timer = 1;
         loop {
             match self._authenticate(shared_state).await {
-                Ok(response) => return Ok(response),
+                Ok(response) => {
+                    return Ok(response);
+                }
                 Err(ATMError::ACLDenied(_)) => {
                     return Err(ATMError::ACLDenied("Authentication Denied".into()));
                 }
@@ -79,15 +81,18 @@ impl Profile {
                 }
             };
 
-            match &*self.inner.authorization.lock().await { Some(tokens) => {
-                debug!("Returning existing tokens");
-                return Ok(tokens.clone());
-            } _ => {
-                self.inner.authenticated.store(false, Ordering::Relaxed);
-                return Err(ATMError::AuthenticationError(
-                    "Authenticated but no tokens found".to_owned(),
-                ));
-            }}
+            match &*self.inner.authorization.lock().await {
+                Some(tokens) => {
+                    debug!("Returning existing tokens");
+                    return Ok(tokens.clone());
+                }
+                _ => {
+                    self.inner.authenticated.store(false, Ordering::Relaxed);
+                    return Err(ATMError::AuthenticationError(
+                        "Authenticated but no tokens found".to_owned(),
+                    ));
+                }
+            }
         }
 
         let _span = span!(Level::DEBUG, "authenticate",);
@@ -103,7 +108,7 @@ impl Profile {
 
             // Step 1. Get the challenge
             let step1_response = _http_post::<AuthenticationChallenge>(
-                &shared_state.client,
+                &shared_state.tdk_common.client,
                 &[&mediator_endpoint, "/authenticate/challenge"].concat(),
                 &format!("{{\"did\": \"{}\"}}", profile_did).to_string(),
             )
@@ -131,8 +136,8 @@ impl Profile {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &shared_state.did_resolver,
-                    &shared_state.secrets_resolver,
+                    &shared_state.tdk_common.did_resolver,
+                    &shared_state.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -146,7 +151,7 @@ impl Profile {
             debug!("Successfully packed auth message\n{:#?}", auth_msg);
 
             let step2_response = _http_post::<AuthorizationResponse>(
-                &shared_state.client,
+                &shared_state.tdk_common.client,
                 &[&mediator_endpoint, "/authenticate"].concat(),
                 &auth_msg,
             )
@@ -231,8 +236,8 @@ impl Profile {
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &shared_state.did_resolver,
-                &shared_state.secrets_resolver,
+                &shared_state.tdk_common.did_resolver,
+                &shared_state.tdk_common.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -283,7 +288,7 @@ impl Profile {
                     ._create_refresh_request(&tokens.refresh_token, shared_state)
                     .await?;
                 let new_tokens = _http_post::<AuthRefreshResponse>(
-                    &shared_state.client,
+                    &shared_state.tdk_common.client,
                     &[&mediator_endpoint, "/authenticate/refresh"].concat(),
                     &refresh_msg,
                 )

@@ -25,7 +25,7 @@ To set the profile you can either set an environment variable, or specify a prof
 Using environment variable:
 
 ```bash
-export AM_PROFILE=local
+export TDK_ENVIRONMENT=local
 
 cargo run --example mediator_ping
 ```

@@ -1,9 +1,9 @@
-use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
-use tracing::{debug, span, Instrument, Level};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::ATMProfile};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Helper method to get the Mediators well-known DID
-    pub async fn well_known_did(&mut self, profile: &Profile) -> Result<String, ATMError> {
+    pub async fn well_known_did(&mut self, profile: &ATMProfile) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "well_known_did");
         async move {
             debug!("Sending well_known_did request");
@@ -19,6 +19,7 @@ impl ATM {
 
             let res = self
                 .inner
+                .tdk_common
                 .client
                 .get(well_known_did_atm_api)
                 .header("Content-Type", "application/json")

@@ -1,11 +1,11 @@
 use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::{
-    fetch::FetchOptions, FetchDeletePolicy, GetMessagesResponse, MessageListElement,
+    FetchDeletePolicy, GetMessagesResponse, MessageListElement, fetch::FetchOptions,
 };
 use itertools::Itertools;
-use redis::{from_redis_value, Value};
-use tracing::{debug, event, span, warn, Instrument, Level};
+use redis::{Value, from_redis_value};
+use tracing::{Instrument, Level, debug, event, span, warn};
 
 impl Database {
     /// Fetch as many messages as possible from the database

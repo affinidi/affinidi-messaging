@@ -7,28 +7,22 @@ Each WsConnection is a tokio parallel task, and responsible for unpacking incomi
 
 */
 use super::SharedState;
-use crate::{errors::ATMError, profiles::Profile, protocols::Protocols, ATM};
+use crate::{
+    ATM, errors::ATMError, profiles::ATMProfile, protocols::Protocols,
+    transports::websockets::utils::connect,
+};
 use affinidi_messaging_didcomm::{Message as DidcommMessage, UnpackMetadata};
-use futures_util::SinkExt;
-use http::header::AUTHORIZATION;
-use std::{sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 use tokio::{
-    net::TcpStream,
+    io::{AsyncRead, AsyncWrite, BufReader},
     select,
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
-    time::sleep,
+    time::{interval_at, sleep},
 };
-use tokio_stream::StreamExt;
-use tokio_tungstenite::{
-    connect_async_tls_with_config,
-    tungstenite::{
-        client::IntoClientRequest, error::ProtocolError, protocol::frame::Utf8Bytes,
-        Error as ws_error, Message,
-    },
-    MaybeTlsStream, WebSocketStream,
-};
-use tracing::{debug, warn, error, span, Instrument};
+use tracing::{Instrument, debug, error, span, warn};
+use url::Url;
+use web_socket::{CloseCode, DataType, Event, MessageType, WebSocket};
 
 /// Commands between the websocket handler and the websocket connections
 #[derive(Debug)]
@@ -40,10 +34,14 @@ pub(crate) enum WsConnectionCommands {
     EnableDirectChannel(Sender<Box<(DidcommMessage, UnpackMetadata)>>),
     DisableDirectChannel,
     // To Handler
-    Connected(Arc<Profile>, String), // Connection is ready for profile (and status message to retrieve)
-    Disconnected(Arc<Profile>), // WebSocket connection is disconnected
+    Connected(Arc<ATMProfile>, String), // Connection is ready for profile (and status message to retrieve)
+    Disconnected(Arc<ATMProfile>),      // WebSocket connection is disconnected
     MessageReceived(Box<(DidcommMessage, UnpackMetadata)>),
 }
+
+/// The following is to help with handling either TCP or TLS connections
+pub(crate) trait ReadWrite: AsyncRead + AsyncWrite + Send {}
+impl<T> ReadWrite for T where T: AsyncRead + AsyncWrite + Send {}
 
 #[derive(Clone, Debug)]
 enum State {
@@ -53,7 +51,7 @@ enum State {
 }
 
 pub struct WsConnection {
-    profile: Arc<Profile>,
+    profile: Arc<ATMProfile>,
     shared: Arc<SharedState>,
     state: State,
     to_handler: Sender<WsConnectionCommands>,
@@ -64,7 +62,7 @@ pub struct WsConnection {
 impl WsConnection {
     pub(crate) async fn activate(
         shared_state: Arc<SharedState>,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         to_handler: Sender<WsConnectionCommands>,
         from_handler: Receiver<WsConnectionCommands>,
         to_connection: Sender<WsConnectionCommands>,
@@ -110,38 +108,70 @@ impl WsConnection {
             };
 
             let mut direct_channel: Option<Sender<Box<(DidcommMessage, UnpackMetadata)>>> = None;
-           
+            let mut watchdog = interval_at(tokio::time::Instant::now()+Duration::from_secs(20), Duration::from_secs(20));
+
+            let mut missed_pings = 0;
             loop {
                 select! {
-                    value = web_socket.next() => {
-                        match value { Some(msg) => {
-                            match msg {
-                                Ok(payload) => {
-                                    if payload.is_text() {
-                                        match payload.to_text() {
-                                            Ok(msg) => {
-                                                debug!("Received text message ({})", msg);
-                                                let unpack = match atm.unpack(msg).await {
-                                                    Ok(unpack) => unpack,
-                                                    Err(e) => {
-                                                        error!("Error unpacking message: {:?}", e);
-                                                        continue;
-                                                    }
-                                                };
-                                                match &direct_channel { 
-                                                    Some(sender) => {
-                                                        let _ = sender.send(Box::new(unpack)).await;
-                                                    } _ => {
-                                                        let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
-                                                    }
-                                                }
+                    _ = watchdog.tick() => {
+                        let _ = web_socket.send_ping(vec![]).await;
+                        if missed_pings > 2 {
+                            warn!("Missed 3 pings, restarting connection");
+                            let _ = web_socket.close(CloseCode::ProtocolError).await;
+                            missed_pings = 0;
+                            web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                Ok(ws) => ws,
+                                Err(e) => {
+                                    error!("Error creating websocket connection: {:?}", e);
+                                    return;
+                                }
+                            };
+                        } else {
+                            missed_pings += 1;
+                        }
+                    }
+                    value = web_socket.recv() => {
+                        match value {
+                            Ok(event) =>
+                                match event {
+                                    Event::Data { ty, data } => {
+                                        let msg = match ty {
+                                            DataType::Complete(MessageType::Text) => String::from_utf8_lossy(&data),
+                                            DataType::Complete(MessageType::Binary) => {
+                                                warn!("Received binary message ({})", String::from_utf8_lossy(&data));
+                                                continue;
+                                            }
+                                            DataType::Stream(_) => {
+                                                warn!("Received stream - not handled");
+                                                continue;
+                                            }
+                                        };
+
+                                        debug!("Received text message ({})", msg);
+                                        let unpack = match atm.unpack(&msg).await {
+                                            Ok(unpack) => unpack,
+                                            Err(e) => {
+                                                error!("Error unpacking message: {:?}", e);
+                                                continue;
+                                            }
+                                        };
+                                        match &direct_channel {
+                                            Some(sender) => {
+                                                let _ = sender.send(Box::new(unpack)).await;
                                             } _ => {
-                                                error!("Received non-text message");
+                                                let _ = self.to_handler.send(WsConnectionCommands::MessageReceived(Box::new(unpack))).await;
                                             }
                                         }
-                                    } else if payload.is_close() {
-                                        error!("Websocket closed");
-                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                    }
+                                    Event::Ping(data) => {
+                                        let _ = web_socket.send_pong(data).await;
+                                    }
+                                    Event::Pong(..) => {
+                                        missed_pings -= 1;
+                                    }
+                                    Event::Error(err) => {
+                                        warn!("WebSocket Error: {}", err);
+                                        let _ = web_socket.close(CloseCode::ProtocolError).await;
                                         web_socket = match self._handle_connection(&atm, &protocols, true).await {
                                             Ok(ws) => ws,
                                             Err(e) => {
@@ -149,15 +179,9 @@ impl WsConnection {
                                                 return;
                                             }
                                         };
-                                    } else {
-                                        error!("Error getting payload from message: {:?}", payload);
-                                        continue;
+                                        missed_pings = 0;
                                     }
-                                }
-                                Err(err) => match err {
-                                    ws_error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => {
-                                        error!("Websocket reset without closing handshake");
-                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
+                                    Event::Close { .. } => {
                                         web_socket = match self._handle_connection(&atm, &protocols, true).await {
                                             Ok(ws) => ws,
                                             Err(e) => {
@@ -165,27 +189,29 @@ impl WsConnection {
                                                 return;
                                             }
                                         };
-                                    }
-                                    _ => {
-                                        let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
-                                        error!("Unknown WebSocket Error: {:?}", err);
-                                        break;
+                                        missed_pings = 0;
                                     }
                                 }
+                                Err(err) => {
+                                    error!("Error receiving websocket message: {:?}", err);
+                                    let _ = web_socket.close(CloseCode::ProtocolError).await;
+                                    web_socket = match self._handle_connection(&atm, &protocols, true).await {
+                                        Ok(ws) => ws,
+                                        Err(e) => {
+                                            error!("Error creating websocket connection: {:?}", e);
+                                            return;
+                                        }
+                                    };
+                                    missed_pings = 0;
+                                }
                             }
-                            } _ => {
-                                let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
-                                error!("websocket error : {:?}", value);
-                                break;
-                            }
-                        }
                     }
                     value = self.from_handler.recv() => {
                         match value { Some(cmd) => {
                             match cmd {
                                 WsConnectionCommands::Send(msg) => {
                                     debug!("Sending message ({}) to websocket", msg);
-                                    match web_socket.send(Message::Text(Utf8Bytes::from(msg))).await {
+                                    match web_socket.send(msg.as_str()).await {
                                         Ok(_) => {
                                             debug!("Message sent");
                                         }
@@ -218,7 +244,7 @@ impl WsConnection {
                 }
             }
             let _ = self.to_handler.send(WsConnectionCommands::Disconnected(self.profile.clone())).await;
-            let _ = web_socket.close(None).await;
+            let _ = web_socket.close(()).await;
             debug!("Websocket connection closed");
         }
         .instrument(_span)
@@ -233,7 +259,7 @@ impl WsConnection {
         atm: &ATM,
         protocols: &Protocols,
         update_sdk: bool,
-    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
+    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError> {
         debug!("Starting websocket connection");
 
         self.state = State::Connecting;
@@ -287,15 +313,13 @@ impl WsConnection {
 
         if update_sdk {
             debug!("channel to SDK = capacity = {}", self.to_handler.capacity());
-            match self
-                .to_handler
-                .try_send(WsConnectionCommands::Connected(
-                    self.profile.clone(),
-                    status_id,
-                )) {
+            match self.to_handler.try_send(WsConnectionCommands::Connected(
+                self.profile.clone(),
+                status_id,
+            )) {
                 Ok(_) => {}
                 Err(e) => {
-                warn!("Channel to WS_handler is full: {:?}", e);
+                    warn!("Channel to WS_handler is full: {:?}", e);
                 }
             }
         }
@@ -306,7 +330,7 @@ impl WsConnection {
     // Responsible for creating a websocket connection to the mediator
     async fn _create_socket(
         &mut self,
-    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ATMError> {
+    ) -> Result<WebSocket<BufReader<Pin<Box<dyn ReadWrite>>>>, ATMError> {
         // Check if authenticated
         let tokens = self.profile.authenticate(&self.shared).await?;
 
@@ -328,41 +352,33 @@ impl WsConnection {
             )));
         };
 
-        let mut request = address.into_client_request().map_err(|e| {
-            ATMError::TransportError(format!("Could not create websocket request. Reason: {}", e))
-        })?;
-
-        // Add the Authorization header to the request
-        let headers = request.headers_mut();
-        headers.insert(
-            AUTHORIZATION,
-            format!("Bearer {}", tokens.access_token)
-                .parse()
-                .map_err(|e| {
-                    ATMError::TransportError(format!("Could not set Authorization header: {:?}", e))
-                })?,
-        );
-
-        // Connect to the websocket
-        let ws_stream = match connect_async_tls_with_config(
-            request,
-            None,
-            false,
-            Some(self.shared.ws_connector.clone()),
-        )
-        .await
-        {
-            Ok((ws_stream, _)) => ws_stream,
-            Err(e) => {
+        let url = match Url::parse(address) {
+            Ok(url) => url,
+            Err(err) => {
+                error!(
+                    "Mediator {}: Invalid ServiceEndpoint address {}: {}",
+                    mediator.did, address, err
+                );
                 return Err(ATMError::TransportError(format!(
-                    "Could not connect to websocket. Reason: {}",
-                    e
-                )))
+                    "Mediator {}: Invalid ServiceEndpoint address {}: {}",
+                    mediator.did, address, err
+                )));
+            }
+        };
+
+        let web_socket = match connect(&url, &tokens.access_token).await {
+            Ok(web_socket) => web_socket,
+            Err(err) => {
+                warn!("WebSocket failed. Reason: {}", err);
+                return Err(ATMError::TransportError(format!(
+                    "Websocket connection failed: {}",
+                    err
+                )));
             }
         };
 
         debug!("Completed websocket connection");
 
-        Ok(ws_stream)
+        Ok(web_socket)
     }
 }

@@ -1,14 +1,14 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    Frame,
     layout::Position,
     prelude::Rect,
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::state_store::{actions::Action, State};
+use crate::state_store::{State, actions::Action};
 
 use super::{Component, ComponentRender};
 

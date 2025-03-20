@@ -6,7 +6,7 @@ use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
 use super::{acls::MediatorACLSet, administration::Mediator};
-use crate::{ATM, errors::ATMError, profiles::Profile, transports::SendMessageResponse};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 use std::{
     fmt::{self, Display, Formatter},
     sync::Arc,
@@ -15,20 +15,25 @@ use std::{
 
 #[derive(Serialize, Deserialize)]
 pub enum MediatorAccountRequest {
+    #[serde(rename = "account_get")]
     AccountGet(String),
-    AccountList {
-        cursor: u32,
-        limit: u32,
-    },
-    AccountAdd {
-        did_hash: String,
-        acls: Option<u64>,
-    },
+    #[serde(rename = "account_list")]
+    AccountList { cursor: u32, limit: u32 },
+    #[serde(rename = "account_add")]
+    AccountAdd { did_hash: String, acls: Option<u64> },
+    #[serde(rename = "account_remove")]
     AccountRemove(String),
+    #[serde(rename = "account_change_type")]
     AccountChangeType {
         did_hash: String,
         #[serde(alias = "type")]
         _type: AccountType,
+    },
+    #[serde(rename = "account_change_queue_limits")]
+    AccountChangeQueueLimits {
+        did_hash: String,
+        send_queue_limit: Option<i32>,
+        receive_queue_limit: Option<i32>,
     },
 }
 
@@ -127,14 +132,45 @@ impl From<AccountType> for String {
 pub struct Account {
     pub did_hash: String,
     pub acls: u64,
+    #[serde(rename = "type")]
     pub _type: AccountType,
     pub access_list_count: u32,
+    /// Number of messages that can be in the queue for this account
+    pub queue_send_limit: Option<i32>,
+    pub queue_receive_limit: Option<i32>,
+    pub send_queue_count: u32,
+    pub send_queue_bytes: u64,
+    pub receive_queue_count: u32,
+    pub receive_queue_bytes: u64,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Account {
+            did_hash: "".to_owned(),
+            acls: 0,
+            _type: AccountType::Standard,
+            access_list_count: 0,
+            queue_send_limit: None,
+            queue_receive_limit: None,
+            send_queue_count: 0,
+            send_queue_bytes: 0,
+            receive_queue_count: 0,
+            receive_queue_bytes: 0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct MediatorAccountList {
     pub accounts: Vec<Account>,
     pub cursor: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountChangeQueueLimitsResponse {
+    pub send_queue_limit: Option<i32>,
+    pub receive_queue_limit: Option<i32>,
 }
 
 impl Mediator {
@@ -145,7 +181,7 @@ impl Mediator {
     pub async fn account_get(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<String>,
     ) -> Result<Option<Account>, ATMError> {
         let _span = span!(Level::DEBUG, "account_get");
@@ -164,7 +200,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountGet":  did_hash}),
+                json!({"account_get":  did_hash}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -180,8 +216,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -222,7 +258,7 @@ impl Mediator {
     pub async fn account_add(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         acls: Option<MediatorACLSet>,
     ) -> Result<Account, ATMError> {
@@ -241,7 +277,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountAdd": {"did_hash": did_hash, "acls": acls.map(|a| a.to_u64())}}),
+                json!({"account_add": {"did_hash": did_hash, "acls": acls.map(|a| a.to_u64())}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -257,8 +293,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -292,7 +328,7 @@ impl Mediator {
     pub async fn account_remove(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: Option<String>,
     ) -> Result<bool, ATMError> {
         let _span = span!(Level::DEBUG, "account_remove");
@@ -311,7 +347,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountRemove":  did_hash}),
+                json!({"account_remove":  did_hash}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -327,8 +363,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -368,7 +404,7 @@ impl Mediator {
     pub async fn accounts_list(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAccountList, ATMError> {
@@ -391,7 +427,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
+                json!({"account_list": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -407,8 +443,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -453,7 +489,7 @@ impl Mediator {
     pub async fn account_change_type(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         did_hash: &str,
         new_type: AccountType,
     ) -> Result<bool, ATMError> {
@@ -472,7 +508,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/account-management".to_owned(),
-                json!({"AccountChangeType": {"did_hash": did_hash, "type": new_type}}),
+                json!({"account_change_type": {"did_hash": did_hash, "type": new_type}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -488,8 +524,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -508,11 +544,101 @@ impl Mediator {
         .await
     }
 
-    /// Parses the response from the mediator for account_add
+    /// Parses the response from the mediator for account_change_type
     fn _parse_account_change_type_response(&self, message: &Message) -> Result<bool, ATMError> {
         serde_json::from_value(message.body.clone()).map_err(|err| {
             ATMError::MsgReceiveError(format!(
                 "Mediator Account Change Type response could not be parsed. Reason: {}",
+                err
+            ))
+        })
+    }
+
+    /// Change the Queue Limits for a DID
+    /// - `atm` - The ATM client to use
+    /// - `profile` - The profile to use
+    /// - `did_hash` - The DID hash to change the type for
+    /// - `send_queue_limit`
+    /// - `receive_queue_limit`
+    ///
+    /// NOTE: queue_limit values
+    ///       - None: No change
+    ///       - Some(-1): Unlimited
+    ///       - Some(-2): Reset to soft_limit
+    ///       - Some(n): Set to n
+    ///
+    /// # Returns
+    /// true or false if the account was changed
+    pub async fn account_change_queue_limits(
+        &self,
+        atm: &ATM,
+        profile: &Arc<ATMProfile>,
+        did_hash: &str,
+        send_queue_limit: Option<i32>,
+        receive_queue_limit: Option<i32>,
+    ) -> Result<AccountChangeQueueLimitsResponse, ATMError> {
+        let _span = span!(Level::DEBUG, "account_change_queue_limit");
+
+        async move {
+            debug!(
+                "Changing account ({}) queue_limits to send({:?}) receive({:?}).",
+                did_hash, send_queue_limit, receive_queue_limit
+            );
+
+            let (profile_did, mediator_did) = profile.dids()?;
+
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            let msg = Message::build(
+                Uuid::new_v4().into(),
+                "https://didcomm.org/mediator/1.0/account-management".to_owned(),
+                json!({"account_change_queue_limits": {"did_hash": did_hash, "send_queue_limit": send_queue_limit, "receive_queue_limit": receive_queue_limit}}),
+            )
+            .to(mediator_did.into())
+            .from(profile_did.into())
+            .created_time(now)
+            .expires_time(now + 10)
+            .finalize();
+
+            let msg_id = msg.id.clone();
+
+            // Pack the message
+            let (msg, _) = msg
+                .pack_encrypted(
+                    mediator_did,
+                    Some(profile_did),
+                    Some(profile_did),
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
+                    &PackEncryptedOptions::default(),
+                )
+                .await
+                .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
+
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => {
+                    self._parse_account_change_queue_limit_response(&message)
+                }
+                _ => Err(ATMError::MsgReceiveError(
+                    "No response from mediator".to_owned(),
+                )),
+            }
+        }
+        .instrument(_span)
+        .await
+    }
+
+    /// Parses the response from the mediator for account_change_queue_limit
+    fn _parse_account_change_queue_limit_response(
+        &self,
+        message: &Message,
+    ) -> Result<AccountChangeQueueLimitsResponse, ATMError> {
+        serde_json::from_value(message.body.clone()).map_err(|err| {
+            ATMError::MsgReceiveError(format!(
+                "Mediator Account Change Queue Limit response could not be parsed. Reason: {}",
                 err
             ))
         })

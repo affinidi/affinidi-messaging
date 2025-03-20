@@ -1,3 +1,4 @@
+use affinidi_secrets_resolver::SecretsResolver;
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
@@ -11,22 +12,24 @@ use askar_crypto::{
 use std::str::FromStr;
 
 use crate::{
+    UnpackOptions,
     algorithms::AnonCryptAlg,
     document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jwe,
-    secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
-    UnpackOptions,
 };
 
-pub(crate) async fn _try_unpack_anoncrypt(
+pub(crate) async fn _try_unpack_anoncrypt<T>(
     jwe: &ParsedEnvelope,
-    secrets_resolver: &dyn SecretsResolver,
+    secrets_resolver: &T,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
-) -> Result<Option<ParsedEnvelope>> {
+) -> Result<Option<ParsedEnvelope>>
+where
+    T: SecretsResolver,
+{
     let jwe = match jwe {
         ParsedEnvelope::Jwe(jwe) => jwe,
         _ => return Ok(None),
@@ -57,7 +60,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
     envelope.metadata.encrypted = true;
     envelope.metadata.anonymous_sender = true;
 
-    let to_kids_found = secrets_resolver.find_secrets(&jwe.to_kids).await?;
+    let to_kids_found = secrets_resolver.find_secrets(&jwe.to_kids).await;
 
     if to_kids_found.is_empty() {
         Err(err_msg(
@@ -69,7 +72,7 @@ pub(crate) async fn _try_unpack_anoncrypt(
     let mut payload: Option<Vec<u8>> = None;
 
     for to_kid in to_kids_found {
-        let to_key = secrets_resolver.get_secret(&to_kid).await?.ok_or_else(|| {
+        let to_key = secrets_resolver.get_secret(&to_kid).await.ok_or_else(|| {
             err_msg(
                 ErrorKind::InvalidState,
                 "Recipient secret not found after existence checking",

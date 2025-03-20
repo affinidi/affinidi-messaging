@@ -1,4 +1,4 @@
-use affinidi_did_resolver_cache_sdk::{document::DocumentExt, DIDCacheClient};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, document::DocumentExt};
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
@@ -12,8 +12,8 @@ use askar_crypto::{
 
 use crate::{
     algorithms::AnonCryptAlg,
-    document::{did_or_url, DIDCommVerificationMethodExt},
-    error::{err_msg, ErrorKind, Result, ResultContext},
+    document::{DIDCommVerificationMethodExt, did_or_url},
+    error::{ErrorKind, Result, ResultContext, err_msg},
     jwe,
     utils::crypto::{AsKnownKeyPair, KnownKeyAlg},
 };

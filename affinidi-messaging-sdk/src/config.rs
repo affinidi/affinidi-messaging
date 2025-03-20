@@ -1,37 +1,34 @@
-use crate::{errors::ATMError, secrets::Secret, transports::websockets::ws_handler::WsHandlerMode};
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use crate::{errors::ATMError, transports::websockets::ws_handler::WsHandlerMode};
 use rustls::pki_types::CertificateDer;
 use std::{fs::File, io::BufReader};
 use tracing::error;
 
 /// Configuration for the Affinidi Trusted Messaging (ATM) Service
-/// You need to use the `builder()` method to create a new instance of `Config`
+/// You need to use the `builder()` method to create a new instance of `ATMConfig`
 /// Example:
 /// ```
-/// use affinidi_messaging_sdk::config::Config;
+/// use affinidi_messaging_sdk::config::ATMConfig;
 ///
-/// let config = Config::builder().build();
+/// let config = ATMConfig::builder().build();
 /// ```
 #[derive(Clone)]
-pub struct Config {
+pub struct ATMConfig {
     pub(crate) ssl_certificates: Vec<CertificateDer<'static>>,
     pub(crate) fetch_cache_limit_count: u32,
     pub(crate) fetch_cache_limit_bytes: u64,
-    pub(crate) secrets: Vec<Secret>,
-    pub(crate) did_resolver: Option<DIDCacheClient>,
     pub(crate) ws_handler_mode: WsHandlerMode,
 }
 
-impl Config {
-    /// Returns a builder for `Config`
+impl ATMConfig {
+    /// Returns a builder for `ATMConfig`
     /// Example:
     /// ```
-    /// use affinidi_messaging_sdk::config::Config;
+    /// use affinidi_messaging_sdk::config::ATMConfig;
     ///
-    /// let config = Config::builder().build();
+    /// let config = ATMConfig::builder().build();
     /// ```
-    pub fn builder() -> ConfigBuilder {
-        ConfigBuilder::default()
+    pub fn builder() -> ATMConfigBuilder {
+        ATMConfigBuilder::default()
     }
 
     pub fn get_ssl_certificates(&self) -> &Vec<CertificateDer> {
@@ -39,62 +36,42 @@ impl Config {
     }
 }
 
-/// Builder for `Config`.
+/// Builder for `ATMConfig`.
 /// Example:
 /// ```
-/// use affinidi_messaging_sdk::config::Config;
+/// use affinidi_messaging_sdk::config::ATMConfig;
 ///
-/// // Create a new `Config` with defaults
-/// let config = Config::builder().build();
+/// // Create a new `ATMConfig` with defaults
+/// let config = ATMConfig::builder().build();
 /// ```
-pub struct ConfigBuilder {
+pub struct ATMConfigBuilder {
     ssl_certificates: Vec<String>,
     fetch_cache_limit_count: u32,
     fetch_cache_limit_bytes: u64,
-    secrets: Vec<Secret>,
-    did_resolver: Option<DIDCacheClient>,
     ws_handler_mode: WsHandlerMode,
 }
 
-impl Default for ConfigBuilder {
+impl Default for ATMConfigBuilder {
     fn default() -> Self {
-        ConfigBuilder {
+        ATMConfigBuilder {
             ssl_certificates: vec![],
             fetch_cache_limit_count: 100,
             fetch_cache_limit_bytes: 1024 * 1024 * 10, // Defaults to 10MB Cache
-            secrets: Vec::new(),
-            did_resolver: None,
             ws_handler_mode: WsHandlerMode::Cached,
         }
     }
 }
 
-impl ConfigBuilder {
-    /// Basic starting constructor for `ConfigBuilder`
-    pub fn new() -> ConfigBuilder {
-        ConfigBuilder::default()
+impl ATMConfigBuilder {
+    /// Default starting constructor for `ATMConfigBuilder`
+    pub fn new() -> ATMConfigBuilder {
+        ATMConfigBuilder::default()
     }
 
     /// Add a list of SSL certificates to the configuration
     /// Each certificate should be a file path to a PEM encoded certificate
     pub fn with_ssl_certificates(mut self, ssl_certificates: &mut Vec<String>) -> Self {
         self.ssl_certificates.append(ssl_certificates);
-        self
-    }
-
-    /// Add a secret to the SDK
-    /// This is required to auto-start the websocket connection
-    pub fn with_secret(mut self, secret: Secret) -> Self {
-        self.secrets.push(secret);
-        self
-    }
-
-    /// Add secrets to the SDK
-    /// This is required to auto-start the websocket connection
-    pub fn with_secrets(mut self, secrets: Vec<Secret>) -> Self {
-        for secret in secrets {
-            self.secrets.push(secret);
-        }
         self
     }
 
@@ -112,14 +89,6 @@ impl ConfigBuilder {
         self
     }
 
-    /// Use an external DID resolver for the SDK
-    /// Useful if you want to configure the DID resolver externally.
-    /// Default: ATM SDK will instantiate a local DID resolver
-    pub fn with_external_did_resolver(mut self, did_resolver: &DIDCacheClient) -> Self {
-        self.did_resolver = Some(did_resolver.clone());
-        self
-    }
-
     /// Set the mode for the websocket handler
     /// Default: Cached
     /// Cached: Messages are cached and sent to the SDK when requested (using the message_pickup protocol)
@@ -129,7 +98,7 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Config, ATMError> {
+    pub fn build(self) -> Result<ATMConfig, ATMError> {
         // Process any custom SSL certificates
         let mut certs = vec![];
         let mut failed_certs = false;
@@ -158,12 +127,10 @@ impl ConfigBuilder {
             ));
         }
 
-        Ok(Config {
+        Ok(ATMConfig {
             ssl_certificates: certs,
             fetch_cache_limit_count: self.fetch_cache_limit_count,
             fetch_cache_limit_bytes: self.fetch_cache_limit_bytes,
-            secrets: self.secrets,
-            did_resolver: self.did_resolver,
             ws_handler_mode: self.ws_handler_mode,
         })
     }

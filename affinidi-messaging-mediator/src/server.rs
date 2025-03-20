@@ -1,19 +1,19 @@
 use crate::{
+    SharedData,
     common::config::init,
     database::Database,
     handlers::{application_routes, health_checker_handler},
     tasks::{statistics::statistics, websocket_streaming::StreamingTask},
-    SharedData,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_mediator_common::database::DatabaseHandler;
 use affinidi_messaging_mediator_processors::message_expiry_cleanup::processor::MessageExpiryCleanupProcessor;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use axum_server::tls_rustls::RustlsConfig;
 use std::{env, net::SocketAddr};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::{self, TraceLayer};
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 pub async fn start() {
     let ansi = env::var("LOCAL").is_ok();

@@ -1,24 +1,23 @@
 //! Extension trait for SSI Document
 //! Contains various helper functions to work with DIDComm
 
-use std::io::Cursor;
-
 use crate::{
-    error::{err_msg, Error, ErrorKind, Result, ResultExt, ToResult},
+    error::{Error, ErrorKind, Result, ResultExt, ToResult, err_msg},
     jwk::FromJwkValue,
-    secrets::{Secret, SecretMaterial, SecretType},
     utils::crypto::{AsKnownKeyPair, AsKnownKeyPairSecret, KnownKeyAlg, KnownKeyPair},
 };
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use askar_crypto::{
     alg::{ed25519::Ed25519KeyPair, k256::K256KeyPair, p256::P256KeyPair, x25519::X25519KeyPair},
     repr::{KeyPublicBytes, KeySecretBytes},
 };
 use base64::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use ssi::{
-    dids::document::DIDVerificationMethod, jwk::Params, multicodec::MultiEncodedBuf,
-    security::MultibaseBuf, JWK,
+    JWK, dids::document::DIDVerificationMethod, jwk::Params, multicodec::MultiEncodedBuf,
+    security::MultibaseBuf,
 };
+use std::io::Cursor;
 use tracing::warn;
 use varint::{VarintRead, VarintWrite};
 
@@ -87,6 +86,21 @@ impl DIDCommVerificationMethodExt for DIDVerificationMethod {
                     }
                 } else {
                     warn!("JsonWebKey2020 missing publicKeyJwk");
+                    None
+                }
+            }
+
+            "EcdsaSecp256k1VerificationKey2019" => {
+                if let Some(key) = self.properties.get("publicKeyJwk") {
+                    match serde_json::from_value(key.clone()) {
+                        Ok(jwk) => Some(jwk),
+                        Err(_) => {
+                            warn!("Failed to parse JWK from {} ({})", self.type_, key);
+                            None
+                        }
+                    }
+                } else {
+                    warn!("{} missing publicKeyJwk", self.type_);
                     None
                 }
             }
@@ -165,7 +179,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::JsonWebKey2020,
                 SecretMaterial::JWK {
-                    private_key_jwk: ref value,
+                    private_key_jwk: value,
                 },
             ) => match (value["kty"].as_str(), value["crv"].as_str()) {
                 (Some(kty), Some(crv)) if kty == "EC" && crv == "P-256" => KnownKeyAlg::P256,
@@ -207,7 +221,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::JsonWebKey2020,
                 SecretMaterial::JWK {
-                    private_key_jwk: ref value,
+                    private_key_jwk: value,
                 },
             ) => match (value["kty"].as_str(), value["crv"].as_str()) {
                 (Some(kty), Some(crv)) if kty == "EC" && crv == "P-256" => {
@@ -239,7 +253,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::X25519KeyAgreementKey2019,
                 SecretMaterial::Base58 {
-                    private_key_base58: ref value,
+                    private_key_base58: value,
                 },
             ) => {
                 let decoded_value = bs58::decode(value)
@@ -280,7 +294,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::Ed25519VerificationKey2018,
                 SecretMaterial::Base58 {
-                    private_key_base58: ref value,
+                    private_key_base58: value,
                 },
             ) => {
                 let decoded_value = bs58::decode(value)
@@ -306,7 +320,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::X25519KeyAgreementKey2020,
                 SecretMaterial::Multibase {
-                    private_key_multibase: ref value,
+                    private_key_multibase: value,
                 },
             ) => {
                 if !value.starts_with('z') {
@@ -364,7 +378,7 @@ impl AsKnownKeyPairSecret for Secret {
             (
                 SecretType::Ed25519VerificationKey2020,
                 SecretMaterial::Multibase {
-                    private_key_multibase: ref value,
+                    private_key_multibase: value,
                 },
             ) => {
                 if !value.starts_with('z') {

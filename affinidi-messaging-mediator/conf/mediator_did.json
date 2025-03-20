@@ -81,6 +81,11 @@
           ]
         }
       ]
+    },
+    {
+      "id": "did:web:localhost%3A7037:mediator:v1:.well-known#auth",
+      "type": "Authentication",
+      "serviceEndpoint": "http://127.0.0.1:7037/mediator/v1/authenticate"
     }
   ]
 }

@@ -1,4 +1,4 @@
-use super::{actions::Action, State};
+use super::{State, actions::Action};
 use crate::{
     state_store::{
         actions::{
@@ -10,10 +10,11 @@ use crate::{
     },
     termination::{Interrupted, Terminator},
 };
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{
-    config::ConfigBuilder, transports::websockets::ws_handler::WsHandlerMode, ATM,
+    ATM, config::ATMConfigBuilder, profiles::ATMProfile,
+    transports::websockets::ws_handler::WsHandlerMode,
 };
+use affinidi_tdk::{common::TDKSharedState, secrets_resolver::SecretsResolver};
 use std::time::Duration;
 use tokio::sync::{
     broadcast,
@@ -39,14 +40,14 @@ impl StateStore {
         mut terminator: Terminator,
         mut action_rx: UnboundedReceiver<Action>,
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
-        did_resolver: DIDCacheClient,
+        tdk: TDKSharedState,
     ) -> anyhow::Result<Interrupted> {
         // Setup the initial state
         let atm = match ATM::new(
-            ConfigBuilder::default()
-                .with_external_did_resolver(&did_resolver)
+            ATMConfigBuilder::default()
                 .with_ws_handler_mode(WsHandlerMode::DirectChannel)
                 .build()?,
+            tdk.clone(),
         )
         .await
         {
@@ -61,6 +62,8 @@ impl StateStore {
         let mut state = State::read_from_file("config.json").unwrap_or_default();
         state.initialization = true;
 
+        tdk.secrets_resolver.insert_vec(&state.secrets).await;
+
         if !state.chat_list.chats.is_empty() {
             // Set the first chat as the active chat
             state.chat_list.active_chat = state.chat_list.chats.keys().next().cloned();
@@ -71,7 +74,7 @@ impl StateStore {
 
         info!("Activating ({}) profiles", state.chat_list.chats.len());
         for chat in state.chat_list.chats.values() {
-            let profile = match chat.our_profile.into_profile(&atm).await {
+            let profile = match ATMProfile::from_tdk_profile(&atm, &chat.our_profile).await {
                 Ok(profile) => profile,
                 Err(e) => {
                     warn!("Failed to load profile for chat {}: {}", chat.name, e);
@@ -92,12 +95,13 @@ impl StateStore {
 
         state.initialization = false;
 
-        let mut inbound_message_channel = match atm.get_inbound_channel() { Some(channel) => {
-            channel
-        } _ => {
-            warn!("Failed to get inbound channel");
-            return Ok(Interrupted::SystemError);
-        }};
+        let mut inbound_message_channel = match atm.get_inbound_channel() {
+            Some(channel) => channel,
+            _ => {
+                warn!("Failed to get inbound channel");
+                return Ok(Interrupted::SystemError);
+            }
+        };
 
         let mut ticker = tokio::time::interval(Duration::from_secs(1));
 
@@ -153,10 +157,10 @@ impl StateStore {
                         state.settings.show_settings_popup = !state.settings.show_settings_popup;
                     },
                     Action::SettingsCheck { settings } => {
-                        settings.check(&mut state, &did_resolver).await;
+                        settings.check(&mut state, &tdk.did_resolver).await;
                     }
                     Action::SettingsUpdate { settings } => {
-                        if settings.update(&mut state, &did_resolver).await {
+                        if settings.update(&mut state, &tdk.did_resolver).await {
                             state.settings.show_settings_popup = false;
                         }
                     }

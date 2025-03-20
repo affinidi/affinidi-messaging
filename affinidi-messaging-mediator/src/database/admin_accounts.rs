@@ -5,8 +5,8 @@ use affinidi_messaging_sdk::protocols::mediator::{
     acls::MediatorACLSet,
     administration::{AdminAccount, MediatorAdminList},
 };
-use redis::{from_redis_value, Value};
-use tracing::{debug, info, span, Instrument, Level};
+use redis::{Value, from_redis_value};
+use tracing::{Instrument, Level, debug, info, span};
 
 use super::Database;
 
@@ -23,7 +23,7 @@ impl Database {
         // Check if the admin account already exists
         if !self.account_exists(admin_did_hash).await? {
             debug!("Admin account doesn't exist, creating: {}", admin_did_hash);
-            self.account_add(admin_did_hash, acls).await?;
+            self.account_add(admin_did_hash, acls, None).await?;
         }
         let mut con = self.0.get_async_connection().await?;
 

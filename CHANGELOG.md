@@ -5,6 +5,60 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
+## 20th March 2025 (0.10.0)
+
+### All (0.10.0)
+
+* Rust 2024 Edition is now enabled for all crates
+  * affinidi-did-resolver-cache updated to 0.3.x
+* Major refactoring of crate namespace and linking into the Affinidi Trust Development Kit (TDK) Libraries
+  * Secrets Resolver now part of TDK Crate
+  * DID Authentication added to TDK, stripped from Messaging SDK
+  
+### SDK (0.10.0)
+
+* FIX/CHANGE: Tungstenite WebSocket replaced with Web-Socket crate
+  * Lower-level implementation of WebSocket allows for more graceful handling of error conditions.
+  * Addresses the problem of a device going to sleep and missing Close()
+* DIDComm Access Lists enabled
+  * access_list_list() - Lists DIDs that are allowed/denied for a given DID
+  * access_list_add() - Add one or more DIDs to the access list for a given DID
+  * access_list_remove() - Remove one or more DIDs from the access list for a given DID
+  * access_list_get() - Searches for one or more DIDs from the access list for a given DID
+  * access_list_clear() - Resets the Access List to empty for a given DID
+* ACL Flag added SELF_MANAGE_QUEUE_LIMIT flag so a DID can change their queue limits
+
+### Mediator (0.10.0)
+
+* FEATURE: Binary WebSocket messages are now converted and handled.
+  * Text and Binary Messages supported
+* AccessList functions (List, Add, Remove, Get, Clear) added (matches SDK)
+  * Database routines added
+  * Protocol handling implemented
+* Database upgrades will now automatically trigger when a new version of the mediator is started
+  * queue_limit ACL Flag will auto add if part of the default ACL set
+* JSON fields changed from UpperCamelCase to snake_case
+  * Mediator Administration Protocol
+  * Mediator Account Management
+* Queue limits can now be set per DID between a soft and hard limit, and separate for send/receive queues
+  * Admin accounts can override and go above the hard limit as needed
+  * New ACL Flag enabled for can change queue_limit (SELF_MANAGE_(SEND|RECEIVE)_QUEUE_LIMIT)
+* Ability to set an ephemeral header on messages that will not store the message
+  * Instead, if the client is live-streaming it will send only via the live stream
+
+### DIDComm Library (0.10.0)
+
+* Verification Method Type added
+  * EcdsaSecp256k1VerificationKey2019
+
+### Helpers (0.10.0)
+
+* mediator_administration
+  * access list management added
+  * Pagination for Account List and Access List improved
+  * Queue Statistics shown in Account Info
+  * Can modify queue limits
+
 ## 13th February 2025 (0.9.7)
 
 ### All (0.9.7)

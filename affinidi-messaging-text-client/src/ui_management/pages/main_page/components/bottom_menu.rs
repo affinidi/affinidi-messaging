@@ -1,8 +1,8 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Style, Stylize},
     text::{self, Span},
-    Frame,
 };
 
 use crate::ui_management::components::ComponentRender;

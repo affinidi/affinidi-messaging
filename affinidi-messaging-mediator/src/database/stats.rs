@@ -2,9 +2,9 @@ use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use itertools::Itertools;
 use num_format::{Locale, ToFormattedString};
-use redis::{from_redis_value, Value};
+use redis::{Value, from_redis_value};
 use std::fmt::{self, Display, Formatter};
-use tracing::{debug, event, Level};
+use tracing::{Level, debug, event};
 
 /// Statistics for the mediator
 #[derive(Default, Debug)]
@@ -70,15 +70,6 @@ impl MetadataStats {
             oob_invites_claimed: self.oob_invites_claimed - previous.oob_invites_claimed,
         }
     }
-}
-
-/// Statistics for a given DID
-#[derive(Default, Debug)]
-pub struct DidStats {
-    pub send_queue_bytes: u64,
-    pub send_queue_count: u64,
-    pub receive_queue_bytes: u64,
-    pub receive_queue_count: u64,
 }
 
 impl Database {
@@ -203,45 +194,6 @@ impl Database {
             })?;
 
         Ok(())
-    }
-
-    /// Get stats relating to a DID
-    /// - `did_hash` - The hash of the DID to get stats for
-    pub async fn get_did_stats(&self, did_hash: &str) -> Result<DidStats, MediatorError> {
-        let mut con = self.0.get_async_connection().await?;
-
-        let result: Value = deadpool_redis::redis::cmd("HGETALL")
-            .arg(["DID", did_hash].join(":"))
-            .query_async(&mut con)
-            .await
-            .map_err(|err| {
-                MediatorError::DatabaseError(
-                    "INTERNAL".into(),
-                    format!(
-                        "Couldn't retrieve DID ({}) stats. Reason: {}",
-                        did_hash, err
-                    ),
-                )
-            })?;
-
-        let mut stats = DidStats::default();
-        let result: Vec<String> = from_redis_value(&result).map_err(|e| {
-            MediatorError::DatabaseError(
-                "NA".into(),
-                format!("Couldn't parse GLOBAL metadata from database: {}", e),
-            )
-        })?;
-
-        for (k, v) in result.iter().tuples() {
-            match k.as_str() {
-                "SEND_QUEUE_BYTES" => stats.send_queue_bytes = v.parse().unwrap_or(0),
-                "SEND_QUEUE_COUNT" => stats.send_queue_count = v.parse().unwrap_or(0),
-                "RECEIVE_QUEUE_BYTES" => stats.receive_queue_bytes = v.parse().unwrap_or(0),
-                "RECEIVE_QUEUE_COUNT" => stats.receive_queue_count = v.parse().unwrap_or(0),
-                _ => {}
-            }
-        }
-        Ok(stats)
     }
 
     /// Forward Task Queue length

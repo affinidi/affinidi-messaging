@@ -1,7 +1,6 @@
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use lazy_static::lazy_static;
 use serde_json::json;
-
-use crate::affinidi_messaging_didcomm::secrets::{Secret, SecretMaterial, SecretType};
 
 lazy_static! {
     pub static ref MEDIATOR3_SECRET_KEY_AGREEMENT_KEY_X25519_1: Secret = Secret {

@@ -1,19 +1,19 @@
 use super::GetMessagesRequest;
 use crate::{
+    ATM,
     errors::ATMError,
     messages::{GetMessagesResponse, SuccessResponse},
-    profiles::Profile,
-    ATM,
+    profiles::ATMProfile,
 };
 use std::sync::Arc;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Returns a list of messages that are stored in the ATM
     /// - messages : List of message IDs to retrieve
     pub async fn get_messages(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         messages: &GetMessagesRequest,
     ) -> Result<GetMessagesResponse, ATMError> {
         let _span = span!(Level::DEBUG, "get_messages");
@@ -39,6 +39,7 @@ impl ATM {
 
             let res = self
                 .inner
+                .tdk_common
                 .client
                 .post([&mediator_url, "/outbound"].concat())
                 .header("Content-Type", "application/json")

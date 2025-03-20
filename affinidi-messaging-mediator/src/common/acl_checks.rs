@@ -4,7 +4,7 @@
  *
  */
 
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::acls::MediatorACLSet;
 use tracing::debug;

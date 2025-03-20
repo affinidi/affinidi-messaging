@@ -2,8 +2,8 @@ use super::Database;
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::MessageListElement;
 use itertools::Itertools;
-use redis::{from_redis_value, Value};
-use tracing::{debug, event, span, Instrument, Level};
+use redis::{Value, from_redis_value};
+use tracing::{Instrument, Level, debug, event, span};
 
 impl Database {
     /// Get a message from the database

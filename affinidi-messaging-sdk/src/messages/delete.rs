@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 use crate::{
-    delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
-    profiles::Profile, ATM,
+    ATM, delete_handler::DeletionHandlerCommands, errors::ATMError, messages::SuccessResponse,
+    profiles::ATMProfile,
 };
 
 use super::{DeleteMessageRequest, DeleteMessageResponse};
@@ -17,9 +17,10 @@ impl ATM {
     /// You can choose to use `delete_message_direct` for a more immediate deletion
     pub async fn delete_message_background(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message_id: &str,
     ) -> Result<(), ATMError> {
+        debug!("Deleting message in the background: {}", message_id);
         self.inner
             .deletion_handler_send_stream
             .send(DeletionHandlerCommands::DeleteMessage(
@@ -41,7 +42,7 @@ impl ATM {
     /// - messages: List of message_ids to delete
     pub async fn delete_messages_direct(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         messages: &DeleteMessageRequest,
     ) -> Result<DeleteMessageResponse, ATMError> {
         let _span = span!(Level::DEBUG, "delete_messages");
@@ -71,7 +72,7 @@ impl ATM {
 
         let res = self
             .inner
-            .client
+            .tdk_common.client
             .delete([&mediator_url, "/delete"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))

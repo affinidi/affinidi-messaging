@@ -2,7 +2,7 @@ use crate::{
     ATM,
     errors::ATMError,
     messages::{GenericDataStruct, GetMessagesRequest, known::MessageType},
-    profiles::Profile,
+    profiles::ATMProfile,
     protocols::{message_pickup::MessagePickup, routing::Routing},
 };
 use affinidi_messaging_didcomm::Message;
@@ -65,7 +65,7 @@ impl ATM {
     ///
     pub async fn send_message(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message: &str,
         msg_id: &str,
         wait_for_response: bool,
@@ -174,7 +174,7 @@ impl ATM {
     #[allow(clippy::too_many_arguments)]
     pub async fn forward_and_send_message(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message: &str,
         msg_id: Option<&str>,
         target_did: &str,
@@ -219,7 +219,7 @@ impl ATM {
     /// - return_response: Whether to return the response from the API
     pub(crate) async fn send_didcomm_message(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         message: &str,
         return_response: bool,
     ) -> Result<SendMessageResponse, ATMError> {
@@ -240,6 +240,7 @@ impl ATM {
 
         let res = self
             .inner
+            .tdk_common
             .client
             .post([&mediator_url, "/inbound"].concat())
             .header("Content-Type", "application/json")

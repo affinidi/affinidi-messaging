@@ -1,102 +1,50 @@
 /*!
-Profiles modules contains the implementation of the Profile struct and its methods.
-
-For Profile network connections:
-1. REST based API is stateless
-2. WebSockets are managed via the WS_Handler task
+ * Profiles modules contains the implementation of the Profile struct and its methods.
+ *
+ * For Profile network connections:
+ * 1. REST based API is stateless
+ * 2. WebSockets are managed via the WS_Handler task
 */
 
 use crate::{
+    ATM,
     errors::ATMError,
     messages::AuthorizationResponse,
     protocols::message_pickup::MessagePickup,
-    secrets::Secret,
     transports::websockets::{
         ws_connection::WsConnectionCommands,
         ws_handler::{WsHandlerCommands, WsHandlerMode},
     },
-    ATM,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use serde::{Deserialize, Serialize};
+use affinidi_tdk_common::profiles::TDKProfile;
+use ahash::AHashMap as HashMap;
 use ssi::dids::{
-    document::{service::Endpoint, Service},
     Document,
+    document::{Service, service::Endpoint},
 };
 use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
 use tokio::sync::{
-    mpsc::{Receiver, Sender},
     Mutex, RwLock,
+    mpsc::{Receiver, Sender},
 };
 use tracing::debug;
 
-/// ProfileConfig is a helper struct wrapper that allows for saving/reading the Profile from config files
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct ProfileConfig {
-    pub alias: String,
-    pub did: String,
-    pub mediator: Option<String>,
-    pub secrets: Vec<Secret>,
-}
-
-impl ProfileConfig {
-    /// Converts a Profile into a ProfileConfig
-    pub async fn from(profile: &Profile) -> Self {
-        ProfileConfig {
-            alias: profile.inner.alias.clone(),
-            did: profile.inner.did.clone(),
-            mediator: profile
-                .inner
-                .mediator
-                .as_ref()
-                .as_ref()
-                .map(|m| m.did.clone()),
-            secrets: profile.inner.secrets.lock().await.clone(),
-        }
-    }
-
-    /// Helper function to convert ATM Profiles into a vec<ProfileConfig>
-    pub async fn from_profiles(profiles: &Profiles) -> Vec<Self> {
-        let profiles = profiles.0.values().collect::<Vec<&Arc<Profile>>>();
-        let mut profiles_config = Vec::new();
-
-        for profile in profiles {
-            profiles_config.push(ProfileConfig::from(profile).await);
-        }
-
-        profiles_config
-    }
-
-    /// Convert ProfileConfig into a Profile
-    pub async fn into_profile(&self, atm: &ATM) -> Result<Profile, ATMError> {
-        Profile::new(
-            atm,
-            Some(self.alias.clone()),
-            self.did.clone(),
-            self.mediator.clone(),
-            self.secrets.clone(),
-        )
-        .await
-    }
-}
-
-/// Wrapper for ProfileInner that lowers the cost of cloning the Profile
+/// Wrapper for ATMProfileInner that lowers the cost of cloning the Profile
 #[derive(Clone, Debug)]
-pub struct Profile {
-    pub inner: Arc<ProfileInner>,
+pub struct ATMProfile {
+    pub inner: Arc<ATMProfileInner>,
 }
 
-/// Working struct of a Profile
+/// Working struct of a ATM Profile
 /// This is used within ATM and contains everything to manage a Profile
 #[derive(Debug)]
-pub struct ProfileInner {
+pub struct ATMProfileInner {
     pub did: String,
     pub alias: String,
-    pub secrets: Mutex<Vec<Secret>>,
     pub mediator: Arc<Option<Mediator>>,
     pub(crate) authorization: Mutex<Option<AuthorizationResponse>>,
     pub(crate) authenticated: AtomicBool,
@@ -106,8 +54,8 @@ pub struct ProfileInner {
     pub(crate) channel_rx: Mutex<Receiver<WsHandlerCommands>>,
 }
 
-impl Profile {
-    /// Creates a new Profile
+impl ATMProfile {
+    /// Creates a new ATM Profile
     /// If no alias is provided, the DID is used as the alias
     /// If no mediator is provided, the mediator field will default the Default Mediator if provided
     /// If no mediator and no default mediator is provided, the mediator field will be None (which is unlikely to be useful)
@@ -116,7 +64,6 @@ impl Profile {
         alias: Option<String>,
         did: String,
         mediator: Option<String>,
-        secrets: Vec<Secret>,
     ) -> Result<Self, ATMError> {
         let alias = if let Some(alias) = alias {
             alias.clone()
@@ -134,11 +81,10 @@ impl Profile {
 
         let (tx, rx) = tokio::sync::mpsc::channel(32);
 
-        let profile = Profile {
-            inner: Arc::new(ProfileInner {
+        let profile = ATMProfile {
+            inner: Arc::new(ATMProfileInner {
                 did,
                 alias,
-                secrets: Mutex::new(secrets),
                 mediator: Arc::new(mediator),
                 authorization: Mutex::new(None),
                 authenticated: AtomicBool::new(false),
@@ -148,6 +94,27 @@ impl Profile {
         };
 
         Ok(profile)
+    }
+
+    /// Convert TDK Profile to an ATM Profile
+    pub async fn from_tdk_profile(atm: &ATM, tdk_profile: &TDKProfile) -> Result<Self, ATMError> {
+        ATMProfile::new(
+            atm,
+            Some(tdk_profile.alias.clone()),
+            tdk_profile.did.clone(),
+            tdk_profile.mediator.clone(),
+        )
+        .await
+    }
+
+    /// Converts an ATM  Profile into a TDK Profile
+    pub fn to_tdk_profile(&self) -> TDKProfile {
+        TDKProfile {
+            alias: self.inner.alias.clone(),
+            did: self.inner.did.clone(),
+            mediator: self.inner.mediator.as_ref().as_ref().map(|m| m.did.clone()),
+            secrets: Vec::new(),
+        }
     }
 
     /// Returns the DID for the Profile and Associated Mediator
@@ -165,11 +132,10 @@ impl Profile {
 
     /// Return the REST endpoint for this profile if it exists
     pub fn get_mediator_rest_endpoint(&self) -> Option<String> {
-        match &*self.inner.mediator { Some(mediator) => {
-            mediator.rest_endpoint.clone()
-        } _ => {
-            None
-        }}
+        match &*self.inner.mediator {
+            Some(mediator) => mediator.rest_endpoint.clone(),
+            _ => None,
+        }
     }
 
     /// Sets up a direct channel to a provided MPSC Receiver
@@ -178,48 +144,50 @@ impl Profile {
         &self,
         channel_tx: Sender<Box<(Message, UnpackMetadata)>>,
     ) -> Result<(), ATMError> {
-        match &*self.inner.mediator { Some(mediator) => {
-            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
-                channel
-                    .send(WsConnectionCommands::EnableDirectChannel(channel_tx))
-                    .await
-                    .map_err(|err| {
-                        ATMError::TransportError(format!(
-                            "Could not send websocket message: {:?}",
-                            err
-                        ))
-                    })?;
-            }
+        match &*self.inner.mediator {
+            Some(mediator) => {
+                if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                    channel
+                        .send(WsConnectionCommands::EnableDirectChannel(channel_tx))
+                        .await
+                        .map_err(|err| {
+                            ATMError::TransportError(format!(
+                                "Could not send websocket message: {:?}",
+                                err
+                            ))
+                        })?;
+                }
 
-            Ok(())
-        } _ => {
-            Err(ATMError::TransportError(
+                Ok(())
+            }
+            _ => Err(ATMError::TransportError(
                 "There is no mediator configured for this profile".to_string(),
-            ))
-        }}
+            )),
+        }
     }
 
     /// Disables the direct channel to the provided MPSC Receiver
     pub async fn disable_direct_channel(&self) -> Result<(), ATMError> {
-        match &*self.inner.mediator { Some(mediator) => {
-            if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
-                channel
-                    .send(WsConnectionCommands::DisableDirectChannel)
-                    .await
-                    .map_err(|err| {
-                        ATMError::TransportError(format!(
-                            "Could not send websocket message: {:?}",
-                            err
-                        ))
-                    })?;
-            }
+        match &*self.inner.mediator {
+            Some(mediator) => {
+                if let Some(channel) = &*mediator.ws_channel_tx.lock().await {
+                    channel
+                        .send(WsConnectionCommands::DisableDirectChannel)
+                        .await
+                        .map_err(|err| {
+                            ATMError::TransportError(format!(
+                                "Could not send websocket message: {:?}",
+                                err
+                            ))
+                        })?;
+                }
 
-            Ok(())
-        } _ => {
-            Err(ATMError::TransportError(
+                Ok(())
+            }
+            _ => Err(ATMError::TransportError(
                 "There is no mediator configured for this profile".to_string(),
-            ))
-        }}
+            )),
+        }
     }
 }
 
@@ -234,7 +202,7 @@ pub struct Mediator {
 
 impl Mediator {
     pub(crate) async fn new(atm: &ATM, did: String) -> Result<Self, ATMError> {
-        let mediator_doc = match atm.inner.did_resolver.resolve(&did).await {
+        let mediator_doc = match atm.inner.tdk_common.did_resolver.resolve(&did).await {
             Ok(response) => response.doc,
             Err(err) => {
                 return Err(ATMError::DIDError(format!(
@@ -318,12 +286,12 @@ impl Mediator {
 /// Key is the alias of the profile
 /// If no alias is provided, the DID is used as the key
 #[derive(Default)]
-pub struct Profiles(pub HashMap<String, Arc<Profile>>);
+pub struct Profiles(pub HashMap<String, Arc<ATMProfile>>);
 
 impl Profiles {
     /// Inserts a new profile into the ATM SDK profiles HashMap
     /// Returns the thread-safe wrapped profile
-    pub fn insert(&mut self, profile: Profile) -> Arc<Profile> {
+    pub fn insert(&mut self, profile: ATMProfile) -> Arc<ATMProfile> {
         let _key = profile.inner.alias.clone();
         let _profile = Arc::new(profile);
         self.0.insert(_key, _profile.clone());
@@ -331,7 +299,7 @@ impl Profiles {
         _profile
     }
 
-    pub fn get(&self, key: &str) -> Option<Arc<Profile>> {
+    pub fn get(&self, key: &str) -> Option<Arc<ATMProfile>> {
         self.0.get(key).cloned()
     }
 
@@ -344,7 +312,7 @@ impl Profiles {
     }
 
     /// Searches through the profiles to find a profile with the given DID
-    pub fn find_by_did(&self, did: &str) -> Option<Arc<Profile>> {
+    pub fn find_by_did(&self, did: &str) -> Option<Arc<ATMProfile>> {
         for profile in self.0.values() {
             if profile.inner.did == did {
                 return Some(profile.clone());
@@ -367,17 +335,11 @@ impl ATM {
     /// NOTE:
     pub async fn profile_add(
         &self,
-        profile: &Profile,
+        profile: &ATMProfile,
         live_stream: bool,
-    ) -> Result<Arc<Profile>, ATMError> {
+    ) -> Result<Arc<ATMProfile>, ATMError> {
         let _profile = self.inner.profiles.write().await.insert(profile.clone());
         debug!("Profile({}): Added to profiles", _profile.inner.alias);
-
-        // Add the profile secrets to Secrets Manager
-        {
-            self.add_secrets(&*profile.inner.secrets.lock().await).await;
-            debug!("Profile({}): Secrets added", _profile.inner.alias);
-        }
 
         if live_stream {
             // Grab a copy of the wrapped Profile
@@ -392,25 +354,29 @@ impl ATM {
     ///
     /// Returns true if the profile was removed
     pub async fn profile_remove(&self, profile: &str) -> Result<bool, ATMError> {
-        match self.inner.profiles.write().await.0.remove(profile) { Some(profile) => {
-            // Send a signal to the WsHandler to Remove this Profile
-            let _ = self
-                .inner
-                .ws_handler_send_stream
-                .send(WsHandlerCommands::Deactivate(profile.clone()))
-                .await;
+        match self.inner.profiles.write().await.0.remove(profile) {
+            Some(profile) => {
+                // Send a signal to the WsHandler to Remove this Profile
+                let _ = self
+                    .inner
+                    .ws_handler_send_stream
+                    .send(WsHandlerCommands::Deactivate(profile.clone()))
+                    .await;
 
-            debug!("Profile({}): Removed from profiles", &profile.inner.alias);
-            Ok(true)
-        } _ => {
-            Ok(false)
-        }}
+                debug!("Profile({}): Removed from profiles", &profile.inner.alias);
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
     }
 
     /// Will create a websocket connection for the profile if one doesn't already exist
     /// Will return Ok() if a connection already exists, or if it successfully started a new connection
     /// Automatically starts live_streaming
-    pub async fn profile_enable_websocket(&self, profile: &Arc<Profile>) -> Result<(), ATMError> {
+    pub async fn profile_enable_websocket(
+        &self,
+        profile: &Arc<ATMProfile>,
+    ) -> Result<(), ATMError> {
         let mediator = {
             let Some(mediator) = &*profile.inner.mediator else {
                 return Err(ATMError::ConfigError(
@@ -458,7 +424,7 @@ impl ATM {
                         return Err(ATMError::TransportError(format!(
                             "Profile({}): Couldn't activate the profile",
                             profile.inner.alias
-                        )))
+                        )));
                     }
                 }
             }
@@ -466,7 +432,7 @@ impl ATM {
                 return Err(ATMError::TransportError(format!(
                     "Profile({}): Couldn't send Activate command to WS_Handler. Reason: {}",
                     profile.inner.alias, err
-                )))
+                )));
             }
         };
 

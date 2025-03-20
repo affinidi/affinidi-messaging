@@ -1,17 +1,18 @@
 use std::time::SystemTime;
 
 use crate::{
-    database::session::Session,
-    messages::{store::store_forwarded_message, ProcessMessageResponse, WrapperType},
     SharedData,
+    database::session::Session,
+    messages::{ProcessMessageResponse, WrapperType, store::store_forwarded_message},
 };
 use affinidi_messaging_didcomm::{AttachmentData, Message};
 use affinidi_messaging_mediator_common::errors::MediatorError;
+use affinidi_messaging_sdk::protocols::mediator::{accounts::Account, acls::MediatorACLSet};
 use base64::prelude::*;
 use serde::Deserialize;
 use sha256::digest;
-use ssi::dids::{document::service::Endpoint, Document};
-use tracing::{debug, span, warn, Instrument};
+use ssi::dids::{Document, document::service::Endpoint};
+use tracing::{Instrument, debug, span, warn};
 
 // Reads the body of an incoming forward message
 #[derive(Default, Deserialize)]
@@ -39,7 +40,7 @@ pub(crate) async fn process(
                         return Err(MediatorError::RequestDataError(
                             session.session_id.clone(),
                             "Message missing valid 'next' field".into(),
-                        ))
+                        ));
                     }
                 }
             } else {
@@ -51,15 +52,25 @@ pub(crate) async fn process(
         let next_did_hash = sha256::digest(next.as_bytes());
 
         // ****************************************************
-        // Check if the next hop is allowed to receive forwarded messages
-        let next_acls = match state.database.get_did_acl(&next_did_hash).await? {
-            Some(next_acls) => next_acls,
-            _ => {
-                // DID is not known, so use default ACL
-                state.config.security.global_acl_default.clone()
+        // Get the next account if it exists
+        let next_account = match state.database.account_get(&next_did_hash).await {
+            Ok(Some(next_account)) => next_account,
+            Ok(None) => Account {
+                did_hash: next_did_hash.clone(),
+                acls: state.config.security.global_acl_default.to_u64(),
+                ..Default::default()
+            },
+            Err(e) => {
+                return Err(MediatorError::DatabaseError(
+                    session.session_id.clone(),
+                    format!("Error getting next account: {}", e),
+                ));
             }
         };
 
+        // ****************************************************
+        // Check if the next hop is allowed to receive forwarded messages
+        let next_acls = MediatorACLSet::from_u64(next_account.acls);
         if !next_acls.get_receive_forwarded().0 {
             return Err(MediatorError::ACLDenied(format!(
                 "Next DID({}) is blocked from receiving forwarded messages",
@@ -92,33 +103,49 @@ pub(crate) async fn process(
         // Determine who the from did is
         // If message is anonymous, then use the session DID
 
-        if let Some(from) = &msg.from {
-            let from_acls = match state.database.get_did_acl(&digest(from.clone())).await? {
-                Some(from_acls) => from_acls,
-                _ => {
-                    // DID is not known, so use default ACL
-                    state.config.security.global_acl_default.clone()
+        let from_account = if let Some(from) = &msg.from {
+            let from_account = match state.database.account_get(&digest(from.as_str())).await {
+                Ok(Some(from_account)) => from_account,
+                Ok(None) => Account {
+                    did_hash: digest(from.as_str()),
+                    acls: state.config.security.global_acl_default.to_u64(),
+                    ..Default::default()
+                },
+                Err(e) => {
+                    return Err(MediatorError::DatabaseError(
+                        session.session_id.clone(),
+                        format!("Error getting from account: {}", e),
+                    ));
                 }
             };
+            let from_acls = MediatorACLSet::from_u64(from_account.acls);
 
             if !from_acls.get_send_forwarded().0 {
                 return Err(MediatorError::ACLDenied(
                     "DID is blocked from sending forwarded messages".into(),
                 ));
             }
+
+            from_account
         } else if !session.acls.get_send_forwarded().0 {
             return Err(MediatorError::ACLDenied(
                 "DID is blocked from sending forwarding messages".into(),
             ));
-        }
+        } else {
+            Account {
+                acls: state.config.security.global_acl_default.to_u64(),
+                ..Default::default()
+            }
+        };
 
         // ****************************************************
 
-        // forwarded messages are typically anonymous, so we don't know the sender
-        // Hence we will check against the session DID for sending checks
-        let from_stats = state.database.get_did_stats(&session.did_hash).await?;
-        if from_stats.send_queue_count as usize + attachments.len()
-            >= state.config.limits.queued_messages
+        // Check against the limits
+        let send_limit = from_account
+            .queue_send_limit
+            .unwrap_or(state.config.limits.queued_send_messages_soft);
+        if send_limit != -1
+            && from_account.send_queue_count + attachments.len() as u32 >= send_limit as u32
         {
             warn!(
                 "Sender DID ({}) has too many messages waiting to be delivered",
@@ -135,9 +162,11 @@ pub(crate) async fn process(
         // Does the sender have too many messages in queue?
         // Too many attachments?
         // Forwarding task queue is full?
-        let next_stats = state.database.get_did_stats(&next_did_hash).await?;
-        if next_stats.receive_queue_count as usize + attachments.len()
-            >= state.config.limits.queued_messages
+        let recv_limit = next_account
+            .queue_receive_limit
+            .unwrap_or(state.config.limits.queued_receive_messages_soft);
+        if recv_limit != -1
+            && next_account.receive_queue_count + attachments.len() as u32 >= recv_limit as u32
         {
             warn!(
                 "Next DID ({}) has too many messages waiting to be delivered",
@@ -223,7 +252,7 @@ pub(crate) async fn process(
                             return Err(MediatorError::RequestDataError(
                                 session.session_id.clone(),
                                 format!("Attachment is not valid JSON: {}", e),
-                            ))
+                            ));
                         }
                     }
                 }
@@ -232,7 +261,7 @@ pub(crate) async fn process(
                 return Err(MediatorError::RequestDataError(
                     session.session_id.clone(),
                     "Attachment is wrong format".into(),
-                ))
+                ));
             }
         };
 
@@ -259,16 +288,42 @@ pub(crate) async fn process(
         debug!(" TO: {}", next);
         debug!(" FROM: {:?}", msg.from);
         debug!(" Forwarded message:\n{}", data);
+        debug!(" Ephemeral: {:?}", msg.extra_headers.get("ephemeral"));
         debug!(" *************************************** ");
-        store_forwarded_message(
-            state,
-            session,
-            &data,
-            msg.from.as_deref(),
-            &next,
-            Some(expires_at),
-        )
-        .await?;
+
+        let ephemeral = if let Some(ephemeral) = msg.extra_headers.get("ephemeral") {
+            ephemeral.as_bool().unwrap_or(false)
+        } else {
+            false
+        };
+
+        if ephemeral {
+            // Live stream the message?
+            if let Some(stream_uuid) = state
+                .database
+                .streaming_is_client_live(&next_did_hash, false)
+                .await
+            {
+                if state
+                    .database
+                    .streaming_publish_message(&next_did_hash, &stream_uuid, &data, false)
+                    .await
+                    .is_ok()
+                {
+                    debug!("Live streaming message to UUID: {}", stream_uuid);
+                }
+            }
+        } else {
+            store_forwarded_message(
+                state,
+                session,
+                &data,
+                msg.from.as_deref(),
+                &next,
+                Some(expires_at),
+            )
+            .await?;
+        }
 
         Ok(ProcessMessageResponse {
             store_message: false,
@@ -311,7 +366,9 @@ fn _service_local(
 
     // If the next hop is the mediator itself, then this is a recursive forward
     if next == state.config.mediator_did {
-        warn!("next hop is the mediator itself, but this should have been unpacked. not accepting this message");
+        warn!(
+            "next hop is the mediator itself, but this should have been unpacked. not accepting this message"
+        );
         return Err(MediatorError::ForwardMessageError(
             session.session_id.clone(),
             "next hop is the mediator, recursive forward found".into(),

@@ -1,20 +1,17 @@
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::{
-    secrets::{Secret, SecretsResolver},
-    Message, PackEncryptedOptions,
-};
-use affinidi_messaging_mediator::{resolvers::affinidi_secrets::AffinidiSecrets, server::start};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
+use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
+use affinidi_messaging_mediator::server::start;
 use affinidi_messaging_sdk::{
-    config::Config,
-    conversions::secret_from_str,
+    config::ATMConfig,
     errors::ATMError,
     messages::{
-        fetch::FetchOptions, AuthenticationChallenge, AuthorizationResponse, DeleteMessageRequest,
+        AuthenticationChallenge, AuthorizationResponse, DeleteMessageRequest,
         DeleteMessageResponse, Folder, GetMessagesRequest, GetMessagesResponse, MessageList,
-        MessageListElement, SuccessResponse,
+        MessageListElement, SuccessResponse, fetch::FetchOptions,
     },
     transports::SendMessageResponse,
 };
+use affinidi_secrets_resolver::{SecretsResolver, SimpleSecretsResolver, secrets::Secret};
 use common::{
     ALICE_DID, ALICE_E1, ALICE_V1, BOB_DID, BOB_E1, BOB_V1, CONFIG_PATH, MEDIATOR_API, SECRETS_PATH,
 };
@@ -62,24 +59,26 @@ async fn test_mediator_server() {
     // Allow some time for the server to start
     sleep(Duration::from_millis(2000)).await;
 
-    let config = Config::builder()
+    let config = ATMConfig::builder()
         .with_ssl_certificates(&mut vec![
             "../affinidi-messaging-mediator/conf/keys/client.chain".into(),
         ])
         .build()
         .unwrap();
 
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .unwrap();
-    let alice_secrets_resolver = AffinidiSecrets::new(vec![
-        secret_from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
-        secret_from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
-    ]);
-    let bob_secrets_resolver = AffinidiSecrets::new(vec![
-        secret_from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
-        secret_from_str(&format!("{}#key-2", BOB_DID), &BOB_E1),
-    ]);
+    let alice_secrets_resolver = SimpleSecretsResolver::new(&[
+        Secret::from_str(&format!("{}#key-1", ALICE_DID), &ALICE_V1),
+        Secret::from_str(&format!("{}#key-2", ALICE_DID), &ALICE_E1),
+    ])
+    .await;
+    let bob_secrets_resolver = SimpleSecretsResolver::new(&[
+        Secret::from_str(&format!("{}#key-1", BOB_DID), &BOB_V1),
+        Secret::from_str(&format!("{}#key-2", BOB_DID), &BOB_E1),
+    ])
+    .await;
 
     let client = init_client(config.clone());
 
@@ -387,7 +386,7 @@ async fn _start_mediator_server() {
 }
 
 #[allow(dead_code)]
-fn init_client(config: Config) -> Client {
+fn init_client(config: ATMConfig) -> Client {
     // Set up the HTTPS client
     let mut client = ClientBuilder::new()
         .use_rustls_tls()
@@ -467,14 +466,17 @@ async fn _authenticate_challenge(client: Client, did: &str) -> AuthenticationCha
     challenge
 }
 
-async fn _authenticate<'sr>(
+async fn _authenticate<S>(
     client: Client,
     auth_response: Message,
     actor_did: &str,
     atm_did: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
-) -> AuthorizationResponse {
+    secrets_resolver: &S,
+) -> AuthorizationResponse
+where
+    S: SecretsResolver,
+{
     let (auth_msg, _) = auth_response
         .pack_encrypted(
             atm_did,

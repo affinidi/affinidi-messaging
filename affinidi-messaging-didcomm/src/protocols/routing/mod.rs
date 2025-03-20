@@ -1,23 +1,22 @@
 mod forward;
 
-use std::collections::HashMap;
-
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use ssi::dids::{
-    document::{service::Endpoint, Service},
     Document,
+    document::{Service, service::Endpoint},
 };
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
+    Attachment, AttachmentData, Message, PackEncryptedOptions,
     algorithms::AnonCryptAlg,
     document::is_did,
-    error::{err_msg, ErrorKind, Result, ResultExt},
-    message::{anoncrypt, MessagingServiceMetadata},
-    Attachment, AttachmentData, Message, PackEncryptedOptions,
+    error::{ErrorKind, Result, ResultExt, err_msg},
+    message::{MessagingServiceMetadata, anoncrypt},
 };
 
 pub use self::forward::ParsedForward;
@@ -72,7 +71,7 @@ fn check_service(service: &Service) -> Result<Option<(String, DIDCommMessagingSe
         // Check that this service endpoint supports didcomm/v2
 
         let endpoint = service_endpoint.into_iter().find(|endpoint| {
-            if let Endpoint::Map(ref value) = endpoint {
+            if let Endpoint::Map(value) = endpoint {
                 if let Some(accept) = value.get("accept") {
                     let a: Vec<String> = match serde_json::from_value(accept.clone()) {
                         Ok(value) => value,
@@ -280,7 +279,7 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
 
     let next = match msg.body {
         Value::Object(ref body) => match body.get("next") {
-            Some(Value::String(ref next)) => Some(next),
+            Some(Value::String(next)) => Some(next),
             _ => None,
         },
         _ => None,
@@ -293,7 +292,7 @@ pub fn try_parse_forward(msg: &Message) -> Option<ParsedForward> {
     let json_attachment_data = match msg.attachments {
         Some(ref attachments) => match &attachments[..] {
             [attachment, ..] => match &attachment.data {
-                AttachmentData::Json { ref value } => Some(value),
+                AttachmentData::Json { value } => Some(value),
                 _ => None,
             },
             _ => None,

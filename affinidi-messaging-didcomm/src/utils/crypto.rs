@@ -8,12 +8,12 @@ use askar_crypto::{
     },
     buffer::SecretBytes,
     encrypt::KeyAeadInPlace,
-    kdf::{ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs, FromKeyDerivation, KeyExchange},
+    kdf::{FromKeyDerivation, KeyExchange, ecdh_1pu::Ecdh1PU, ecdh_es::EcdhEs},
     repr::{KeySecretBytes, ToSecretBytes},
 };
 use ssi::JWK;
 
-use crate::error::{err_msg, Error, ErrorKind, Result};
+use crate::error::{Error, ErrorKind, Result, err_msg};
 
 /// Note this trait is compatible with KW algorithms only
 pub(crate) trait KeyWrap: KeyAeadInPlace {

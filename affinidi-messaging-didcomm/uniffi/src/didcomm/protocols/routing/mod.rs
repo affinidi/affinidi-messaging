@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-
+use crate::common::EXECUTOR;
+use crate::{DIDComm, ErrorCode, did_resolver_adapter::DIDResolverAdapter};
+use ahash::AHashMap as HashMap;
 use didcomm_core::{
     algorithms::AnonCryptAlg, error::ErrorKind, protocols::routing::wrap_in_forward,
 };
 use serde_json::Value;
-
-use crate::common::EXECUTOR;
-use crate::{did_resolver_adapter::DIDResolverAdapter, DIDComm, ErrorCode};
-
 pub trait OnWrapInForwardResult: Sync + Send {
     fn success(&self, result: String);
     fn error(&self, err: ErrorKind, err_msg: String);
@@ -53,15 +50,13 @@ impl DIDComm {
 
 #[cfg(test)]
 mod tests {
-
-    use std::collections::HashMap;
     use std::iter::FromIterator;
 
-    use crate::test_helper::{
-        create_did_resolver, create_secrets_resolver, get_ok, PackResult, UnpackResult,
-        WrapInForwardResult,
-    };
     use crate::DIDComm;
+    use crate::test_helper::{
+        PackResult, UnpackResult, WrapInForwardResult, create_did_resolver,
+        create_secrets_resolver, get_ok,
+    };
     use didcomm_core::algorithms::AnonCryptAlg;
     use didcomm_core::protocols::routing::try_parse_forward;
     use didcomm_core::test_vectors::{

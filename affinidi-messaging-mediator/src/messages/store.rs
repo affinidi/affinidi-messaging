@@ -1,14 +1,14 @@
 use std::time::SystemTime;
 
-use crate::database::session::Session;
 use crate::database::Database;
+use crate::database::session::Session;
 use crate::messages::MessageHandler;
-use crate::{messages::PackOptions, SharedData};
+use crate::{SharedData, messages::PackOptions};
 use affinidi_messaging_didcomm::{PackEncryptedMetadata, UnpackMetadata};
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::messages::sending::{InboundMessageList, InboundMessageResponse};
 use sha256::digest;
-use tracing::{debug, error, span, trace, warn, Instrument};
+use tracing::{Instrument, debug, error, span, trace, warn};
 
 use super::{ProcessMessageResponse, WrapperType};
 
@@ -117,7 +117,7 @@ pub(crate) async fn store_message(
                                 recipient,
                                 &state.config.mediator_did,
                                 metadata,
-                                &state.config.security.mediator_secrets,
+                                &*state.config.security.mediator_secrets,
                                 &state.did_resolver,
                                 &PackOptions {
                                     to_keys_per_recipient_limit: state
@@ -181,7 +181,7 @@ pub(crate) async fn store_message(
                     &session.did,
                     &state.config.mediator_did,
                     metadata,
-                    &state.config.security.mediator_secrets,
+                    &*state.config.security.mediator_secrets,
                     &state.did_resolver,
                     &PackOptions {
                         to_keys_per_recipient_limit: state.config.limits.to_keys_per_recipient,

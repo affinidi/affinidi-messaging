@@ -1,24 +1,24 @@
+use crate::{SharedConfig, account_management::acl_management::manage_account_acls};
+use affinidi_messaging_helpers::common::did::manually_enter_did_or_hash;
 use affinidi_messaging_sdk::{
-    profiles::Profile,
+    ATM,
+    profiles::ATMProfile,
     protocols::{
+        Protocols,
         mediator::{
-            accounts::{Account, AccountType},
+            accounts::{Account, AccountChangeQueueLimitsResponse, AccountType},
             acls::MediatorACLSet,
         },
-        Protocols,
     },
-    ATM,
 };
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input, Select};
-use sha256::digest;
+use dialoguer::{Input, Select, theme::ColorfulTheme};
+use regex::Regex;
 use std::sync::Arc;
-
-use crate::{account_management::acl_management::manage_account_acls, SharedConfig};
 
 pub(crate) async fn account_management_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -53,12 +53,12 @@ pub(crate) async fn account_management_menu(
 
 pub(crate) async fn create_account_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(new_did_hash) = _manually_enter_did_or_hash(theme) else {
+    let Some(new_did_hash) = manually_enter_did_or_hash(theme) else {
         println!("No new account created...");
         return Ok(());
     };
@@ -90,7 +90,7 @@ pub(crate) async fn create_account_menu(
 
 pub(crate) async fn manage_account_menu(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -99,6 +99,7 @@ pub(crate) async fn manage_account_menu(
     let selections = &[
         "Modify ACLs",
         "Change Account Type",
+        "Change Queue Limits",
         "Delete Account",
         "Back",
     ];
@@ -107,11 +108,13 @@ pub(crate) async fn manage_account_menu(
     loop {
         println!();
         println!(
-            "{} {}  {} {:064b}",
+            "{} {}  {} {:064b} {} {}",
             style("Selected DID: ").yellow(),
             style(&account.did_hash).color256(208),
             style("ACL:").yellow(),
             style(account.acls).blue().bold(),
+            style("Access List Count:").yellow(),
+            style(account.access_list_count).blue().bold()
         );
 
         println!(
@@ -125,6 +128,35 @@ pub(crate) async fn manage_account_menu(
                 "{:064b}",
                 &mediator_config.global_acl_default.to_u64()
             ))
+            .blue()
+            .bold()
+        );
+
+        println!(
+            "{} {} {} {} {} {} {} {} {} {} {} {} {}",
+            style("Stats").yellow(),
+            style("INBOX Count:").yellow(),
+            style(&account.receive_queue_count).blue().bold(),
+            style("INBOX bytes").yellow(),
+            style(&account.receive_queue_bytes).blue().bold(),
+            style("OUTBOX Count:").yellow(),
+            style(&account.receive_queue_count).blue().bold(),
+            style("OUTBOX bytes").yellow(),
+            style(&account.receive_queue_bytes).blue().bold(),
+            style("Send Q Limit:").yellow(),
+            style(
+                &account
+                    .queue_send_limit
+                    .unwrap_or(mediator_config.queued_send_messages_soft)
+            )
+            .blue()
+            .bold(),
+            style("Receive Q Limit:").yellow(),
+            style(
+                &account
+                    .queue_receive_limit
+                    .unwrap_or(mediator_config.queued_receive_messages_soft)
+            )
             .blue()
             .bold()
         );
@@ -164,6 +196,33 @@ pub(crate) async fn manage_account_menu(
                 }
             }
             2 => {
+                // Change Queue Limits
+                match _change_account_queue_limit(atm, profile, protocols, theme, &account).await {
+                    Ok(response) => {
+                        if let Some(response) = response {
+                            if let Some(limit) = response.send_queue_limit {
+                                if limit == -2 {
+                                    account.queue_send_limit = None;
+                                } else {
+                                    account.queue_send_limit = response.send_queue_limit;
+                                }
+                            }
+                            if let Some(limit) = response.receive_queue_limit {
+                                if limit == -2 {
+                                    account.queue_receive_limit = None;
+                                } else {
+                                    account.queue_receive_limit = response.receive_queue_limit;
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => println!(
+                        "{}",
+                        style(format!("Error changing account queue_limit: {}", err)).red()
+                    ),
+                }
+            }
+            3 => {
                 // Delete Account
                 match protocols
                     .mediator
@@ -180,7 +239,7 @@ pub(crate) async fn manage_account_menu(
                     ),
                 }
             }
-            3 => {
+            4 => {
                 // Return to previous menu
                 return Ok(());
             }
@@ -193,7 +252,7 @@ pub(crate) async fn manage_account_menu(
 
 async fn _change_account_type(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
@@ -233,12 +292,127 @@ async fn _change_account_type(
     }
 }
 
+async fn _change_account_queue_limit(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<Option<AccountChangeQueueLimitsResponse>, Box<dyn std::error::Error>> {
+    let send_input = Input::with_theme(theme)
+        .with_prompt("New Send Queue Limit? (-2 = Reset, -1 = Unlimited, n = limit, blank = no change, exit = cancel")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            let re = Regex::new(r"\d*|exit").unwrap();
+            if input == "exit" || input.is_empty() {
+                Ok(())
+            } else if re.is_match(input) {
+                match input.parse::<i32>() {
+                    Ok(limit) => {
+                        if limit < -2 {
+                            Err("Invalid queue limit")
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(_) => {
+                        Err("Couldn't parse queue_limit")
+                    }
+                }
+            } else {
+                Err("Invalid queue limit")
+            }
+        }).allow_empty(true)
+        .interact_text()
+        .unwrap();
+
+    if send_input == "exit" {
+        return Ok(None);
+    }
+
+    println!("Changing account send queue_limit to: {}", send_input);
+    let send_queue_limit: Option<i32> = if send_input.is_empty() {
+        None
+    } else {
+        match send_input.parse::<i32>() {
+            Ok(limit) => Some(limit),
+            Err(e) => {
+                println!("{}", style(format!("Couldn't parse number: {}", e)).red());
+                return Err("Couldn't parse queue_limit".into());
+            }
+        }
+    };
+
+    let receive_input = Input::with_theme(theme)
+        .with_prompt("New Receive Queue Limit? (-2 = Reset, -1 = Unlimited, n = limit, blank = no change, exit = cancel")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            let re = Regex::new(r"\d*|exit").unwrap();
+            if input == "exit" || input.is_empty() {
+                Ok(())
+            } else if re.is_match(input) {
+                match input.parse::<i32>() {
+                    Ok(limit) => {
+                        if limit < -2 {
+                            Err("Invalid queue limit")
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    Err(_) => {
+                        Err("Couldn't parse queue_limit")
+                    }
+                }
+            } else {
+                Err("Invalid queue limit")
+            }
+        }).allow_empty(true)
+        .interact_text()
+        .unwrap();
+
+    if receive_input == "exit" {
+        return Ok(None);
+    }
+
+    println!("Changing account receive queue_limit to: {}", receive_input);
+    let receive_queue_limit: Option<i32> = if receive_input.is_empty() {
+        None
+    } else {
+        match receive_input.parse::<i32>() {
+            Ok(limit) => Some(limit),
+            Err(e) => {
+                println!("{}", style(format!("Couldn't parse number: {}", e)).red());
+                return Err("Couldn't parse queue_limit".into());
+            }
+        }
+    };
+
+    let response = protocols
+        .mediator
+        .account_change_queue_limits(
+            atm,
+            profile,
+            &account.did_hash,
+            send_queue_limit,
+            receive_queue_limit,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    println!(
+        "{}",
+        style(format!(
+            "Account queue_limits changed successfully {:#?}",
+            response
+        ))
+        .green()
+    );
+    Ok(Some(response))
+}
+
 /// Picks the target DID
 /// returns the selected DID Hash
 /// returns None if the user cancels the selection
 pub(crate) async fn select_did(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -274,7 +448,7 @@ pub(crate) async fn select_did(
                 }
             }
             1 => {
-                if let Some(did_hash) = _manually_enter_did_or_hash(theme) {
+                if let Some(did_hash) = manually_enter_did_or_hash(theme) {
                     // Look up the Account for this DID
                     let account = protocols
                         .mediator
@@ -301,43 +475,9 @@ pub(crate) async fn select_did(
     }
 }
 
-fn _manually_enter_did_or_hash(theme: &ColorfulTheme) -> Option<String> {
-    println!();
-    println!(
-        "{}",
-        style("Limited checks are done on the DID or Hash - be careful!").yellow()
-    );
-    println!("DID or SHA256 Hash of a DID (type exit to quit this dialog)");
-
-    let input: String = Input::with_theme(theme)
-        .with_prompt("DID or SHA256 Hash")
-        .interact_text()
-        .unwrap();
-
-    if input == "exit" {
-        return None;
-    }
-
-    if input.starts_with("did:") {
-        Some(digest(input))
-    } else if input.len() != 64 {
-        println!(
-            "{}",
-            style(format!(
-                "Invalid SHA256 Hash length. length({}) when expected(64)",
-                input.len()
-            ))
-            .red()
-        );
-        None
-    } else {
-        Some(input.to_ascii_lowercase())
-    }
-}
-
 async fn _select_from_existing_dids(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     cursor: Option<u32>,
@@ -394,7 +534,8 @@ async fn _select_from_existing_dids(
     did_list.push("Back".to_string());
 
     println!(
-        "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags");
+        "  DID SHA-256 Hash                                                 Account Type Blocked? Local? ACL Flags"
+    );
     let selected = Select::with_theme(theme)
         .with_prompt("Select DID (space to select, enter to continue)?")
         .items(&did_list)

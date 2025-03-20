@@ -1,4 +1,5 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
 use serde::{Deserialize, Serialize};
 
 use anoncrypt::_try_unpack_anoncrypt;
@@ -8,15 +9,14 @@ use std::str::FromStr;
 use tracing::debug;
 
 use crate::{
+    FromPrior, Message,
     algorithms::{AnonCryptAlg, AuthCryptAlg, SignAlg},
     document::did_or_url,
     envelope::{Envelope, MetaEnvelope, ParsedEnvelope},
-    error::{err_msg, ErrorKind, Result, ResultExt},
+    error::{ErrorKind, Result, ResultExt, err_msg},
     jws::Jws,
     message::unpack::plaintext::_try_unpack_plaintext,
     protocols::routing::try_parse_forward,
-    secrets::SecretsResolver,
-    FromPrior, Message,
 };
 
 mod anoncrypt;
@@ -25,14 +25,14 @@ mod plaintext;
 mod sign;
 
 impl Message {
-    pub async fn unpack_string<S>(
+    pub async fn unpack_string<T>(
         msg: &str,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &S,
+        secrets_resolver: &T,
         options: &UnpackOptions,
     ) -> Result<(Message, UnpackMetadata)>
     where
-        S: SecretsResolver,
+        T: SecretsResolver,
     {
         let mut envelope = MetaEnvelope::new(msg, did_resolver).await?;
 
@@ -68,14 +68,14 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving.
     ///
     /// TODO: verify and update errors list
-    pub async fn unpack<S>(
+    pub async fn unpack<T>(
         envelope: &mut MetaEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &S,
+        secrets_resolver: &T,
         options: &UnpackOptions,
     ) -> Result<(Message, UnpackMetadata)>
     where
-        S: SecretsResolver,
+        T: SecretsResolver,
     {
         let mut anoncrypted: Option<ParsedEnvelope>;
         let mut forwarded_msg: String;
@@ -160,11 +160,14 @@ impl Message {
         Ok((msg, envelope.metadata.to_owned()))
     }
 
-    async fn _try_unwrap_forwarded_message(
+    async fn _try_unwrap_forwarded_message<T>(
         msg: &ParsedEnvelope,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &dyn SecretsResolver,
-    ) -> Result<Option<String>> {
+        secrets_resolver: &T,
+    ) -> Result<Option<String>>
+    where
+        T: SecretsResolver,
+    {
         let plaintext = match msg {
             ParsedEnvelope::Message(m) => m.clone(),
             _ => return Ok(None),
@@ -266,11 +269,14 @@ pub struct UnpackMetadata {
     pub from_prior: Option<FromPrior>,
 }
 
-async fn has_key_agreement_secret(
+async fn has_key_agreement_secret<T>(
     did_or_kid: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &dyn SecretsResolver,
-) -> Result<bool> {
+    secrets_resolver: &T,
+) -> Result<bool>
+where
+    T: SecretsResolver,
+{
     let kids = match did_or_url(did_or_kid) {
         (_, Some(kid)) => {
             vec![kid.to_owned()]
@@ -282,7 +288,7 @@ async fn has_key_agreement_secret(
                     return Err(err_msg(
                         ErrorKind::DIDNotResolved,
                         format!("Couldn't resolve did({}). Reason: {}", did, e),
-                    ))
+                    ));
                 }
             };
             did_doc
@@ -296,9 +302,9 @@ async fn has_key_agreement_secret(
 
     let kids = kids.iter().map(|k| k.to_owned()).collect::<Vec<_>>();
 
-    let secrets_ids = secrets_resolver.find_secrets(&kids).await?;
+    let secrets_ids = secrets_resolver.find_secrets(&kids);
 
-    Ok(!secrets_ids.is_empty())
+    Ok(!secrets_ids.await.is_empty())
 }
 
 /*

@@ -1,11 +1,9 @@
 use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::protocols::mediator::{accounts::AccountType, acls::MediatorACLSet};
+use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use std::{
-    collections::HashMap,
-    fmt::{self, Display, Formatter},
-};
+use std::fmt::{self, Display, Formatter};
 use tracing::{debug, warn};
 
 use super::Database;

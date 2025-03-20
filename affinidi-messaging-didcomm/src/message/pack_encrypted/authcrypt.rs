@@ -1,4 +1,5 @@
-use affinidi_did_resolver_cache_sdk::{document::DocumentExt, DIDCacheClient};
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, document::DocumentExt};
+use affinidi_secrets_resolver::SecretsResolver;
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Gcm, A256Kw, AesKey},
@@ -12,25 +13,28 @@ use askar_crypto::{
 
 use crate::{
     algorithms::{AnonCryptAlg, AuthCryptAlg},
-    document::{did_or_url, DIDCommVerificationMethodExt},
-    error::{err_msg, ErrorKind, Result, ResultContext},
+    document::{DIDCommVerificationMethodExt, did_or_url},
+    error::{ErrorKind, Result, ResultContext, err_msg},
     jwe,
-    secrets::SecretsResolver,
     utils::crypto::{AsKnownKeyPair, AsKnownKeyPairSecret, KnownKeyAlg},
 };
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn authcrypt<'sr>(
+pub(crate) async fn authcrypt<T>(
     to: &str,
     from: &str,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &'sr (dyn SecretsResolver + 'sr + Sync),
+    secrets_resolver: &T,
     msg: &[u8],
     enc_alg_auth: &AuthCryptAlg,
     enc_alg_anon: &AnonCryptAlg,
     protect_sender: bool,
     to_kids_limit: usize,
-) -> Result<(String, String, Vec<String>)> /* (msg, from_kid, to_kids) */ {
+) -> Result<(String, String, Vec<String>)>
+/* (msg, from_kid, to_kids) */
+where
+    T: SecretsResolver,
+{
     let (to_did, to_kid) = did_or_url(to);
 
     // TODO: Avoid resolving of same dids multiple times
@@ -66,10 +70,7 @@ pub(crate) async fn authcrypt<'sr>(
     }
 
     // Keep only sender keys present in the wallet
-    let from_kids = secrets_resolver
-        .find_secrets(&from_kids)
-        .await
-        .context("Unable find secrets")?;
+    let from_kids = secrets_resolver.find_secrets(&from_kids).await;
 
     if from_kids.is_empty() {
         Err(err_msg(
@@ -194,7 +195,6 @@ pub(crate) async fn authcrypt<'sr>(
     let from_priv_key = secrets_resolver
         .get_secret(&from_key.id)
         .await
-        .context("Unable resolve sender secret")?
         .ok_or_else(|| err_msg(ErrorKind::InvalidState, "Sender secret not found"))?;
 
     let from_jwk = from_key.get_jwk().unwrap();

@@ -1,4 +1,5 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
+use affinidi_secrets_resolver::SecretsResolver;
 use askar_crypto::{
     alg::{
         aes::{A256CbcHs512, A256Kw, AesKey},
@@ -9,26 +10,28 @@ use askar_crypto::{
     kdf::ecdh_1pu::Ecdh1PU,
 };
 use std::str::FromStr;
-use tracing::{debug, event, Level};
+use tracing::{Level, debug, event};
 
 use crate::envelope::{Envelope, MetaEnvelope, ParsedEnvelope};
 use crate::{
-    algorithms::AuthCryptAlg,
-    error::{err_msg, ErrorKind, Result, ResultExt},
-    jwe,
-    secrets::SecretsResolver,
-    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
     UnpackOptions,
+    algorithms::AuthCryptAlg,
+    error::{ErrorKind, Result, ResultExt, err_msg},
+    jwe,
+    utils::crypto::{AsKnownKeyPairSecret, KnownKeyPair},
 };
 
-pub(crate) async fn _try_unpack_authcrypt(
+pub(crate) async fn _try_unpack_authcrypt<T>(
     jwe: &ParsedEnvelope,
     did_resolver: &DIDCacheClient,
-    secrets_resolver: &dyn SecretsResolver,
+    secrets_resolver: &T,
     opts: &UnpackOptions,
     envelope: &mut MetaEnvelope,
     present_crypto_operations_count: usize,
-) -> Result<Option<ParsedEnvelope>> {
+) -> Result<Option<ParsedEnvelope>>
+where
+    T: SecretsResolver,
+{
     let jwe = match jwe {
         ParsedEnvelope::Jwe(jwe) => jwe,
         _ => return Ok(None),
@@ -53,7 +56,7 @@ pub(crate) async fn _try_unpack_authcrypt(
 
     envelope.to_kids_found = secrets_resolver
         .find_secrets(&envelope.metadata.encrypted_to_kids)
-        .await?;
+        .await;
 
     if envelope.to_kids_found.is_empty() {
         Err(err_msg(
@@ -74,12 +77,16 @@ pub(crate) async fn _try_unpack_authcrypt(
                 ),
             ));
         }
-        let to_key = secrets_resolver.get_secret(to_kid).await?.ok_or_else(|| {
-            err_msg(
-                ErrorKind::InvalidState,
-                "Recipient secret not found after existence checking",
-            )
-        })?;
+        let to_key = secrets_resolver
+            .get_secret(to_kid)
+            .await
+            .ok_or_else(|| {
+                err_msg(
+                    ErrorKind::InvalidState,
+                    "Recipient secret not found after existence checking",
+                )
+            })?
+            .to_owned();
         let to_key = to_key.as_key_pair()?;
 
         let _payload = match (
@@ -88,8 +95,8 @@ pub(crate) async fn _try_unpack_authcrypt(
             &jwe.protected.enc,
         ) {
             (
-                KnownKeyPair::X25519(ref from_key),
-                KnownKeyPair::X25519(ref to_key),
+                KnownKeyPair::X25519(from_key),
+                KnownKeyPair::X25519(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);
@@ -102,8 +109,8 @@ pub(crate) async fn _try_unpack_authcrypt(
                 >(Some((envelope.from_kid.as_ref().unwrap(), from_key)), (to_kid, to_key))?
             }
             (
-                KnownKeyPair::P256(ref from_key),
-                KnownKeyPair::P256(ref to_key),
+                KnownKeyPair::P256(from_key),
+                KnownKeyPair::P256(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);
@@ -124,8 +131,8 @@ pub(crate) async fn _try_unpack_authcrypt(
                 "Incompatible sender and recipient key agreement curves",
             ))?,
             (
-                KnownKeyPair::K256(ref from_key),
-                KnownKeyPair::K256(ref to_key),
+                KnownKeyPair::K256(from_key),
+                KnownKeyPair::K256(to_key),
                 jwe::EncAlgorithm::A256cbcHs512,
             ) => {
                 envelope.metadata.enc_alg_auth = Some(AuthCryptAlg::A256cbcHs512Ecdh1puA256kw);

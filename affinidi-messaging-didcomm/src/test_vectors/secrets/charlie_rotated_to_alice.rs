@@ -1,6 +1,5 @@
+use affinidi_secrets_resolver::secrets::Secret;
 use lazy_static::lazy_static;
-
-use crate::affinidi_messaging_didcomm::secrets::Secret;
 
 use super::{
     alice::{

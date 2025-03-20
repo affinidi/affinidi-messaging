@@ -5,10 +5,10 @@ use crate::state_store::actions::invitation::create_new_profile;
 use crate::state_store::chat_message::{ChatEffect, ChatMessage, ChatMessageType};
 use affinidi_messaging_didcomm::{Attachment, AttachmentData, Message, UnpackMetadata};
 use affinidi_messaging_sdk::protocols::message_pickup::{MessagePickup, MessagePickupStatusReply};
-use affinidi_messaging_sdk::{protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{ATM, protocols::Protocols};
 use base64::prelude::*;
-use rand::distr::Alphanumeric;
 use rand::Rng;
+use rand::distr::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::error;
@@ -144,9 +144,10 @@ async fn _handle_connection_setup(
     // Create the new DID for this chat
     let our_new_did = create_new_profile(
         atm,
-        state.settings.mediator_did.as_ref().unwrap(),
+        &state.settings.mediator_did.clone().unwrap(),
         Some(new_chat_name.clone()),
         true,
+        state,
     )
     .await
     .unwrap();
@@ -329,12 +330,13 @@ pub async fn handle_message(
     };
 
     let profile = {
-        match atm.get_profiles().read().await.find_by_did(&to_did) { Some(profile) => {
-            profile
-        } _ => {
-            warn!("Profile not found for DID({})", &to_did);
-            return;
-        }}
+        match atm.get_profiles().read().await.find_by_did(&to_did) {
+            Some(profile) => profile,
+            _ => {
+                warn!("Profile not found for DID({})", &to_did);
+                return;
+            }
+        }
     };
 
     let Some(chat) = state.chat_list.find_chat_by_did(&to_did) else {
@@ -517,9 +519,9 @@ pub async fn handle_message(
                                     Ok(decoded) => decoded,
                                     Err(e) => {
                                         warn!(
-                                                "Error encoding vec[u8] to string: ({:?}). Attachment ID ({:?})",
-                                                e, attachment.id
-                                            );
+                                            "Error encoding vec[u8] to string: ({:?}). Attachment ID ({:?})",
+                                            e, attachment.id
+                                        );
                                         continue;
                                     }
                                 },

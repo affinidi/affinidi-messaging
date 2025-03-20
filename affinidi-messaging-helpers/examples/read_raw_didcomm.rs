@@ -4,12 +4,14 @@
  * To read the DIDComm messages, you will need access to the Secrets for the DID Recipients
  */
 
-use affinidi_did_resolver_cache_sdk::{config::ClientConfigBuilder, DIDCacheClient};
-use affinidi_messaging_didcomm::{envelope::MetaEnvelope, AttachmentData};
-use affinidi_messaging_sdk::{
-    config::Config, errors::ATMError, profiles::Profile, secrets::Secret, ATM,
+use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
+use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::ATMProfile};
+use affinidi_tdk::{
+    common::TDKSharedState,
+    secrets_resolver::{SecretsResolver, secrets::Secret},
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
 use console::style;
 use std::{
@@ -28,11 +30,12 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), ATMError> {
     // Create a new ATM Client
-    let config = Config::builder();
-    let atm = ATM::new(config.build()?).await?;
+    let config = ATMConfig::builder();
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config.build()?, tdk).await?;
 
     // Local DID Resolver
-    let did_resolver = DIDCacheClient::new(ClientConfigBuilder::default().build())
+    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
         .await
         .map_err(|e| {
             ATMError::DIDError(format!("Couldn't instantiate DID Resolver. Reason: {}", e))
@@ -136,8 +139,9 @@ async fn main() -> Result<(), ATMError> {
             return Ok(());
         }
     };
+    atm.get_tdk().secrets_resolver.insert_vec(&secrets).await;
 
-    let profile = Profile::new(&atm, None, to_did.clone(), None, secrets).await?;
+    let profile = ATMProfile::new(&atm, None, to_did.clone(), None).await?;
     atm.profile_add(&profile, false).await?;
     println!("{}", style("DIDComm Profile created...").green());
 

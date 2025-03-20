@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 pub mod delete;
 pub mod fetch;

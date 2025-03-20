@@ -8,15 +8,15 @@ use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::administration::MediatorAdminRequest,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha256::digest;
-use tracing::{span, warn, Instrument};
+use tracing::{Instrument, span, warn};
 use uuid::Uuid;
 
 use crate::{
-    database::session::Session,
-    messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
+    database::session::Session,
+    messages::{ProcessMessageResponse, error_response::generate_error_response},
 };
 
 /// Responsible for processing a Mediator Administration message

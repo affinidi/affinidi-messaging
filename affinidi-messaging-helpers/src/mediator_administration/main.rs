@@ -1,37 +1,45 @@
 //! Example of how to manage administration accounts for the mediator
 use account_management::account_management::account_management_menu;
-use affinidi_messaging_helpers::common::{
-    affinidi_logo::print_logo,
-    check_path,
-    profiles::{Profile, Profiles},
-};
+use affinidi_messaging_helpers::common::{affinidi_logo::print_logo, check_path};
 use affinidi_messaging_sdk::{
-    config::Config,
-    protocols::{
-        mediator::acls::{AccessListModeType, MediatorACLSet},
-        Protocols,
-    },
     ATM,
+    config::ATMConfig,
+    profiles::ATMProfile,
+    protocols::{
+        Protocols,
+        mediator::acls::{AccessListModeType, MediatorACLSet},
+    },
 };
+use affinidi_tdk::common::{
+    TDKSharedState,
+    environments::{TDKEnvironment, TDKEnvironments},
+};
+use ahash::AHashMap as HashMap;
 use clap::Parser;
-use console::{style, Style, Term};
-use dialoguer::{theme::ColorfulTheme, Select};
+use console::{Style, Term, style};
+use dialoguer::{Select, theme::ColorfulTheme};
 use serde::Deserialize;
 use serde_json::Value;
 use sha256::digest;
+use std::env;
 use std::error::Error;
-use std::{collections::HashMap, env};
 use tracing_subscriber::filter;
 use ui::administration_accounts_menu;
 
 mod account_management;
 mod ui;
 
+/// Affinidi Mediator Administration
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Environment to use
     #[arg(short, long)]
-    profile: Option<String>,
+    environment: Option<String>,
+
+    /// Path to the environments file (defaults to environments.json)
+    #[arg(short, long)]
+    path_environments: Option<String>,
 }
 
 /// Holds information from the mediator configuration
@@ -42,6 +50,8 @@ struct SharedConfig {
     pub mediator_did_hash: String,
     pub acl_mode: AccessListModeType,
     pub global_acl_default: MediatorACLSet,
+    pub queued_send_messages_soft: i32,
+    pub queued_receive_messages_soft: i32,
 }
 
 impl SharedConfig {
@@ -83,7 +93,7 @@ impl SharedConfig {
             match serde_json::from_value::<AccessListModeType>(acl_mode.to_owned()) {
                 Ok(acl_mode) => acl_mode,
                 Err(_) => {
-                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into())
+                    return Err("Couldn't find mediator_acl_mode in Mediator Configuration".into());
                 }
             }
         } else {
@@ -104,21 +114,64 @@ impl SharedConfig {
             return Err("Couldn't find global_acl_default in Mediator Configuration".into());
         };
 
+        let queued_send_messages_soft = if let Some(queued_send_message_soft) = config
+            .get("limits")
+            .and_then(|limits| limits.get("queued_send_messages_soft"))
+        {
+            if let Some(queued_send_message_soft) = queued_send_message_soft.as_i64() {
+                queued_send_message_soft as i32
+            } else {
+                return Err(
+                    "Couldn't find queued_send_messages_soft in Mediator Configuration".into(),
+                );
+            }
+        } else {
+            return Err("Couldn't find queued_send_messages_soft in Mediator Configuration".into());
+        };
+
+        let queued_receive_messages_soft = if let Some(queued_receive_message_soft) = config
+            .get("limits")
+            .and_then(|limits| limits.get("queued_receive_messages_soft"))
+        {
+            if let Some(queued_receive_message_soft) = queued_receive_message_soft.as_i64() {
+                queued_receive_message_soft as i32
+            } else {
+                return Err(
+                    "Couldn't find queued_receive_messages_soft in Mediator Configuration".into(),
+                );
+            }
+        } else {
+            return Err(
+                "Couldn't find queued_receive_messages_soft in Mediator Configuration".into(),
+            );
+        };
+
         Ok(SharedConfig {
             version,
             acl_mode,
             global_acl_default,
             our_admin_hash: String::new(),
             mediator_did_hash: digest(mediator_did),
+            queued_send_messages_soft,
+            queued_receive_messages_soft,
         })
     }
 }
 
-async fn init() -> Result<(ColorfulTheme, Config, Profile), Box<dyn Error>> {
+async fn init() -> Result<(ColorfulTheme, ATMConfig, TDKEnvironment), Box<dyn Error>> {
     let args: Args = Args::parse();
 
-    let (profile_name, profile) = Profiles::smart_load(args.profile, env::var("AM_PROFILE").ok())?;
-    println!("Using Profile: {}", profile_name);
+    let environment_name = if let Some(environment_name) = &args.environment {
+        environment_name.to_string()
+    } else if let Ok(environment_name) = env::var("TDK_ENVIRONMENT") {
+        environment_name
+    } else {
+        "default".to_string()
+    };
+
+    let environment =
+        TDKEnvironments::fetch_from_file(args.path_environments.as_deref(), &environment_name)?;
+    println!("Using Environment: {}", environment_name);
 
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
@@ -145,39 +198,40 @@ async fn init() -> Result<(ColorfulTheme, Config, Profile), Box<dyn Error>> {
         style("Welcome to the Affinidi Messaging Mediator Administration wizard").green(),
     );
 
-    if profile.admin_did.is_none() {
-        return Err("Admin DID not found in Profile".into());
+    if environment.admin_did.is_none() {
+        return Err("Admin DID not found in Environment".into());
     }
 
     let mut ssl_certificates = Vec::new();
-    if let Some(ssl_certificate) = &profile.ssl_certificate {
-        ssl_certificates.push(ssl_certificate.to_string());
+    for certificate in &environment.ssl_certificates {
+        ssl_certificates.push(certificate.to_string());
     }
 
     // Connect to the Mediator
-    let config = Config::builder()
+    let config = ATMConfig::builder()
         .with_ssl_certificates(&mut ssl_certificates)
         .build()?;
 
-    Ok((theme, config, profile))
+    Ok((theme, config, environment))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let (theme, config, profile) = init().await?;
+    let (theme, config, environment) = init().await?;
 
-    let admin = if let Some(admin) = profile.admin_did {
+    let admin = if let Some(admin) = environment.admin_did {
         admin
     } else {
-        return Err("Admin DID not found in Profile".into());
+        return Err("Admin DID not found in Environment".into());
     };
 
     // Create a new ATM Client
-    let atm = ATM::new(config).await?;
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config, tdk).await?;
     let protocols = Protocols::new();
 
     // Create the admin profile and enable it
-    let admin_profile = admin.into_profile(&atm).await?;
+    let admin_profile = ATMProfile::from_tdk_profile(&atm, &admin).await?;
     let admin = atm.profile_add(&admin_profile, true).await?;
 
     println!("{}", style("Admin account connected...").green());

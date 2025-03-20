@@ -1,7 +1,6 @@
-use crate::resolvers::affinidi_secrets::AffinidiSecrets;
 use affinidi_did_resolver_cache_sdk::{
-    config::{ClientConfig, ClientConfigBuilder},
     DIDCacheClient,
+    config::{DIDCacheConfig, DIDCacheConfigBuilder},
 };
 use affinidi_messaging_mediator_common::{
     database::config::{DatabaseConfig, DatabaseConfigRaw},
@@ -11,33 +10,34 @@ use affinidi_messaging_mediator_processors::message_expiry_cleanup::config::{
     MessageExpiryCleanupConfig, MessageExpiryCleanupConfigRaw,
 };
 use affinidi_messaging_sdk::protocols::mediator::acls::{AccessListModeType, MediatorACLSet};
-use async_convert::{async_trait, TryFrom};
+use affinidi_secrets_resolver::{SecretsResolver, ThreadedSecretsResolver, secrets::Secret};
+use ahash::AHashSet as HashSet;
+use async_convert::{TryFrom, async_trait};
 use aws_config::{self, BehaviorVersion, Region, SdkConfig};
 use aws_sdk_secretsmanager;
 use aws_sdk_ssm::types::ParameterType;
 use base64::prelude::*;
 use http::{
-    header::{AUTHORIZATION, CONTENT_TYPE},
     HeaderValue, Method,
+    header::{AUTHORIZATION, CONTENT_TYPE},
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use regex::{Captures, Regex};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
-use ssi::dids::{document::service::Endpoint, Document};
+use ssi::dids::{Document, document::service::Endpoint};
 use std::{
-    collections::HashSet,
     env,
     fmt::{self, Debug},
     fs::File,
     io::{self, BufRead},
     path::Path,
+    sync::Arc,
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use tracing_subscriber::{filter::LevelFilter, EnvFilter};
-
+use tracing_subscriber::{EnvFilter, filter::LevelFilter};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerConfig {
     pub listen_address: String,
@@ -68,7 +68,7 @@ pub struct SecurityConfig {
     pub global_acl_default: MediatorACLSet,
     pub local_direct_delivery_allowed: bool,
     #[serde(skip_serializing)]
-    pub mediator_secrets: AffinidiSecrets,
+    pub mediator_secrets: Arc<ThreadedSecretsResolver>,
     pub use_ssl: bool,
     pub ssl_certificate_file: String,
     #[serde(skip_serializing)]
@@ -92,10 +92,6 @@ impl Debug for SecurityConfig {
                 "local_direct_delivery_allowed",
                 &self.local_direct_delivery_allowed,
             )
-            .field(
-                "mediator_secrets",
-                &format!("({}) secrets loaded", self.mediator_secrets.len()),
-            )
             .field("use_ssl", &self.use_ssl)
             .field("ssl_certificate_file", &self.ssl_certificate_file)
             .field("ssl_key_file", &self.ssl_key_file)
@@ -108,13 +104,13 @@ impl Debug for SecurityConfig {
     }
 }
 
-impl Default for SecurityConfig {
-    fn default() -> Self {
+impl SecurityConfig {
+    async fn default() -> Self {
         SecurityConfig {
             mediator_acl_mode: AccessListModeType::ExplicitDeny,
             global_acl_default: MediatorACLSet::default(),
             local_direct_delivery_allowed: false,
-            mediator_secrets: AffinidiSecrets::new(vec![]),
+            mediator_secrets: Arc::new(ThreadedSecretsResolver::new(None).await.0),
             use_ssl: true,
             ssl_certificate_file: "".into(),
             ssl_key_file: "".into(),
@@ -167,7 +163,7 @@ impl SecurityConfigRaw {
             ssl_key_file: self.ssl_key_file.clone(),
             jwt_access_expiry: self.jwt_access_expiry.parse().unwrap_or(900),
             jwt_refresh_expiry: self.jwt_refresh_expiry.parse().unwrap_or(86_400),
-            ..Default::default()
+            ..SecurityConfig::default().await
         };
 
         // Convert the default ACL Set into a GlobalACLSet
@@ -192,7 +188,7 @@ impl SecurityConfigRaw {
         }
 
         // Load mediator secrets
-        config.mediator_secrets = load_secrets(&self.mediator_secrets, aws_config).await?;
+        config.mediator_secrets = Arc::new(load_secrets(&self.mediator_secrets, aws_config).await?);
 
         // Create the JWT encoding and decoding keys
         let jwt_secret = config_jwt_secret(&self.jwt_authorization_secret, aws_config).await?;
@@ -241,7 +237,10 @@ pub struct LimitsConfig {
     pub local_max_acl: usize,
     pub message_expiry_seconds: u64,
     pub message_size: usize,
-    pub queued_messages: usize,
+    pub queued_send_messages_soft: i32,
+    pub queued_send_messages_hard: i32,
+    pub queued_receive_messages_soft: i32,
+    pub queued_receive_messages_hard: i32,
     pub to_keys_per_recipient: usize,
     pub to_recipients: usize,
     pub ws_size: usize,
@@ -261,7 +260,10 @@ impl Default for LimitsConfig {
             local_max_acl: 1_000,
             message_expiry_seconds: 604_800,
             message_size: 1_048_576,
-            queued_messages: 100,
+            queued_send_messages_soft: 200,
+            queued_send_messages_hard: 1_000,
+            queued_receive_messages_soft: 200,
+            queued_receive_messages_hard: 1_000,
             to_keys_per_recipient: 100,
             to_recipients: 100,
             ws_size: 10_485_760,
@@ -282,7 +284,10 @@ struct LimitsConfigRaw {
     pub local_max_acl: String,
     pub message_expiry_seconds: String,
     pub message_size: String,
-    pub queued_messages: String,
+    pub queued_send_messages_soft: String,
+    pub queued_send_messages_hard: String,
+    pub queued_receive_messages_soft: String,
+    pub queued_receive_messages_hard: String,
     pub to_keys_per_recipient: String,
     pub to_recipients: String,
     pub ws_size: String,
@@ -307,7 +312,10 @@ impl std::convert::TryFrom<LimitsConfigRaw> for LimitsConfig {
             local_max_acl: raw.local_max_acl.parse().unwrap_or(1_000),
             message_expiry_seconds: raw.message_expiry_seconds.parse().unwrap_or(10_080),
             message_size: raw.message_size.parse().unwrap_or(1_048_576),
-            queued_messages: raw.queued_messages.parse().unwrap_or(100),
+            queued_send_messages_soft: raw.queued_send_messages_soft.parse().unwrap_or(100),
+            queued_send_messages_hard: raw.queued_send_messages_hard.parse().unwrap_or(1_000),
+            queued_receive_messages_soft: raw.queued_receive_messages_soft.parse().unwrap_or(100),
+            queued_receive_messages_hard: raw.queued_receive_messages_hard.parse().unwrap_or(1_000),
             to_keys_per_recipient: raw.to_keys_per_recipient.parse().unwrap_or(100),
             to_recipients: raw.to_recipients.parse().unwrap_or(100),
             ws_size: raw.ws_size.parse().unwrap_or(10_485_760),
@@ -376,8 +384,8 @@ impl std::convert::TryFrom<ForwardingConfigRaw> for ForwardingConfig {
 }
 
 impl DIDResolverConfig {
-    pub fn convert(&self) -> ClientConfig {
-        let mut config = ClientConfigBuilder::default()
+    pub fn convert(&self) -> DIDCacheConfig {
+        let mut config = DIDCacheConfigBuilder::default()
             .with_cache_capacity(self.cache_capacity.parse().unwrap_or(1000))
             .with_cache_ttl(self.cache_ttl.parse().unwrap_or(300))
             .with_network_timeout(self.network_timeout.parse().unwrap_or(5))
@@ -424,7 +432,7 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub security: SecurityConfig,
     #[serde(skip_serializing)]
-    pub did_resolver_config: ClientConfig,
+    pub did_resolver_config: DIDCacheConfig,
     pub processors: ProcessorsConfig,
     pub limits: LimitsConfig,
 }
@@ -451,9 +459,9 @@ impl fmt::Debug for Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        let did_resolver_config = ClientConfigBuilder::default()
+impl Config {
+    async fn default() -> Self {
+        let did_resolver_config = DIDCacheConfigBuilder::default()
             .with_cache_capacity(1000)
             .with_cache_ttl(300)
             .with_network_timeout(5)
@@ -473,7 +481,7 @@ impl Default for Config {
             streaming_uuid: "".into(),
             did_resolver_config,
             api_prefix: "/mediator/v1/".into(),
-            security: SecurityConfig::default(),
+            security: SecurityConfig::default().await,
             processors: ProcessorsConfig {
                 forwarding: ForwardingConfig::default(),
                 message_expiry_cleanup: MessageExpiryCleanupConfig::default(),
@@ -493,7 +501,7 @@ impl TryFrom<ConfigRaw> for Config {
             Ok(region) => Region::new(region),
             Err(_) => Region::new("ap-southeast-1"),
         };
-        let aws_config = aws_config::defaults(BehaviorVersion::v2024_03_28())
+        let aws_config = aws_config::defaults(BehaviorVersion::v2025_01_17())
             .region(region)
             .load()
             .await;
@@ -521,7 +529,7 @@ impl TryFrom<ConfigRaw> for Config {
                 message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
             },
             limits: raw.limits.try_into()?,
-            ..Default::default()
+            ..Config::default().await
         };
 
         config.mediator_did_hash = digest(&config.mediator_did);
@@ -591,7 +599,7 @@ impl TryFrom<ConfigRaw> for Config {
 async fn load_secrets(
     secrets: &str,
     aws_config: &SdkConfig,
-) -> Result<AffinidiSecrets, MediatorError> {
+) -> Result<ThreadedSecretsResolver, MediatorError> {
     let parts: Vec<&str> = secrets.split("://").collect();
     if parts.len() != 2 {
         return Err(MediatorError::ConfigError(
@@ -626,19 +634,27 @@ async fn load_secrets(
             return Err(MediatorError::ConfigError(
                 "NA".into(),
                 "Invalid `mediator_secrets` format! Expecting file:// or aws_secrets:// ...".into(),
-            ))
+            ));
         }
     };
 
-    Ok(AffinidiSecrets::new(
-        serde_json::from_str(&content).map_err(|err| {
-            eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
-            MediatorError::ConfigError(
-                "NA".into(),
-                format!("Could not parse `mediator_secrets` JSON content. {}", err),
-            )
-        })?,
-    ))
+    let (secrets_resolver, _) = ThreadedSecretsResolver::new(None).await;
+    let secrets: Vec<Secret> = serde_json::from_str(&content).map_err(|err| {
+        eprintln!("Could not parse `mediator_secrets` JSON content. {}", err);
+        MediatorError::ConfigError(
+            "NA".into(),
+            format!("Could not parse `mediator_secrets` JSON content. {}", err),
+        )
+    })?;
+
+    info!(
+        "Loading {} mediatior Secret{}",
+        secrets.len(),
+        if secrets.is_empty() { "" } else { "s" }
+    );
+    secrets_resolver.insert_vec(&secrets).await;
+
+    Ok(secrets_resolver)
 }
 
 /// Read the primary configuration file for the mediator
@@ -746,7 +762,7 @@ async fn read_did_config(
                 "NA".into(),
                 "Invalid mediator_did format! Expecting file:// or aws_parameter_store:// ..."
                     .into(),
-            ))
+            ));
         }
     };
 
@@ -904,7 +920,7 @@ async fn read_document(
                 "NA".into(),
                 "Invalid document_path format! Expecting file:// or aws_parameter_store:// ..."
                     .into(),
-            ))
+            ));
         }
     };
 
@@ -960,7 +976,10 @@ async fn load_forwarding_protection_blocks(
                                     eprintln!("WARN: Couldn't parse URI as a string: {:#?}", uri);
                                 }
                             } else {
-                                eprintln!("WARN: Service endpoint map does not contain a URI. DID ({}), Service ({:#?}), Endpoint ({:#?})", did, service, map);
+                                eprintln!(
+                                    "WARN: Service endpoint map does not contain a URI. DID ({}), Service ({:#?}), Endpoint ({:#?})",
+                                    did, service, map
+                                );
                             }
                         }
                     }

@@ -1,9 +1,8 @@
-use std::time::Duration;
-
+use crate::database::{Database, stats::MetadataStats};
 use affinidi_messaging_mediator_common::errors::MediatorError;
-use tracing::{debug, info, span, Instrument, Level};
-
-use crate::database::{stats::MetadataStats, Database};
+use std::env;
+use std::time::Duration;
+use tracing::{Instrument, Level, debug, info, span};
 
 /// Periodically logs statistics about the database.
 /// Is spawned as a task from main().
@@ -16,12 +15,18 @@ pub async fn statistics(database: Database) -> Result<(), MediatorError> {
 
         let mut previous_stats = MetadataStats::default();
 
+        let mediator_id = match env::var("MEDIATOR_ID") {
+            Ok(val) => val,
+            Err(_e) => "NA".to_string(),
+        };
+
         loop {
             interval.tick().await;
             let stats = database.get_db_metadata().await?;
             let delta = stats.delta(&previous_stats);
             info!(
                 event_type = "UpdateStats",
+                mediator_id = mediator_id,
                 received_bytes = stats.received_bytes,
                 sent_bytes = stats.sent_bytes,
                 deleted_bytes = stats.deleted_bytes,
@@ -38,6 +43,7 @@ pub async fn statistics(database: Database) -> Result<(), MediatorError> {
 
             info!(
                 event_type = "UpdateDeltaStats",
+                mediator_id = mediator_id,
                 received_bytes = delta.received_bytes,
                 sent_bytes = delta.sent_bytes,
                 deleted_bytes = delta.deleted_bytes,

@@ -1,8 +1,8 @@
 use super::{Folder, MessageList};
-use crate::{errors::ATMError, messages::SuccessResponse, profiles::Profile, ATM};
+use crate::{ATM, errors::ATMError, messages::SuccessResponse, profiles::ATMProfile};
 use sha256::digest;
 use std::sync::Arc;
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 
 impl ATM {
     /// Returns a list of messages that are stored in the ATM
@@ -11,7 +11,7 @@ impl ATM {
     /// - `folder`: The folder to list messages from
     pub async fn list_messages(
         &self,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         folder: Folder,
     ) -> Result<MessageList, ATMError> {
         let _span = span!(Level::DEBUG, "list_messages", folder = folder.to_string());
@@ -30,6 +30,7 @@ impl ATM {
 
             let res = self
                 .inner
+                .tdk_common
                 .client
                 .get(format!(
                     "{}/list/{}/{}",

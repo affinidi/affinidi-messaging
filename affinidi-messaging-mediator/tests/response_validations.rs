@@ -1,16 +1,16 @@
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_didcomm::{
-    envelope::MetaEnvelope, secrets::SecretsResolver, AttachmentData, Message, UnpackMetadata,
-    UnpackOptions,
+    AttachmentData, Message, UnpackMetadata, UnpackOptions, envelope::MetaEnvelope,
 };
 use affinidi_messaging_sdk::{
     messages::{
-        sending::InboundMessageResponse, GetMessagesResponse, MessageListElement, SuccessResponse,
+        GetMessagesResponse, MessageListElement, SuccessResponse, sending::InboundMessageResponse,
     },
     protocols::message_pickup::MessagePickupStatusReply,
     transports::SendMessageResponse,
 };
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use affinidi_secrets_resolver::SecretsResolver;
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use sha256::digest;
 
 #[allow(dead_code)]
@@ -20,7 +20,7 @@ pub async fn validate_status_reply<S>(
     did_resolver: &DIDCacheClient,
     secrets_resolver: &S,
 ) where
-    S: SecretsResolver + Send,
+    S: SecretsResolver,
 {
     if let SendMessageResponse::RestAPI(value) = status_reply {
         let j: SuccessResponse<InboundMessageResponse> =
@@ -59,7 +59,7 @@ pub async fn validate_message_delivery<S>(
     pong_msg_id: &str,
 ) -> Vec<String>
 where
-    S: SecretsResolver + Send,
+    S: SecretsResolver,
 {
     if let SendMessageResponse::RestAPI(value) = message_delivery {
         let j: SuccessResponse<InboundMessageResponse> =
@@ -102,7 +102,7 @@ async fn _handle_delivery<S>(
     secrets_resolver: &S,
 ) -> Vec<(Message, UnpackMetadata)>
 where
-    S: SecretsResolver + Send,
+    S: SecretsResolver,
 {
     let mut response: Vec<(Message, UnpackMetadata)> = Vec::new();
 
@@ -164,7 +164,7 @@ pub async fn validate_message_received_status_reply<S>(
     did_resolver: &DIDCacheClient,
     secrets_resolver: &S,
 ) where
-    S: SecretsResolver + Send,
+    S: SecretsResolver,
 {
     if let SendMessageResponse::RestAPI(value) = status_reply {
         let j: SuccessResponse<InboundMessageResponse> =
@@ -218,7 +218,7 @@ pub async fn validate_get_message_response<S>(
     did_resolver: &DIDCacheClient,
     secrets_resolver: &S,
 ) where
-    S: SecretsResolver + Send,
+    S: SecretsResolver,
 {
     for msg in list.success {
         assert_eq!(msg.to_address.unwrap(), digest(actor_did));

@@ -3,14 +3,14 @@
 //! JWE = Encrypted Messages
 //! Message = Plaintext Messages
 use crate::{
-    error::{err_msg, Error, ErrorKind, Result, ToResult},
-    utils::crypto::KnownKeyPair,
-    UnpackMetadata,
+    Message,
+    jwe::{ParsedJWE, envelope::Jwe},
+    jws::{Jws, ParsedJWS},
 };
 use crate::{
-    jwe::{envelope::Jwe, ParsedJWE},
-    jws::{Jws, ParsedJWS},
-    Message,
+    UnpackMetadata,
+    error::{Error, ErrorKind, Result, ToResult, err_msg},
+    utils::crypto::KnownKeyPair,
 };
 use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use serde::Deserialize;
@@ -132,7 +132,7 @@ impl MetaEnvelope {
                 return Err(err_msg(
                     ErrorKind::Malformed,
                     "Unable to fill envelope from",
-                ))
+                ));
             }
         };
 

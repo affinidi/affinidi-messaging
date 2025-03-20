@@ -2,26 +2,27 @@
  * Handles ACL management tasks for an account
  */
 
+use affinidi_messaging_helpers::common::did::manually_enter_did_or_hash;
 use affinidi_messaging_sdk::{
-    profiles::Profile,
+    ATM,
+    profiles::ATMProfile,
     protocols::{
+        Protocols,
         mediator::{
             accounts::Account,
             acls::{AccessListModeType, MediatorACLSet},
         },
-        Protocols,
     },
-    ATM,
 };
 use console::style;
-use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use dialoguer::{MultiSelect, Select, theme::ColorfulTheme};
 use std::sync::Arc;
 
 use crate::SharedConfig;
 
 pub(crate) async fn manage_account_acls(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     protocols: &Protocols,
     theme: &ColorfulTheme,
     mediator_config: &SharedConfig,
@@ -29,10 +30,11 @@ pub(crate) async fn manage_account_acls(
 ) -> Result<Account, Box<dyn std::error::Error>> {
     let selections = &[
         "Modify ACL Flags",
-        "Show ACL List",
-        "Add to ACL List",
-        "Remove from ACL List",
-        "Search ACL List",
+        "Access List - List",
+        "Access List - Add",
+        "Access List - Remove",
+        "Access List - Search",
+        "Access List - Clear",
         "Back",
     ];
 
@@ -80,11 +82,34 @@ pub(crate) async fn manage_account_acls(
                     .await?
                     .to_u64();
             }
-            1 => {}
-            2 => {}
-            3 => {}
-            4 => {}
-            5 => break,
+            1 => {
+                // Access List - List
+                _access_list_list(atm, profile, protocols, &account).await?;
+            }
+            2 => {
+                // Access List - Add
+                if _access_list_add(atm, profile, protocols, theme, &account)
+                    .await?
+                    .is_some()
+                {
+                    account.access_list_count += 1;
+                }
+            }
+            3 => {
+                // Access List - Remove
+                account.access_list_count -=
+                    _access_list_remove(atm, profile, protocols, theme, &account).await? as u32;
+            }
+            4 => {
+                // Access List - Search
+                _access_list_get(atm, profile, protocols, theme, &account).await?;
+            }
+            5 => {
+                // Access List - Clear
+                _access_list_clear(atm, profile, protocols, &account).await?;
+                account.access_list_count = 0;
+            }
+            6 => break,
             _ => println!("Invalid selection"),
         }
     }
@@ -92,9 +117,9 @@ pub(crate) async fn manage_account_acls(
 }
 
 async fn _modify_acl_flags(
-    _atm: &ATM,
-    _profile: &Arc<Profile>,
-    _protocols: &Protocols,
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
     theme: &ColorfulTheme,
     account: &Account,
 ) -> Result<MediatorACLSet, Box<dyn std::error::Error>> {
@@ -146,6 +171,14 @@ async fn _modify_acl_flags(
             acls.get_anon_receive().1,
         ),
         ("access_list self-change?", acls.get_self_manage_list()),
+        (
+            "queue send limits self-change?",
+            acls.get_self_manage_send_queue_limit(),
+        ),
+        (
+            "queue receive limits self-change?",
+            acls.get_self_manage_receive_queue_limit(),
+        ),
     ];
 
     // returns a vector of chosen indices
@@ -157,7 +190,7 @@ async fn _modify_acl_flags(
         .unwrap();
 
     // convert the selection to an array of bools
-    let mut flags = [false; 17];
+    let mut flags = [false; 19];
     for s in selection {
         flags[s] = true;
     }
@@ -182,11 +215,120 @@ async fn _modify_acl_flags(
     let _ = new_acls.set_create_invites(flags[12], flags[13], true);
     let _ = new_acls.set_anon_receive(flags[14], flags[15], true);
     new_acls.set_self_manage_list(flags[16]);
+    new_acls.set_self_manage_send_queue_limit(flags[17]);
+    new_acls.set_self_manage_receive_queue_limit(flags[18]);
 
     if new_acls == acls {
         println!("{}", style("No changes made").yellow());
         return Ok(acls);
     }
     println!("New ACLs: {:064b}", new_acls.to_u64());
-    todo!("Change the ACL on the mediator");
+
+    match protocols
+        .mediator
+        .acls_set(atm, profile, &account.did_hash, &new_acls)
+        .await
+    {
+        Ok(_) => println!("{}", style("ACLs updated").green()),
+        Err(e) => println!("{}", style(format!("Error updating ACLs: {}", e)).red()),
+    }
+
+    Ok(new_acls)
+}
+
+async fn _access_list_list(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    account: &Account,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cursor: Option<u64> = None;
+    loop {
+        let list = protocols
+            .mediator
+            .access_list_list(atm, profile, Some(&account.did_hash), cursor)
+            .await?;
+
+        for hash in list.did_hashes {
+            println!("{}", style(hash).blue());
+        }
+
+        if let Some(_cursor) = list.cursor {
+            cursor = Some(_cursor);
+        } else {
+            break;
+        }
+    }
+    Ok(())
+}
+
+async fn _access_list_add(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    if let Some(hash) = manually_enter_did_or_hash(theme) {
+        protocols
+            .mediator
+            .access_list_add(atm, profile, Some(&account.did_hash), &[hash.as_str()])
+            .await?;
+        Ok(Some(hash))
+    } else {
+        Ok(None)
+    }
+}
+
+async fn _access_list_remove(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<usize, Box<dyn std::error::Error>> {
+    if let Some(hash) = manually_enter_did_or_hash(theme) {
+        Ok(protocols
+            .mediator
+            .access_list_remove(atm, profile, Some(&account.did_hash), &[hash.as_str()])
+            .await?)
+    } else {
+        Ok(0)
+    }
+}
+
+async fn _access_list_get(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    theme: &ColorfulTheme,
+    account: &Account,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(hash) = manually_enter_did_or_hash(theme) {
+        let result = protocols
+            .mediator
+            .access_list_get(atm, profile, Some(&account.did_hash), &[hash.as_str()])
+            .await?;
+
+        println!("{}", style("DID Hashes Found:").blue());
+        for hash in &result.did_hashes {
+            println!("  {}", style(hash).blue());
+        }
+        if result.did_hashes.is_empty() {
+            println!("{}", style("No DID Hashes found").yellow());
+        }
+    }
+    Ok(())
+}
+
+async fn _access_list_clear(
+    atm: &ATM,
+    profile: &Arc<ATMProfile>,
+    protocols: &Protocols,
+    account: &Account,
+) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(protocols
+        .mediator
+        .access_list_clear(atm, profile, Some(&account.did_hash))
+        .await?)
 }

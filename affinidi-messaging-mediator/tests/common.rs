@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[allow(dead_code)]
 pub const ALICE_DID: &str = "did:peer:2.Vz6MkgWJfVmPELozq6aCycK3CpxHN8Upphn3WSuQkWY6iqsjF.EzQ3shfb7vwQaTJqFkt8nRfo7Nu98tmeYpdDfWgrqQitDaqXRz";

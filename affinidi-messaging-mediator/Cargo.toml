@@ -9,6 +9,7 @@ keywords.workspace = true
 publish.workspace = true
 license.workspace = true
 readme = "README.md"
+rust-version.workspace = true
 
 [[bin]]
 name = "mediator"
@@ -20,8 +21,9 @@ affinidi-messaging-didcomm.workspace = true
 affinidi-messaging-mediator-processors.workspace = true
 affinidi-messaging-mediator-common.workspace = true
 affinidi-did-resolver-cache-sdk.workspace = true
+affinidi-secrets-resolver.workspace = true
+ahash.workspace = true
 async-convert.workspace = true
-async-trait.workspace = true
 aws-config.workspace = true
 aws-sdk-dynamodb.workspace = true
 aws-sdk-memorydb.workspace = true

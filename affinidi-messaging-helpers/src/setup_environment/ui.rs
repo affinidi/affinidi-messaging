@@ -3,15 +3,19 @@ use crate::{
     network::fetch_well_known_did,
     ssl_certs::create_ssl_certs,
 };
-use affinidi_messaging_helpers::common::{
-    did::{create_did, get_service_address},
-    profiles::{Profile, Profiles},
+use affinidi_messaging_helpers::common::did::{create_did, get_service_address};
+use affinidi_tdk::{
+    common::{
+        environments::{TDKEnvironment, TDKEnvironments},
+        profiles::TDKProfile,
+    },
+    dids::{DID, KeyType},
 };
-use affinidi_messaging_sdk::profiles::ProfileConfig;
 use console::style;
 use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
+use did_peer::DIDPeerKeys;
 use regex::Regex;
-use std::{collections::HashMap, error::Error, path::Path};
+use std::{error::Error, path::Path};
 use toml::Value;
 
 /// Local or Remote mediator
@@ -24,7 +28,7 @@ pub enum MediatorType {
 
 pub(crate) fn local_remote_mediator(
     theme: &ColorfulTheme,
-    profiles: &Profiles,
+    environments: &TDKEnvironments,
 ) -> Result<Option<MediatorType>, Box<dyn Error>> {
     println!();
 
@@ -32,8 +36,8 @@ pub(crate) fn local_remote_mediator(
         "Local Mediator Configuration".to_string(),
         "Remote Mediator Configuration".to_string(),
     ];
-    if !profiles.profiles.is_empty() {
-        selections.push("Select Existing Profile?".to_string());
+    if !environments.is_empty() {
+        selections.push("Select Existing Environment?".to_string());
     }
 
     selections.push("Exit".to_string());
@@ -53,9 +57,9 @@ pub(crate) fn local_remote_mediator(
             0 => return Ok(Some(MediatorType::Local)),
             1 => return Ok(Some(MediatorType::Remote)),
             2 => {
-                if profiles.profiles.is_empty() {
-                    unreachable!("No profiles to manage");
-                } else if let Some(profile) = select_profile(theme, profiles)? {
+                if environments.is_empty() {
+                    unreachable!("No environments to manage");
+                } else if let Some(profile) = select_profile(theme, environments)? {
                     return Ok(Some(profile));
                 }
             }
@@ -66,12 +70,11 @@ pub(crate) fn local_remote_mediator(
 
 fn select_profile(
     theme: &ColorfulTheme,
-    profiles: &Profiles,
+    environments: &TDKEnvironments,
 ) -> Result<Option<MediatorType>, Box<dyn Error>> {
-    let mut selections: Vec<&String> = profiles.profiles.keys().collect();
+    let mut selections: Vec<String> = environments.environments();
 
-    let main_menu = "Back to Main Menu".to_string();
-    selections.push(&main_menu);
+    selections.push("Back to Main Menu".to_string());
 
     let profile = Select::with_theme(theme)
         .with_prompt("Select Profile")
@@ -89,40 +92,40 @@ fn select_profile(
     }
 }
 
-/// Gets a profile name and saves the profile
-fn save_profile(
+/// Saves an environment to environments
+fn save_environment(
     theme: &ColorfulTheme,
-    profiles: &mut Profiles,
-    profile: Profile,
+    environments: &mut TDKEnvironments,
+    environment: TDKEnvironment,
     name: &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
     println!();
     match Input::<String>::with_theme(theme)
-        .with_prompt("Save profile with name?")
+        .with_prompt("Save environment with name?")
         .with_initial_text(name)
         .interact_text()
     {
         Ok(name) => {
             if Confirm::with_theme(theme)
-                .with_prompt(format!("Save Profile: {}?", name))
+                .with_prompt(format!("Save Environment: {}?", name))
                 .default(true)
                 .interact()?
             {
-                if profiles.add_profile(&name, profile) {
-                    println!("  {}", style("Profile added").green());
+                if environments.add(&name, environment) {
+                    println!("  {}", style("Environment added").green());
                 } else {
-                    println!("  {}", style("Profile replaced").color256(208));
+                    println!("  {}", style("Environment replaced").color256(208));
                 }
 
-                profiles.save()?;
-                println!("  {}", style("Profiles saved...").green());
+                environments.save()?;
+                println!("  {}", style("Environments saved...").green());
                 Ok(Some(name))
             } else {
-                println!("  {}", style("Profile not saved").red());
+                println!("  {}", style("Environment not saved").red());
                 Ok(None)
             }
         }
-        _ => Err("Profile name not provided".into()),
+        _ => Err("Environment name not provided".into()),
     }
 }
 
@@ -130,12 +133,12 @@ fn save_profile(
 /// Expected that the remote mediator is already up and running
 pub(crate) async fn init_remote_mediator(
     theme: &ColorfulTheme,
-    profiles: &mut Profiles,
+    environments: &mut TDKEnvironments,
 ) -> Result<(MediatorType, Option<String>), Box<dyn Error>> {
     fn _ask_for_remote_address(theme: &ColorfulTheme) -> Result<String, Box<dyn Error>> {
         let address = Input::with_theme(theme)
             .with_prompt("Remote Mediator Address")
-            .default("https://localhost:7037/msg/v1/mediator".to_string())
+            .default("https://localhost:7037/v1/mediator".to_string())
             .interact_text()?;
 
         Ok(address)
@@ -172,14 +175,22 @@ pub(crate) async fn init_remote_mediator(
         }
     }
 
-    fn _admin_did(theme: &ColorfulTheme) -> Option<ProfileConfig> {
+    fn _admin_did(mediator: &str, theme: &ColorfulTheme) -> Option<TDKProfile> {
         if Confirm::with_theme(theme)
             .with_prompt("Do you want to create an Admin account?")
             .default(true)
             .interact()
             .unwrap()
         {
-            let admin_did = Profile::create_new_friend("Admin", None, None).unwrap();
+            let (did, secrets) = DID::generate_did_peer(
+                vec![
+                    (DIDPeerKeys::Verification, KeyType::Ed25519),
+                    (DIDPeerKeys::Encryption, KeyType::Secp256k1),
+                ],
+                None,
+            )
+            .unwrap();
+            let admin_did = TDKProfile::new("Admin", &did, Some(mediator), secrets);
             println!(
                 "  {}{}",
                 style("Admin DID: ").blue(),
@@ -207,10 +218,10 @@ pub(crate) async fn init_remote_mediator(
                     .blink()
                     .red()
             );
-            Some(ProfileConfig {
+            Some(TDKProfile {
                 alias: "Admin".to_string(),
                 did: admin_did,
-                mediator: None,
+                mediator: Some(mediator.to_string()),
                 secrets: vec![],
             })
         } else {
@@ -278,28 +289,31 @@ pub(crate) async fn init_remote_mediator(
     }
 
     // We need to know where the SSL Certificate is if needed?
-    let ssl_certificate = _ssl_cert(theme)?;
+    let mut ssl_certificates = Vec::new();
+    if let Some(ssl_cert) = _ssl_cert(theme)? {
+        ssl_certificates.push(ssl_cert)
+    }
 
     // Get admin account info
-    let admin_did = _admin_did(theme);
+    let admin_did = _admin_did(&mediator_did, theme);
 
-    let profile = Profile {
+    let environment = TDKEnvironment {
         default_mediator: Some(mediator_did.clone()),
-        friends: HashMap::new(),
+        profiles: std::collections::HashMap::new(),
         admin_did,
-        ssl_certificate,
+        ssl_certificates,
     };
 
     Ok((
         MediatorType::Remote,
-        save_profile(theme, profiles, profile, "remote")?,
+        save_environment(theme, environments, environment, "remote")?,
     ))
 }
 
 /// Initialize local mediator configuration
 pub(crate) async fn init_local_mediator(
     theme: &ColorfulTheme,
-    profiles: &mut Profiles,
+    environments: &mut TDKEnvironments,
 ) -> Result<(MediatorType, Option<String>), Box<dyn Error>> {
     /// Rewrite the network address from listen address to localhost
     /// - config: Mediator Configuration
@@ -370,9 +384,9 @@ pub(crate) async fn init_local_mediator(
             }
         }
 
-        let response = create_did(Some("https://localhost:7037/".into()))?;
+        let response = create_did(Some("https://localhost:7037/v1/mediator".into()))?;
         new_config.mediator_did = Some(response.0.clone());
-        new_config.mediator_secrets = Some(response.1.into_iter().map(|s| s.into()).collect());
+        new_config.mediator_secrets = Some(response.1);
         println!(
             "  {} {}",
             style("Mediator DID created: ").blue().bold(),
@@ -401,7 +415,20 @@ pub(crate) async fn init_local_mediator(
     }
 
     // Creating new Admin account
-    let admin_did = Profile::create_new_friend("Admin", None, None)?;
+    let (did, secrets) = DID::generate_did_peer(
+        vec![
+            (DIDPeerKeys::Verification, KeyType::Ed25519),
+            (DIDPeerKeys::Encryption, KeyType::Secp256k1),
+        ],
+        None,
+    )
+    .unwrap();
+    let admin_did = TDKProfile::new(
+        "Admin",
+        &did,
+        new_mediator_config.mediator_did.as_deref(),
+        secrets,
+    );
     new_mediator_config.admin_did = Some(admin_did.did.clone());
 
     println!();
@@ -428,14 +455,14 @@ pub(crate) async fn init_local_mediator(
         );
     }
 
-    let profile = Profile {
+    let environment = TDKEnvironment {
         default_mediator: new_mediator_config.mediator_did.clone(),
-        friends: HashMap::new(),
+        profiles: std::collections::HashMap::new(),
         admin_did: Some(admin_did),
-        ssl_certificate: Some("./affinidi-messaging-mediator/conf/keys/client.chain".to_string()),
+        ssl_certificates: vec!["./affinidi-messaging-mediator/conf/keys/client.chain".to_string()],
     };
     Ok((
         MediatorType::Local,
-        save_profile(theme, profiles, profile, "local")?,
+        save_environment(theme, environments, environment, "local")?,
     ))
 }

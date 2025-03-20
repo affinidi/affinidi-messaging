@@ -1,10 +1,10 @@
 use crate::{
     state_store::{
-        actions::{
-            chat_list::{Chat, ChatList},
-            Action,
-        },
         State,
+        actions::{
+            Action,
+            chat_list::{Chat, ChatList},
+        },
     },
     ui_management::pages::{
         accept_invite_popup::accept_invite_popup::AcceptInvitePopup,
@@ -16,10 +16,10 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
+    Frame,
     layout::Constraint::{Length, Min, Percentage},
     prelude::*,
     widgets::*,
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -32,8 +32,8 @@ use super::{
         message_input_box::{self, MessageInputBox},
     },
     section::{
-        usage::{widget_usage_to_text, HasUsageInfo, UsageInfo, UsageInfoLine},
         SectionActivation,
+        usage::{HasUsageInfo, UsageInfo, UsageInfoLine, widget_usage_to_text},
     },
 };
 use crate::ui_management::components::{Component, ComponentRender};

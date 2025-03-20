@@ -5,10 +5,10 @@ Used to help discover 3rd party DID's while protecting your own privacy.
 */
 
 use crate::{
+    ATM,
     errors::ATMError,
     messages::{GenericDataStruct, SuccessResponse},
-    profiles::Profile,
-    ATM,
+    profiles::ATMProfile,
 };
 use affinidi_messaging_didcomm::Message;
 use base64::prelude::*;
@@ -38,7 +38,7 @@ impl OOBDiscovery {
     pub async fn create_invite(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         expiry: Option<Duration>,
     ) -> Result<String, ATMError> {
         // Check if authenticated
@@ -78,6 +78,7 @@ impl OOBDiscovery {
 
         let res = atm
             .inner
+            .tdk_common
             .client
             .post([&mediator_url, "/oob"].concat())
             .header("Content-Type", "application/json")
@@ -124,6 +125,7 @@ impl OOBDiscovery {
     pub async fn retrieve_invite(&self, atm: &ATM, url: &str) -> Result<Message, ATMError> {
         let res = atm
             .inner
+            .tdk_common
             .client
             .get(url)
             .header("Content-Type", "application/json")
@@ -191,7 +193,7 @@ impl OOBDiscovery {
     pub async fn delete_invite(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         oobid: &str,
     ) -> Result<String, ATMError> {
         // Check if authenticated
@@ -206,6 +208,7 @@ impl OOBDiscovery {
 
         let res = atm
             .inner
+            .tdk_common
             .client
             .delete(format!("{}/oob?_oobid={}", mediator_url, oobid))
             .header("Content-Type", "application/json")

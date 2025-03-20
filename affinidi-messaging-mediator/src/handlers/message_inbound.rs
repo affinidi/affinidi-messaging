@@ -1,10 +1,10 @@
-use crate::{database::session::Session, messages::inbound::handle_inbound, SharedData};
+use crate::{SharedData, database::session::Session, messages::inbound::handle_inbound};
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::messages::sending::InboundMessageResponse;
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tracing::{span, Instrument, Level};
+use tracing::{Instrument, Level, span};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RecipientHeader {

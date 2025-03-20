@@ -2,7 +2,7 @@ use crossterm::event::KeyEvent;
 use ratatui::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::state_store::{actions::Action, State};
+use crate::state_store::{State, actions::Action};
 
 pub trait Component {
     fn new(state: &State, action_tx: UnboundedSender<Action>) -> Self

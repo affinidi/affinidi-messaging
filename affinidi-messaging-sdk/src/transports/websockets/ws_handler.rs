@@ -3,17 +3,17 @@
  */
 use super::SharedState;
 use crate::{
-    errors::ATMError,
-    profiles::Profile,
-    transports::{
-        websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
-        WsConnectionCommands,
-    },
     ATM,
+    errors::ATMError,
+    profiles::ATMProfile,
+    transports::{
+        WsConnectionCommands,
+        websockets::{ws_cache::MessageCache, ws_connection::WsConnection},
+    },
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
+use ahash::AHashMap as HashMap;
 use std::{
-    collections::HashMap,
     fmt::{self, Debug, Formatter},
     sync::Arc,
 };
@@ -21,7 +21,7 @@ use tokio::{
     select,
     sync::mpsc::{self, Receiver, Sender},
 };
-use tracing::{debug, info, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, info, span, warn};
 
 /// The mode in which the handler should operate
 /// Cached: Messages are cached and sent to the SDK when requested
@@ -46,12 +46,12 @@ impl Debug for WsHandlerMode {
 pub enum WsHandlerCommands {
     // Messages sent from SDK to the Handler
     Exit,
-    Activate(Arc<Profile>),
-    Deactivate(Arc<Profile>),
+    Activate(Arc<ATMProfile>),
+    Deactivate(Arc<ATMProfile>),
     Next,                                   // Gets the next message from the cache
     CancelNext,                             // Cancels the next message request
     Get(String, Sender<WsHandlerCommands>), // Gets the message with the specified ID from the cache
-    TimeOut(Arc<Profile>, String), // SDK request timed out, contains msg_id we were looking for
+    TimeOut(Arc<ATMProfile>, String), // SDK request timed out, contains msg_id we were looking for
     // Messages sent from Handler to the SDK
     Started, // WsHandler has started and is ready to work
     MessageReceived(Message, Box<UnpackMetadata>), // Message received from the websocket
@@ -83,7 +83,7 @@ impl ATM {
                 ..Default::default()};
 
             // A list of all the active connections
-            let mut connections: HashMap<String, Arc<Profile>> = HashMap::new();
+            let mut connections: HashMap<String, Arc<ATMProfile>> = HashMap::new();
 
             // Set up the channel for WS_Connections to communicate to the handler
             // Create a new channel with a capacity of at most 32. This communicates from WS_Connections to the WS_Handler
@@ -95,7 +95,7 @@ impl ATM {
 
             // Used to track outstanding next message requests
             let mut next_counter = 0;
-           
+
             loop {
                 select! {
                     value = handler_rx.recv(), if !cache.is_full() => {

@@ -54,6 +54,8 @@ pub struct MediatorACLSet {
        14: anon_receive (0 = no, 1 = yes)
        15: anon_receive_change (0 = admin_only, 1 = self)
        16: self_manage_list (0 = admin_only, 1 = self)
+       17: self_manage_send_queue_limit
+       18: self_manage_receive_queue_limit
     */
     access_list_mode: AccessListModeType,
     access_list_mode_self_change: bool,
@@ -72,6 +74,8 @@ pub struct MediatorACLSet {
     anon_receive: bool,
     anon_receive_self_change: bool,
     self_manage_list: bool,
+    self_manage_send_queue_limit: bool,
+    self_manage_receive_queue_limit: bool,
     /// Internal use only
     acl: u64,
 }
@@ -107,6 +111,8 @@ impl MediatorACLSet {
                     default_acl.set_create_invites(true, true, true)?;
                     default_acl.set_anon_receive(true, true, true)?;
                     default_acl.set_self_manage_list(true);
+                    default_acl.set_self_manage_send_queue_limit(true);
+                    default_acl.set_self_manage_receive_queue_limit(true);
                 }
                 "deny_all" => {
                     default_acl.set_access_list_mode(
@@ -122,6 +128,8 @@ impl MediatorACLSet {
                     default_acl.set_create_invites(false, false, true)?;
                     default_acl.set_anon_receive(false, false, true)?;
                     default_acl.set_self_manage_list(false);
+                    default_acl.set_self_manage_send_queue_limit(false);
+                    default_acl.set_self_manage_receive_queue_limit(false);
                 }
                 "mode_explicit_allow" => {
                     default_acl.set_access_list_mode(
@@ -221,6 +229,12 @@ impl MediatorACLSet {
                 "blocked" => {
                     default_acl.set_blocked(true);
                 }
+                "self_manage_send_queue_limit" => {
+                    default_acl.set_self_manage_send_queue_limit(true);
+                }
+                "self_manage_receive_queue_limit" => {
+                    default_acl.set_self_manage_receive_queue_limit(true);
+                }
                 _ => {
                     return Err(ATMError::ConfigError(format!(
                         "Invalid ACL String ({})",
@@ -267,6 +281,8 @@ impl MediatorACLSet {
         acls.anon_receive = acls.get_anon_receive().0;
         acls.anon_receive_self_change = acls.get_anon_receive().1;
         acls.self_manage_list = acls.get_self_manage_list();
+        acls.self_manage_send_queue_limit = acls.get_self_manage_send_queue_limit();
+        acls.self_manage_receive_queue_limit = acls.get_self_manage_receive_queue_limit();
 
         acls
     }
@@ -651,6 +667,34 @@ impl MediatorACLSet {
         self._generic_set(16, flag);
         self.self_manage_list = flag;
     }
+
+    /// Can this DID self manage their own queue send limits?
+    pub fn get_self_manage_send_queue_limit(&self) -> bool {
+        // BIT Position 17
+        self._generic_get(17)
+    }
+
+    /// Set whether this DID can self manage their own queue send limits
+    /// flag = true means the DID can self manage send queue limit
+    pub fn set_self_manage_send_queue_limit(&mut self, flag: bool) {
+        // BIT 17 :: DID can set send queue limit? (0 = no, 1 = yes)
+        self._generic_set(17, flag);
+        self.self_manage_send_queue_limit = flag;
+    }
+
+    /// Can this DID self manage their own queue receive limits?
+    pub fn get_self_manage_receive_queue_limit(&self) -> bool {
+        // BIT Position 18
+        self._generic_get(18)
+    }
+
+    /// Set whether this DID can self manage their own queue receive limits
+    /// flag = true means the DID can self manage receive queue limit
+    pub fn set_self_manage_receive_queue_limit(&mut self, flag: bool) {
+        // BIT 18 :: DID can set receive queue limit? (0 = no, 1 = yes)
+        self._generic_set(18, flag);
+        self.self_manage_receive_queue_limit = flag;
+    }
 }
 
 #[cfg(test)]
@@ -663,9 +707,10 @@ mod tests {
 
         // set up some ACL's
         acl.set_blocked(true);
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
-            .is_ok());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
+                .is_ok()
+        );
         acl.set_local(true);
 
         // Convert to u64 and back
@@ -700,9 +745,10 @@ mod tests {
         let mut acl = MediatorACLSet::default();
 
         // Test that admin can change both the mode and the change setting
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
-            .is_ok());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitDeny, true, true)
+                .is_ok()
+        );
         assert!(matches!(
             acl.get_access_list_mode(),
             (AccessListModeType::ExplicitDeny, true)
@@ -710,9 +756,10 @@ mod tests {
         assert!(acl.get_access_list_mode_admin_change());
 
         // Test that we can flip back to the default
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitAllow, false, true)
-            .is_ok());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitAllow, false, true)
+                .is_ok()
+        );
         assert!(matches!(
             acl.get_access_list_mode(),
             (AccessListModeType::ExplicitAllow, false)
@@ -725,9 +772,10 @@ mod tests {
         let mut acl = MediatorACLSet::default();
 
         // Test that non-admins can't change the mode
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitDeny, true, false)
-            .is_err());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitDeny, true, false)
+                .is_err()
+        );
         assert!(matches!(
             acl.get_access_list_mode(),
             (AccessListModeType::ExplicitAllow, false)
@@ -740,14 +788,16 @@ mod tests {
         let mut acl = MediatorACLSet::default();
 
         // Set up ACL so we can change it
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitAllow, true, true)
-            .is_ok());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitAllow, true, true)
+                .is_ok()
+        );
 
         // Test that non-admins only changes what it should
-        assert!(acl
-            .set_access_list_mode(AccessListModeType::ExplicitDeny, false, false)
-            .is_ok());
+        assert!(
+            acl.set_access_list_mode(AccessListModeType::ExplicitDeny, false, false)
+                .is_ok()
+        );
         assert!(matches!(
             acl.get_access_list_mode(),
             (AccessListModeType::ExplicitDeny, true)
@@ -1026,5 +1076,47 @@ mod tests {
         // set to unblocked
         acl.set_self_manage_list(false);
         assert!(!acl.get_self_manage_list());
+    }
+
+    #[test]
+    fn test_self_manage_send_queue_limit_default() {
+        let acl = MediatorACLSet::default();
+
+        // Should default to false/allowed
+        assert!(!acl.get_self_manage_send_queue_limit(),);
+    }
+
+    #[test]
+    fn test_self_manage_send_queue_limit_change() {
+        let mut acl = MediatorACLSet::default();
+
+        // set to self_manage_queue_limit
+        acl.set_self_manage_send_queue_limit(true);
+        assert!(acl.get_self_manage_send_queue_limit());
+
+        // set to unblocked
+        acl.set_self_manage_send_queue_limit(false);
+        assert!(!acl.get_self_manage_send_queue_limit());
+    }
+
+    #[test]
+    fn test_self_manage_receive_queue_limit_default() {
+        let acl = MediatorACLSet::default();
+
+        // Should default to false/allowed
+        assert!(!acl.get_self_manage_receive_queue_limit(),);
+    }
+
+    #[test]
+    fn test_self_manage_receive_queue_limit_change() {
+        let mut acl = MediatorACLSet::default();
+
+        // set to self_manage_queue_limit
+        acl.set_self_manage_receive_queue_limit(true);
+        assert!(acl.get_self_manage_receive_queue_limit());
+
+        // set to unblocked
+        acl.set_self_manage_receive_queue_limit(false);
+        assert!(!acl.get_self_manage_receive_queue_limit());
     }
 }

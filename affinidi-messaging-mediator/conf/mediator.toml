@@ -38,7 +38,7 @@ api_prefix = "${API_PREFIX:/mediator/v1/}"
 ### NOTE: It is strongly recommended to NOT use the same DID as the mediator! 
 ###       This causes more use cases where the secrets of the mediator itself can be exposed in administration tasks.
 ### NOTE: You can add additional Mediator admin DIDs after mediator has started by using the Affinidi Mediator admin DIDComm protocol
-admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MksaHPuhNEewaJTywkDdBWnHWe2xpW6hva2KSkuvKBKys3.EzQ3shX5rNyeLJXqiBoYq9UFGPpi8sSoBqB5VgDS1LA4CyFAZs}"
+admin_did = "${ADMIN_DID:did://did:peer:2.Vz6MkjjuGgApQJhZ1vjf6w6vEjg1y92XFDaTYyhkpJT3uUDkB.EzQ3shnF7Ek7a1x9hjTrE4HJrhBrVJVJBDTnbkkFCKDQ8mDP5F}"
 
 ### did_web_self_hosted: <DID Document Path> Path to the self-hosted DID Document
 ### Default: None
@@ -105,7 +105,9 @@ mediator_acl_mode = "${MEDIATOR_ACL_MODE:explicit_deny}"
 ###    - ANON_RECEIVE: DID can receive anonymous messages
 ###    - ANON_RECEIVE_CHANGE: Allows the DID owner to change the anon_receive ACL for their own DID
 ###    - SELF_MANAGE_LIST: DID can self manage their own ACL list (add/remove)
-###  NOTE: Can be comma seperated to allow multiple options
+###    - SELF_MANAGE_SEND_QUEUE_LIMIT: DID can set their send queue limits (between the queued_messages_soft and queued_messages_hard)
+###    - SELF_MANAGE_RECEIVE_QUEUE_LIMIT: DID can set their receive queue limits (between the queued_messages_soft and queued_messages_hard)
+###  NOTE: Can be comma separated to allow multiple options
 global_acl_default = "${GLOBAL_DEFAULT_ACL:ALLOW_ALL}"
 
 ### local_direct_delivery_allowed: If true, messages that are addressed to a local DID directly will be delivered
@@ -142,7 +144,7 @@ ssl_key_file = "${SSL_KEY_FILE:conf/keys/end.key}"
 ### Supported Formats:
 ### - string://<key> - Use the key as is
 ### - aws_secrets://<secret_name> - Load the key from AWS Secrets Manager
-jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEIGARAda-NDucNM2L6x2dmkO8wJSPQvrWaryjyigcgspsgSEAReoGHKXiehaZARzl3koMw2osM6Bsy_MceZoIf9tR4kc}"
+jwt_authorization_secret = "${JWT_AUTHORIZATION_SECRET:string://MFECAQEwBQYDK2VwBCIEILmEDOx2i51aajzZgkKMwj6NFtUb0hEvKBru66D7RtzfgSEAE1rYEDNaqPm0IlrOuz-fcH80Pv1B_XNR7sw5sTZgD90}"
 
 ### jwt_access_expiry: Expiry time in seconds for JWT access tokens
 ### Default: 900 (15 Minutes)
@@ -243,10 +245,27 @@ message_expiry_seconds = "${LIMIT_MESSAGE_EXPIRY_SECONDS:604800}"
 ### Default: 1048576 (1MB)
 message_size = "${LIMIT_MESSAGE_SIZE:1048576}"
 
-### queued_messages: How many messages will we queue for a single recipient or a single sender
-### Default: 100
-### NOTE: This is a per-recipient or per-sender limit
-queued_messages = "${LIMIT_QUEUED_MESSAGES:100}"
+### queued_send_messages_soft: Default number of messages that can queued for outbound delivery for a DID
+### Default: 200
+### NOTE: -1 means no limit
+queued_send_messages_soft = "${LIMIT_QUEUED_SEND_MESSAGES_SOFT:200}"
+
+### queued_messages_hard: Maximum number of messages that a non-admin account can set the queue_send_messages to (upper bound)
+### Default: 1000
+### NOTE: -1 means no limit
+### NOTE: Admin accounts can set higher limits beyond the hard limit. Be careful though as this can be used to DoS the mediator
+queued_send_messages_hard = "${LIMIT_QUEUED_SEND_MESSAGES_HARD:1000}"
+
+### queued_receive_messages_soft: Default number of messages that can queued for inbound delivery for a DID
+### Default: 200
+### NOTE: -1 means no limit
+queued_receive_messages_soft = "${LIMIT_QUEUED_RECEIVE_MESSAGES_SOFT:200}"
+
+### queued_messages_hard: Maximum number of messages that a non-admin account can set the queue_receive_messages to (upper bound)
+### Default: 1000
+### NOTE: -1 means no limit
+### NOTE: Admin accounts can set higher limits beyond the hard limit. Be careful though as this can be used to DoS the mediator
+queued_receive_messages_hard = "${LIMIT_QUEUED_RECEIVE_MESSAGES_HARD:1000}"
 
 ### to_keys_per_recipient: Maximum number of keys in a single recipient did
 ### Default: 100

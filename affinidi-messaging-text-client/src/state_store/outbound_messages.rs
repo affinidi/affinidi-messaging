@@ -7,8 +7,8 @@ use tracing::warn;
 use uuid::Uuid;
 
 use super::{
-    chat_message::{ChatMessage, ChatMessageType},
     State,
+    chat_message::{ChatMessage, ChatMessageType},
 };
 
 /// Takes a chat_msg and sends it to the right

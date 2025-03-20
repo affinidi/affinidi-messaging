@@ -9,7 +9,7 @@ Roles:
    - WS_Connection: A single Mediator
 */
 
-use crate::{errors::ATMError, SharedState, ATM};
+use crate::{ATM, SharedState, errors::ATMError};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
@@ -17,6 +17,8 @@ use tokio::{
 use tracing::{debug, warn};
 use ws_handler::WsHandlerCommands;
 
+pub(crate) mod handshake;
+pub(crate) mod utils;
 pub(crate) mod ws_cache;
 pub(crate) mod ws_connection;
 pub mod ws_handler;

@@ -5,19 +5,19 @@ use affinidi_messaging_mediator_common::errors::MediatorError;
 use affinidi_messaging_sdk::{
     messages::problem_report::{ProblemReport, ProblemReportScope, ProblemReportSorter},
     protocols::mediator::{
-        accounts::{AccountType, MediatorAccountRequest},
+        accounts::{AccountChangeQueueLimitsResponse, AccountType, MediatorAccountRequest},
         acls::{AccessListModeType, MediatorACLSet},
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha256::digest;
-use tracing::{debug, info, span, warn, Instrument};
+use tracing::{Instrument, debug, info, span, warn};
 use uuid::Uuid;
 
 use crate::{
-    database::session::Session,
-    messages::{error_response::generate_error_response, ProcessMessageResponse},
     SharedData,
+    database::session::Session,
+    messages::{ProcessMessageResponse, error_response::generate_error_response},
 };
 
 use super::acls::check_permissions;
@@ -182,7 +182,7 @@ pub(crate) async fn process(
 
                 match state
                     .database
-                    .account_add(&did_hash, &acls)
+                    .account_add(&did_hash, &acls, None)
                     .await
                 {
                     Ok(response) => _generate_response_message(
@@ -352,6 +352,95 @@ pub(crate) async fn process(
                         &session.did,
                         &state.config.mediator_did,
                         &json!(true),
+                    )}
+                    Err(err) => {
+                        warn!("Error Changing account type. Reason: {}", err);
+                        generate_error_response(
+                            state,
+                            session,
+                            &msg.id,
+                            ProblemReport::new(
+                                ProblemReportSorter::Error,
+                                ProblemReportScope::Protocol,
+                                "database_error".into(),
+                                "Error changing account type. Reason: {1}".into(),
+                                vec![err.to_string()],
+                                None,
+                            ),
+                            false,
+                        )
+                    }
+                }
+            }
+            MediatorAccountRequest::AccountChangeQueueLimits {did_hash, send_queue_limit, receive_queue_limit } => {
+                 // Check permissions and ACLs
+                 if !check_permissions(session, &[did_hash.clone()]) {
+                    warn!("ACL Request from DID ({}) failed. ", session.did_hash);
+                    return generate_error_response(
+                        state,
+                        session,
+                        &msg.id,
+                        ProblemReport::new(
+                            ProblemReportSorter::Error,
+                            ProblemReportScope::Protocol,
+                            "permission_error".into(),
+                            "Error getting ACLs {1}".into(),
+                            vec!["Permission denied".to_string()],
+                            None,
+                        ),
+                    false,
+                    );
+                }
+
+                // Check ACL's
+                let (send_queue_limit, receive_queue_limit) = if session.account_type == AccountType::Standard {
+                    // Check send queue limit ACL and limits
+                    let send_queue_limit = if session.acls.get_self_manage_send_queue_limit() {
+                        if let Some(limit) = send_queue_limit {
+                            if limit == -1 || limit == -2 {
+                                send_queue_limit
+                            } else if limit > state.config.limits.queued_send_messages_hard {
+                                Some(state.config.limits.queued_send_messages_hard)
+                            } else {
+                                send_queue_limit
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    let receive_queue_limit = if session.acls.get_self_manage_receive_queue_limit() {
+                        if let Some(limit) = receive_queue_limit {
+                            if limit == -1 || limit == -2 {
+                                receive_queue_limit
+                            } else if limit > state.config.limits.queued_receive_messages_hard {
+                                Some(state.config.limits.queued_receive_messages_hard)
+                            } else {
+                                receive_queue_limit
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    (send_queue_limit, receive_queue_limit)
+                } else {
+                    // Admin account
+                    (send_queue_limit, receive_queue_limit)
+                };
+
+                match state.database.account_change_queue_limits(&did_hash, send_queue_limit, receive_queue_limit).await {
+                    Ok(_) => {
+                        info!("Changed account queue_limits for DID: ({}) to send({:?}) receive({:?})", did_hash, send_queue_limit, receive_queue_limit);
+                        _generate_response_message(
+                        &msg.id,
+                        &session.did,
+                        &state.config.mediator_did,
+                        &json!(AccountChangeQueueLimitsResponse { send_queue_limit, receive_queue_limit}),
                     )}
                     Err(err) => {
                         warn!("Error Changing account type. Reason: {}", err);

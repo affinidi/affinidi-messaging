@@ -1,7 +1,6 @@
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use lazy_static::lazy_static;
 use serde_json::json;
-
-use crate::affinidi_messaging_didcomm::secrets::{Secret, SecretMaterial, SecretType};
 
 lazy_static! {
     pub static ref ALICE_SECRET_AUTH_KEY_ED25519: Secret = Secret {

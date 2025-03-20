@@ -1,5 +1,5 @@
 //! Helper functions to do with the Mediator
-use affinidi_messaging_didcomm::secrets::Secret;
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use base64::prelude::*;
 use console::style;
 use regex::{Captures, Regex};

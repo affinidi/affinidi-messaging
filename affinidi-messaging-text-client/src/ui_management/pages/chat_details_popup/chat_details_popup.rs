@@ -1,21 +1,21 @@
 use crate::{
     state_store::{
-        actions::{
-            chat_list::{Chat, ChatStatus},
-            Action,
-        },
         ChatDetailsPopupState, State,
+        actions::{
+            Action,
+            chat_list::{Chat, ChatStatus},
+        },
     },
     ui_management::components::{Component, ComponentRender},
 };
 use circular_queue::CircularQueue;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
+    Frame,
     layout::{Constraint, Flex, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Clear, Paragraph, Widget},
-    Frame,
 };
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::error;

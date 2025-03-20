@@ -15,7 +15,7 @@ impl Database {
     pub(crate) async fn initialize(&self, config: &Config) -> Result<(), MediatorError> {
         // Check the schema version and update if necessary
         // TODO: Update is not implemented yet
-        self._check_schema_version().await?;
+        self._check_schema_version(config).await?;
 
         // Setup the mediator account if it doesn't exist
         // Set the ACL for the mediator account to deny_all by default
@@ -38,7 +38,7 @@ impl Database {
         Ok(())
     }
 
-    async fn _check_schema_version(&self) -> Result<(), MediatorError> {
+    async fn _check_schema_version(&self, config: &Config) -> Result<(), MediatorError> {
         let mut conn = self.0.get_async_connection().await?;
 
         let schema_version: Option<String> =
@@ -80,12 +80,9 @@ impl Database {
                     "Database schema version ({}) doesn't match mediator version ({}).",
                     schema_version, mediator_version
                 );
-                // TODO: In the future this should call an update function
-                return Err(MediatorError::DatabaseError(
-                    "NA".into(),
-                    "Database schema version doesn't match mediator version, needs to be updated"
-                        .into(),
-                ));
+                self.upgrade_0_10_0(&config.security.global_acl_default)
+                    .await?;
+                info!("Database schema version updated to ({})", mediator_version);
             }
         } else {
             warn!(
@@ -93,15 +90,8 @@ impl Database {
                 env!("CARGO_PKG_VERSION")
             );
             // Set the schema version
-            deadpool_redis::redis::Cmd::hset("GLOBAL", "SCHEMA_VERSION", env!("CARGO_PKG_VERSION"))
-                .exec_async(&mut conn)
-                .await
-                .map_err(|e| {
-                    MediatorError::DatabaseError(
-                        "NA".into(),
-                        format!("Couldn't set database SCHEMA_VERSION: {}", e),
-                    )
-                })?;
+            self.upgrade_change_schema_version(env!("CARGO_PKG_VERSION"))
+                .await?;
         }
         Ok(())
     }

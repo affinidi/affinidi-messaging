@@ -2,14 +2,14 @@
 //! Admin account management
 //! Global ACL management
 
-use crate::{errors::ATMError, profiles::Profile, transports::SendMessageResponse, ATM};
+use crate::{ATM, errors::ATMError, profiles::ATMProfile, transports::SendMessageResponse};
 use affinidi_messaging_didcomm::{Message, PackEncryptedOptions};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha256::digest;
 use std::{sync::Arc, time::SystemTime};
-use tracing::{debug, span, Instrument, Level};
+use tracing::{Instrument, Level, debug, span};
 use uuid::Uuid;
 
 use super::accounts::AccountType;
@@ -19,9 +19,15 @@ pub struct Mediator {}
 
 #[derive(Serialize, Deserialize)]
 pub enum MediatorAdminRequest {
+    #[serde(rename = "admin_add")]
     AdminAdd(Vec<String>),
+    #[serde(rename = "admin_strip")]
     AdminStrip(Vec<String>),
-    AdminList { cursor: u32, limit: u32 },
+    #[serde(rename = "admin_list")]
+    AdminList {
+        cursor: u32,
+        limit: u32,
+    },
     Configuration(Value),
 }
 
@@ -42,7 +48,11 @@ pub struct AdminAccount {
 }
 
 impl Mediator {
-    pub async fn get_config(&self, atm: &ATM, profile: &Arc<Profile>) -> Result<Value, ATMError> {
+    pub async fn get_config(
+        &self,
+        atm: &ATM,
+        profile: &Arc<ATMProfile>,
+    ) -> Result<Value, ATMError> {
         let _span = span!(Level::DEBUG, "get_config");
 
         async move {
@@ -72,21 +82,19 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            match atm.send_message(profile, &msg, &msg_id, true, true).await?
-            { SendMessageResponse::Message(message) => {
-                Ok(message.body)
-            } _ => {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => Ok(message.body),
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
-            }}
+                )),
+            }
         }
         .instrument(_span)
         .await
@@ -112,7 +120,7 @@ impl Mediator {
     pub async fn add_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "add_admins");
@@ -157,7 +165,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
-                json!({"AdminAdd": digests}),
+                json!({"admin_add": digests}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -173,21 +181,19 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            match atm.send_message(profile, &msg, &msg_id, true, true).await?
-            { SendMessageResponse::Message(message) => {
-                self._parse_add_admins_response(&message)
-            } _ => {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => self._parse_add_admins_response(&message),
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
-            }}
+                )),
+            }
         }
         .instrument(_span)
         .await
@@ -213,7 +219,7 @@ impl Mediator {
     pub async fn strip_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         admins: &[String],
     ) -> Result<i32, ATMError> {
         let _span = span!(Level::DEBUG, "strip_admins");
@@ -250,7 +256,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
-                json!({"AdminStrip": admins}),
+                json!({"admin_strip": admins}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -266,21 +272,21 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
                 .map_err(|e| ATMError::MsgSendError(format!("Error packing message: {}", e)))?;
 
-            match atm.send_message(profile, &msg, &msg_id, true, true).await?
-            { SendMessageResponse::Message(message) => {
-                self._parse_strip_admins_response(&message)
-            } _ => {
-                Err(ATMError::MsgReceiveError(
+            match atm.send_message(profile, &msg, &msg_id, true, true).await? {
+                SendMessageResponse::Message(message) => {
+                    self._parse_strip_admins_response(&message)
+                }
+                _ => Err(ATMError::MsgReceiveError(
                     "No response from mediator".to_owned(),
-                ))
-            }}
+                )),
+            }
         }
         .instrument(_span)
         .await
@@ -308,7 +314,7 @@ impl Mediator {
     pub async fn list_admins(
         &self,
         atm: &ATM,
-        profile: &Arc<Profile>,
+        profile: &Arc<ATMProfile>,
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<MediatorAdminList, ATMError> {
@@ -331,7 +337,7 @@ impl Mediator {
             let msg = Message::build(
                 Uuid::new_v4().into(),
                 "https://didcomm.org/mediator/1.0/admin-management".to_owned(),
-                json!({"AdminList": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
+                json!({"admin_list": {"cursor": cursor.unwrap_or(0), "limit": limit.unwrap_or(100)}}),
             )
             .to(mediator_did.into())
             .from(profile_did.into())
@@ -347,8 +353,8 @@ impl Mediator {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

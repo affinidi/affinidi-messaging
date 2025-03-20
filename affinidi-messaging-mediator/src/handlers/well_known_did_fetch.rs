@@ -1,9 +1,9 @@
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError};
 use affinidi_messaging_sdk::messages::SuccessResponse;
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use http::StatusCode;
 use ssi::dids::Document;
-use tracing::{span, Instrument, Level};
+use tracing::{Instrument, Level, span};
 
 use crate::SharedData;
 

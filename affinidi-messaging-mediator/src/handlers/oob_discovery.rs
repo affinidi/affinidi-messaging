@@ -13,13 +13,13 @@
  Alice and Bob then swap messages and create a confidential communication channel between themselves.
 */
 
-use crate::{database::session::Session, SharedData};
+use crate::{SharedData, database::session::Session};
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_mediator_common::errors::{AppError, MediatorError, SuccessResponse};
 use affinidi_messaging_sdk::protocols::oob_discovery::OOBInviteResponse;
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use http::StatusCode;
 use serde::Deserialize;
