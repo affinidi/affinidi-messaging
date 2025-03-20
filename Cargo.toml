@@ -32,9 +32,9 @@ affinidi-messaging-mediator-processors = { version = "0.10.0", path = "./affinid
 affinidi-messaging-mediator-common = { version = "0.10.0", path = "./affinidi-messaging-mediator/affinidi-messaging-mediator-common" }
 
 # External Affinidi Crates
-affinidi-tdk = 0.1
-affinidi-tdk-common = 0.1
-affinidi-secrets-resolver = 0.1
+affinidi-tdk = "0.1"
+affinidi-tdk-common = "0.1"
+affinidi-secrets-resolver = "0.1"
 affinidi-did-resolver-cache-sdk = { version = "~0.5", features = ["network"] }
 
 ahash = { version = "0.8", features = ["serde"] }

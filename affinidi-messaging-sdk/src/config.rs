@@ -4,12 +4,12 @@ use std::{fs::File, io::BufReader};
 use tracing::error;
 
 /// Configuration for the Affinidi Trusted Messaging (ATM) Service
-/// You need to use the `builder()` method to create a new instance of `Config`
+/// You need to use the `builder()` method to create a new instance of `ATMConfig`
 /// Example:
 /// ```
-/// use affinidi_messaging_sdk::config::Config;
+/// use affinidi_messaging_sdk::config::ATMConfig;
 ///
-/// let config = Config::builder().build();
+/// let config = ATMConfig::builder().build();
 /// ```
 #[derive(Clone)]
 pub struct ATMConfig {
@@ -20,12 +20,12 @@ pub struct ATMConfig {
 }
 
 impl ATMConfig {
-    /// Returns a builder for `Config`
+    /// Returns a builder for `ATMConfig`
     /// Example:
     /// ```
     /// use affinidi_messaging_sdk::config::ATMConfig;
     ///
-    /// let config = Config::builder().build();
+    /// let config = ATMConfig::builder().build();
     /// ```
     pub fn builder() -> ATMConfigBuilder {
         ATMConfigBuilder::default()
