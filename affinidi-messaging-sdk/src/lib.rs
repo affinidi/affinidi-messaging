@@ -62,9 +62,6 @@ impl ATM {
     /// Creates a new instance of the SDK with a given configuration
     /// You need to add at least the DID Method for the SDK DID to work
     pub async fn new(config: ATMConfig, tdk_common: TDKSharedState) -> Result<ATM, ATMError> {
-        // Set a process wide default crypto provider.
-        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
         // Set up the channels for the WebSocket handler
         // Create a new channel with a capacity of at most 32. This communicates from SDK to the websocket handler
         let (sdk_tx, ws_handler_rx) = mpsc::channel::<WsHandlerCommands>(32);
