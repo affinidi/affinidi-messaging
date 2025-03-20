@@ -108,7 +108,7 @@ impl ATMProfile {
 
             // Step 1. Get the challenge
             let step1_response = _http_post::<AuthenticationChallenge>(
-                &shared_state.client,
+                &shared_state.tdk_common.client,
                 &[&mediator_endpoint, "/authenticate/challenge"].concat(),
                 &format!("{{\"did\": \"{}\"}}", profile_did).to_string(),
             )
@@ -136,8 +136,8 @@ impl ATMProfile {
                     mediator_did,
                     Some(profile_did),
                     Some(profile_did),
-                    &shared_state.did_resolver,
-                    &shared_state.secrets_resolver,
+                    &shared_state.tdk_common.did_resolver,
+                    &shared_state.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -151,7 +151,7 @@ impl ATMProfile {
             debug!("Successfully packed auth message\n{:#?}", auth_msg);
 
             let step2_response = _http_post::<AuthorizationResponse>(
-                &shared_state.client,
+                &shared_state.tdk_common.client,
                 &[&mediator_endpoint, "/authenticate"].concat(),
                 &auth_msg,
             )
@@ -236,8 +236,8 @@ impl ATMProfile {
                 mediator_did,
                 Some(profile_did),
                 Some(profile_did),
-                &shared_state.did_resolver,
-                &shared_state.secrets_resolver,
+                &shared_state.tdk_common.did_resolver,
+                &shared_state.tdk_common.secrets_resolver,
                 &PackEncryptedOptions::default(),
             )
             .await
@@ -288,7 +288,7 @@ impl ATMProfile {
                     ._create_refresh_request(&tokens.refresh_token, shared_state)
                     .await?;
                 let new_tokens = _http_post::<AuthRefreshResponse>(
-                    &shared_state.client,
+                    &shared_state.tdk_common.client,
                     &[&mediator_endpoint, "/authenticate/refresh"].concat(),
                     &refresh_msg,
                 )

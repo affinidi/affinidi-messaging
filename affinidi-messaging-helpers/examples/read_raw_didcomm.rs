@@ -7,7 +7,10 @@
 use affinidi_did_resolver_cache_sdk::{DIDCacheClient, config::DIDCacheConfigBuilder};
 use affinidi_messaging_didcomm::{AttachmentData, envelope::MetaEnvelope};
 use affinidi_messaging_sdk::{ATM, config::ATMConfig, errors::ATMError, profiles::ATMProfile};
-use affinidi_tdk::secrets_resolver::secrets::Secret;
+use affinidi_tdk::{
+    common::TDKSharedState,
+    secrets_resolver::{SecretsResolver, secrets::Secret},
+};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use clap::Parser;
 use console::style;
@@ -28,7 +31,8 @@ struct Args {
 async fn main() -> Result<(), ATMError> {
     // Create a new ATM Client
     let config = ATMConfig::builder();
-    let atm = ATM::new(config.build()?).await?;
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config.build()?, tdk).await?;
 
     // Local DID Resolver
     let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build())
@@ -135,7 +139,7 @@ async fn main() -> Result<(), ATMError> {
             return Ok(());
         }
     };
-    atm.add_secrets(&secrets).await;
+    atm.get_tdk().secrets_resolver.insert_vec(&secrets).await;
 
     let profile = ATMProfile::new(&atm, None, to_did.clone(), None).await?;
     atm.profile_add(&profile, false).await?;

@@ -74,8 +74,8 @@ impl Routing {
                     target_did,
                     Some(&profile.inner.did),
                     Some(&profile.inner.did),
-                    &atm.inner.did_resolver,
-                    &atm.inner.secrets_resolver,
+                    &atm.inner.tdk_common.did_resolver,
+                    &atm.inner.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await

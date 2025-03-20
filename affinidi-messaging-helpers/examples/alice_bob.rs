@@ -4,7 +4,7 @@ use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
     ATM, config::ATMConfig, errors::ATMError, profiles::ATMProfile, protocols::Protocols,
 };
-use affinidi_tdk::common::environments::TDKEnvironments;
+use affinidi_tdk::common::{TDKSharedState, environments::TDKEnvironments};
 use clap::Parser;
 use serde_json::json;
 use std::{
@@ -72,7 +72,8 @@ async fn main() -> Result<(), ATMError> {
     config = config.with_ssl_certificates(&mut environment.ssl_certificates);
 
     // Create a new ATM Client
-    let atm = ATM::new(config.build()?).await?;
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config.build()?, tdk).await?;
     let protocols = Protocols::new();
 
     debug!("Enabling Alice's Profile");

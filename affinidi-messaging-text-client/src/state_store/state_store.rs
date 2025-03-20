@@ -10,11 +10,11 @@ use crate::{
     },
     termination::{Interrupted, Terminator},
 };
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
 use affinidi_messaging_sdk::{
     ATM, config::ATMConfigBuilder, profiles::ATMProfile,
     transports::websockets::ws_handler::WsHandlerMode,
 };
+use affinidi_tdk::{common::TDKSharedState, secrets_resolver::SecretsResolver};
 use std::time::Duration;
 use tokio::sync::{
     broadcast,
@@ -40,14 +40,14 @@ impl StateStore {
         mut terminator: Terminator,
         mut action_rx: UnboundedReceiver<Action>,
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
-        did_resolver: DIDCacheClient,
+        tdk: TDKSharedState,
     ) -> anyhow::Result<Interrupted> {
         // Setup the initial state
         let atm = match ATM::new(
             ATMConfigBuilder::default()
-                .with_external_did_resolver(&did_resolver)
                 .with_ws_handler_mode(WsHandlerMode::DirectChannel)
                 .build()?,
+            tdk.clone(),
         )
         .await
         {
@@ -62,7 +62,7 @@ impl StateStore {
         let mut state = State::read_from_file("config.json").unwrap_or_default();
         state.initialization = true;
 
-        atm.add_secrets(&state.secrets).await;
+        tdk.secrets_resolver.insert_vec(&state.secrets).await;
 
         if !state.chat_list.chats.is_empty() {
             // Set the first chat as the active chat
@@ -157,10 +157,10 @@ impl StateStore {
                         state.settings.show_settings_popup = !state.settings.show_settings_popup;
                     },
                     Action::SettingsCheck { settings } => {
-                        settings.check(&mut state, &did_resolver).await;
+                        settings.check(&mut state, &tdk.did_resolver).await;
                     }
                     Action::SettingsUpdate { settings } => {
-                        if settings.update(&mut state, &did_resolver).await {
+                        if settings.update(&mut state, &tdk.did_resolver).await {
                             state.settings.show_settings_popup = false;
                         }
                     }

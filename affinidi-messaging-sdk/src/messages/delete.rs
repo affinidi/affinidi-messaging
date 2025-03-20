@@ -72,7 +72,7 @@ impl ATM {
 
         let res = self
             .inner
-            .client
+            .tdk_common.client
             .delete([&mediator_url, "/delete"].concat())
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", tokens.access_token))

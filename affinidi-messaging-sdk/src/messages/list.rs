@@ -30,6 +30,7 @@ impl ATM {
 
             let res = self
                 .inner
+                .tdk_common
                 .client
                 .get(format!(
                     "{}/list/{}/{}",

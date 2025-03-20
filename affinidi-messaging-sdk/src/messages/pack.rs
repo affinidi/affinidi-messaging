@@ -39,8 +39,8 @@ impl SharedState {
                     to,
                     from,
                     sign_by,
-                    &self.did_resolver,
-                    &self.secrets_resolver,
+                    &self.tdk_common.did_resolver,
+                    &self.tdk_common.secrets_resolver,
                     &PackEncryptedOptions::default(),
                 )
                 .await
@@ -67,7 +67,11 @@ impl SharedState {
 
         async move {
             message
-                .pack_signed(sign_by, &self.did_resolver, &self.secrets_resolver)
+                .pack_signed(
+                    sign_by,
+                    &self.tdk_common.did_resolver,
+                    &self.tdk_common.secrets_resolver,
+                )
                 .await
         }
         .instrument(_span)
@@ -85,7 +89,7 @@ impl SharedState {
     pub async fn pack_plaintext(&self, message: &Message) -> Result<String, ATMError> {
         let _span = span!(Level::DEBUG, "pack_plaintext",);
 
-        async move { message.pack_plaintext(&self.did_resolver).await }
+        async move { message.pack_plaintext(&self.tdk_common.did_resolver).await }
             .instrument(_span)
             .await
             .map_err(|e| {

@@ -11,7 +11,7 @@ use affinidi_messaging_sdk::{
     protocols::Protocols,
     transports::SendMessageResponse,
 };
-use affinidi_tdk::common::environments::TDKEnvironments;
+use affinidi_tdk::common::{TDKSharedState, environments::TDKEnvironments};
 use clap::Parser;
 use std::{
     env,
@@ -72,7 +72,8 @@ async fn main() -> Result<(), ATMError> {
     config = config.with_ssl_certificates(&mut environment.ssl_certificates);
 
     // Create a new ATM Client
-    let atm = ATM::new(config.build()?).await?;
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config.build()?, tdk).await?;
     let protocols = Protocols::new();
 
     debug!("Enabling Alice's Profile");

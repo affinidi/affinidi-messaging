@@ -92,6 +92,7 @@ impl ATM {
             };
             let res = self
                 .inner
+                .tdk_common
                 .client
                 .post([&mediator_url, "/fetch"].concat())
                 .header("Content-Type", "application/json")

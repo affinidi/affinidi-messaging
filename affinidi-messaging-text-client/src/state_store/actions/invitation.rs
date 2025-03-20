@@ -2,7 +2,10 @@ use affinidi_messaging_didcomm::{Attachment, Message, MessageBuilder};
 use affinidi_messaging_sdk::{
     ATM, messages::SuccessResponse, profiles::ATMProfile, protocols::Protocols,
 };
-use affinidi_tdk::secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_tdk::secrets_resolver::{
+    SecretsResolver,
+    secrets::{Secret, SecretMaterial, SecretType},
+};
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use image::Luma;
 use qrcode::QrCode;
@@ -107,7 +110,7 @@ pub async fn create_new_profile(
         ));
     }
 
-    atm.add_secret(&secret).await;
+    atm.get_tdk().secrets_resolver.insert(secret.clone()).await;
     state.add_secret(secret);
     match ATMProfile::new(
         atm,

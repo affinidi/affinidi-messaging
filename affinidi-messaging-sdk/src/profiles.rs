@@ -98,8 +98,6 @@ impl ATMProfile {
 
     /// Convert TDK Profile to an ATM Profile
     pub async fn from_tdk_profile(atm: &ATM, tdk_profile: &TDKProfile) -> Result<Self, ATMError> {
-        atm.add_secrets(&tdk_profile.secrets).await;
-
         ATMProfile::new(
             atm,
             Some(tdk_profile.alias.clone()),
@@ -204,7 +202,7 @@ pub struct Mediator {
 
 impl Mediator {
     pub(crate) async fn new(atm: &ATM, did: String) -> Result<Self, ATMError> {
-        let mediator_doc = match atm.inner.did_resolver.resolve(&did).await {
+        let mediator_doc = match atm.inner.tdk_common.did_resolver.resolve(&did).await {
             Ok(response) => response.doc,
             Err(err) => {
                 return Err(ATMError::DIDError(format!(

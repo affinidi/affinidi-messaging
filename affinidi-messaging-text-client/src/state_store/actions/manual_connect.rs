@@ -1,7 +1,10 @@
 use super::chat_list::ChatStatus;
 use crate::state_store::State;
 use affinidi_messaging_sdk::{ATM, profiles::ATMProfile};
-use affinidi_tdk::secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_tdk::secrets_resolver::{
+    SecretsResolver,
+    secrets::{Secret, SecretMaterial, SecretType},
+};
 use anyhow::{Context, Result, anyhow};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
@@ -30,7 +33,7 @@ pub async fn manual_connect_setup(
         Some(mediator_did.to_string()),
     )
     .await?;
-    atm.add_secrets(&secrets).await;
+    atm.get_tdk().secrets_resolver.insert_vec(&secrets).await;
     state.add_secrets(&mut secrets);
 
     let profile = atm.profile_add(&profile, true).await?;

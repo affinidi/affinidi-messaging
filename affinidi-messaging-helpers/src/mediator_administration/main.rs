@@ -10,7 +10,10 @@ use affinidi_messaging_sdk::{
         mediator::acls::{AccessListModeType, MediatorACLSet},
     },
 };
-use affinidi_tdk::common::environments::{TDKEnvironment, TDKEnvironments};
+use affinidi_tdk::common::{
+    TDKSharedState,
+    environments::{TDKEnvironment, TDKEnvironments},
+};
 use ahash::AHashMap as HashMap;
 use clap::Parser;
 use console::{Style, Term, style};
@@ -223,7 +226,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Create a new ATM Client
-    let atm = ATM::new(config).await?;
+    let tdk = TDKSharedState::default().await;
+    let atm = ATM::new(config, tdk).await?;
     let protocols = Protocols::new();
 
     // Create the admin profile and enable it

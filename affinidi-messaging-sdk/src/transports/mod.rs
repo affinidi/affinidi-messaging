@@ -240,6 +240,7 @@ impl ATM {
 
         let res = self
             .inner
+            .tdk_common
             .client
             .post([&mediator_url, "/inbound"].concat())
             .header("Content-Type", "application/json")

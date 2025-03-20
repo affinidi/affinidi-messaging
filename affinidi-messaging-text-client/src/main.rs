@@ -1,5 +1,4 @@
-use affinidi_did_resolver_cache_sdk::DIDCacheClient;
-use affinidi_did_resolver_cache_sdk::config::DIDCacheConfigBuilder;
+use affinidi_tdk::common::TDKSharedState;
 use log::LevelFilter;
 use state_store::StateStore;
 use std::fs::OpenOptions;
@@ -34,19 +33,14 @@ async fn main() -> anyhow::Result<()> {
     tui_logger::init_logger(LevelFilter::Info).unwrap();
 
     // Setup the initial state
-    let did_resolver = DIDCacheClient::new(DIDCacheConfigBuilder::default().build()).await?;
 
     let (terminator, mut interrupt_rx) = create_termination();
     let (state_store, state_rx) = StateStore::new();
     let (ui_manager, action_rx) = UiManager::new();
 
+    let tdk = TDKSharedState::default().await;
     tokio::try_join!(
-        state_store.main_loop(
-            terminator,
-            action_rx,
-            interrupt_rx.resubscribe(),
-            did_resolver
-        ),
+        state_store.main_loop(terminator, action_rx, interrupt_rx.resubscribe(), tdk),
         ui_manager.main_loop(state_rx, interrupt_rx.resubscribe()),
     )?;
 
