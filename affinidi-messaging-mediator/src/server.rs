@@ -88,8 +88,10 @@ pub async fn start() {
 
     // Start the statistics thread
     let _stats_database = database.clone(); // Clone the database handler for the statistics thread
+    let tags = config.tags.clone(); // Clone the tags config for the statistics thread
+
     tokio::spawn(async move {
-        statistics(_stats_database)
+        statistics(_stats_database, tags)
             .await
             .expect("Error starting statistics thread");
     });
