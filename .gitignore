@@ -2,6 +2,5 @@
 dump.rdb
 .DS_Store
 /**/secrets.json
-.vscode
 **/*.gif
 environments.json
