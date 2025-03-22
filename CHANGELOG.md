@@ -5,6 +5,13 @@
 Why are there skipped version numbers? Sometimes when deploying via CI/CD Pipeline we find little issues that only affect deployment.
 Missing versions on the changelog simply reflect minor deployment changes on our tooling.
 
+## XYZ March 2025 (0.10.1)
+
+### Mediator
+
+* Ability to specify custom logging attributes to the statistics logs, useful for log aggregation.
+  * NOTE: This uses an unstable feature of tracing.
+
 ## 20th March 2025 (0.10.0)
 
 ### All (0.10.0)

@@ -1,2 +1,2 @@
 [build]
-rustflags = ["--cfg", "tracing_unstable"]        # needed for object logging
+rustflags = ["--cfg", "tracing_unstable"] # needed for object logging

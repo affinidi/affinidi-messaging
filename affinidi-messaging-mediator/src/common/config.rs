@@ -539,7 +539,7 @@ impl TryFrom<ConfigRaw> for Config {
                 message_expiry_cleanup: raw.processors.message_expiry_cleanup.clone().try_into()?,
             },
             limits: raw.limits.try_into()?,
-            tags: tags,
+            tags,
             ..Config::default().await
         };
 
