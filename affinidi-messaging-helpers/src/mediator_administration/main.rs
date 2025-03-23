@@ -10,9 +10,12 @@ use affinidi_messaging_sdk::{
         mediator::acls::{AccessListModeType, MediatorACLSet},
     },
 };
-use affinidi_tdk::common::{
-    TDKSharedState,
-    environments::{TDKEnvironment, TDKEnvironments},
+use affinidi_tdk::{
+    common::{
+        TDKSharedState,
+        environments::{TDKEnvironment, TDKEnvironments},
+    },
+    secrets_resolver::SecretsResolver,
 };
 use ahash::AHashMap as HashMap;
 use clap::Parser;
@@ -227,6 +230,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Create a new ATM Client
     let tdk = TDKSharedState::default().await;
+    tdk.secrets_resolver.insert_vec(&admin.secrets).await;
     let atm = ATM::new(config, tdk).await?;
     let protocols = Protocols::new();
 

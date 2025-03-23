@@ -74,17 +74,17 @@ impl Message {
     /// - `IOError` IO error during DID or secrets resolving
     ///
     /// TODO: verify and update errors list
-    pub async fn pack_encrypted<T>(
+    pub async fn pack_encrypted<S>(
         &self,
         to: &str,
         from: Option<&str>,
         sign_by: Option<&str>,
         did_resolver: &DIDCacheClient,
-        secrets_resolver: &T,
+        secrets_resolver: &S,
         options: &PackEncryptedOptions,
     ) -> Result<(String, PackEncryptedMetadata)>
     where
-        T: SecretsResolver,
+        S: SecretsResolver,
     {
         self._validate_pack_encrypted(to, from, sign_by)?;
         // TODO: Think how to avoid resolving of did multiple times
