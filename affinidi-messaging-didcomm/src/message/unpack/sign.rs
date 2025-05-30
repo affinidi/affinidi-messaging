@@ -101,6 +101,7 @@ pub(crate) async fn _try_unpack_sign(
 
     let valid = match alg {
         jws::Algorithm::EdDSA => {
+            println!("EdDSA");
             envelope.metadata.sign_alg = Some(SignAlg::EdDSA);
 
             let signer_key = signer_key
@@ -112,6 +113,7 @@ pub(crate) async fn _try_unpack_sign(
                 .context("Unable verify sign envelope")?
         }
         jws::Algorithm::Es256 => {
+            println!("Es256");
             envelope.metadata.sign_alg = Some(SignAlg::ES256);
 
             let signer_key = signer_key
@@ -123,11 +125,15 @@ pub(crate) async fn _try_unpack_sign(
                 .context("Unable verify sign envelope")?
         }
         jws::Algorithm::Es256K => {
+            println!("Es256K");
             envelope.metadata.sign_alg = Some(SignAlg::ES256K);
 
             let signer_key = signer_key
                 .as_k256(&signer_key_jwk)
                 .context("Unable instantiate signer key")?;
+
+            println!("parsed_jws");
+            println!("{:?}", parsed_jws);
 
             parsed_jws
                 .verify::<K256KeyPair>((signer_kid, &signer_key))
@@ -139,6 +145,8 @@ pub(crate) async fn _try_unpack_sign(
         ))?,
     };
 
+    println!("valid");
+    println!("{:?}", valid);
     if !valid {
         Err(err_msg(ErrorKind::Malformed, "Wrong signature"))?
     }

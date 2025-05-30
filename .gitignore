@@ -4,4 +4,5 @@ dump.rdb
 /**/secrets.json
 .vscode
 **/*.gif
-environments.json
+examples/
+!examples/*.rs

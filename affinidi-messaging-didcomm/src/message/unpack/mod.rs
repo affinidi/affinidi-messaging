@@ -105,6 +105,7 @@ impl Message {
             anoncrypted =
                 _try_unpack_anoncrypt(&parsed_jwe, secrets_resolver, options, envelope).await?;
 
+
             if options.unwrap_re_wrapping_forward && anoncrypted.is_some() {
                 let forwarded_msg_opt = Self::_try_unwrap_forwarded_message(
                     &anoncrypted.clone().unwrap(),
@@ -131,6 +132,10 @@ impl Message {
 
         debug!("metadata = {:#?}", envelope.metadata);
 
+        // let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, envelope).await?;
+        // println!("signed!!!");
+        // println!("{:?}", signed);
+
         let authcrypted = _try_unpack_authcrypt(
             &parsed_jwe,
             did_resolver,
@@ -141,9 +146,15 @@ impl Message {
         )
         .await?;
 
+
         let parsed_jwe = authcrypted.unwrap_or(parsed_jwe);
+        println!("parsed_jwe");
+        println!("{:?}", parsed_jwe);
 
         let signed = _try_unpack_sign(&parsed_jwe, did_resolver, options, envelope).await?;
+        println!("signed!!!");
+        println!("{:?}", signed);
+
         let parsed_jwe = signed.unwrap_or(parsed_jwe);
 
         let msg = _try_unpack_plaintext(&parsed_jwe, did_resolver, envelope)

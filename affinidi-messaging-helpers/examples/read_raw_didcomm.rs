@@ -44,155 +44,146 @@ async fn main() -> Result<(), ATMError> {
     // Load the DIDComm message
     println!("{}", style("Raw DIDComm Message troubleshooting").green(),);
 
-    let args: Args = Args::parse();
-    let raw_message = match args.raw_message {
-        Some(raw_message) => raw_message,
-        None => {
-            println!("{}", style("No DIDComm message provided").red());
-            return Ok(());
-        }
-    };
+    // let args: Args = Args::parse();
+    // let raw_message = match args.raw_message {
+    //     Some(raw_message) => raw_message,
+    //     None => {
+    //         println!("{}", style("No DIDComm message provided").red());
+    //         return Ok(());
+    //     }
+    // };
 
-    let mut file = File::open(&raw_message).map_err(|e| {
-        ATMError::ConfigError(format!("Can't open file ({}). Reason: {}", raw_message, e))
-    })?;
-    let mut didcomm_raw_message = String::new();
-    file.read_to_string(&mut didcomm_raw_message).map_err(|e| {
-        ATMError::ConfigError(format!(
-            "Couldn't read file ({}) contents. Reason: {}",
-            raw_message, e
-        ))
-    })?;
+    for x in 0..30 {
+        println!("Number of Message!!!!!!!!!");
+        println!("{}", x);
+    // }
 
-    println!();
-    println!(
-        "{}",
-        style("Reading the DIDComm message envelope...").blue()
-    );
+    // let x = 0;
+    // let x = "-signed";
 
-    let envelope = MetaEnvelope::new(&didcomm_raw_message, &did_resolver)
-        .await
-        .map_err(|e| {
-            ATMError::DidcommError(
-                "NA".to_string(),
-                format!("Couldn't read DIDComm raw message: {}", e),
-            )
+        let raw_message = "message".to_string() + &x.to_string() + ".txt";
+
+        let mut file = File::open(&raw_message).map_err(|e| {
+            ATMError::ConfigError(format!("Can't open file ({}). Reason: {}", raw_message, e))
+        })?;
+        let mut didcomm_raw_message = String::new();
+        file.read_to_string(&mut didcomm_raw_message).map_err(|e| {
+            ATMError::ConfigError(format!(
+                "Couldn't read file ({}) contents. Reason: {}",
+                raw_message, e
+            ))
         })?;
 
-    println!(
-        "{}",
-        style(format!("\tFrom DID: {:?}", envelope.from_did)).cyan()
-    );
-    println!(
-        "{}",
-        style(format!("\t  To DID: {:?}", envelope.to_did)).cyan()
-    );
-    println!(
-        "{}",
-        style(format!("\tMSG Hash: {}", envelope.sha256_hash)).cyan()
-    );
-
-    let Some(to_did) = envelope.to_did else {
+        println!();
         println!(
             "{}",
-            style("Couldn't find the recipient DID. Exiting...").red()
+            style("Reading the DIDComm message envelope...").blue()
         );
-        return Ok(());
-    };
 
-    // Grab the secrets
-    let stdin = io::stdin();
-    let lines = stdin.lock().lines();
-    let mut raw_secrets = String::new();
+        let envelope = MetaEnvelope::new(&didcomm_raw_message, &did_resolver)
+            .await
+            .map_err(|e| {
+                ATMError::DidcommError(
+                    "NA".to_string(),
+                    format!("Couldn't read DIDComm raw message: {}", e),
+                )
+            })?;
 
-    println!();
-    println!(
-        "{}",
-        style(format!(
-            "Copy and Paste the JSON Secrets for {}. Press <ENTER> to terminate input",
-            to_did
-        ))
-        .green(),
-    );
-    for line in lines {
-        match line {
-            Ok(line) => {
-                if line.is_empty() {
-                    break;
-                }
-                raw_secrets.push_str(&line);
-            }
-            Err(e) => {
-                println!("Error reading input: {:?}", e);
-                break;
-            }
-        }
-    }
+        println!(
+            "{}",
+            style(format!("\tFrom DID: {:?}", envelope.from_did)).cyan()
+        );
+        println!(
+            "{}",
+            style(format!("\t  To DID: {:?}", envelope.to_did)).cyan()
+        );
+        println!(
+            "{}",
+            style(format!("\tMSG Hash: {}", envelope.sha256_hash)).cyan()
+        );
 
-    let secrets: Vec<Secret> = match serde_json::from_str(&raw_secrets) {
-        Ok(secrets) => secrets,
-        Err(e) => {
+        let Some(to_did) = envelope.to_did else {
             println!(
                 "{}",
-                style(format!("Error converting secrets: {}", e)).red()
+                style("Couldn't find the recipient DID. Exiting...").red()
             );
             return Ok(());
-        }
-    };
-    atm.get_tdk().secrets_resolver.insert_vec(&secrets).await;
+        };
 
-    let profile = ATMProfile::new(&atm, None, to_did.clone(), None).await?;
-    atm.profile_add(&profile, false).await?;
-    println!("{}", style("DIDComm Profile created...").green());
+        // Grab the secrets
+        let stdin = io::stdin();
+        let _lines = stdin.lock().lines();
+        let mut raw_secrets = String::new();
 
-    let (inner_message, meta) = atm.unpack(&didcomm_raw_message).await?;
+        raw_secrets.push_str("[{\"id\": \"did:key:zQ3shTL7MW8nKRhACRkTmc4EHdmEnZyaJFH3zcksoeY2sYAtq#zQ3shTL7MW8nKRhACRkTmc4EHdmEnZyaJFH3zcksoeY2sYAtq\",\"type\": \"JsonWebKey2020\",\"privateKeyJwk\": {\"kid\": \"did:key:zQ3shTL7MW8nKRhACRkTmc4EHdmEnZyaJFH3zcksoeY2sYAtq#zQ3shTL7MW8nKRhACRkTmc4EHdmEnZyaJFH3zcksoeY2sYAtq\",\"kty\": \"EC\",\"crv\": \"secp256k1\",\"x\": \"V_M-9D36VFBs1u-4dbJWZYofloQ8H9u6ZeJGmrJgq9o\",\"y\": \"e0wmnK0dr26-GhzP8WwDLPywAOqM40e24NLwRh6N33Q\",\"d\": \"IWu9tivhmh1GgW-5fbLCXvFPeN3xxCqV7gjE76qN7VM\"}}]");
+        // raw_secrets.push_str("[{\"id\": \"did:key:zDnaepZeT7HDHa6SLYw4Xomd25yN2V95qaKXiGUtpFLvs8uAV#zDnaepZeT7HDHa6SLYw4Xomd25yN2V95qaKXiGUtpFLvs8uAV\",\"type\": \"JsonWebKey2020\",\"privateKeyJwk\": {\"kid\": \"did:key:zDnaepZeT7HDHa6SLYw4Xomd25yN2V95qaKXiGUtpFLvs8uAV#zDnaepZeT7HDHa6SLYw4Xomd25yN2V95qaKXiGUtpFLvs8uAV\",\"kty\": \"EC\",\"crv\": \"P-256\",\"x\": \"ZpAbZaLOpln4wYAcozZvRkD03zSnUmsbHcPcmMQ4Zo4\",\"y\": \"C7dbfuHCme0-ka_HxzbAhJYLCNxJjFEVhDIz4vWl6xk\",\"d\": \"yMFWj09rkpkPh-uXfYqipDJlhTJw06_u3s_u93E3cKw\"}}]");
 
-    println!("{}", style("DIDComm Message").green());
-    println!();
 
-    println!("{}", style(format!("{:#?}", meta)).yellow());
-    println!();
-    println!("{}", style(format!("{:#?}", inner_message)).green());
+        let secrets: Vec<Secret> = match serde_json::from_str(&raw_secrets) {
+            Ok(secrets) => secrets,
+            Err(e) => {
+                println!(
+                    "{}",
+                    style(format!("Error converting secrets: {}", e)).red()
+                );
+                return Ok(());
+            }
+        };
+        atm.get_tdk().secrets_resolver.insert_vec(&secrets).await;
 
-    // >>>>> Additional processing of the message can be done here <<<<<
+        let profile = ATMProfile::new(&atm, None, to_did.clone(), None).await?;
+        atm.profile_add(&profile, false).await?;
+        println!("{}", style("DIDComm Profile created...").green());
 
-    if inner_message.type_ == "https://didcomm.org/routing/2.0/forward" {
+        let (inner_message, meta) = atm.unpack(&didcomm_raw_message).await?;
+
+        println!("{}", style("DIDComm Message").green());
         println!();
-        println!("{}", style("Forwarded Message").green());
-        if let Some(attachments) = inner_message.attachments {
-            let attachment = attachments.first().unwrap();
-            let data = match attachment.data {
-                AttachmentData::Base64 { ref value } => {
-                    String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(&value.base64).unwrap())
-                        .unwrap()
-                }
-                AttachmentData::Json { ref value } => {
-                    if value.jws.is_some() {
-                        println!("{}", style("JWS is not supported").red());
-                        return Ok(());
-                    } else {
-                        match serde_json::to_string(&value.json) {
-                            Ok(data) => data,
-                            Err(e) => {
-                                println!(
-                                    "{}",
-                                    style(format!("Error converting JSON: {}", e)).red()
-                                );
-                                return Ok(());
+
+        println!("{}", style(format!("{:#?}", meta)).yellow());
+        println!();
+        println!("{}", style(format!("{:#?}", inner_message)).green());
+
+        // >>>>> Additional processing of the message can be done here <<<<<
+
+        if inner_message.type_ == "https://didcomm.org/routing/2.0/forward" {
+            println!();
+            println!("{}", style("Forwarded Message").green());
+            if let Some(attachments) = inner_message.attachments {
+                let attachment = attachments.first().unwrap();
+                let data = match attachment.data {
+                    AttachmentData::Base64 { ref value } => {
+                        String::from_utf8(BASE64_URL_SAFE_NO_PAD.decode(&value.base64).unwrap())
+                            .unwrap()
+                    }
+                    AttachmentData::Json { ref value } => {
+                        if value.jws.is_some() {
+                            println!("{}", style("JWS is not supported").red());
+                            return Ok(());
+                        } else {
+                            match serde_json::to_string(&value.json) {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    println!(
+                                        "{}",
+                                        style(format!("Error converting JSON: {}", e)).red()
+                                    );
+                                    return Ok(());
+                                }
                             }
                         }
                     }
-                }
-                _ => {
-                    println!("{}", style("Unsupported attachment type").red());
-                    return Ok(());
-                }
-            };
-            println!("{}", style("Forwarded message found").green());
-            println!();
-            println!("{}", style(data).green());
+                    _ => {
+                        println!("{}", style("Unsupported attachment type").red());
+                        return Ok(());
+                    }
+                };
+                println!("{}", style("Forwarded message found").green());
+                println!();
+                println!("{}", style(data).green());
+            }
         }
-    }
 
+    }
     Ok(())
 }
